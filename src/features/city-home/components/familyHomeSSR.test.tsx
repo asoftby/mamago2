@@ -90,6 +90,8 @@ for (const count of [1, 2, 3, 5, 7]) {
       <CityHomeFamilyPicks citySlug="minsk" initialContext={context} />
     </AuthProvider></AppRouterContext.Provider>);
     assert.match(html, /События, которые подходят вам/);
+    assert.match(html, /На ближайшие 7 дней/, "loading state must describe the rolling personal window");
+    assert.doesNotMatch(html, /На этой неделе/, "rolling 7 days can cross calendar weeks");
     assert.match(html, /aria-busy="true"/);
     assert.match(html, /Подбираем события/);
     assert.equal((html.match(/aria-pressed=/g) ?? []).length, count + 1);

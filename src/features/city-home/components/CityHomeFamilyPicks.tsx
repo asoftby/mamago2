@@ -19,7 +19,7 @@ import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { homeChipSelectEvent, homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
 import { HomeSelectionSync, persistHomeSelection } from "../lib/homeSelectionSync";
 import { FamilyHomeCache, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
-import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
+import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
 
 async function post(body: Record<string, unknown>, signal?: AbortSignal) {
@@ -257,7 +257,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const sortedChildren = homeChildrenYoungestFirst(context);
   const adultCatalogHref = "/" + citySlug + "/events?age=18%2B";
   return <CityHomeSection title="События, которые подходят вам"
-    subtitle={data?.window.horizonDays === 30 ? "На ближайшие 30 дней" : "На этой неделе"} reserveCarouselControls>
+    subtitle={data ? homePeriodLabel(data.window) : "На ближайшие 7 дней"} reserveCarouselControls>
     <div className="min-h-40" data-placement="HOME_FOR_FAMILY" aria-busy={state === "loading"}>
       {context.children.length > 0 ? <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="mr-1 text-sm text-muted-foreground">Для кого:</span>

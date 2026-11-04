@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
+import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, homePeriodLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
 import { FamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 
@@ -9,6 +9,11 @@ const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat
   selectedChildId: null, preferenceVersion: null, selectionPersistence: "account",
   children: [{ id: "child_0001", name: "А", hasBirthDate: true, ageFilter: ["3-5"] }, { id: "child_0002", name: "Б", hasBirthDate: true, ageFilter: ["9-12"] }] };
 function delivery(ids = ["event_a", "event_b"]) { return { items: ids.map(id => ({ id })), window: { horizonDays: 7 as const }, runId: "same_run" }; }
+
+test("personal rolling windows are labeled precisely, not as a calendar week", () => {
+  assert.equal(homePeriodLabel({ horizonDays: 7, dateFrom: "2026-11-04", dateTo: "2026-11-10" }), "На ближайшие 7 дней");
+  assert.equal(homePeriodLabel({ horizonDays: 30, dateFrom: "2026-11-04", dateTo: "2026-12-03" }), "На ближайшие 30 дней");
+});
 
 test("child chips are sorted youngest first, unknown DOB last, without mutating source order", () => {
   const children = [
