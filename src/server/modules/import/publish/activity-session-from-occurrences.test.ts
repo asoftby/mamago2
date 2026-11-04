@@ -189,8 +189,13 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
   );
   assert.match(
     dateFilters,
-    /startsAt:\s*\{\s*gte:\s*effectiveEventSessionStart\(filters\.dateRange,\s*now\),\s*lt:\s*filters\.dateRange\.end\s*\},\s*withdrawnAt:\s*null/,
-    "date filters must exclude withdrawn sessions and already-started sessions",
+    /const start = effectiveEventSessionStart\(filters\.dateRange, now\)/,
+    "date filters must use the shared future-session cutoff and selected end",
+  );
+  assert.match(
+    dateFilters,
+    /sessions:\s*\{\s*some:\s*\{\s*startsAt:\s*\{\s*gte:\s*start,\s*lt:\s*filters\.dateRange\.end\s*\},\s*withdrawnAt:\s*null\s*\}\s*\}/,
+    "date filters must exclude withdrawn sessions when using that bounded window",
   );
   assert.match(
     scheduleSource,
