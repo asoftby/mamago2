@@ -31,13 +31,21 @@ fi
 # The installed pnpm graph must match the committed lockfile BEFORE any expensive gate.
 node scripts/git/full-gate-proof.cjs validate || exit 1
 
-# Reuse ONLY a worktree-local proof from an actual completed full gate.
-# If any relevant input changed, the proof is rejected and the full gate runs.
-if node scripts/git/full-gate-proof.cjs check; then
-  echo "[pre-push] Full push gate already passed for this exact candidate."
-  exit 0
+# A caller-provided test DB is supported, but its results must NEVER be reused.
+# This is a cache-ineligibility condition, not a reason to block the real gate.
+cache_enabled=1
+if [ -n "${GATE_DATABASE_URL:-}" ]; then
+  cache_enabled=0
+else
+  if node scripts/git/full-gate-proof.cjs check; then
+    echo "[pre-push] Full push gate already passed for this exact candidate."
+    exit 0
+  fi
 fi
 node scripts/git/full-gate-proof.cjs clear || exit 1
+if [ "$cache_enabled" -eq 1 ]; then
+  node scripts/git/full-gate-proof.cjs begin || exit 1
+fi
 
 gate_dir="${NEXT_DIST_DIR:-node_modules/.cache/next-gate}"
 max_gb="${NEXT_CACHE_MAX_GB:-6}"
@@ -92,8 +100,10 @@ for f in tsconfig.json next-env.d.ts; do
 done
 rm -rf "$backup"
 
-if [ "$status" -eq 0 ]; then
-  # A missing/stale/dirty proof is a hard failure: do not push without evidence.
+if [ "$status" -eq 0 ] && [ "$cache_enabled" -eq 1 ]; then
+  # A missing or changed initial fingerprint is a hard failure.
   node scripts/git/full-gate-proof.cjs record || exit 1
+else
+  node scripts/git/full-gate-proof.cjs abort || exit 1
 fi
 exit "$status"
