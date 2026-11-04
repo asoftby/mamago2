@@ -78,12 +78,35 @@ export function buildEffectivePlaceMetroWhere(metroId: string): Prisma.PlaceWher
 }
 
 /**
- * Event Wizard stores `scheduleJson.pricingMode="free"`; import normalization
- * stores structured numeric zero. Both are authoritative structured states.
- * Null/unset price without the explicit pricing mode is not free.
+ * FREE is the canonical publication price mode. Legacy imported events can
+ * retain UNKNOWN despite explicit 0 BYN + "бесплатно" in their public card.
+ * Admit that narrow, unambiguous legacy state; never treat an UNKNOWN zero
+ * placeholder without an explicit free label as a free offer.
  */
 export function buildFreeEventWhere(): Prisma.ActivityWhereInput {
-  return { priceMode: "FREE" };
+  return {
+    OR: [
+      { priceMode: "FREE" },
+      {
+        priceMode: "UNKNOWN",
+        priceFrom: 0,
+        priceText: { in: ["бесплатно", "free"], mode: "insensitive" },
+      },
+    ],
+  };
+}
+
+/** The in-memory FREE facet must match buildFreeEventWhere's strict legacy rule. */
+export function matchesPublicFreePrice(input: {
+  priceMode: string;
+  priceFrom: number | null;
+  priceText: string | null;
+}): boolean {
+  return input.priceMode === "FREE" || (
+    input.priceMode === "UNKNOWN" &&
+    input.priceFrom === 0 &&
+    ["бесплатно", "free"].includes((input.priceText ?? "").toLowerCase())
+  );
 }
 
 const NUMERIC_PRICE_MODES = ["FREE", "EXACT", "FROM", "RANGE"] as const;
