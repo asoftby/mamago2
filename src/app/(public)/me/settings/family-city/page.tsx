@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -19,6 +20,7 @@ async function saveFamilyHomeCity(formData: FormData) {
   });
   if (!membership) throw new Error("Домашний город может изменить только владелец семьи.");
   await prisma.family.update({ where: { id: membership.familyId }, data: { homeCityId: city.id } });
+  revalidatePath("/me/settings/profile");
   redirect("/me/settings/profile#residence-city");
 }
 
