@@ -30,10 +30,10 @@ test("place creation stays available but is visually separated after offer inten
   assert.ok(businessStart >= 0 && businessEnd > businessStart);
   const intents = menu.slice(businessStart, businessEnd);
   assert.ok(intents.indexOf('id: "visit-place"') > intents.indexOf('id: "camps"'));
-  assert.match(intents, /id: "visit-place",[\\s\\S]*?label: "Добавить место"/);
+  assert.match(intents, /id: "visit-place",[\s\S]*?label: "Добавить место"/);
   assert.match(menu, /publicationMode === "business" && item\.id === "visit-place"/);
   assert.match(menu, /role="separator"/);
-  assert.match(menu, /aria-label=\\{publicationMode === "business" \\? "Добавить"/);
+  assert.match(menu, /aria-label=\{publicationMode === "business" \? "Добавить"/);
 });
 
 test("place visit offer uses the existing OFFER model and editor", () => {
