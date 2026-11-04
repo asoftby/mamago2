@@ -19,7 +19,7 @@ async function saveFamilyHomeCity(formData: FormData) {
   });
   if (!membership) throw new Error("Домашний город может изменить только владелец семьи.");
   await prisma.family.update({ where: { id: membership.familyId }, data: { homeCityId: city.id } });
-  redirect("/me/profile");
+  redirect("/me/settings/profile#residence-city");
 }
 
 export default async function FamilyHomeCityPage() {
@@ -36,12 +36,12 @@ export default async function FamilyHomeCityPage() {
   });
   return (
     <main className="mx-auto max-w-xl px-4 py-8">
-      <Link href="/me/profile" className="text-sm text-primary">← Моя семья</Link>
-      <h1 className="mt-5 text-3xl font-semibold">Домашний город семьи</h1>
+      <Link href="/me/settings/profile" className="text-sm text-primary">← Профиль</Link>
+      <h1 className="mt-5 text-3xl font-semibold">Город проживания</h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        Указывается отдельно от города просмотра. Используется для определения интереса семей к событиям других регионов.
+        Город, в котором живёт семья. Он не меняется при временном просмотре афиши другого города.
       </p>
-      {!membership ? <p className="mt-6 text-sm">Сначала создайте семейный профиль.</p>
+      {!membership ? <p className="mt-6 text-sm">Чтобы указать город проживания, сначала создайте семейный профиль.</p>
         : membership.role !== "OWNER" ? <p className="mt-6 text-sm">Изменить город может владелец семьи.</p>
         : (
           <form action={saveFamilyHomeCity} className="mt-6 space-y-4">
@@ -52,7 +52,7 @@ export default async function FamilyHomeCityPage() {
               {cities.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
             </select>
             <button type="submit" className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white">
-              Сохранить домашний город
+              Сохранить
             </button>
           </form>
         )}
