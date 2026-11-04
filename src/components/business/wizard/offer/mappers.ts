@@ -1,4 +1,4 @@
-import type { OfferKind, PartyCategory, PartyOccasion } from "@prisma/client";
+import type { OfferKind, OfferStatus, PartyCategory, PartyOccasion } from "@prisma/client";
 import type {
   OfferFormData,
   CampLodgingTypeKey,
@@ -1161,7 +1161,7 @@ export function mapOfferToFormData(offer: {
   sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
   contactSocialLinks?: unknown;
   details?: unknown;
-  status?: "DRAFT" | "PENDING" | "PUBLISHED";
+  status?: OfferStatus;
   // Phase 3b-1 party-filter columns (PARTY_SERVICE canon)
   category?: PartyCategory | null;
   partyLocationType?: BirthdayLocationType | null;
