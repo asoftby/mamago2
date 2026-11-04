@@ -53,11 +53,13 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const controller = useRef<AbortController | null>(null);
 
   const mounted = useRef(false);
+  const lastCheckedAt = useRef(0);
   const initialSignatureRef = useRef(initialContext.signature);
   const allowedActor = useRef(false);
 
   const load = useCallback(async (options?: { keepCurrent?: boolean }) => {
     if (!mounted.current || !allowedActor.current) return;
+    lastCheckedAt.current = Date.now();
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
@@ -97,7 +99,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
           result = await post({
             action: "recommend", city: citySlug, selectedChildId: null,
             signature: fresh.signature,
-            dismissedIds: stored.map(entry => entry.id),
+            dismissedIds: stored.filter(entry => entry.selectedChildId == null).map(entry => entry.id),
           }, abort.signal) as HomeFamilyDelivery;
         } catch (error) {
           if (valid() && attempt === 0 && error instanceof Error && error.message === "home_409") continue;
@@ -130,6 +132,21 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     void load();
     return () => { mounted.current = false; controller.current?.abort(); cache.current.cancel(); };
   }, [actor, load]);
+
+  useEffect(() => {
+    // Returning from another tab/app may invalidate event availability.
+    // Focus and visibility events are coalesced; retain current cards while checking.
+    const onReturn = () => {
+      if (document.visibilityState !== "visible" || Date.now() - lastCheckedAt.current < 60_000) return;
+      void load({ keepCurrent: true });
+    };
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, [load]);
 
   useEffect(() => {
     const refresh = () => { cache.current.clear(); void load({ keepCurrent: true }); };

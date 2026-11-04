@@ -166,6 +166,9 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   assert.ok(ui.includes("homeRecommendationLabel"));
   assert.ok(ui.includes("hasCatalogEvents"));
   assert.ok(!ui.includes("homeChipSelectEvent"));
+  assert.ok(ui.includes("stored.filter(entry => entry.selectedChildId == null)"));
+  assert.ok(ui.includes("Date.now() - lastCheckedAt.current < 60_000"));
+  assert.ok(ui.includes("visibilitychange"));
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
   assert.doesNotMatch(page, /CityHomeKudaSection|getKudaDiscoveryFeed|hasHomeContent|kudaPreviewPromise/);
   assert.match(page, /events.mode === "personal"/);
