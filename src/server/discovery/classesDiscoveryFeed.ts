@@ -1,7 +1,7 @@
 import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
 import { composePromotedCards } from "@/lib/discovery/promotionComposition";
 import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
-import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { placeInTerritoryScopeWhere, resolveTerritoryScope, resolveCountryScopeForTerritory } from "@/server/territory/territoryScope";
 import { ActivityFormat, type AgePolicy, type Prisma, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
@@ -99,6 +99,8 @@ type GetClassesDiscoveryFeedOptions = {
   take?: number;
   onlyIds?: string[];
   productTypes?: Array<"REGULAR_ACTIVITY" | "ONE_TIME_ACTIVITY">;
+  /** Homepage-only bounded organic fill from outside the current region. */
+  homeGeoFallback?: boolean;
   chipSlug?: string | null;
   chipTitleBySlug?: Map<string, string>;
   free?: boolean;
@@ -179,6 +181,23 @@ export async function getClassesDiscoveryFeed(
     }
   }
 
+  // Only the homepage's automatic region context may expand organically.
+  // Explicit catalog filters and ID hydration remain strictly scoped.
+  if (options?.homeGeoFallback && !options.onlyIds && rows.length < 10) {
+    const country = scope ? await resolveCountryScopeForTerritory(scope) : null;
+    if (country && country.type === "COUNTRY") {
+      const external = await runQuery({
+        publicWhereParts, cityId,
+        placeWhere: placeInTerritoryScopeWhere(country.territoryIds),
+        excludePlaceWhere: placeWhere,
+        targetRegionId: null, chipSlug, now, free, priceMax,
+        take: Math.min(24, Math.max(10 - rows.length, 1) * 3),
+        productTypes: options.productTypes, skipChipSlugsSelect: !classChipSlugsAvailable,
+      });
+      rows = [...rows, ...external.filter(offer => !rows.some(local => local.id === offer.id))];
+    }
+  }
+
   const chipTitleBySlug = options?.chipTitleBySlug ?? new Map<string, string>();
 
   // Business quality boost — soft multiplier based on booking reputation.
@@ -250,7 +269,15 @@ export async function getClassesDiscoveryFeed(
     };
   });
 
+  const localOfferIds = new Set(rows.filter(row => homeCityIds.includes(row.place?.cityId ?? "")).map(row => row.id));
   cards.sort((left, right) => {
+    // Extra-region organic fill is lower priority; promoted offers stay governed
+    // by the original promotion composition and published targeting rules.
+    if (options?.homeGeoFallback && left.crossRegionReason !== "PAID_BOOST" && right.crossRegionReason !== "PAID_BOOST") {
+      const leftLocal = localOfferIds.has(left.id);
+      const rightLocal = localOfferIds.has(right.id);
+      if (leftLocal !== rightLocal) return leftLocal ? -1 : 1;
+    }
     const boostDelta = (right.engagementScore ?? 0) - (left.engagementScore ?? 0);
     if (boostDelta !== 0) return boostDelta;
 
@@ -281,6 +308,7 @@ type RunQueryParams = {
   take?: number;
   onlyIds?: string[];
   productTypes?: Array<"REGULAR_ACTIVITY" | "ONE_TIME_ACTIVITY">;
+  excludePlaceWhere?: Prisma.PlaceWhereInput;
 };
 
 export function buildClassesDiscoveryWhere(input: Pick<RunQueryParams, "publicWhereParts" | "cityId" | "placeWhere" | "targetRegionId" | "chipSlug" | "now" | "free" | "priceMax" | "skipChipSlugsSelect" | "productTypes">): Prisma.OfferWhereInput {
@@ -329,11 +357,13 @@ async function runQuery({
   take = 80,
   onlyIds,
   productTypes,
+  excludePlaceWhere,
 }: RunQueryParams) {
   const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free, priceMax, skipChipSlugsSelect, productTypes });
   return prisma.offer.findMany({
-    where: onlyIds ? { AND: [where, { id: { in: onlyIds } } ] } : where,
-    take: onlyIds ? onlyIds.length : Math.max(120, take),
+    where: { AND: [where, ...(onlyIds ? [{ id: { in: onlyIds } }] : []),
+      ...(excludePlaceWhere ? [{ NOT: { place: excludePlaceWhere } }] : [])] },
+    take: onlyIds ? onlyIds.length : excludePlaceWhere ? take : Math.max(120, take),
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
     select: {
       id: true,

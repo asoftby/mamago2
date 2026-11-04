@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
@@ -9,6 +9,9 @@ import { CityHomeSection } from "./CityHomeSection";
 import { HorizontalCardRow } from "./HorizontalCardRow";
 import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { applyPersonaRanking } from "../lib/personaRanking";
+import { homeOfferRecommendationLabel } from "../lib/homeOfferRecommendationLabel";
 import type { ActivityMock } from "@/types/activity";
 
 const MAX_PREVIEW_EVENTS = 10;
@@ -28,6 +31,11 @@ export function CityHomeGeneralEvents({
   const [addingChild, setAddingChild] = useState(false);
   const [editingChild, setEditingChild] = useState<{ id: string; name: string | null } | null>(null);
   const router = useRouter();
+  const family = useFamilyPersona();
+  const preview = useMemo(() => authenticated
+    ? applyPersonaRanking(activities, { personas: family?.personas ?? [],
+        selectedPersonaIds: family?.selectedPersonaIds ?? [] })
+    : activities, [authenticated, activities, family?.personas, family?.selectedPersonaIds]);
   const catalogHref = "/" + citySlug + "/events";
 
   return <CityHomeSection
@@ -44,13 +52,17 @@ export function CityHomeGeneralEvents({
     </div>}
     {!activities.length && <p role="status" className="py-6 text-sm text-muted-foreground">Пока нет опубликованных событий. Загляните позже.</p>}
     <HorizontalCardRow headerHasSubtitle>
-      {activities.slice(0, MAX_PREVIEW_EVENTS).map((activity, index) => (
+      {preview.slice(0, MAX_PREVIEW_EVENTS).map((activity, index) => (
         <div key={activity.id} className={EVENT_CARD_SHELL + " flex flex-col"}>
           <AnalyticsCardViewTracker entityType="EVENT" entityId={activity.id} vertical="CITY" citySlug={citySlug}
             threshold={0.5} dwellMs={1000} meta={{ section: "afisha", exposureId: activity.exposureId ?? null }}>
             <EventCard {...activityMockToEventCard(activity, citySlug)} framing="fixed" coverRatio="2/3" coverFit="cover"
               className="h-full" imagePriority={index < 2} />
           </AnalyticsCardViewTracker>
+          {authenticated && homeOfferRecommendationLabel(activity, family?.personas ?? []) &&
+            <p className="pt-2 text-xs font-medium">
+              {homeOfferRecommendationLabel(activity, family?.personas ?? [])}
+            </p>}
         </div>
       ))}
       <HomeMoreEventsCard href={catalogHref} hasEvents={activities.length > 0} />

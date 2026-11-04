@@ -21,7 +21,7 @@ import {
 } from "@/features/city-home/components/CityHomeContentRows";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
-import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
+import { getCityNominativeName, getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { listNearbyCities, type NearbyCity } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
@@ -103,7 +103,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     : Promise.resolve([]);
   const localClassesPromise = sectionAvailability.classes
     ? getClassesDiscoveryFeed(city.id, city.slug, {
-        take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"],
+        take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"], homeGeoFallback: true,
       }).catch(() => [])
     : Promise.resolve([]);
 
@@ -130,7 +130,6 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
   const [
     user,
     ,
-    events,
     localRoutes,
     journalArticles,
     birthdayOffers,
@@ -140,7 +139,6 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
   ] = await Promise.all([
     userPromise,
     nearbyCitiesPromise,
-    eventsPromise,
     localRoutesPromise,
     journalArticlesPromise,
     birthdayOffersPromise,
@@ -217,14 +215,13 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           <ActivationBannerHost />
         </div>
 
-        {events.mode === "error" ? <CityHomeSection title="Мероприятия для семьи"><p role="alert">Не удалось проверить профиль. Обновите страницу, чтобы повторить.</p></CityHomeSection> :
-          <HomeEventsBoundary key={`${events.actorId}:${city.slug}:${events.mode}`} actorId={events.actorId} citySlug={city.slug}>
-            {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={city.slug} initialContext={events.context} /> :
-              <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug}
-                periodLabel={events.periodLabel} authenticated={Boolean(user)}
-                hasChildren={events.hasChildren} incompleteChild={events.incompleteChild}
-                incompleteChildren={events.incompleteChildren} />}
-          </HomeEventsBoundary>}
+        <Suspense fallback={<CityHomeSection title={user
+          ? "События, которые подходят вашей семье"
+          : `Куда пойти с ребёнком ${getCityLocativePhrase(city.slug)}`}>
+          <div className="h-48 animate-pulse rounded-2xl bg-muted/30" role="status" aria-label="Загружаем события" />
+        </CityHomeSection>}>
+          <HomeEventsStream eventsPromise={eventsPromise} citySlug={city.slug} authenticated={Boolean(user)} />
+        </Suspense>
 
         {sectionAvailability.classes ? (
           <CityHomeClassesSection
@@ -251,5 +248,30 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
         <CityHomeJournalSection articles={journalArticles} />
       </Container>
     </div>
+  );
+}
+
+
+/** Streaming boundary: sparse geography fallback must not block first paint of
+ * the header, Stories, article previews, or other independent home sections. */
+async function HomeEventsStream({
+  eventsPromise, citySlug, authenticated,
+}: {
+  eventsPromise: Promise<Awaited<ReturnType<typeof loadHomeEvents>> | { mode: "error"; actorId: null }>;
+  citySlug: string;
+  authenticated: boolean;
+}) {
+  const events = await eventsPromise;
+  return (
+    <>
+        {events.mode === "error" ? <CityHomeSection title="Мероприятия для семьи"><p role="alert">Не удалось проверить профиль. Обновите страницу, чтобы повторить.</p></CityHomeSection> :
+          <HomeEventsBoundary key={`${events.actorId}:${citySlug}:${events.mode}`} actorId={events.actorId} citySlug={citySlug}>
+            {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={citySlug} initialContext={events.context} /> :
+              <CityHomeGeneralEvents activities={events.activities} citySlug={citySlug}
+                periodLabel={events.periodLabel} authenticated={authenticated}
+                hasChildren={events.hasChildren} incompleteChild={events.incompleteChild}
+                incompleteChildren={events.incompleteChildren} />}
+          </HomeEventsBoundary>}
+    </>
   );
 }

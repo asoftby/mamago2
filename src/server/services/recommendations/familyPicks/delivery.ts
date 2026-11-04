@@ -39,7 +39,9 @@ export async function deliverHomeFamilyPicks(input: {
     algorithmVersion: result.policyVersion, candidateCount: result.candidateCount,
     decisionContext: {
       intent: "family_picks", actor: { kind: "user", id: input.userId },
-      subjects: input.profile.children.filter(child => input.selection.mode === "ALL_FAMILY" || child.id === input.selection.selectedChildId)
+      subjects: input.profile.children.filter(child => input.selection.mode === "ALL_FAMILY"
+        || (input.selection.mode === "CHILD" && child.id === input.selection.selectedChildId)
+        || (input.selection.mode === "PERSONAS" && input.selection.selectedChildIds.includes(child.id)))
         .map(child => ({ kind: "child", refId: child.id, source: "profile" })),
       constraints: { policy: { value: result.policyVersion, source: "derived" }, selection: { value: input.selection, source: "manual" },
         sharedAlgorithm: { value: result.sharedAlgorithmVersion, source: "derived" } },

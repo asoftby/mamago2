@@ -520,7 +520,13 @@ export function selectFamilyPicks(
 }
 
 // Confirmed-age v2 is composition over the shared ranker's score, not another ranker.
-export type PersonalFamilySelection = { mode: "ALL_FAMILY" } | { mode: "CHILD"; selectedChildId: string };
+export type PersonalFamilySelection =
+  | { mode: "ALL_FAMILY" }
+  | { mode: "CHILD"; selectedChildId: string }
+  /** No global "For whom" selection: broad discovery with factual fit labels. */
+  | { mode: "DISCOVERY" }
+  /** One or more verified family participants. OR between selected participants. */
+  | { mode: "PERSONAS"; selectedChildIds: string[]; includeAdult: boolean };
 export type PersonalFamilyChild = ChildBirthRecord & { id: string };
 export type PersonalFamilyCandidate = Pick<FamilyPickCandidate,
   "id" | "agePolicy" | "ageMinMonths" | "ageMaxMonths" | "categoryId" | "businessId" | "occurrences"
@@ -553,6 +559,35 @@ export function selectPersonalFamilyPicks(
   children: readonly PersonalFamilyChild[],
   selection: PersonalFamilySelection,
 ): PersonalFamilyPick[] {
+  if (selection.mode === "DISCOVERY" || selection.mode === "PERSONAS") {
+    const chosenChildren = selection.mode === "PERSONAS" ? new Set(selection.selectedChildIds) : new Set<string>();
+    const includesAdult = selection.mode === "PERSONAS" && selection.includeAdult;
+    const ranked = candidates.flatMap(candidate => {
+      const occurrences = candidate.occurrences.map(startsAt => {
+        const matchedChildIds = children.filter(child =>
+          confirmedAgeMatchAt(child, candidate, startsAt) === "MATCH").map(child => child.id).sort();
+        const adultFit = candidate.agePolicy === "ADULT_ONLY" ||
+          candidate.agePolicy === "UNRESTRICTED" ||
+          (candidate.ageMaxMonths != null && candidate.ageMaxMonths >= 216) ||
+          (candidate.ageMinMonths != null && candidate.ageMinMonths >= 216);
+        const targetFit = selection.mode === "DISCOVERY"
+          ? true
+          : (includesAdult && adultFit) || matchedChildIds.some(id => chosenChildren.has(id));
+        return { candidate, startsAt, matchedChildIds,
+          allChildrenMatch: children.length > 0 && matchedChildIds.length === children.length,
+          targetFit, position: 0 };
+      });
+      occurrences.sort((a, b) => Number(b.targetFit) - Number(a.targetFit)
+        || Number(b.allChildrenMatch) - Number(a.allChildrenMatch)
+        || b.matchedChildIds.length - a.matchedChildIds.length
+        || a.startsAt.getTime() - b.startsAt.getTime());
+      return occurrences[0] ? [occurrences[0]] : [];
+    });
+    // Keep soft-mismatch content below matching items rather than hiding it.
+    ranked.sort((a, b) => Number(b.targetFit) - Number(a.targetFit) || comparePersonalPicks(a, b));
+    return ranked.slice(0, PERSONAL_FAMILY_PICKS_POLICY.resultCount)
+      .map((pick, index) => ({ ...pick, position: index + 1 }));
+  }
   const target = selection.mode === "CHILD" ? children.find(child => child.id === selection.selectedChildId) : null;
   if (children.length === 0 || (selection.mode === "CHILD" && !target)) return [];
   const events = new Map<string, PersonalFamilyPick>();

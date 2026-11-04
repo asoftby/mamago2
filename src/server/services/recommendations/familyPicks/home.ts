@@ -30,7 +30,7 @@ export async function loadHomeEvents(userId: string | null, cityId: string, city
   // A second query is needed only when the week is empty: keep a useful way
   // into the afisha, and never mislabel next month's events as this week.
   const activities = activitiesThisWeek.length ? activitiesThisWeek
-    : await deps.common(cityId, citySlug, null, { take: 7 });
+    : await deps.common(cityId, citySlug, null, { take: userId ? 16 : 7, homeGeoFallback: true });
   const periodLabel = activitiesThisWeek.length ? "На этой неделе" as const : "Ближайшие события" as const;
   const childWithoutBirthDate = userId ? profile.children.find(child => !child.birthDate) : null;
   return { mode: "general" as const, context: null, activities, periodLabel, actorId: userId,

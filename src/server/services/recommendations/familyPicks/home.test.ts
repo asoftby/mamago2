@@ -133,6 +133,30 @@ test("API guest/malformed/foreign/stale cannot rank or leak another actor", asyn
   assert.ok(!calls.includes("delivery"));
 });
 
+test("global header selection is ACL-validated and free search is distinct from family choice", async () => {
+  const { deps } = dependencies();
+  const seen: unknown[] = [];
+  const deliver = async (input: { selection: unknown }) => {
+    seen.push(input.selection);
+    return { runId: "test" } as HomeFamilyDelivery;
+  };
+  const base = { action: "recommend", city: "minsk", signature: context.signature };
+  const request = (ids: string[]) => resolveHomeRequest({ ...base, selectedPersonaIds: ids },
+    "account_a", null, { ...deps, deliver });
+  assert.equal((await request([])).status, 200);
+  assert.equal((await request(["child_0001"])).status, 200);
+  assert.equal((await request(["account_a", "child_0001"])).status, 200);
+  assert.deepEqual(seen, [
+    { mode: "DISCOVERY" },
+    { mode: "PERSONAS", selectedChildIds: ["child_0001"], includeAdult: false },
+    { mode: "PERSONAS", selectedChildIds: ["child_0001"], includeAdult: true },
+  ]);
+  assert.equal((await request(["foreign_01"])).status, 404);
+  assert.equal((await request(["child_0001", "child_0001"])).status, 404);
+  assert.equal((await request(["account_a", "child_0001", "foreign_01", "other_01"])).status, 400);
+  assert.equal(seen.length, 3, "invalid selections must never reach recommendation engine");
+});
+
 test("child scoped dismissal requires an owned child and preserves context in telemetry", async () => {
   const { deps } = dependencies();
   const raw = { action: "dismiss", city: "minsk", eventId: "event_0001",

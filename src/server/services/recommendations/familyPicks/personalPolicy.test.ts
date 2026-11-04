@@ -71,6 +71,33 @@ test("unknown DOB/event age never becomes MATCH, including unrestricted; individ
   assert.deepEqual(selectPersonalFamilyPicks([event("adult", { agePolicy: "ADULT_ONLY" })], children, all), []);
 });
 
+test("free global discovery keeps mismatched and adult events with no false child fit", () => {
+  const result = selectPersonalFamilyPicks([
+    event("adult-only", { agePolicy: "ADULT_ONLY", sharedScore: 30 }),
+    event("child", { ageMaxMonths: 90, sharedScore: 5 }),
+    event("older-only", { ageMinMonths: 240, ageMaxMonths: 360, sharedScore: 4 }),
+  ], children, { mode: "DISCOVERY" });
+  assert.deepEqual(result.map(item => item.candidate.id), ["adult-only", "child", "older-only"]);
+  assert.deepEqual(result.find(item => item.candidate.id === "adult-only")?.matchedChildIds, []);
+});
+
+test("multi-persona global selection ranks verified child/adult fits first but never pretends a mismatch fits", () => {
+  const candidates = [
+    event("too-old", { ageMinMonths: 144, ageMaxMonths: 180, sharedScore: 100 }),
+    event("for-six", { ageMaxMonths: 90, sharedScore: 2 }),
+    event("adults", { agePolicy: "ADULT_ONLY", sharedScore: 3 }),
+  ];
+  const kidOnly = selectPersonalFamilyPicks(candidates, children, {
+    mode: "PERSONAS", selectedChildIds: [children[0]!.id], includeAdult: false,
+  });
+  assert.equal(kidOnly[0]?.candidate.id, "for-six");
+  assert.equal(kidOnly.at(-1)?.matchedChildIds.length, 0);
+  const adultAndKid = selectPersonalFamilyPicks(candidates, children, {
+    mode: "PERSONAS", selectedChildIds: [children[0]!.id], includeAdult: true,
+  });
+  assert.deepEqual(adultAndKid.slice(0, 2).map(item => item.candidate.id), ["adults", "for-six"]);
+});
+
 test("multiple sessions: card date and matching children are one consistent proof", () => {
   const child = { ...children[0]!, birthDate: new Date("2024-11-06Z") };
   const before = new Date("2030-11-04Z"), after = new Date("2030-11-07Z");

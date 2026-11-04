@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { EventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { CityHomeSection } from "./CityHomeSection";
@@ -12,6 +13,7 @@ import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
+import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { FAMILY_PERSONAS_CHANGED_EVENT } from "@/lib/family/familyPersonaEvents";
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
@@ -25,6 +27,11 @@ import { postFamilyPicks as post } from "../lib/familyPicksRequest";
 export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: string; initialContext: HomeFamilyContext }) {
   const router = useRouter();
   const auth = useAuthMe();
+  const family = useFamilyPersona();
+  // One source of truth: the global header selection. No chips in this block.
+  const selectedPersonaIdsKey = family && !family.loading
+    ? JSON.stringify([...family.selectedPersonaIds].sort())
+    : null;
   const actor = initialContext.actorId!;
   const [data, setData] = useState<HomeFamilyDelivery | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -36,16 +43,17 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const mounted = useRef(false);
   const lastCheckedAt = useRef(0);
   const initialSignatureRef = useRef(initialContext.signature);
+  const signedContext = useRef<HomeFamilyContext | null>(initialContext);
   const allowedActor = useRef(false);
 
   const load = useCallback(async (options?: { keepCurrent?: boolean }) => {
-    if (!mounted.current || !allowedActor.current) return;
+    if (!mounted.current || !allowedActor.current || selectedPersonaIdsKey === null) return;
     lastCheckedAt.current = Date.now();
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
     const generation = cache.current.begin();
-    if (!options?.keepCurrent) setState("loading");
+    if (!options?.keepCurrent) { setState("loading"); setData(null); }
     const valid = () => mounted.current && allowedActor.current && !abort.signal.aborted && cache.current.current(generation);
     const deadline = setTimeout(() => {
       if (valid()) {
@@ -61,16 +69,22 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       // any additional queries, selection writes, or navigation on the home page.
       for (let attempt = 0; attempt < 2; attempt++) {
         if (!valid()) return;
-        const contextResponse = await post({ action: "context", city: citySlug }, abort.signal);
+        // The SSR context signature is verified by the API on recommend.
+        // Reuse it to avoid one extra network request on every header change.
+        const contextResponse = signedContext.current
+          ? { context: signedContext.current }
+          : await post({ action: "context", city: citySlug }, abort.signal);
         if (!valid() || contextResponse === null) return;
         const fresh = contextResponse.context as HomeFamilyContext;
+        signedContext.current = fresh;
         if (fresh.actorId !== actor || fresh.audience !== "personalized") {
           cache.current.cancel();
           setData(null);
           router.refresh();
           return;
         }
-        const cached = cache.current.get(fresh, citySlug, null);
+        const cacheScope = "personas:" + selectedPersonaIdsKey;
+        const cached = cache.current.get(fresh, citySlug, cacheScope);
         if (cached) {
           setData(cached);
           setState("ready");
@@ -80,18 +94,22 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         try {
           const response = await post({
             action: "recommend", city: citySlug, selectedChildId: null,
+            selectedPersonaIds: JSON.parse(selectedPersonaIdsKey) as string[],
             signature: fresh.signature,
             dismissedIds: stored.filter(entry => entry.selectedChildId == null).map(entry => entry.id),
           }, abort.signal) as HomeFamilyDelivery | null;
           if (!valid() || response === null) return;
           result = response;
         } catch (error) {
-          if (valid() && attempt === 0 && error instanceof Error && error.message === "home_409") continue;
+          if (valid() && attempt === 0 && error instanceof Error && error.message === "home_409") {
+            signedContext.current = null;
+            continue;
+          }
           throw error;
         }
         if (!valid()) return;
         if (result.context.actorId !== actor || result.context.signature !== fresh.signature) throw new Error("stale_context");
-        cache.current.set(fresh, citySlug, null, result);
+        cache.current.set(fresh, citySlug, cacheScope, result);
         setData(cache.current.filter(result, Date.now(), null));
         setState("ready");
         return;
@@ -107,15 +125,18 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     } finally {
       clearTimeout(deadline);
     }
-  }, [actor, citySlug, router]);
+  }, [actor, citySlug, router, selectedPersonaIdsKey]);
 
   useEffect(() => {
     mounted.current = true;
     allowedActor.current = !auth.isLoading && auth.user?.id === actor;
     for (const entry of readHomeDismissals(actor)) cache.current.dismiss(entry.id, entry.at + HOME_DISMISS_TTL_MS, entry.selectedChildId ?? null);
     void load();
-    return () => { mounted.current = false; controller.current?.abort(); cache.current.cancel(); };
-  }, [actor, load]);
+    const liveCache = cache.current;
+    // Switching the global header selection invalidates the in-flight request,
+    // not the short-lived results cached for previously selected participants.
+    return () => { mounted.current = false; controller.current?.abort(); liveCache.begin(); };
+  }, [actor, load, auth.isLoading, auth.user?.id]);
 
   useEffect(() => {
     // Returning from another tab/app may invalidate event availability.
@@ -161,9 +182,10 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     if (initialSignatureRef.current === initialContext.signature) return;
     initialSignatureRef.current = initialContext.signature;
     cache.current.cancel();
+    signedContext.current = initialContext;
     setData(null);
     void load();
-  }, [initialContext.signature, load]);
+  }, [initialContext, initialContext.signature, load]);
 
   const actorMatches = !auth.isLoading && auth.user?.id === actor;
   const catalogHref = `/${citySlug}/events`;
@@ -226,6 +248,9 @@ export function FamilyHomeResults({ data, context, citySlug, impressed, onImpres
               coverFit="cover" imagePriority={index < 2} saveMeta={{ dateISO: minskPlanDate(item.startsAt), source: "home-family-picks" }} categoryLabel={item.categoryName ?? undefined}
               metaLabel={`${homeAgeLabel(item)} · ${formatRuShortDayMonth(item.startsAt)}`}
               priceLabel={formatPublicCardPrice(item) ?? undefined} />
+            {item.physicalCitySlug && item.physicalCitySlug !== citySlug && <p className="pt-2 text-xs text-muted-foreground">
+              {getCityNominativeName(item.physicalCitySlug)}
+            </p>}
             {recommendation && <p className="pt-2 text-xs font-medium">{recommendation}</p>}
           </div>
         </AnalyticsCardViewTracker>

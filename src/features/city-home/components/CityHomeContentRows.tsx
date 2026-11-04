@@ -12,7 +12,7 @@ import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCar
 import { CityHomeAllLink } from "@/features/city-home/components/SectionHeader";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
-import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { getCityLocativePhrase, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
@@ -30,6 +30,7 @@ import {
   buildMainTitle,
 } from "@/features/city-home/lib/audiencePersonalization";
 import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
+import { homeOfferRecommendationLabel } from "@/features/city-home/lib/homeOfferRecommendationLabel";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
@@ -212,8 +213,9 @@ export function CityHomeClassesSection({
             activity.ageFrom != null ? `${activity.ageFrom}+` : undefined;
           const dateLabel = [ageLabel, dateRange].filter(Boolean).join(" · ");
           const priceLabel = formatPublicCardPrice({ priceMode: activity.priceMode, priceFrom: activity.priceMin, priceTo: activity.priceMax, currency: activity.currency }) ?? undefined;
+          const fitLabel = homeOfferRecommendationLabel(activity, family?.personas ?? []);
           return (
-            <div key={activity.id} className={cardShell}>
+            <div key={activity.id} className={cardShell + " flex flex-col"}>
               <AnalyticsCardViewTracker
                 entityType="OFFER"
                 entityId={activity.id}
@@ -237,6 +239,10 @@ export function CityHomeClassesSection({
                   saveDateEndISO={activity.dateEnd ?? null}
                 />
               </AnalyticsCardViewTracker>
+              {activity.citySlug && activity.citySlug !== citySlug && <p className="pt-2 text-xs text-muted-foreground">
+                {getCityNominativeName(activity.citySlug)}
+              </p>}
+              {fitLabel && <p className="pt-2 text-xs font-medium">{fitLabel}</p>}
             </div>
           );
         })}

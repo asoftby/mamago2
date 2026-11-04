@@ -1,3 +1,4 @@
+import { canonicalPublicActivityPath } from "@/lib/business/eventPublicLink";
 import { parseSafeOpaqueId } from "@/lib/decision/identifiers";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { AnalyticsEntityType, RecommendationSurface } from "@prisma/client";
@@ -406,7 +407,8 @@ const personalDependencies: PersonalLoadDependencies = {
         const meta = row.meta && typeof row.meta === "object" && !Array.isArray(row.meta) ? row.meta : {};
         const childScope = typeof meta.homeSelectedChildId === "string" ? meta.homeSelectedChildId : null;
         // All-family selection does not inherit individual child rejections.
-        if (childScope && (selection.mode !== "CHILD" || childScope !== selection.selectedChildId)) return [];
+        if (childScope && !(selection.mode === "CHILD" && childScope === selection.selectedChildId)
+          && !(selection.mode === "PERSONAS" && selection.selectedChildIds.includes(childScope))) return [];
         return [row.entityId];
       }),
     ];
@@ -441,13 +443,16 @@ export async function loadPersonalFamilyPicks(input: {
   const profile = input.serverProfile ?? await deps.loadProfile(input.userId);
   if (profile.userId !== input.userId) throw new FamilyPicksSelectionUnavailableError();
   const selection = input.selection;
-  if (selection.mode !== "ALL_FAMILY" && (selection.mode !== "CHILD"
-    || !parseSafeOpaqueId(selection.selectedChildId)
-    || !profile.children.some(child => child.id === selection.selectedChildId))) {
+  const allowed = new Set(profile.children.map(child => child.id));
+  if ((selection.mode === "CHILD" && (!parseSafeOpaqueId(selection.selectedChildId)
+      || !allowed.has(selection.selectedChildId)))
+    || (selection.mode === "PERSONAS" && (!selection.includeAdult && selection.selectedChildIds.length === 0
+      || selection.selectedChildIds.some(id => !parseSafeOpaqueId(id) || !allowed.has(id))))) {
     throw new FamilyPicksSelectionUnavailableError();
   }
   let candidateCount = 0;
   let cardExtras = new Map<string, PersonalExtras>();
+  let citySlugById = new Map<string, string>();
   const response = (window: PersonalShowWindow, items: PersonalFamilyPick[], suggestions: RankedPlanSuggestion[], sharedAlgorithmVersion: string | null) => {
     const byId = new Map(suggestions.map(suggestion => [suggestion.activity.id, suggestion]));
     return {
@@ -460,7 +465,15 @@ export async function loadPersonalFamilyPicks(input: {
       runId: null,
       items: items.map(pick => ({
         id: pick.candidate.id, title: byId.get(pick.candidate.id)!.activity.title,
-        href: `/${input.citySlug}/events/${byId.get(pick.candidate.id)!.activity.slug ?? pick.candidate.id}`,
+        href: canonicalPublicActivityPath({
+          activityId: pick.candidate.id,
+          activitySlug: byId.get(pick.candidate.id)!.activity.slug,
+          activityCitySlug: citySlugById.get(byId.get(pick.candidate.id)!.activity.cityId ?? ""),
+          placeCitySlug: byId.get(pick.candidate.id)!.activity.place?.city?.slug,
+          venueCitySlug: byId.get(pick.candidate.id)!.activity.venue?.place?.city?.slug,
+          cityField: input.citySlug,
+        }),
+        physicalCitySlug: citySlugById.get(byId.get(pick.candidate.id)!.activity.cityId ?? "") ?? input.citySlug,
         imageUrl: byId.get(pick.candidate.id)!.activity.coverImageUrl ?? null,
         categoryName: byId.get(pick.candidate.id)!.activity.eventCategory?.nameRu ?? null,
         agePolicy: pick.candidate.agePolicy, ageMinMonths: pick.candidate.ageMinMonths, ageMaxMonths: pick.candidate.ageMaxMonths,
@@ -478,7 +491,10 @@ export async function loadPersonalFamilyPicks(input: {
     return response(resolvePersonalShowWindow(now, 7), [], [], null);
   }
   const selectedChildren = selection.mode === "CHILD"
-    ? profile.children.filter(child => child.id === selection.selectedChildId) : profile.children;
+    ? profile.children.filter(child => child.id === selection.selectedChildId)
+    : selection.mode === "PERSONAS"
+      ? profile.children.filter(child => selection.selectedChildIds.includes(child.id))
+      : selection.mode === "DISCOVERY" ? [] : profile.children;
   const subjects: Subject[] = selectedChildren.map(child => ({ kind: "child", refId: child.id, source: "profile" }));
   const [storedExcluded, experienceAffinity] = await Promise.all([
     deps.loadExcluded(profile.userId, now, selection), deps.loadAffinity({ userId: profile.userId, subjects, now }),
@@ -491,6 +507,7 @@ export async function loadPersonalFamilyPicks(input: {
     const batch = await deps.rank({
       citySlug: input.citySlug, excludeActivityIds: excluded, dateFrom: window.dateFrom, dateTo: window.dateTo,
       exhaustiveCandidatePool: true,
+      homeGeoFallback: selection.mode === "DISCOVERY" || selection.mode === "PERSONAS",
       profileInterestSlugs: [...new Set(selectedChildren.flatMap(child => child.systemInterests.map(interest => interest.interestSlug)))],
       experienceAffinity,
     });
@@ -499,6 +516,14 @@ export async function loadPersonalFamilyPicks(input: {
     const extras = batch.suggestions.length ? await deps.loadExtras(batch.suggestions.map(s => s.activity.id), now, range) : [];
     const byId = new Map(extras.map(extra => [extra.id, extra]));
     cardExtras = byId;
+    // Resolve physical city only if cards reference a different city. One
+    // small batched lookup, no N+1 query and no guessing from the home region.
+    const cityIds = [...new Set(batch.suggestions.map(s => s.activity.cityId).filter(
+      (id): id is string => typeof id === "string" && id.length > 0))];
+    if (cityIds.length > 0) {
+      const cities = await prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, slug: true } });
+      citySlugById = new Map(cities.map(c => [c.id, c.slug]));
+    }
     const candidates: PersonalFamilyCandidate[] = batch.suggestions.flatMap(suggestion => {
       const extra = byId.get(suggestion.activity.id);
       if (!extra || excluded.includes(extra.id)) return [];

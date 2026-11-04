@@ -31,10 +31,10 @@ export function CityHomeBirthdayOffers({ offers }: { offers: BirthdayCatalogItem
               id={offer.id}
               title={offer.title}
               href={getOfferPublicPath({ slug: offer.slug ?? offer.id }, citySlug)}
-              imageUrl={offer.coverImage}
+              imageUrl={offer.coverImage ?? undefined}
               categoryLabel={offer.productType === "PARTY_PACKAGE" ? "Праздник под ключ" : offer.category ? CATEGORY_LABELS[offer.category] : "Для праздника"}
               dateLabel={offer.ageMinMonths != null ? `${Math.floor(offer.ageMinMonths / 12)}+` : undefined}
-              priceLabel={formatPublicCardPrice({ priceMode: offer.priceMode as Parameters<typeof formatPublicCardPrice>[0]["priceMode"], priceFrom: offer.priceFrom, priceTo: null, currency: offer.currency })}
+              priceLabel={formatPublicCardPrice({ priceMode: offer.priceMode as Parameters<typeof formatPublicCardPrice>[0]["priceMode"], priceFrom: offer.priceFrom, priceTo: null, currency: offer.currency }) ?? undefined}
               hideSave
             />
           </div>

@@ -178,5 +178,6 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   assert.match(general, /authenticated=|События, которые подходят вашей семье/);
   assert.doesNotMatch(general, /AGE_GROUPS|age_discovery_unavailable|\/api\/discovery\/events\/page/,
     "guest must not launch a second discovery request for age filters");
-  assert.doesNotMatch(general, /useFamilyPersona|useDiscoveryFilters|selectedPersona/);
+  assert.match(general, /useFamilyPersona/, "authenticated non-personalized users still honor global header selection");
+  assert.doesNotMatch(general, /useDiscoveryFilters|\/api\/discovery\/events\/page/);
 });

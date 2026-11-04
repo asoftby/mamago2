@@ -72,7 +72,7 @@ function getSelectedPersonaSummary(input: PersonaRankingInput): SelectedPersonaS
   };
 }
 
-function getAgeFromBirthDate(birthDate: string | null | undefined): number | null {
+export function getAgeFromBirthDate(birthDate: string | null | undefined): number | null {
   if (!birthDate) {
     return null;
   }
