@@ -246,18 +246,20 @@ export function resolveSubdomainMiddlewareDecision(params: {
   }
 
   if (isBusinessHost) {
-    // Direct messages live on the public surface. A same-host /me/direct
-    // redirect would be rewritten to a non-existent /business/me/direct (404).
-    // Redirect here before the business surface rewrite, including deep links.
-    if (pathname === "/direct" || pathname.startsWith("/direct/")) {
+    // Unified direct messages live on the public surface. Without this narrow
+    // redirect, business-host /me/direct becomes /business/me/direct (404).
+    // Preserve legacy /direct links and unhydrated /me/direct navigation.
+    const isLegacyDirect = pathname === "/direct" || pathname.startsWith("/direct/");
+    const isUnifiedDirect = pathname === "/me/direct" || pathname.startsWith("/me/direct/");
+    if (isLegacyDirect || isUnifiedDirect) {
       return {
         kind: "redirect",
         location: buildPublicLocation({
           host,
           protocol,
-          pathname: `/me${pathname}`,
+          pathname: isLegacyDirect ? `/me${pathname}` : pathname,
           search: adminSafeSearch,
-          // Preserve the DEV/PROD host even if NEXT_PUBLIC_APP_URL differs.
+          // Preserve DEV/PROD host even if NEXT_PUBLIC_APP_URL differs.
         }),
       };
     }
