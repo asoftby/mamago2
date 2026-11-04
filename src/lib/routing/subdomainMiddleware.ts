@@ -246,6 +246,24 @@ export function resolveSubdomainMiddlewareDecision(params: {
   }
 
   if (isBusinessHost) {
+    // Unified direct messages live on the public surface. Without this narrow
+    // redirect, business-host /me/direct becomes /business/me/direct (404).
+    // Preserve legacy /direct links and unhydrated /me/direct navigation.
+    const isLegacyDirect = pathname === "/direct" || pathname.startsWith("/direct/");
+    const isUnifiedDirect = pathname === "/me/direct" || pathname.startsWith("/me/direct/");
+    if (isLegacyDirect || isUnifiedDirect) {
+      return {
+        kind: "redirect",
+        location: buildPublicLocation({
+          host,
+          protocol,
+          pathname: isLegacyDirect ? `/me${pathname}` : pathname,
+          search: adminSafeSearch,
+          // Preserve DEV/PROD host even if NEXT_PUBLIC_APP_URL differs.
+        }),
+      };
+    }
+
     if (isAuthRoute(pathname)) {
       return {
         kind: "redirect",

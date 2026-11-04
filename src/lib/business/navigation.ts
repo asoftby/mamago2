@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Megaphone,
   MessageSquareText,
+  Settings,
   Users,
   Wallet,
 } from "lucide-react";
@@ -66,8 +67,6 @@ export const BUSINESS_ACTS_HREF = businessRoute("/documents/acts");
 export const BUSINESS_OFFERS_HREF = businessRoute("/offers");
 
 export const businessNavigation: BusinessNavItem[] = [
-  { type: "item", label: "Сообщения", href: businessRoute("/direct"), icon: MessageSquareText },
-  { type: "item", label: "Поддержка mamaGo", href: businessRoute("/support"), icon: CircleHelp },
   {
     type: "item",
     label: "Панель управления",
@@ -75,6 +74,7 @@ export const businessNavigation: BusinessNavItem[] = [
     icon: LayoutDashboard,
     match: [businessRoute("/dashboard")],
   },
+  { type: "item", label: "Сообщения", href: "/me/direct", icon: MessageSquareText },
   {
     type: "group",
     label: "Публикации",
@@ -156,11 +156,12 @@ export const businessNavigation: BusinessNavItem[] = [
     icon: Wallet,
     match: [businessRoute("/billing")],
   },
+  { type: "item", label: "Поддержка mamaGo", href: businessRoute("/support"), icon: CircleHelp },
   {
     type: "item",
-    label: "Настройки и помощь",
+    label: "Настройки",
     href: BUSINESS_SETTINGS_HREF,
-    icon: CircleHelp,
+    icon: Settings,
     match: [businessRoute("/settings")],
   },
 ];

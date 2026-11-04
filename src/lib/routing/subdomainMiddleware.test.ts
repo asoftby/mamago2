@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { businessNavigation } from "../business/navigation";
+import { buildClientCompatibleDestination } from "./clientNavigation";
 
 import {
   getPublicBaseFromHost,
@@ -503,5 +505,77 @@ assert.deepEqual(
     location: "https://mamago.local/register",
   },
 );
+
+// Business sidebar opens the shared user inbox on the public host, not a
+// non-existent /business/me/direct URL. Both list and legacy thread links work.
+for (const [host, expectedUrl] of [
+  ["business.mamago.by", "https://mamago.by/me/direct"],
+  ["business.dev.mamago.by", "https://dev.mamago.by/me/direct"],
+  ["business.prod.mamago.by", "https://prod.mamago.by/me/direct"],
+] as const) {
+  assert.deepEqual(
+    resolveSubdomainMiddlewareDecision({
+      host,
+      protocol: "https:",
+      pathname: "/direct",
+      search: "",
+    }),
+    { kind: "redirect", location: expectedUrl },
+  );
+}
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.dev.mamago.by",
+    protocol: "https:",
+    pathname: "/direct/test-thread-123",
+    search: "?from=notification",
+  }),
+  {
+    kind: "redirect",
+    location: "https://dev.mamago.by/me/direct/test-thread-123?from=notification",
+  },
+);
+
+// Unhydrated links on the business host must work as well. Client navigation
+// already resolves the same link to an absolute public-host destination.
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.dev.mamago.by",
+    protocol: "https:",
+    pathname: "/me/direct",
+    search: "",
+    publicAppUrl: "https://mamago.by",
+  }),
+  { kind: "redirect", location: "https://dev.mamago.by/me/direct" },
+);
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.mamago.by",
+    protocol: "https:",
+    pathname: "/me/direct/thread-456",
+    search: "",
+  }),
+  { kind: "redirect", location: "https://mamago.by/me/direct/thread-456" },
+);
+
+// Business navigation: dashboard is the first task, messages next, support
+// remains available, and settings is distinct rather than duplicated help.
+const businessMenuLabels = businessNavigation.map(({ label }) => label);
+assert.equal(businessMenuLabels[0], "Панель управления");
+assert.equal(businessMenuLabels[1], "Сообщения");
+const messagesHref = businessNavigation.find(({ label }) => label === "Сообщения");
+assert.equal(messagesHref?.type, "item");
+assert.equal(messagesHref?.type === "item" ? messagesHref.href : null, "/me/direct");
+assert.equal(
+  buildClientCompatibleDestination("/me/direct", {
+    currentHost: "business.dev.mamago.by",
+    currentProtocol: "https",
+  }),
+  "https://dev.mamago.by/me/direct",
+);
+assert.equal(businessMenuLabels.at(-2), "Поддержка mamaGo");
+assert.equal(businessMenuLabels.at(-1), "Настройки");
+assert.equal(businessMenuLabels.includes("Настройки и помощь"), false);
 
 console.log("subdomain middleware tests: OK");
