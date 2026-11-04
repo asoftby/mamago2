@@ -73,6 +73,19 @@ test("logged-in child without DOB edits the existing child instead of adding a d
   assert.doesNotMatch(html, /\+ Добавить ребёнка/);
 });
 
+test("logged-in children without birth dates remain visible as chips for completing their ages", () => {
+  const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
+    <CityHomeGeneralEvents activities={[]} citySlug="minsk" authenticated hasChildren
+      incompleteChild={{ id: "child_a", name: "Степан" }}
+      incompleteChildren={[{ id: "child_a", name: "Степан" }, { id: "child_b", name: "Таисия" }]} />
+  </AuthProvider></AppRouterContext.Provider>);
+  assert.match(html, /Для кого:/);
+  assert.match(html, /Для всех/);
+  assert.match(html, /Указать возраст: Степан/);
+  assert.match(html, /Указать возраст: Таисия/);
+  assert.doesNotMatch(html, /\+ Добавить ребёнка|child_a|child_b/);
+});
+
 test("Home boundary never renders another account's events on the server", () => {
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "current" } as never}>
     <HomeEventsBoundary actorId="old" citySlug="minsk"><p>Old account private events</p></HomeEventsBoundary>

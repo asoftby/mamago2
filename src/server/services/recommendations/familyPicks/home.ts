@@ -2,7 +2,6 @@ import "server-only";
 import { loadFamilyPicksProfile } from "./profile";
 import { loadHomeContext } from "./homeContext";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
-import { homeFamilyPicksEnabled } from "@/features/city-home/lib/familyHome";
 import { zonedDateKey, weekdayFromDateKey, zonedDayRange } from "@/lib/stories/ranges";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 
@@ -18,9 +17,9 @@ export function publicHomeWeekRange(now: Date = new Date()) {
 }
 
 /** SSR chooses exactly one surface. A profile error propagates; never call common on error. */
-export async function loadHomeEvents(userId: string | null, cityId: string, citySlug: string, deps = defaults, enabled = homeFamilyPicksEnabled()) {
+export async function loadHomeEvents(userId: string | null, cityId: string, citySlug: string, deps = defaults) {
   const profile = await deps.profile(userId);
-  if (enabled && profile.audience === "personalized") {
+  if (profile.audience === "personalized") {
     const { context } = await deps.context(userId, profile);
     return { mode: "personal" as const, context, activities: [], actorId: userId };
   }
@@ -36,5 +35,6 @@ export async function loadHomeEvents(userId: string | null, cityId: string, city
   const childWithoutBirthDate = userId ? profile.children.find(child => !child.birthDate) : null;
   return { mode: "general" as const, context: null, activities, periodLabel, actorId: userId,
     hasChildren: profile.children.length > 0,
-    incompleteChild: childWithoutBirthDate ? { id: childWithoutBirthDate.id, name: childWithoutBirthDate.name } : null };
+    incompleteChild: childWithoutBirthDate ? { id: childWithoutBirthDate.id, name: childWithoutBirthDate.name } : null,
+    incompleteChildren: userId ? profile.children.filter(child => !child.birthDate).map(child => ({ id: child.id, name: child.name })) : [] };
 }

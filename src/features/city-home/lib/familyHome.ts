@@ -1,9 +1,6 @@
 import { AGE_OPTIONS } from "@/lib/config/ages";
 import type { PersonalShowWindow } from "@/server/services/recommendations/familyPicks/window";
 
-export function homeFamilyPicksEnabled(env: Record<string, string | undefined> = process.env) {
-  return env.HOME_FAMILY_PICKS_V2 === "1";
-}
 export type HomeFamilyContext = {
   actorId: string | null;
   signature: string;
