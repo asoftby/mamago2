@@ -105,7 +105,7 @@ export function matchesPublicFreePrice(input: {
   return input.priceMode === "FREE" || (
     input.priceMode === "UNKNOWN" &&
     input.priceFrom === 0 &&
-    normalizedFreeText(input.priceText)
+    ["бесплатно", "free"].includes((input.priceText ?? "").toLowerCase())
   );
 }
 
