@@ -9,6 +9,7 @@ import { EventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { CityHomeSection } from "./CityHomeSection";
 import { HorizontalCardRow } from "./HorizontalCardRow";
+import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
@@ -18,16 +19,8 @@ import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { homeChipSelectEvent, homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
 import { HomeSelectionSync, persistHomeSelection } from "../lib/homeSelectionSync";
 import { FamilyHomeCache, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
-import { homeCatalogHref, homeSelection, homeSelectionLabel, homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
+import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
-
-function ageYearsLabel(years: number | null | undefined): string {
-  if (years == null) return "";
-  if (years === 0) return "до года";
-  const ending = years % 100 >= 11 && years % 100 <= 14 ? "лет"
-    : years % 10 === 1 ? "год" : years % 10 >= 2 && years % 10 <= 4 ? "года" : "лет";
-  return years + " " + ending;
-}
 
 async function post(body: Record<string, unknown>, signal?: AbortSignal) {
   const timeout = new AbortController();
@@ -261,23 +254,29 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const actorMatches = auth.user?.id === actor && !auth.isLoading;
   const deliveryScopeMatches = !data || (data.selection.mode === "CHILD"
     ? data.selection.selectedChildId === selected : selected === null);
-  return <CityHomeSection title="Для вашей семьи" subtitle={data ? homePeriodLabel(data.window) : "Подбираем события для вашей семьи"} reserveCarouselControls>
+  const sortedChildren = homeChildrenYoungestFirst(context);
+  const adultCatalogHref = "/" + citySlug + "/events?age=18%2B";
+  return <CityHomeSection title="События, которые подходят вам"
+    subtitle={data?.window.horizonDays === 30 ? "На ближайшие 30 дней" : "На этой неделе"} reserveCarouselControls>
     <div className="min-h-40" data-placement="HOME_FOR_FAMILY" aria-busy={state === "loading"}>
-      {context.children.length > 0 && <div role="group" aria-label="Для кого подобрать события" className="mb-4 flex gap-2 overflow-x-auto py-1"
-        onKeyDown={event => {
-          const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
-          const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-          const next = event.key === "ArrowRight" ? (index + 1) % buttons.length : event.key === "ArrowLeft" ? (index + buttons.length - 1) % buttons.length : event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : -1;
-          if (next >= 0) { event.preventDefault(); buttons[next]?.focus(); buttons[next]?.click(); }
-        }}>
-        {[{ id: null, label: "Вся семья" }, ...context.children.map(child => ({ id: child.id, label: [child.name?.trim() || "Ребёнок", ageYearsLabel(child.ageYears)].filter(Boolean).join(" · ") }))].map(chip => <button key={chip.id ?? "all"} type="button"
-          aria-pressed={selected === chip.id} tabIndex={selected === chip.id ? 0 : -1} onClick={() => select(chip.id)}
-          className={`min-h-11 shrink-0 rounded-full border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected === chip.id ? "bg-primary text-primary-foreground" : "bg-background"}`}>{chip.label}</button>)}
-        <button type="button" tabIndex={0} onClick={() => setAddingChild(true)}
-          className="min-h-11 shrink-0 rounded-full border border-dashed border-border px-4 text-sm">
-          + Ребёнок
-        </button>
-      </div>}
+      {context.children.length > 0 ? <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-sm text-muted-foreground">Для кого:</span>
+        <div role="group" aria-label="Для кого подобрать события" className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
+          {[{ id: null, label: "Для всех" }, ...sortedChildren.map(child => ({ id: child.id, label: child.name?.trim() || "Ребёнок" }))].map(chip =>
+            <button key={chip.id ?? "all"} type="button" aria-pressed={selected === chip.id}
+              onClick={() => select(chip.id)}
+              className={`min-h-11 shrink-0 rounded-full border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected === chip.id ? "bg-primary text-primary-foreground" : "bg-background"}`}>{chip.label}</button>)}
+          {(context.adults ?? []).filter(adult => !adult.isMe).map((adult, index) => <Link
+            key={index} href={adultCatalogHref} aria-label={`Куда пойти взрослому: ${adult.name?.trim() || "Взрослый"}`}
+            className="inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm hover:bg-muted">
+            {adult.name?.trim() || "Взрослый"}</Link>)}
+          <Link href={adultCatalogHref} aria-label="Куда пойти мне: афиша для взрослых"
+            className="inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm hover:bg-muted">Я</Link>
+          <button type="button" onClick={() => setAddingChild(true)}
+            className="min-h-11 shrink-0 rounded-full border border-dashed border-border px-4 text-sm">+ Ребёнок</button>
+        </div>
+      </div> : <button type="button" onClick={() => setAddingChild(true)}
+        className="mb-4 min-h-11 rounded-full border border-primary px-4 text-sm text-primary">+ Добавить ребёнка</button>}
       {context.selectionPersistence === "device" && <p className="mb-3 text-xs text-muted-foreground">Выбор запоминается на этом устройстве.</p>}
       {choiceChild && !choiceChild.hasBirthDate && <p className="mb-4 text-sm">Укажите дату рождения ребёнка для точного подбора.{" "}
         <button type="button" className="min-h-11 underline" onClick={() => setEditingChildId(choiceChild.id)}>Указать возраст</button>
@@ -316,20 +315,22 @@ export function FamilyHomeResults({ data, context, citySlug, selected, impressed
             {items.slice(0, 10).map((item, index) => {
               const badge = item.allChildrenMatch ? "Подходит всем" : `Подходит: ${context.children.filter(child => item.matchedChildIds.includes(child.id)).map(child => child.name?.trim() || "ребёнок").join(", ")}`;
               const identity = item.exposureId ?? `${context.signature}:${selected}:${item.id}`;
-              return <div key={identity} className={EVENT_CARD_SHELL} data-recommendation-run={data?.runId ?? undefined}>
+              return <div key={identity} className={EVENT_CARD_SHELL + " flex flex-col"} data-recommendation-run={data?.runId ?? undefined}>
                 <AnalyticsCardViewTracker key={identity} entityType="EVENT" entityId={item.id} vertical="CITY" citySlug={citySlug} threshold={0.5} dwellMs={1000}
                   meta={meta(item)} wasImpressed={impressed.has(identity)} onImpression={() => onImpression(identity)}>
-                  <div onClickCapture={event => { if ((event.target as HTMLElement).closest("a")?.getAttribute("href") === item.href) void postAnalyticsEvent({ eventType: "DETAIL_OPEN", entityType: "EVENT", entityId: item.id, vertical: "CITY", citySlug, meta: meta(item) }); }}>
-                    <EventCard id={item.id} title={item.title} href={item.href} imageUrl={item.imageUrl} imageWidth={item.imageWidth} imageHeight={item.imageHeight} framing="poster" imagePriority={index < 2}
+                  <div className="flex h-full flex-col" onClickCapture={event => { if ((event.target as HTMLElement).closest("a")?.getAttribute("href") === item.href) void postAnalyticsEvent({ eventType: "DETAIL_OPEN", entityType: "EVENT", entityId: item.id, vertical: "CITY", citySlug, meta: meta(item) }); }}>
+                    <EventCard id={item.id} title={item.title} href={item.href} imageUrl={item.imageUrl} imageWidth={item.imageWidth} imageHeight={item.imageHeight} framing="fixed" coverRatio="2/3" coverFit="contain" className="flex-1" imagePriority={index < 2}
                       categoryLabel={item.categoryName ?? undefined} metaLabel={`${homeAgeLabel(item)} · ${formatRuShortDayMonth(item.startsAt)}`} priceLabel={formatPublicCardPrice(item) ?? undefined} />
-                    <p className="mt-2 text-xs font-medium">{badge}</p>
-                    <div className="mt-3 flex flex-wrap gap-2"><SaveHeart activityId={item.id} activityTitle={item.title} coverImageUrl={item.imageUrl} eventPlanDateISO={minskPlanDate(item.startsAt)} source="home-family-picks" planAttribution={{ planAddSource: "home-family-picks", recommendationExposureId: item.exposureId }} triggerLabel="В мой план" onSaveChange={onSave} />
+                    <div className="mt-auto pt-2">
+                      <p className="text-xs font-medium">{badge}</p>
+                      <div className="mt-3 flex flex-wrap gap-2"><SaveHeart activityId={item.id} activityTitle={item.title} coverImageUrl={item.imageUrl} eventPlanDateISO={minskPlanDate(item.startsAt)} source="home-family-picks" planAttribution={{ planAddSource: "home-family-picks", recommendationExposureId: item.exposureId }} triggerLabel="В мой план" onSaveChange={onSave} />
                       <button type="button" onClick={() => onDismiss(item)} className="min-h-11 px-2 text-sm underline">Не подходит</button></div>
+                    </div>
                   </div>
                 </AnalyticsCardViewTracker>
               </div>;
             })}
-            <div className={EVENT_CARD_SHELL}><Link href={href} onClick={() => void postAnalyticsEvent(homeCatalogEvent(selected, citySlug))} className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed p-6 text-center">Все события для {homeSelectionLabel(context, selected)}</Link></div>
+            <HomeMoreEventsCard href={href} onClick={() => void postAnalyticsEvent(homeCatalogEvent(selected, citySlug))} />
           </HorizontalCardRow>
         </>;
 }

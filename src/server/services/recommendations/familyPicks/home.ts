@@ -13,5 +13,8 @@ export async function loadHomeEvents(userId: string | null, cityId: string, city
     return { mode: "personal" as const, context, activities: [], actorId: userId };
   }
   const activities = await deps.common(cityId, citySlug, null, { take: 7 });
-  return { mode: "general" as const, context: null, activities, actorId: userId };
+  const childWithoutBirthDate = userId ? profile.children.find(child => !child.birthDate) : null;
+  return { mode: "general" as const, context: null, activities, actorId: userId,
+    hasChildren: profile.children.length > 0,
+    incompleteChild: childWithoutBirthDate ? { id: childWithoutBirthDate.id, name: childWithoutBirthDate.name } : null };
 }

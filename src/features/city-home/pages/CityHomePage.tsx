@@ -199,6 +199,8 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           />
         </Suspense>
 
+        <StoriesSection cityId={city.id} citySlug={city.slug} />
+
         <div className="px-1">
           <ActivationBannerHost />
         </div>
@@ -206,11 +208,9 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
         {events.mode === "error" ? <CityHomeSection title="Мероприятия для семьи"><p role="alert">Не удалось проверить профиль. Обновите страницу, чтобы повторить.</p></CityHomeSection> :
           <HomeEventsBoundary key={`${events.actorId}:${city.slug}:${events.mode}`} actorId={events.actorId} citySlug={city.slug}>
             {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={city.slug} initialContext={events.context} /> :
-              <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug} />}
+              <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug}
+                authenticated={Boolean(user)} hasChildren={events.hasChildren} incompleteChild={events.incompleteChild} />}
           </HomeEventsBoundary>}
-
-
-        <StoriesSection cityId={city.id} citySlug={city.slug} />
 
         {sectionAvailability.classes ? (
           <CityHomeClassesSection

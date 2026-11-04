@@ -26,6 +26,16 @@ for (const count of [0, 1, 2, 3]) {
   });
 }
 
+test("general result carries only the ACL-visible incomplete child for authenticated onboarding", async () => {
+  const result = await loadHomeEvents("account_a", "city_a", "minsk", {
+    profile: async () => ({ ...profile([]), audience: "no_child_with_DOB", children: [{ ...child, birthDate: null }] }),
+    context: async () => { throw new Error("should not read personal context"); },
+    common: async () => [],
+  }, true);
+  assert.equal(result.mode, "general");
+  assert.deepEqual(result.incompleteChild, { id: child.id, name: child.name });
+});
+
 test("guest/without DOB/deleted-last-child are general; flag rollback is one common block", async () => {
   for (const p of [profile([], null), { ...profile(), audience: "no_child_with_DOB" as const, children: [{ ...child, birthDate: null }] }, profile([])]) {
     const result = await loadHomeEvents(p.userId, "city_a", "minsk", { profile: async () => p, context: async () => { throw new Error("must not read personal"); }, common: async () => [] }, true);
