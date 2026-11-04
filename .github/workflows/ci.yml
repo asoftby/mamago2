@@ -97,7 +97,7 @@ jobs:
           pnpm exec tsx src/components/business/wizard/offer/offerIntentV1Entry.contract.test.ts
           pnpm exec tsx src/components/business/wizard/offer/offerWizardV2Steps.contract.test.ts
           pnpm exec tsx src/components/business/wizard/offer/PartyDurationCapacityFields.test.tsx
-          pnpm exec eslint src/components/business/wizard/offer/OfferWizard.tsx src/components/business/wizard/offer/offerIntentV1Entry.contract.test.ts src/components/business/wizard/offer/offerWizardV2Steps.contract.test.ts src/components/business/wizard/offer/PartyDurationCapacityFields.test.tsx src/components/business/wizard/offer/steps/Step2Placements.tsx src/components/business/wizard/offer/components/PartyDurationCapacityFields.tsx --quiet
+          pnpm exec eslint src/components/business/wizard/offer/OfferWizard.tsx src/components/business/wizard/offer/offerIntentV1Entry.contract.test.ts src/components/business/wizard/offer/offerWizardV2Steps.contract.test.ts src/components/business/wizard/offer/PartyDurationCapacityFields.test.tsx src/components/business/wizard/offer/steps/Step2Placements.tsx src/components/business/wizard/offer/components/PartyDurationCapacityFields.tsx src/components/business/wizard/offer/components/OfferCategoryPicker.tsx src/components/business/wizard/offer/steps/Step1Type.tsx src/components/business/wizard/offer/offerTypeChoices.ts --quiet
 
       - name: Business support notification routing contract
         run: pnpm exec tsx src/server/support/supportNoticeContract.test.ts

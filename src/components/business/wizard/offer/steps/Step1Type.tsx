@@ -61,6 +61,8 @@ export function Step1Type({ data, onChange, isEditable, showCategories = false }
         : prev.schedule,
       // Категории зависят от формата: при смене формата выбор сбрасывается.
       categoryIds: [],
+      // PartyCategory belongs to a specific single-service category, never a previous format.
+      partyCategory: null,
       serviceType: null,
       locationType: null,
       classFormat:
