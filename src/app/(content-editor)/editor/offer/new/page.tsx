@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { isOfferCtaStepFeatureEnabled } from "@/components/business/wizard/offer/ctaStepFeatureFlag";
-import { isOfferWizardV2Enabled } from "@/lib/business/businessFeatures";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -93,7 +92,7 @@ export default async function EditorNewOfferPage({
         defaultPlaceId={defaultPlaceId}
         creationIntent={creationIntent === "place" || creationIntent === "classes" || creationIntent === "parties" || creationIntent === "camps" ? creationIntent : undefined}
         ctaStepEnabled={ctaStepEnabled}
-        newWizard={isOfferWizardV2Enabled(business)}
+
       />
     </ContentEditorChrome>
   );

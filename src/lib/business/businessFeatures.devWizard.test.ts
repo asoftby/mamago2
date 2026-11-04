@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { isOfferWizardV2Enabled } from "./businessFeatures";
 
-const disabled = { features: { newOfferWizard: false } };
-const enabled = { features: { newOfferWizard: true } };
-
-test("DEV rollout requires both explicit APP_ENV and opt-in override", () => {
-  assert.equal(isOfferWizardV2Enabled(disabled, { APP_ENV: "dev", OFFER_WIZARD_V2_DEV_ENABLED: "true" }), true);
-  assert.equal(isOfferWizardV2Enabled(disabled, { APP_ENV: "DEV", OFFER_WIZARD_V2_DEV_ENABLED: "true" }), true);
-  assert.equal(isOfferWizardV2Enabled(disabled, { APP_ENV: "dev", OFFER_WIZARD_V2_DEV_ENABLED: "false" }), false);
-  assert.equal(isOfferWizardV2Enabled(disabled, { APP_ENV: "production", OFFER_WIZARD_V2_DEV_ENABLED: "true" }), false);
-  assert.equal(isOfferWizardV2Enabled(disabled, { APP_ENV: "prod", OFFER_WIZARD_V2_DEV_ENABLED: "true" }), false);
-  assert.equal(isOfferWizardV2Enabled(disabled, { APP_ENV: undefined, OFFER_WIZARD_V2_DEV_ENABLED: "true" }), false);
-  assert.equal(isOfferWizardV2Enabled(enabled, { APP_ENV: "production", OFFER_WIZARD_V2_DEV_ENABLED: "true" }), true);
+test("all offer editor entrypoints always use six-step V2", () => {
+  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
+  assert.match(wizard, /const variant: OfferWizardVariant = "v2";/);
+  assert.doesNotMatch(wizard, /newWizard/);
+  for (const path of [
+    "src/app/(content-editor)/editor/offer/new/page.tsx",
+    "src/app/(content-editor)/editor/offer/[id]/edit/page.tsx",
+  ]) {
+    const page = readFileSync(path, "utf8");
+    assert.match(page, /<OfferWizard/);
+    assert.doesNotMatch(page, /isOfferWizardV2Enabled|newWizard=/);
+  }
 });
