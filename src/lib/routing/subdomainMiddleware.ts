@@ -257,7 +257,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
           protocol,
           pathname: `/me${pathname}`,
           search: adminSafeSearch,
-          publicAppUrl,
+          // Preserve the DEV/PROD host even if NEXT_PUBLIC_APP_URL differs.
         }),
       };
     }
