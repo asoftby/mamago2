@@ -40,6 +40,14 @@ test("guest events use a uniform poster height without cropping and have one fin
   assert.equal((html.match(/Еще варианты/g) ?? []).length, 1);
 });
 
+test("public fallback is labeled as nearest events, not this week", () => {
+  const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={null}>
+    <CityHomeGeneralEvents activities={[]} citySlug="minsk" periodLabel="Ближайшие события" />
+  </AuthProvider></AppRouterContext.Provider>);
+  assert.match(html, /Ближайшие события/);
+  assert.doesNotMatch(html, /На этой неделе/);
+});
+
 test("logged-in no-child state shows add-child action, but never age filters", () => {
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" authenticated />

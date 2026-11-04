@@ -17,9 +17,10 @@ const FamilyActivationEditChildBirthOverlay = dynamic(() => import("./FamilyActi
 
 /** Guests see the public afisha without age chips, registration prompts or additional filter requests. */
 export function CityHomeGeneralEvents({
-  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null,
+  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null, periodLabel = "На этой неделе",
 }: {
   activities: ActivityMock[]; citySlug: string; authenticated?: boolean; hasChildren?: boolean;
+  periodLabel?: "На этой неделе" | "Ближайшие события";
   incompleteChild?: { id: string; name: string | null } | null;
 }) {
   const [addingChild, setAddingChild] = useState(false);
@@ -28,7 +29,7 @@ export function CityHomeGeneralEvents({
 
   return <CityHomeSection
     title={authenticated ? "События, которые подходят вам" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
-    subtitle="На этой неделе" reserveCarouselControls>
+    subtitle={periodLabel} reserveCarouselControls>
     {authenticated && (!hasChildren || incompleteChild) && <div className="mb-4 flex flex-wrap items-center gap-3">
       <span className="text-sm text-muted-foreground">
         {incompleteChild ? "Укажите возраст ребёнка для персональной афиши." : "Добавьте ребёнка — персонализируем афишу."}

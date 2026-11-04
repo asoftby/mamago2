@@ -209,7 +209,8 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           <HomeEventsBoundary key={`${events.actorId}:${city.slug}:${events.mode}`} actorId={events.actorId} citySlug={city.slug}>
             {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={city.slug} initialContext={events.context} /> :
               <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug}
-                authenticated={Boolean(user)} hasChildren={events.hasChildren} incompleteChild={events.incompleteChild} />}
+                periodLabel={events.periodLabel} authenticated={Boolean(user)}
+                hasChildren={events.hasChildren} incompleteChild={events.incompleteChild} />}
           </HomeEventsBoundary>}
 
         {sectionAvailability.classes ? (
