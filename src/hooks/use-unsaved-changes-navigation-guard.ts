@@ -21,6 +21,8 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
   useEffect(() => {
     if (!dirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Once leaving was confirmed in our own dialog, never show a second browser prompt.
+      if (confirmingLeaveRef.current) return;
       e.preventDefault();
       e.returnValue = "";
     };
@@ -31,7 +33,7 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
   useEffect(() => {
     if (!dirty) return;
     const onClickCapture = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       const a = el?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a?.href) return;
@@ -76,9 +78,12 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
     } else if (p) {
       router.push(p);
     }
-    queueMicrotask(() => {
+    // Keep suppression active during navigation; the previous microtask reset
+    // ran before a full-page navigation could trigger beforeunload.
+    // Restore protection if navigation failed or kept this editor mounted.
+    window.setTimeout(() => {
       confirmingLeaveRef.current = false;
-    });
+    }, 5000);
   }, [router]);
 
   const onLeaveDialogOpenChange = useCallback((open: boolean) => {
