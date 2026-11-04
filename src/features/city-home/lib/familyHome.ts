@@ -10,7 +10,7 @@ export type HomeFamilyContext = {
   day: string;
   policyVersion: string;
   audience: "guest" | "no_child_with_DOB" | "personalized";
-  children: { id: string; name: string | null; hasBirthDate: boolean; ageFilter: string[] }[];
+  children: { id: string; name: string | null; hasBirthDate: boolean; ageYears?: number | null; ageFilter: string[] }[];
   selectedChildId: string | null;
   preferenceVersion: string | null;
   selectionPersistence: "account" | "device";

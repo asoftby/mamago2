@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { homeCatalogHref, homeSelection, homeAgeLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
-import { FamilyHomeCache, HOME_DISMISS_TTL_MS, readHomeDismissals, writeHomeDismissals } from "./familyHomeCache";
+import { FamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 
 const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02", policyVersion: "v2", audience: "personalized",
@@ -72,6 +72,22 @@ test("dismiss removes every chip and refetch cannot resurrect, independent of PO
   }
 });
 
+test("child-scoped dismissal does not affect other children or the whole-family feed", () => {
+  const cache = new FamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+  for (const choice of [null, "child_0001", "child_0002"]) cache.set(context, "minsk", choice, delivery());
+  cache.dismiss("event_a", Date.now() + HOME_DISMISS_TTL_MS, "child_0001");
+  // A dismissal invalidates stale cache entries; fresh response must still be filtered.
+  for (const choice of [null, "child_0001", "child_0002"]) cache.set(context, "minsk", choice, delivery());
+  assert.deepEqual(cache.get(context, "minsk", "child_0001")?.items, [{ id: "event_b" }]);
+  assert.equal(cache.get(context, "minsk", "child_0002")?.items.length, 2);
+  assert.equal(cache.get(context, "minsk", null)?.items.length, 2);
+  // Same event can be rejected separately for a second child.
+  cache.dismiss("event_a", Date.now() + HOME_DISMISS_TTL_MS, "child_0002");
+  for (const choice of [null, "child_0001", "child_0002"]) cache.set(context, "minsk", choice, delivery());
+  assert.deepEqual(cache.get(context, "minsk", "child_0002")?.items, [{ id: "event_b" }]);
+  assert.equal(cache.get(context, "minsk", null)?.items.length, 2);
+});
+
 test("device dismissal storage is account-scoped, bounded and aligned with server 60-day TTL", () => {
   const storage = new Map<string, string>();
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) } });
@@ -86,11 +102,68 @@ test("device dismissal storage is account-scoped, bounded and aligned with serve
   } finally { Reflect.deleteProperty(globalThis, "localStorage"); }
 });
 
+test("failed or deleted-child dismissals cannot block valid entries or cause retry loops", async () => {
+  const entry = (token: string, child: string | null): HomeDismissal =>
+    ({ id: token, token, city: "minsk", exposureId: null, selectedChildId: child, at: Date.now(), saved: false });
+  const records = [entry("orphan", "deleted_child"), entry("valid", "child_0001"), entry("network", null)];
+  const attempts: string[] = [];
+  let failures = 0;
+  let writes = 0;
+  const flush = () => drainPendingHomeDismissals(
+    () => records, () => true,
+    async record => {
+      attempts.push(record.token);
+      if (record.token === "orphan" || (record.token === "network" && failures < 2)) {
+        throw new Error(record.token === "orphan" ? "home_404" : "home_503");
+      }
+    },
+    () => { writes++; },
+    () => { failures++; },
+  );
+  await flush();
+  assert.deepEqual(attempts, ["orphan", "valid", "network"]);
+  assert.deepEqual(records.map(record => record.saved), [false, true, false]);
+  assert.equal(writes, 1);
+  await flush();
+  assert.deepEqual(attempts, ["orphan", "valid", "network", "orphan", "network"]);
+  assert.deepEqual(records.map(record => record.saved), [false, true, true]);
+  assert.equal(writes, 2);
+});
+
+test("newly queued dismissals are sent while an earlier write is pending", async () => {
+  const records: HomeDismissal[] = [{ id: "first", token: "first", city: "minsk", exposureId: null, at: Date.now(), saved: false }];
+  const attempts: string[] = [];
+  await drainPendingHomeDismissals(
+    () => records, () => true,
+    async record => {
+      attempts.push(record.token);
+      if (record.token === "first") records.push({ id: "second", token: "second", city: "minsk", exposureId: null, at: Date.now(), saved: false });
+    },
+    () => {},
+    () => assert.fail("no write should fail"),
+  );
+  assert.deepEqual(attempts, ["first", "second"]);
+  assert.ok(records.every(record => record.saved));
+});
+
 test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty states", () => {
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
   assert.equal((ui.match(/<SaveHeart /g) ?? []).length, 1);
+  assert.ok(ui.includes("<FamilyActivationEditChildBirthOverlay"), "birth-only editor must preserve existing interests");
+  assert.match(ui, /attempt < 2/);
+  assert.match(ui, /error\.message === "home_409"/);
+  assert.match(ui, /deliveryScopeMatches/);
+  assert.match(ui, /const deadline = setTimeout/);
+  assert.match(ui, /clearTimeout\(deadline\)/);
+  assert.match(ui, /setData\(null\)/);
+  assert.match(ui, /keepalive: body.action === "dismiss"/, "dismissal request should survive page navigation");
+  assert.match(ui, /if \(dismissFlushActive.current \|\| !allowedActor.current\) return/, "dismissal writes must be serialized");
+  assert.match(ui, /await drainPendingHomeDismissals\(/, "retryable failures must not block other dismissals");
+  assert.match(ui, /void flushDismissals\(\);\s*void load\(\{ keepCurrent: true \}\)/,
+    "persist user rejection before fetching replacement recommendations");
+  assert.doesNotMatch(ui, /AddParticipantModal/);
   assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
-  for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 1', 'items.slice(0, 7)', 'role="alert"', 'horizonDays === 30', 'Все события для']) assert.ok(ui.includes(expected), expected);
+  for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'Все события для', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
   assert.doesNotMatch(page, /CityHomeKudaSection|getKudaDiscoveryFeed|hasHomeContent|kudaPreviewPromise/);
   assert.match(page, /events.mode === "personal"/);

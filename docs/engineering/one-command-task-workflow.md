@@ -1,6 +1,6 @@
 # One-command task workflow
 
-This is the preferred local workflow for every repository-changing mamaGo task.
+This is the preferred **Local Assisted** workflow for repository-changing mamaGo tasks. **GitHub Direct** is an equally valid first-class mode: it uses a fresh remote `dev` SHA, dedicated GitHub branch and task-only PR without local worktree or pre-push hook. Select it only when the applicable final-SHA GitHub CI and review provide the evidence required by `CLAUDE.md`; otherwise use Local Assisted.
 It automates the existing safety model; it does not weaken it.
 
 ## Who should run it
@@ -43,7 +43,7 @@ mgtask stories-display-rules fix
 mgfinish
 ```
 
-`mgcheck` is an optional preflight when you want the full common gate before finishing. It is not required immediately before `mgfinish`, because the repository pre-push hook already runs `pnpm check:push` during `mgfinish`.
+`mgcheck` is an optional preflight. It uses the same isolated full-gate wrapper as the pre-push hook and records a worktree-local PASS proof. On unchanged HEAD, clean worktree, current `origin/dev`, matching installed dependencies/Prisma Client and Node/pnpm/environment, `mgfinish` validates and reuses the proof instead of rerunning the full gate. Any mismatch runs the full gate. The normal fast path remains targeted checks followed by `mgfinish` once; never bypass the hook or hide a failed gate.
 
 For an agent session, the agent should execute the equivalent repository scripts itself without asking the user to copy these commands.
 
@@ -108,7 +108,7 @@ mgcheck
 7. runs `git diff --check`;
 8. requires Node 22 and `pnpm`;
 9. `worktree-deps.sh ensure`: installs dependencies if the worktree has no `node_modules`, regenerates the Prisma Client if its schema/config/generated-client fingerprint is missing or changed, and fails if `node_modules` is a symlink pointing outside the worktree;
-10. runs `pnpm check:push`.
+10. runs `scripts/git/run-push-gate.sh`: the same isolated Next.js gate build as pre-push, with PASS proof recorded only on success. `mgfinish` reuses this proof only if all input and freshness guards still match.
 
 Targeted tests required by the task are still the agent/developer's responsibility. `mgcheck` is the common repository gate, not a replacement for task-specific verification.
 
@@ -158,9 +158,9 @@ Agents or environments that do not use the interactive shortcuts can call the re
 sh scripts/git/task-start.sh <slug> [prefix]
 
 # task worktree
-sh scripts/git/task-sync.sh
-sh scripts/git/task-check.sh      # optional common preflight
-sh scripts/git/task-finish.sh
+sh scripts/git/task-sync.sh       # optional explicit sync; finish also syncs
+sh scripts/git/task-check.sh      # optional full preflight; duplicates finish's full gate
+sh scripts/git/task-finish.sh     # standard final gate via pre-push hook
 ```
 
 Agents with repository shell access should execute these themselves. They should not ask the user to manually create branches/worktrees or repeat routine Git commands unless a safety stop requires human judgment.

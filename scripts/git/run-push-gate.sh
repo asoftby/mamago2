@@ -21,6 +21,32 @@ if [ -f scripts/git/worktree-deps.sh ]; then
   sh scripts/git/worktree-deps.sh check || exit 1
 fi
 
+# Refresh the integration base even for a direct git push outside task-finish.
+# A failed fetch must never certify a stale PASS.
+if ! git fetch --quiet origin dev; then
+  echo "[pre-push] STOP: cannot refresh origin/dev for gate proof." >&2
+  exit 1
+fi
+
+# The installed pnpm graph must match the committed lockfile BEFORE any expensive gate.
+node scripts/git/full-gate-proof.cjs validate || exit 1
+
+# A caller-provided test DB is supported, but its results must NEVER be reused.
+# This is a cache-ineligibility condition, not a reason to block the real gate.
+cache_enabled=1
+if [ -n "${GATE_DATABASE_URL:-}" ]; then
+  cache_enabled=0
+else
+  if node scripts/git/full-gate-proof.cjs check; then
+    echo "[pre-push] Full push gate already passed for this exact candidate."
+    exit 0
+  fi
+fi
+node scripts/git/full-gate-proof.cjs clear || exit 1
+if [ "$cache_enabled" -eq 1 ]; then
+  node scripts/git/full-gate-proof.cjs begin || exit 1
+fi
+
 gate_dir="${NEXT_DIST_DIR:-node_modules/.cache/next-gate}"
 max_gb="${NEXT_CACHE_MAX_GB:-6}"
 max_kb=$((max_gb * 1024 * 1024))
@@ -66,12 +92,18 @@ for f in tsconfig.json next-env.d.ts; do
   [ -f "$f" ] && cp "$f" "$backup/$f"
 done
 
-NEXT_DIST_DIR="$gate_dir" pnpm check:push
-status=$?
+status=0
+NEXT_DIST_DIR="$gate_dir" pnpm check:push || status=$?
 
 for f in tsconfig.json next-env.d.ts; do
   [ -f "$backup/$f" ] && cp "$backup/$f" "$f"
 done
 rm -rf "$backup"
 
+if [ "$status" -eq 0 ] && [ "$cache_enabled" -eq 1 ]; then
+  # A missing or changed initial fingerprint is a hard failure.
+  node scripts/git/full-gate-proof.cjs record || exit 1
+else
+  node scripts/git/full-gate-proof.cjs abort || exit 1
+fi
 exit "$status"

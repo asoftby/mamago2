@@ -39,10 +39,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const ip = getTrustedClientIp(request);
   if (!ip) {
-    // Preserves the endpoint's original behavior: without a trusted proxy,
-    // this anonymous, unauthenticated endpoint does nothing at all rather
-    // than fall back to only email-scoped rate limiting.
-    return acceptedResponse(startedAt);
+    // Never accept a request that we cannot safely rate-limit by trusted IP.
+    // Report a generic service failure rather than claiming a link was sent.
+    // This is identical for known and unknown accounts (no email oracle).
+    return NextResponse.json(
+      { accepted: false, message: "Активация временно недоступна. Попробуйте позже." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   await requestMigratedAccountActivationByEmail({ email, ip, source: "MANUAL_REQUEST" });

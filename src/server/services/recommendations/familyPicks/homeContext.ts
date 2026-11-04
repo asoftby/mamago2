@@ -1,5 +1,5 @@
 import "server-only";
-import { ageMonthsIntervalAt } from "@/lib/child/birth";
+import { ageMonthsIntervalAt, ageYearsAt } from "@/lib/child/birth";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { activePlanScopeFor, familyReadsEnabled, childScopeFor } from "@/server/family/familyAccess";
@@ -25,6 +25,7 @@ export async function loadHomeContext(userId: string | null, snapshot?: FamilyPi
     actorId: userId, signature, day, policyVersion: PERSONAL_FAMILY_PICKS_POLICY.version,
     audience: profile.audience, selectedChildId: null, preferenceVersion: null, selectionPersistence: "account",
     children: children.map(child => ({ id: child.id, name: child.name, hasBirthDate: Boolean(child.birthDate),
+      ageYears: ageYearsAt(child, new Date(day + "T12:00:00Z")),
       ageFilter: (() => {
         const range = ageMonthsIntervalAt(child, new Date(`${day}T00:00:00Z`));
         return range ? ageFilterKeysForChildren([{ ageMonths: range.min }, { ageMonths: range.max }]) : [];

@@ -73,7 +73,7 @@ fi
 # node_modules symlink pointing outside the worktree.
 sh scripts/git/worktree-deps.sh ensure
 
-echo "[task-check] Running pnpm check:push"
-pnpm check:push
+echo "[task-check] Running the full push-gate wrapper (reuses only valid PASS proof)"
+sh scripts/git/run-push-gate.sh
 
 echo "[task-check] PASS: branch is current with origin/dev and full push checks passed."

@@ -55,6 +55,9 @@ async function main(): Promise<void> {
       ["production", "production", "false", "true", "DELIVERY_DISABLED"],
       ["production", "production", "true", "false", "DELIVERY_DISABLED"],
       ["production", "production", "true", "true", "DELIVERY_ALLOWED"],
+      ["production", "prod", "true", "true", "DELIVERY_ALLOWED"],
+      ["production", "prod", "false", "false", "DELIVERY_DISABLED"],
+      ["production", "development", "true", "true", "DELIVERY_DISABLED"],
     ] as const;
     for (const [nodeEnv, appEnvironment, productionEnabled, productionApproved, status] of matrix) {
       assert.deepEqual(
@@ -67,6 +70,24 @@ async function main(): Promise<void> {
         { status },
       );
     }
+    assert.deepEqual(
+      resolveActivationEmailDelivery({
+        nodeEnv: "production",
+        appEnvironment: "prod",
+        productionEnabled: "false",
+        productionApproved: "false",
+      }, "SELF_SERVICE"),
+      { status: "DELIVERY_ALLOWED" },
+    );
+    assert.deepEqual(
+      resolveActivationEmailDelivery({
+        nodeEnv: "development",
+        appEnvironment: "prod",
+        productionEnabled: "true",
+        productionApproved: "true",
+      }, "SELF_SERVICE"),
+      { status: "DELIVERY_DISABLED" },
+    );
     assert.deepEqual(
       resolveActivationEmailDelivery({
         nodeEnv: undefined,
@@ -232,7 +253,11 @@ async function main(): Promise<void> {
       ),
     );
     process.env.TRUST_PROXY_HEADERS = "true";
-    assert.equal(untrustedHeaderResponse.status, 202);
+    assert.equal(untrustedHeaderResponse.status, 503);
+    assert.deepEqual(await untrustedHeaderResponse.json(), {
+      accepted: false,
+      message: "Активация временно недоступна. Попробуйте позже.",
+    });
     assert.equal(
       await prisma.userActionToken.count({ where: { userId: pending.id } }),
       beforeUntrustedRequest,

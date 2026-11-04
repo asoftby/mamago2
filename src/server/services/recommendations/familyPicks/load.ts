@@ -381,7 +381,7 @@ type PersonalExtras = {
 type PersonalLoadDependencies = {
   loadProfile: typeof loadFamilyPicksProfile;
   rank: typeof rankPlanSuggestionsForCity;
-  loadExcluded: (userId: string, now: Date) => Promise<string[]>;
+  loadExcluded: (userId: string, now: Date, selection: PersonalFamilySelection) => Promise<string[]>;
   loadAffinity: typeof resolveSelectedExperienceAffinity;
   loadExtras: (ids: string[], now: Date, range: { start: Date; end: Date }) => Promise<PersonalExtras[]>;
 };
@@ -389,16 +389,27 @@ const personalDependencies: PersonalLoadDependencies = {
   loadProfile: loadFamilyPicksProfile,
   rank: rankPlanSuggestionsForCity,
   loadAffinity: resolveSelectedExperienceAffinity,
-  loadExcluded: async (userId, now) => {
+  loadExcluded: async (userId, now, selection) => {
     const [planned, dismissed] = await Promise.all([
       prisma.planItem.findMany({ where: { ...(await activePlanScopeFor(userId)), activityId: { not: null } }, select: { activityId: true } }),
-      // v2 is account-scoped: an adult's rejection is not another adult's preference.
+      // HOME dismissal is scoped to the account AND optional owned child.
+      // Legacy dismissals with no child remain account-wide.
       prisma.userEvent.findMany({ where: {
         userId, eventType: "DISMISS", entityType: "EVENT", entityId: { not: null },
         createdAt: { gte: new Date(now.getTime() - DEFAULT_FAMILY_PICKS_CONFIG.dismissCooldownDays * 86_400_000) },
-      }, select: { entityId: true } }),
+      }, orderBy: { createdAt: "desc" }, take: 2000, select: { entityId: true, meta: true } }),
     ]);
-    return [...planned.flatMap(row => row.activityId ? [row.activityId] : []), ...dismissed.flatMap(row => row.entityId ? [row.entityId] : [])];
+    return [
+      ...planned.flatMap(row => row.activityId ? [row.activityId] : []),
+      ...dismissed.flatMap(row => {
+        if (!row.entityId) return [];
+        const meta = row.meta && typeof row.meta === "object" && !Array.isArray(row.meta) ? row.meta : {};
+        const childScope = typeof meta.homeSelectedChildId === "string" ? meta.homeSelectedChildId : null;
+        // All-family selection does not inherit individual child rejections.
+        if (childScope && (selection.mode !== "CHILD" || childScope !== selection.selectedChildId)) return [];
+        return [row.entityId];
+      }),
+    ];
   },
   loadExtras: (ids, now, range) => prisma.activity.findMany({
     // Recheck visibility at hydration, not only at shared candidate generation.
@@ -470,7 +481,7 @@ export async function loadPersonalFamilyPicks(input: {
     ? profile.children.filter(child => child.id === selection.selectedChildId) : profile.children;
   const subjects: Subject[] = selectedChildren.map(child => ({ kind: "child", refId: child.id, source: "profile" }));
   const [storedExcluded, experienceAffinity] = await Promise.all([
-    deps.loadExcluded(profile.userId, now), deps.loadAffinity({ userId: profile.userId, subjects, now }),
+    deps.loadExcluded(profile.userId, now, selection), deps.loadAffinity({ userId: profile.userId, subjects, now }),
   ]);
   const excluded = [...new Set([...storedExcluded, ...(input.excludeActivityIds ?? [])])];
   let lastAlgorithmVersion: string | null = null;

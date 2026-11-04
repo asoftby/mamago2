@@ -2,44 +2,56 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync("src/components/shared/CreatePublicationQuickMenu.tsx", "utf8");
+const menu = readFileSync("src/components/shared/CreatePublicationQuickMenu.tsx", "utf8");
+const page = readFileSync("src/app/(content-editor)/editor/offer/new/page.tsx", "utf8");
+const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
 
-test("business creation shows family-facing intents, not Event/Offer model choices", () => {
+test("business creation distinguishes the place profile from its visit offer", () => {
   for (const label of [
     "Мероприятие",
-    "Место для посещения",
+    "Добавить место",
+    "Предложение о посещении",
     "Занятия и кружки",
     "Дни рождения и услуги",
     "Лагеря и каникулы",
   ]) {
-    assert.ok(source.includes(`label: "${label}"`));
+    assert.ok(menu.includes(`label: "${label}"`), label);
   }
-  assert.ok(source.includes('publicationMode === "full"'));
-  assert.ok(source.includes(": BUSINESS_INTENTS"));
+  assert.match(menu, /id: "visit-place",[\s\S]*?href: "\/editor\/place\/new"/);
+  assert.match(menu, /id: "place-offer",[\s\S]*?href: "\/editor\/offer\/new\?creationIntent=place"/);
+  assert.ok(menu.includes('publicationMode === "full"'));
+  assert.ok(menu.includes(": BUSINESS_INTENTS"));
+  assert.ok(menu.includes("currentSurfaceReturnTo"));
 });
 
-test("business intent routing reuses current editors, without writes or duplicates", () => {
-  assert.ok(source.includes('href: "/editor/event/new"'));
-  assert.ok(source.includes('href: "/editor/place/new"'));
-  assert.ok(source.includes('href: "/editor/offer/new"'));
-  assert.ok(source.includes("currentSurfaceReturnTo"));
+test("place creation stays available but is visually separated after offer intents", () => {
+  const businessStart = menu.indexOf("const BUSINESS_INTENTS: Item[] = [");
+  const businessEnd = menu.indexOf("\n];", businessStart);
+  assert.ok(businessStart >= 0 && businessEnd > businessStart);
+  const intents = menu.slice(businessStart, businessEnd);
+  assert.ok(intents.indexOf('id: "visit-place"') > intents.indexOf('id: "camps"'));
+  assert.match(intents, /id: "visit-place",[\s\S]*?label: "Добавить место"/);
+  assert.match(menu, /publicationMode === "business" && item\.id === "visit-place"/);
+  assert.match(menu, /role="separator"/);
+  assert.match(menu, /aria-label=\{publicationMode === "business" \? "Добавить"/);
 });
 
-test("business intent preselects offer type without creating another entity", () => {
-  for (const intent of ["classes", "parties", "camps"]) {
-    assert.ok(source.includes(`/editor/offer/new?creationIntent=${intent}`));
+test("place visit offer uses the existing OFFER model and editor", () => {
+  for (const intent of ["place", "classes", "parties", "camps"]) {
+    assert.ok(menu.includes(`/editor/offer/new?creationIntent=${intent}`), intent);
+    assert.ok(page.includes(`creationIntent === "${intent}"`), intent);
   }
-  const page = readFileSync("src/app/(content-editor)/editor/offer/new/page.tsx", "utf8");
-  assert.ok(page.includes("creationIntent={creationIntent"));
-  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
-  assert.ok(wizard.includes('creationIntent === "classes" ? "REGULAR_ACTIVITY"'));
-  assert.ok(wizard.includes('creationIntent === "parties" ? "PARTY_SERVICE"'));
-  assert.ok(wizard.includes('creationIntent === "camps" ? "CAMP"'));
-  assert.ok(wizard.includes('creationIntent ? "about" : "type"'));
+  assert.match(wizard, /creationIntent === "place" \? "PLACE_VISIT"/);
+  const info = readFileSync("src/components/business/wizard/offer/steps/Step2Information.tsx", "utf8");
+  assert.match(info, /isClassOffer \|\| data\.productType === "PLACE_VISIT"/);
+  assert.match(info, /<OfferCategoryPicker/);
+  assert.ok(wizard.includes("...getOfferTypeSelection(selectedType)"));
+  assert.match(wizard, /variant === "v2" \? "about" : creationIntent === "parties" \? "placements" : "details"/);
 });
 
-test("subtype choices preserve shared content and remain on the About step", () => {
-  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
+test("subtype questions stay available for classes and parties", () => {
+  assert.ok(wizard.includes('creationIntent === "classes" && ('));
+  assert.ok(wizard.includes('creationIntent === "parties" && ('));
   assert.ok(wizard.includes("<OfferSubtypeClarifier group={creationIntent}"));
   const clarifier = readFileSync("src/components/business/wizard/offer/components/OfferSubtypeClarifier.tsx", "utf8");
   for (const type of ["ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "PARTY_SERVICE", "PARTY_PACKAGE"]) {
@@ -47,4 +59,11 @@ test("subtype choices preserve shared content and remain on the About step", () 
   }
   assert.ok(clarifier.includes("...getOfferTypeSelection(item.type)"));
   assert.ok(!clarifier.includes("categoryIds: []"));
+});
+
+test("business creation cards have equal height and two-line descriptions, without technical captions", () => {
+  assert.ok(menu.includes('min-h-[104px] items-center'));
+  assert.ok(menu.includes('line-clamp-2 min-h-10 max-w-[260px] leading-5'));
+  assert.ok(!menu.includes('Создаёт Place'));
+  assert.ok(!menu.includes('Создаёт Offer'));
 });
