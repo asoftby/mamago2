@@ -102,12 +102,6 @@ export function OfferCard({
             </span>
           )}
 
-          {/* Price badge — bottom right */}
-          {priceLabel && (
-            <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(250,247,241,0.93)] text-[#141210]">
-              {renderPriceWithIcon(normalizeUiCurrencyText(priceLabel ?? ""))}
-            </span>
-          )}
         </div>
 
         {/* Text */}
@@ -120,9 +114,15 @@ export function OfferCard({
           <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors group-hover:text-[#C24E22]">
             {title}
           </div>
-          {dateLabel && (
-            <div className="mt-0.5 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-              {dateLabel}
+          {(dateLabel || priceLabel) && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-1 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
+              {dateLabel && <span>{dateLabel}</span>}
+              {dateLabel && priceLabel && <span aria-hidden="true">·</span>}
+              {priceLabel && (
+                <span className={/бесплатно|^free$/i.test(priceLabel.trim()) ? "font-medium text-[var(--success)]" : "text-[#141210]"}>
+                  {renderPriceWithIcon(normalizeUiCurrencyText(priceLabel))}
+                </span>
+              )}
             </div>
           )}
         </div>
