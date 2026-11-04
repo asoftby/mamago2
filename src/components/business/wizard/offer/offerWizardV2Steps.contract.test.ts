@@ -3,12 +3,19 @@ import { readFileSync } from "node:fs";
 import { getDefaultFormData } from "./defaults";
 import { partyCategoryFromOfferCategorySlug } from "./offerTypeChoices";
 import { V2_STEPS, V2_STEP_KEYS, getV2StepMembers, isV2CompositeStepKey } from "./offerWizardV2Steps";
+import { getStepsForOfferType } from "./offerWizardSteps.config";
+import { getOfferTypeSelection } from "./offerTypeChoices";
 
 const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
 
 {
   // новый мастер: ровно 6 шагов в нужном порядке; составные — about/services/schedule/terms
   assert.deepEqual(V2_STEPS.map((s) => s.key), V2_KEYS);
+  assert.deepEqual(getStepsForOfferType(null, null, "v2").map((s) => s.key), V2_KEYS);
+  for (const productType of ["PLACE_VISIT", "ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "CAMP", "PARTY_SERVICE", "PARTY_PACKAGE"] as const) {
+    const selected = getOfferTypeSelection(productType);
+    assert.deepEqual(getStepsForOfferType(selected.offerWizardType, productType, "v2").map((s) => s.key), V2_KEYS, productType);
+  }
   assert.deepEqual([...V2_STEP_KEYS], ["about", "services", "schedule", "terms"]);
   assert.ok(isV2CompositeStepKey("about"));
   assert.ok(!isV2CompositeStepKey("type"));

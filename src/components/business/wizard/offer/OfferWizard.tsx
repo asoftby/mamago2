@@ -117,8 +117,6 @@ interface OfferWizardProps {
   /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
   initialStepNumber?: number;
   ctaStepEnabled?: boolean;
-  /** Новый мастер из 6 шагов (Business.features.newOfferWizard). */
-  newWizard?: boolean;
   /** Колонки ожидающей ревизии опубликованного оффера (правки автора ждут модерации). */
   pendingRevisionFields?: string[];
   /** Версия операционных данных оффера на момент загрузки редактора (защита от записи устаревшего снимка). */
@@ -287,11 +285,10 @@ export function OfferWizard({
   returnTo,
   initialStepNumber,
   ctaStepEnabled,
-  newWizard = false,
   pendingRevisionFields,
   operationalVersion: initialOperationalVersion,
 }: OfferWizardProps) {
-  const variant: OfferWizardVariant = newWizard ? "v2" : "v1";
+  const variant: OfferWizardVariant = "v2";
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {

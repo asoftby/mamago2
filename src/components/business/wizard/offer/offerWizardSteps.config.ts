@@ -93,8 +93,8 @@ export function getStepsForOfferType(
   productType?: OfferProductType | null,
   variant: OfferWizardVariant = "v1",
 ): OfferWizardStepDef[] {
-  if (!type) return [];
   if (variant === "v2") return V2_STEPS;
+  if (!type) return [];
 
   const priceStepTitle = type === "CAMP" ? "Участие" : "Цена";
   const priceStepDescription =

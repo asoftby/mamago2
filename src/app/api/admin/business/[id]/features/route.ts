@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 /**
  * PATCH /api/admin/business/[id]/features
- * Body: { newOfferWizard?: boolean, leadForm?: boolean, selections?: boolean }
+ * Body: { leadForm?: boolean, selections?: boolean }
  * Меняет только перечисленные ключи `Business.features`.
  */
 export async function PATCH(
