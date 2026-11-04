@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -122,14 +122,6 @@ const BUSINESS_INTENTS: Item[] = [
     Icon: Calendar,
   },
   {
-    id: "visit-place",
-    kind: "link",
-    href: "/editor/place/new",
-    label: "Страница места",
-    description: "Музей, кафе, игровая комната или другая площадка с собственной страницей",
-    Icon: MapPin,
-  },
-  {
     id: "place-offer",
     kind: "link",
     href: "/editor/offer/new?creationIntent=place",
@@ -160,6 +152,14 @@ const BUSINESS_INTENTS: Item[] = [
     label: "Лагеря и каникулы",
     description: "Детские лагеря, смены, программы и отдых во время каникул",
     Icon: Sun,
+  },
+  {
+    id: "visit-place",
+    kind: "link",
+    href: "/editor/place/new",
+    label: "Добавить место",
+    description: "Адрес, фотографии и информация об объекте",
+    Icon: MapPin,
   },
 ];
 
@@ -238,12 +238,15 @@ export function CreatePublicationQuickMenu({
           })();
 
           return (
-            <Link
-              key={item.id}
-              href={href}
-              onClick={() => setOpen(false)}
-              className={itemRowClass}
-            >
+            <Fragment key={item.id}>
+              {publicationMode === "business" && item.id === "visit-place" && (
+                <div role="separator" aria-orientation="horizontal" className="my-2 border-t border-border" />
+              )}
+              <Link
+                href={href}
+                onClick={() => setOpen(false)}
+                className={itemRowClass}
+              >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Icon className="h-5 w-5" />
               </span>
@@ -257,7 +260,8 @@ export function CreatePublicationQuickMenu({
                   </span>
                 ) : null}
               </span>
-            </Link>
+              </Link>
+            </Fragment>
           );
         }
 
@@ -298,7 +302,7 @@ export function CreatePublicationQuickMenu({
           size="icon"
           className={cn(HEADER_CHROME_ICON_BUTTON_CLASS)}
           onClick={() => setOpen(true)}
-          aria-label="Создать публикацию"
+          aria-label={publicationMode === "business" ? "Добавить" : "Создать публикацию"}
         >
           <Plus className="h-4 w-4" />
         </Button>
