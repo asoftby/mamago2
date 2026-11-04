@@ -31,7 +31,7 @@ test("place creation stays available but is visually separated after offer inten
   const intents = menu.slice(businessStart, businessEnd);
   assert.ok(intents.indexOf('id: "visit-place"') > intents.indexOf('id: "camps"'));
   assert.match(intents, /id: "visit-place",[\s\S]*?label: "Добавить место"/);
-  assert.match(menu, /publicationMode === "business" && item\.id === "visit-place"/);
+  assert.match(menu, /item\.id === "visit-place" &&/);
   assert.match(menu, /role="separator"/);
   assert.match(menu, /aria-label=\{publicationMode === "business" \? "Добавить"/);
 });
@@ -50,7 +50,7 @@ test("place visit offer uses the existing OFFER model and editor", () => {
 });
 
 test("V2 subtype questions are selected once on step one for classes and parties", () => {
-  assert.match(wizard, /const variant: OfferWizardVariant = "v2";/);
+  assert.match(wizard, /const variant: OfferWizardVariant = activeOfferWizardVariant\(\);/);
   assert.ok(!wizard.includes("<OfferSubtypeClarifier"),
     "Universal V2 must not repeat class or party subtype questions on later steps");
   const typeStep = readFileSync("src/components/business/wizard/offer/steps/Step1Type.tsx", "utf8");

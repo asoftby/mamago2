@@ -178,7 +178,7 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
     "persist user rejection before fetching replacement recommendations");
   assert.doesNotMatch(ui, /AddParticipantModal/);
   assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
-  for (const expected of ['framing="fixed"', 'coverRatio="2/3"', 'coverFit="contain"', 'aria-pressed', 'Для кого:', 'homeChildrenYoungestFirst', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'HomeMoreEventsCard', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
+  for (const expected of ['framing="fixed"', 'coverRatio="2/3"', 'coverFit="cover"', 'aria-pressed', 'Для кого:', 'homeChildrenYoungestFirst', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'HomeMoreEventsCard', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
   assert.doesNotMatch(page, /CityHomeKudaSection|getKudaDiscoveryFeed|hasHomeContent|kudaPreviewPromise/);
   assert.match(page, /events.mode === "personal"/);

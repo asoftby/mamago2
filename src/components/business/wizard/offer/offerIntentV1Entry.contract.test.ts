@@ -8,7 +8,7 @@ const v2 = readFileSync("src/components/business/wizard/offer/offerWizardV2Steps
 const quickMenu = readFileSync("src/components/shared/CreatePublicationQuickMenu.tsx", "utf8");
 
 test("every business menu offer starts on V2 step one with its type preselected", () => {
-  assert.match(source, /const variant: OfferWizardVariant = "v2";/);
+  assert.match(source, /const variant: OfferWizardVariant = activeOfferWizardVariant\(\);/);
   assert.match(source, /if \(mode !== "edit" \|\| !offer \|\| initialStepNumber == null \|\| initialStepNumber < 1\) \{\s*\/\/[^\n]*\n\s*return "type";/);
   for (const [intent, productType] of [
     ["place", "PLACE_VISIT"],
@@ -25,7 +25,7 @@ test("every business menu offer starts on V2 step one with its type preselected"
 });
 
 test("party and class details are part of V2 composite steps without repeated subtype prompts", () => {
-  assert.match(config, /if \(variant === "v2"\) return V2_STEPS;\s*if \(!type\) return \[\];/);
+  assert.match(config, /if \(variant === "v2"\) return getV2StepsForProductType\(productType\);\s*if \(!type\) return \[\];/);
   assert.match(v2, /case "about":/);
   assert.match(v2, /isParty \? \["placements", "details", "photo"\]/);
   assert.match(source, /case "placements":\s*return <Step2Placements[^;]*v2 \/>;/);

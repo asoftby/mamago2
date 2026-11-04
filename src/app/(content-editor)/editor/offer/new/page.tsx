@@ -92,6 +92,7 @@ export default async function EditorNewOfferPage({
         defaultPlaceId={defaultPlaceId}
         creationIntent={creationIntent === "place" || creationIntent === "classes" || creationIntent === "parties" || creationIntent === "camps" ? creationIntent : undefined}
         ctaStepEnabled={ctaStepEnabled}
+
       />
     </ContentEditorChrome>
   );

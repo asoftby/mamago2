@@ -55,6 +55,19 @@ export const V2_STEPS: OfferWizardStepDef[] = [
   },
 ];
 
+/** For regular classes, a group must be configured before a group tariff.
+ * Keep step ordering independent of UI imports so it is testable in Node. */
+export function getV2StepsForProductType(productType: OfferProductType | null | undefined): OfferWizardStepDef[] {
+  if (productType !== "REGULAR_ACTIVITY") return V2_STEPS;
+  const order: OfferWizardStepKey[] =
+    ["type", "about", "schedule", "services", "terms", "review"];
+  return order.map((key) => {
+    const step = V2_STEPS.find((candidate) => candidate.key === key);
+    if (!step) throw new Error(`Missing V2 step: ${key}`);
+    return step;
+  });
+}
+
 export function v2StepDefWithoutKey(key: OfferWizardStepKey): Omit<OfferWizardStepDef, "key"> {
   const def = V2_STEPS.find((step) => step.key === key)!;
   return { title: def.title, description: def.description, shortLabel: def.shortLabel };

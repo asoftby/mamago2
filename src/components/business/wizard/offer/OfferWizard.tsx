@@ -86,6 +86,12 @@ import { PartyResourceSchedule } from "./components/PartyResourceSchedule";
 import { Step6Contacts } from "./steps/Step6Contacts";
 import { FaqStep } from "../shared/FaqStep";
 
+// Central, unconditional V2 selection. Return the union type to preserve
+// compatibility of legacy branches until the old flow can be deleted.
+function activeOfferWizardVariant(): OfferWizardVariant {
+  return "v2";
+}
+
 interface OfferWizardProps {
   mode: OfferWizardMode;
   offer?: Offer & {
@@ -287,7 +293,8 @@ export function OfferWizard({
   pendingRevisionFields,
   operationalVersion: initialOperationalVersion,
 }: OfferWizardProps) {
-  const variant: OfferWizardVariant = "v2";
+  // V2 is the only active editor flow for every offer and every user role.
+  const variant: OfferWizardVariant = activeOfferWizardVariant();
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {

@@ -129,6 +129,7 @@ export default async function EditorEditOfferPage({
         pendingRevisionFields={pendingRevision?.fields}
         operationalVersion={offerOperationalVersion(offer as unknown as Record<string, unknown>)}
         ctaStepEnabled={ctaStepEnabled}
+
       />
     </ContentEditorChrome>
   );
