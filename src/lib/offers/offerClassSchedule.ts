@@ -281,6 +281,12 @@ export function getClassScheduleMissingFields(
   if (productType === "REGULAR_ACTIVITY") {
     const valid = form.groups.filter((group) => group.days.length > 0 && TIME_RE.test(group.time));
     if (valid.length === 0) missing.push("Дни и время занятий");
+    // Every priced group must survive serialization. Otherwise publication
+    // silently drops tariffs belonging to unscheduled groups.
+    if (form.groups.some((group) =>
+      (group.tariffs?.length ?? 0) > 0 &&
+      (group.days.length === 0 || !TIME_RE.test(group.time))
+    )) missing.push("Расписание для каждой группы с тарифами");
     if (duration !== null && valid.some((group) => (timeToMinutes(group.time) ?? 0) + duration > 1440)) {
       missing.push("Занятие заканчивается после полуночи");
     }
