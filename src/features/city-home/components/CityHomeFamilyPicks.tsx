@@ -21,30 +21,7 @@ import { HomeSelectionSync, persistHomeSelection } from "../lib/homeSelectionSyn
 import { FamilyHomeCache, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
 import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
-
-async function post(body: Record<string, unknown>, signal?: AbortSignal) {
-  const timeout = new AbortController();
-  // React Strict Mode deliberately unmounts effects and cancels stale requests.
-  // Give cancellation an explicit reason and translate expected aborts into
-  // application errors so a routine cleanup never surfaces as an AbortError.
-  const onAbort = () => timeout.abort(new Error("home_request_cancelled"));
-  if (signal?.aborted) onAbort();
-  else signal?.addEventListener("abort", onAbort, { once: true });
-  const timer = setTimeout(() => timeout.abort(new Error("home_request_timeout")), 15_000);
-  try {
-    const response = await fetch("/api/recommendations/family-picks", { method: "POST", credentials: "include", cache: "no-store",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: timeout.signal,
-      keepalive: body.action === "dismiss" });
-    if (!response.ok) throw new Error(`home_${response.status}`);
-    return await response.json();
-  } catch (error) {
-    if (timeout.signal.aborted) {
-      throw new Error(signal?.aborted ? "home_request_cancelled" : "home_request_timeout");
-    }
-    throw error;
-  } finally { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); }
-
-}
+import { postFamilyPicks as post } from "../lib/familyPicksRequest";
 
 export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: string; initialContext: HomeFamilyContext }) {
   const router = useRouter();
@@ -123,8 +100,9 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       // reach the ranker, and a stale signature can be retried once.
       for (let attempt = 0; attempt < 2; attempt++) {
         if (!valid()) return;
-        const fresh = (await post({ action: "context", city: citySlug }, abort.signal)).context as HomeFamilyContext;
-        if (!valid()) return;
+        const contextResponse = await post({ action: "context", city: citySlug }, abort.signal);
+        if (!valid() || contextResponse === null) return;
+        const fresh = contextResponse.context as HomeFamilyContext;
         if (fresh.actorId !== actor || fresh.audience !== "personalized") {
           setData(null);
           setState("loading");
@@ -153,9 +131,11 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         }
         let result: HomeFamilyDelivery;
         try {
-          result = await post({ action: "recommend", city: citySlug, selectedChildId: choice, signature: fresh.signature,
+          const response = await post({ action: "recommend", city: citySlug, selectedChildId: choice, signature: fresh.signature,
             dismissedIds: dismissals.current.filter(entry =>
-              !entry.selectedChildId || entry.selectedChildId === choice).map(entry => entry.id) }, abort.signal) as HomeFamilyDelivery;
+              !entry.selectedChildId || entry.selectedChildId === choice).map(entry => entry.id) }, abort.signal) as HomeFamilyDelivery | null;
+          if (!valid() || response === null) return;
+          result = response;
         } catch (error) {
           if (valid() && attempt === 0 && error instanceof Error && error.message === "home_409") continue;
           throw error;
