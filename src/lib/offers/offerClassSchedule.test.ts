@@ -248,3 +248,26 @@ const draftWithInvalidFields = classPricingDraftFromDetails({
 });
 assert.deepEqual(draftWithInvalidFields, incompletePricingGroup.groups,
   "Unfinished numeric fields remain editable after draft save/reopen");
+
+
+// The editor may contain multiple priced groups. Publishing must not silently
+// drop a group whose schedule has not been filled in yet.
+const oneScheduledOneUnscheduled = defaultClassSchedule();
+oneScheduledOneUnscheduled.groups = [
+  { id: "scheduled", days: [1], time: "17:00", seats: "8",
+    tariffs: [{ id: "t1", title: "Абонемент", price: "120", unit: "занятие", periodDays: 30 }] },
+  { id: "unscheduled", days: [], time: "18:00", seats: "8",
+    tariffs: [{ id: "t2", title: "Абонемент", price: "100", unit: "занятие", periodDays: 30 }] },
+];
+assert.ok(
+  getClassScheduleMissingFields(oneScheduledOneUnscheduled, "REGULAR_ACTIVITY", "60")
+    .includes("Расписание для каждой группы с тарифами"),
+  "A priced unscheduled group must block publication even if another group is scheduled",
+);
+oneScheduledOneUnscheduled.groups[1]!.days = [3];
+assert.ok(
+  !getClassScheduleMissingFields(oneScheduledOneUnscheduled, "REGULAR_ACTIVITY", "60")
+    .includes("Расписание для каждой группы с тарифами"),
+  "Completing the second group's schedule unblocks publication",
+);
+console.log("All priced groups require schedules before publication");
