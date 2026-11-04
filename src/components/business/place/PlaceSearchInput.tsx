@@ -108,7 +108,7 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
 
       widget.setAttribute("placeholder", "Адрес или название места");
       widget.setAttribute("aria-label", "Адрес или название места");
-      widget.setAttribute("included-region-codes", "by");
+      // Worldwide address search: no country inclusion filter.
       widget.setAttribute("requested-language", "ru");
       widget.setAttribute("requested-region", "by");
 
