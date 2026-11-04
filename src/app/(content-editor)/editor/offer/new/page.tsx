@@ -91,7 +91,7 @@ export default async function EditorNewOfferPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         defaultPlaceId={defaultPlaceId}
-        creationIntent={creationIntent === "classes" || creationIntent === "parties" || creationIntent === "camps" ? creationIntent : undefined}
+        creationIntent={creationIntent === "place" || creationIntent === "classes" || creationIntent === "parties" || creationIntent === "camps" ? creationIntent : undefined}
         ctaStepEnabled={ctaStepEnabled}
         newWizard={isOfferWizardV2Enabled(business)}
       />

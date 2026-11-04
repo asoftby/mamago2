@@ -43,7 +43,7 @@ mgtask stories-display-rules fix
 mgfinish
 ```
 
-`mgcheck` is an optional preflight when you want the full common gate before finishing. It is **not** required immediately before `mgfinish`: `mgcheck` directly executes `pnpm check:push`, and `mgfinish` triggers the pre-push wrapper, which executes it **again**. There is no gate-result cache. The normal fast path is targeted checks followed by `mgfinish` once; never bypass the hook or hide a failed gate.
+`mgcheck` is an optional preflight. It uses the same isolated full-gate wrapper as the pre-push hook and records a worktree-local PASS proof. On unchanged HEAD, clean worktree, current `origin/dev`, matching installed dependencies/Prisma Client and Node/pnpm/environment, `mgfinish` validates and reuses the proof instead of rerunning the full gate. Any mismatch runs the full gate. The normal fast path remains targeted checks followed by `mgfinish` once; never bypass the hook or hide a failed gate.
 
 For an agent session, the agent should execute the equivalent repository scripts itself without asking the user to copy these commands.
 
@@ -108,7 +108,7 @@ mgcheck
 7. runs `git diff --check`;
 8. requires Node 22 and `pnpm`;
 9. `worktree-deps.sh ensure`: installs dependencies if the worktree has no `node_modules`, regenerates the Prisma Client if its schema/config/generated-client fingerprint is missing or changed, and fails if `node_modules` is a symlink pointing outside the worktree;
-10. runs `pnpm check:push` directly. Unlike the pre-push hook (`scripts/git/run-push-gate.sh`), this does **not** use the isolated Next.js gate build directory; avoid using it unnecessarily while `next dev` runs in the same worktree.
+10. runs `scripts/git/run-push-gate.sh`: the same isolated Next.js gate build as pre-push, with PASS proof recorded only on success. `mgfinish` reuses this proof only if all input and freshness guards still match.
 
 Targeted tests required by the task are still the agent/developer's responsibility. `mgcheck` is the common repository gate, not a replacement for task-specific verification.
 
