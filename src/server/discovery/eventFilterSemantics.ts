@@ -96,6 +96,19 @@ export function buildFreeEventWhere(): Prisma.ActivityWhereInput {
   };
 }
 
+/** The in-memory FREE facet must match buildFreeEventWhere's strict legacy rule. */
+export function matchesPublicFreePrice(input: {
+  priceMode: string;
+  priceFrom: number | null;
+  priceText: string | null;
+}): boolean {
+  return input.priceMode === "FREE" || (
+    input.priceMode === "UNKNOWN" &&
+    input.priceFrom === 0 &&
+    normalizedFreeText(input.priceText)
+  );
+}
+
 const NUMERIC_PRICE_MODES = ["FREE", "EXACT", "FROM", "RANGE"] as const;
 
 export function matchesCanonicalStartingPrice(
