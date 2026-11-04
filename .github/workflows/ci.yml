@@ -92,6 +92,11 @@ jobs:
       - name: Business Place versus PLACE_VISIT creation contract
         run: pnpm exec tsx src/components/shared/createPublicationBusinessIntent.contract.test.ts
 
+      - name: Business offer menu first-step regressions
+        run: |
+          pnpm exec tsx src/components/business/wizard/offer/offerIntentV1Entry.contract.test.ts
+          pnpm exec eslint src/components/business/wizard/offer/OfferWizard.tsx src/components/business/wizard/offer/offerIntentV1Entry.contract.test.ts --quiet
+
       - name: Business support notification routing contract
         run: pnpm exec tsx src/server/support/supportNoticeContract.test.ts
 

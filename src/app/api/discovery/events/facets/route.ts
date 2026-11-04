@@ -6,7 +6,7 @@ import { matchesManualAgeRanges } from "@/lib/discovery/audienceEligibility";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { buildKudaDiscoveryWhere } from "@/server/discovery/kudaDiscoveryFeed";
-import { resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
+import { matchesPublicFreePrice, resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
 
 /**
  * Availability facets for Kuda: every visible option corresponds to at least
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       eventCategory: { select: { slug: true } },
       genreSlugs: true,
       format: true,
-      priceMode: true, priceFrom: true,
+      priceMode: true, priceFrom: true, priceText: true,
       ageTags: true, ageMinMonths: true, ageMaxMonths: true, agePolicy: true,
       occasionLinks: {
         where: { occasion: { isActive: true } },
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     if (except !== "age" && !allowedForAge(row, ageFilters)) return false;
     if (except !== "occasion" && occasion === "halloween" && !row.occasionLinks.some(link => link.occasion.slug === "halloween")) return false;
     if (except !== "price") {
-      if (free && row.priceMode !== "FREE") return false;
+      if (free && !matchesPublicFreePrice(row)) return false;
       if (!free && (hasPriceMin || hasPriceMax) && (
         row.priceFrom == null ||
         !["FREE", "EXACT", "FROM", "RANGE"].includes(row.priceMode) ||
@@ -100,6 +100,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     categories, genres, formats, ages, occasions,
-    freeAvailable: facetRows("price").some(row => row.priceMode === "FREE"),
+    freeAvailable: facetRows("price").some(matchesPublicFreePrice),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
