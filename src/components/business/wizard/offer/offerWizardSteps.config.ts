@@ -24,6 +24,7 @@ import { getCampShiftMissingFields } from "./campOfferModel";
 import {
   type OfferWizardStepDef,
   V2_STEPS,
+  getV2StepsForProductType,
   getV2StepMembers,
   isV2CompositeStepKey,
   v2StepDefWithoutKey,
@@ -94,19 +95,7 @@ export function getStepsForOfferType(
   variant: OfferWizardVariant = "v1",
 ): OfferWizardStepDef[] {
   if (!type) return [];
-  if (variant === "v2") {
-    // A regular-activity tariff belongs to a class group. The group must
-    // exist before Services validates its tariff; otherwise the wizard
-    // deadlocks between Services and Schedule for business users.
-    if (productType === "REGULAR_ACTIVITY") {
-      const regularOrder: OfferWizardStepKey[] =
-        ["type", "about", "schedule", "services", "terms", "review"];
-      return [...V2_STEPS].sort(
-        (a, b) => regularOrder.indexOf(a.key) - regularOrder.indexOf(b.key),
-      );
-    }
-    return V2_STEPS;
-  }
+  if (variant === "v2") return getV2StepsForProductType(productType);
 
   const priceStepTitle = type === "CAMP" ? "Участие" : "Цена";
   const priceStepDescription =
