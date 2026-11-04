@@ -323,9 +323,8 @@ export function OfferWizard({
   // Current step key (not number)
   const [currentStepKey, setCurrentStepKey] = useState<OfferWizardStepKey>(() => {
     if (mode !== "edit" || !offer || initialStepNumber == null || initialStepNumber < 1) {
-      return mode === "create" && creationIntent
-        ? (variant === "v2" ? "about" : creationIntent === "parties" ? "placements" : "details")
-        : "type";
+      // Menu intents preselect a category, but users still confirm it on step 1.
+      return "type";
     }
     const fd = mapOfferToFormData(offer);
     const initialSteps = getStepsForOfferType(fd.offerWizardType ?? (freeStepNavigation ? "SINGLE" : null), fd.productType, variant);
