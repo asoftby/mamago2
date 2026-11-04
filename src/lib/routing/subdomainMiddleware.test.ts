@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { businessNavigation } from "../business/navigation";
 
 import {
   getPublicBaseFromHost,
@@ -503,5 +504,45 @@ assert.deepEqual(
     location: "https://mamago.local/register",
   },
 );
+
+// Business sidebar opens the shared user inbox on the public host, not a
+// non-existent /business/me/direct URL. Both list and legacy thread links work.
+for (const [host, expectedUrl] of [
+  ["business.mamago.by", "https://mamago.by/me/direct"],
+  ["business.dev.mamago.by", "https://dev.mamago.by/me/direct"],
+  ["business.prod.mamago.by", "https://prod.mamago.by/me/direct"],
+] as const) {
+  assert.deepEqual(
+    resolveSubdomainMiddlewareDecision({
+      host,
+      protocol: "https:",
+      pathname: "/direct",
+      search: "",
+    }),
+    { kind: "redirect", location: expectedUrl },
+  );
+}
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.dev.mamago.by",
+    protocol: "https:",
+    pathname: "/direct/test-thread-123",
+    search: "?from=notification",
+  }),
+  {
+    kind: "redirect",
+    location: "https://dev.mamago.by/me/direct/test-thread-123?from=notification",
+  },
+);
+
+// Business navigation: dashboard is the first task, messages next, support
+// remains available, and settings is distinct rather than duplicated help.
+const businessMenuLabels = businessNavigation.map(({ label }) => label);
+assert.equal(businessMenuLabels[0], "Панель управления");
+assert.equal(businessMenuLabels[1], "Сообщения");
+assert.equal(businessMenuLabels.at(-2), "Поддержка mamaGo");
+assert.equal(businessMenuLabels.at(-1), "Настройки");
+assert.equal(businessMenuLabels.includes("Настройки и помощь"), false);
 
 console.log("subdomain middleware tests: OK");
