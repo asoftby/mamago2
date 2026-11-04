@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { getDefaultFormData } from "./defaults";
 import { partyCategoryFromOfferCategorySlug } from "./offerTypeChoices";
-import { V2_STEPS, V2_STEP_KEYS, getV2StepMembers, isV2CompositeStepKey } from "./offerWizardV2Steps";
+import { V2_STEPS, V2_STEP_KEYS, getV2StepMembers, getV2StepsForProductType, isV2CompositeStepKey } from "./offerWizardV2Steps";
 
 const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
 
@@ -44,6 +44,22 @@ const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
   assert.deepEqual(getV2StepMembers("terms", base), ["contacts"]);
 }
 
+// Regular classes create their schedule groups before configuring tariffs;
+// other offer types preserve the same six V2 steps and normal order.
+{
+  assert.deepEqual(getV2StepsForProductType("REGULAR_ACTIVITY").map((s) => s.key),
+    ["type", "about", "schedule", "services", "terms", "review"]);
+  assert.deepEqual(getV2StepsForProductType("REGULAR_ACTIVITY").length, 6);
+  for (const product of [
+    "ONE_TIME_ACTIVITY", "CAMP", "PLACE_VISIT", "PARTY_SERVICE", "PARTY_PACKAGE",
+  ] as const) {
+    assert.deepEqual(getV2StepsForProductType(product).map((s) => s.key),
+      V2_KEYS, `${product}: standard V2 order`);
+  }
+  const config = readFileSync("src/components/business/wizard/offer/offerWizardSteps.config.ts", "utf8");
+  assert.ok(config.includes('if (variant === "v2") return getV2StepsForProductType(productType);'),
+    "Wizard step selection uses the tested pure ordering helper");
+}
 console.log("offerWizardV2Steps contract tests passed");
 
 {

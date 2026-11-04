@@ -24,6 +24,7 @@ import { getCampShiftMissingFields } from "./campOfferModel";
 import {
   type OfferWizardStepDef,
   V2_STEPS,
+  getV2StepsForProductType,
   getV2StepMembers,
   isV2CompositeStepKey,
   v2StepDefWithoutKey,
@@ -94,7 +95,7 @@ export function getStepsForOfferType(
   variant: OfferWizardVariant = "v1",
 ): OfferWizardStepDef[] {
   if (!type) return [];
-  if (variant === "v2") return V2_STEPS;
+  if (variant === "v2") return getV2StepsForProductType(productType);
 
   const priceStepTitle = type === "CAMP" ? "Участие" : "Цена";
   const priceStepDescription =

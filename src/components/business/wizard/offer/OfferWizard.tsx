@@ -87,6 +87,12 @@ import { PartyResourceSchedule } from "./components/PartyResourceSchedule";
 import { Step6Contacts } from "./steps/Step6Contacts";
 import { FaqStep } from "../shared/FaqStep";
 
+// Central, unconditional V2 selection. Return the union type to preserve
+// compatibility of legacy branches until the old flow can be deleted.
+function activeOfferWizardVariant(): OfferWizardVariant {
+  return "v2";
+}
+
 interface OfferWizardProps {
   mode: OfferWizardMode;
   offer?: Offer & {
@@ -117,8 +123,6 @@ interface OfferWizardProps {
   /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
   initialStepNumber?: number;
   ctaStepEnabled?: boolean;
-  /** Новый мастер из 6 шагов (Business.features.newOfferWizard). */
-  newWizard?: boolean;
   /** Колонки ожидающей ревизии опубликованного оффера (правки автора ждут модерации). */
   pendingRevisionFields?: string[];
   /** Версия операционных данных оффера на момент загрузки редактора (защита от записи устаревшего снимка). */
@@ -287,11 +291,11 @@ export function OfferWizard({
   returnTo,
   initialStepNumber,
   ctaStepEnabled,
-  newWizard = false,
   pendingRevisionFields,
   operationalVersion: initialOperationalVersion,
 }: OfferWizardProps) {
-  const variant: OfferWizardVariant = newWizard ? "v2" : "v1";
+  // V2 is the only active editor flow for every offer and every user role.
+  const variant: OfferWizardVariant = activeOfferWizardVariant();
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {
