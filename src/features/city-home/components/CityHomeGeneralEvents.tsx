@@ -45,7 +45,7 @@ export function CityHomeGeneralEvents({
         <div key={activity.id} className={EVENT_CARD_SHELL + " flex flex-col"}>
           <AnalyticsCardViewTracker entityType="EVENT" entityId={activity.id} vertical="CITY" citySlug={citySlug}
             threshold={0.5} dwellMs={1000} meta={{ section: "afisha", exposureId: activity.exposureId ?? null }}>
-            <EventCard {...activityMockToEventCard(activity, citySlug)} framing="fixed" coverRatio="2/3" coverFit="contain"
+            <EventCard {...activityMockToEventCard(activity, citySlug)} framing="fixed" coverRatio="2/3" coverFit="cover"
               className="h-full" imagePriority={index < 2} />
           </AnalyticsCardViewTracker>
         </div>
