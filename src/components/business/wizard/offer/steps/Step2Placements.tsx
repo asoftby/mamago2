@@ -54,13 +54,19 @@ export function Step2Placements({
   const birthday = data.birthdayDetails;
   const orderDelivery = v2 && isService && (data.partyCategory === "CAKE" || data.partyCategory === "FOOD");
   const photoService = v2 && isService && data.partyCategory === "PHOTO";
-  const omitDuration = v2 && isService && (
+  const advancedDuration = v2 && isService && (
     data.partyCategory === "CAKE" || data.partyCategory === "FOOD" || data.partyCategory === "DECOR"
   );
-  const omitChildren = v2 && isService && (
+  const advancedChildren = v2 && isService && (
     data.partyCategory === "CAKE" || data.partyCategory === "FOOD" ||
     data.partyCategory === "DECOR" || data.partyCategory === "PHOTO"
   );
+  // Hidden fields still affect published discovery and server-side selection.
+  // Keep previously entered limits visible and removable when changing categories.
+  const existingDuration = birthday.durationMinutes != null;
+  const existingChildren = birthday.minChildren != null || birthday.maxChildren != null;
+  const omitDuration = advancedDuration && !existingDuration;
+  const omitChildren = advancedChildren && !existingChildren;
   const locationQuestion = orderDelivery ? "Как получить заказ?" : photoService ? "Где проходит съёмка?" : "Где проходит?";
   const locationOptions = orderDelivery
     ? [{ value: "ON_SITE" as const, label: "Самовывоз" }, { value: "OFF_SITE" as const, label: "Доставка" }, { value: "BOTH" as const, label: "И так, и так" }]
@@ -136,6 +142,12 @@ export function Step2Placements({
           ))}
         </div>
       </div>
+
+      {((advancedDuration && existingDuration) || (advancedChildren && existingChildren)) && (
+        <p className="text-sm text-muted-foreground">
+          Сохранённые ограничения влияют на подбор услуги. Измените их или очистите поля, если они больше не нужны.
+        </p>
+      )}
 
       {(!omitDuration || !omitChildren) && (
         <PartyDurationCapacityFields
