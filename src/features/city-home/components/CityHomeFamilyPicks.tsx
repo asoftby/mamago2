@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
@@ -201,11 +200,12 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
             </div>)}</HorizontalCardRow>
         </div>
       ) : state === "error" && !data ? (
-        <div role="alert" className="py-8">
-          <p>Не удалось загрузить события. Повторите попытку.</p>
-          <button type="button" className="min-h-11 underline" onClick={() => void load()}>Повторить</button>
-          <p><Link href={catalogHref} className="underline">Открыть каталог</Link></p>
-        </div>
+        // Show the same poster-size placeholder as a genuinely empty result.
+        // Network failures remain observable internally without exposing a
+        // technical error panel in the public homepage.
+        <HorizontalCardRow headerHasSubtitle>
+          <HomeMoreEventsCard href={catalogHref} hasEvents={false} />
+        </HorizontalCardRow>
       ) : data ? (
         <FamilyHomeResults data={data} context={data.context} citySlug={citySlug} impressed={impressed}
           onImpression={identity => setImpressed(previous => new Set([...previous, identity]))} />
