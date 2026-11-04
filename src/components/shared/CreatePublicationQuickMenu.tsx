@@ -247,7 +247,6 @@ export function CreatePublicationQuickMenu({
               <div role="separator" aria-orientation="horizontal" className="my-2 border-t border-border" />
             )}
           <button
-            key={item.id}
             type="button"
             onClick={() => goAdminPublication(item.publicationType)}
             className={cn(itemRowClass, "w-full")}
@@ -260,7 +259,7 @@ export function CreatePublicationQuickMenu({
                 {item.label}
               </span>
               {item.description ? (
-                <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
+                <span className={cn("block text-[12px] text-muted-foreground", isBusinessIntent && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
                   {item.description}
                 </span>
               ) : null}
@@ -305,7 +304,7 @@ export function CreatePublicationQuickMenu({
             <DialogHeader>
               <DialogTitle>Что хотите добавить?</DialogTitle>
               <DialogDescription>
-                "Выберите понятный формат. Даты и детали уточним при заполнении."
+                Выберите понятный формат. Даты и детали уточним при заполнении.
               </DialogDescription>
             </DialogHeader>
             {renderItems()}
