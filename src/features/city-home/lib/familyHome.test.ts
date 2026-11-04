@@ -167,6 +167,10 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   assert.doesNotMatch(ui, /Не удалось обновить\. Повторить/, "failed background refresh must not add a technical CTA below loaded cards");
   assert.doesNotMatch(ui, /Не удалось загрузить события\. Повторите попытку\./, "initial load errors use a poster-size card instead of a technical message");
   assert.match(ui, /state === "error" && !data[\s\S]*?<HomeMoreEventsCard href=\{catalogHref\} hasEvents=\{false\}/, "initial failure renders the same empty event-card component");
+  assert.match(ui, /loadHomePublicFallback\(citySlug\)/, "a failed personalized API attempts a public catalog recovery");
+  assert.match(ui, /fallbackEvents\.map/, "recovered events are rendered as real poster cards");
+  assert.doesNotMatch(ui, /wasAuthorized && mounted\.current/, "auth resolution must not start a duplicate recommendation request");
+  assert.doesNotMatch(ui, /setTimeout\(\(\) => \{[\s\S]*?setState\("error"\)/, "component must not race request-level timeout with a second deadline");
 
   assert.ok(ui.includes("hasCatalogEvents"));
   assert.ok(!ui.includes("homeChipSelectEvent"));

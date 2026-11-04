@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
-import { EventCard, EVENT_CARD_SHELL } from "@/components/events";
+import { EventCard, EVENT_CARD_SHELL, activityMockToEventCard } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { CityHomeSection } from "./CityHomeSection";
 import { HorizontalCardRow } from "./HorizontalCardRow";
@@ -21,6 +21,8 @@ import { homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } 
 import { homeRecommendationLabel } from "../lib/homeRecommendationLabel";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
 import { postFamilyPicks as post } from "../lib/familyPicksRequest";
+import { loadHomePublicFallback } from "../lib/loadHomePublicFallback";
+import type { ActivityMock } from "@/types/activity";
 
 /** One read-only family recommendation feed. Audience filtering belongs in the header/catalog. */
 export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: string; initialContext: HomeFamilyContext }) {
@@ -34,7 +36,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const actor = initialContext.actorId!;
   const [data, setData] = useState<HomeFamilyDelivery | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [announcement, setAnnouncement] = useState("");
+  const [fallbackEvents, setFallbackEvents] = useState<ActivityMock[] | null>(null);
   const [impressed, setImpressed] = useState(new Set<string>());
   const cache = useRef(new FamilyHomeCache<HomeFamilyDelivery>(actor));
   const controller = useRef<AbortController | null>(null);
@@ -52,15 +54,8 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     const abort = new AbortController();
     controller.current = abort;
     const generation = cache.current.begin();
-    if (!options?.keepCurrent) { setState("loading"); setData(null); }
+    if (!options?.keepCurrent) { setState("loading"); setData(null); setFallbackEvents(null); }
     const valid = () => mounted.current && allowedActor.current && !abort.signal.aborted && cache.current.current(generation);
-    const deadline = setTimeout(() => {
-      if (valid()) {
-        setState("error");
-        setAnnouncement("Подбор не ответил вовремя. Повторите попытку.");
-      }
-      abort.abort();
-    }, 15_000);
     try {
       const stored = readHomeDismissals(actor);
 
@@ -109,6 +104,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         if (!valid()) return;
         if (result.context.actorId !== actor || result.context.signature !== fresh.signature) throw new Error("stale_context");
         cache.current.set(fresh, citySlug, cacheScope, result);
+        setFallbackEvents(null);
         setData(cache.current.filter(result, Date.now(), null));
         setState("ready");
         return;
@@ -120,9 +116,19 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         setData(null);
         router.refresh();
       }
+      // A failed personalized recommendation is not evidence that there are
+      // no events. Only then, make one public catalog recovery request. Do not
+      // start it for background refreshes with already visible cards.
+      if (!options?.keepCurrent) {
+        const publicCards = await loadHomePublicFallback(citySlug);
+        if (!valid()) return;
+        if (publicCards !== null) {
+          setFallbackEvents(publicCards);
+          setState("ready");
+          return;
+        }
+      }
       setState("error");
-    } finally {
-      clearTimeout(deadline);
     }
   }, [actor, citySlug, router, selectedPersonaIdsKey]);
 
@@ -165,16 +171,15 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
 
   useEffect(() => {
     const authorized = !auth.isLoading && auth.user?.id === actor;
-    const wasAuthorized = allowedActor.current;
     allowedActor.current = authorized;
     if (!authorized) {
       controller.current?.abort();
       cache.current.cancel();
       setData(null);
-    } else if (!wasAuthorized && mounted.current) {
-      void load();
     }
-  }, [actor, auth.isLoading, auth.user?.id, load]);
+    // The primary effect already reloads when authorization changes.
+    // A second call here caused duplicate uncancellable HTTP requests.
+  }, [actor, auth.isLoading, auth.user?.id]);
 
   useEffect(() => {
     // Don't invalidate the first mount; only react to a changed server identity snapshot.
@@ -199,10 +204,17 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
               <div className="mt-3 h-16 rounded bg-muted/50" />
             </div>)}</HorizontalCardRow>
         </div>
+      ) : fallbackEvents !== null && !data ? (
+        <HorizontalCardRow headerHasSubtitle>
+          {fallbackEvents.map((event, index) => (
+            <div key={event.id} className={EVENT_CARD_SHELL}>
+              <EventCard {...activityMockToEventCard(event, citySlug)}
+                framing="fixed" coverRatio="2/3" coverFit="cover" imagePriority={index < 2} />
+            </div>
+          ))}
+          <HomeMoreEventsCard href={catalogHref} hasEvents={fallbackEvents.length > 0} />
+        </HorizontalCardRow>
       ) : state === "error" && !data ? (
-        // Show the same poster-size placeholder as a genuinely empty result.
-        // Network failures remain observable internally without exposing a
-        // technical error panel in the public homepage.
         <HorizontalCardRow headerHasSubtitle>
           <HomeMoreEventsCard href={catalogHref} hasEvents={false} />
         </HorizontalCardRow>
@@ -210,7 +222,6 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         <FamilyHomeResults data={data} context={data.context} citySlug={citySlug} impressed={impressed}
           onImpression={identity => setImpressed(previous => new Set([...previous, identity]))} />
       ) : null}
-      <p role="status" aria-live="polite" className="sr-only">{announcement}</p>
     </div>
   </CityHomeSection>;
 }
