@@ -85,11 +85,21 @@ for (const [category, locationText, duration, children] of [
     data, onChange: () => undefined, isEditable: true, v2: true,
   }));
   assert.ok(html.includes(locationText), `${category}: contextual location question`);
+  assert.ok(!html.includes("Какая услуга?"), `${category}: V2 does not repeat the category selected on step 1`);
   assert.equal(html.includes("Продолжительность"), duration, `${category}: duration relevance`);
   assert.equal(html.includes("Количество детей"), children, `${category}: children relevance`);
   if (category === "CAKE" || category === "FOOD") {
     assert.ok(html.includes("Самовывоз") && html.includes("Доставка"), `${category}: fulfilment choices`);
     assert.ok(html.includes("Что входит в заказ?"), `${category}: understandable included label`);
   }
+}
+{
+  const data = getDefaultFormData("test-place");
+  data.productType = "PARTY_SERVICE";
+  data.partyCategory = null;
+  const html = renderToStaticMarkup(createElement(Step2Placements, {
+    data, onChange: () => undefined, isEditable: true, v2: true,
+  }));
+  assert.ok(html.includes("Какая услуга?"), "Unknown legacy categories retain the type fallback");
 }
 console.log("Party duration/capacity render tests passed");

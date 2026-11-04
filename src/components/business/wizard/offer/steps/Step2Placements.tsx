@@ -86,7 +86,7 @@ export function Step2Placements({
         <p className="text-sm text-muted-foreground">Укажите основные условия. Остальное — по желанию.</p>
       </div>
 
-      {isService && (
+      {isService && (!v2 || !data.partyCategory) && (
         <div className="space-y-2">
           <p className="text-sm font-medium">Какая услуга? <span className="text-destructive">*</span></p>
           <div role="group" aria-label="Вид услуги" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
