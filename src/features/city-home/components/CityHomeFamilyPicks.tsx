@@ -24,16 +24,24 @@ import type { HomeFamilyDelivery } from "@/server/services/recommendations/famil
 
 async function post(body: Record<string, unknown>, signal?: AbortSignal) {
   const timeout = new AbortController();
-  const onAbort = () => timeout.abort();
+  // React Strict Mode deliberately unmounts effects and cancels stale requests.
+  // Give cancellation an explicit reason and translate expected aborts into
+  // application errors so a routine cleanup never surfaces as an AbortError.
+  const onAbort = () => timeout.abort(new Error("home_request_cancelled"));
   if (signal?.aborted) onAbort();
   else signal?.addEventListener("abort", onAbort, { once: true });
-  const timer = setTimeout(onAbort, 15_000);
+  const timer = setTimeout(() => timeout.abort(new Error("home_request_timeout")), 15_000);
   try {
     const response = await fetch("/api/recommendations/family-picks", { method: "POST", credentials: "include", cache: "no-store",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: timeout.signal,
       keepalive: body.action === "dismiss" });
     if (!response.ok) throw new Error(`home_${response.status}`);
     return await response.json();
+  } catch (error) {
+    if (timeout.signal.aborted) {
+      throw new Error(signal?.aborted ? "home_request_cancelled" : "home_request_timeout");
+    }
+    throw error;
   } finally { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); }
 
 }
