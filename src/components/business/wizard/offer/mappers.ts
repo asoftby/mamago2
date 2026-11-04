@@ -24,9 +24,11 @@ import {
   defaultOfferSchedule,
   normalizeClosedDates,
   type OfferScheduleForm,
+  type OfferScheduleInput,
 } from "@/lib/offers/offerSchedule";
 import {
   classPricingDraftFromDetails,
+  classScheduleInputSchema,
   defaultClassSchedule,
   groupsFromRules,
   offerIsClass,
@@ -616,6 +618,18 @@ export function isValidVideoUrl(url: string): boolean {
   return videoUrlPatterns.some((pattern) => pattern.test(url));
 }
 
+/** Drafts retain unfinished groups in details.classPricingDraft.
+ * Never send a partially invalid class schedule through the strict API schema:
+ * preserving the last valid persisted schedule is safer than overwriting it
+ * with a lossy conversion. Publishing always uses strict validation instead.
+ */
+function draftSafeSchedule(input: OfferScheduleInput | undefined): OfferScheduleInput | undefined {
+  if (!input?.classSchedule || classScheduleInputSchema.safeParse(input.classSchedule).success) return input;
+  const { classSchedule: _invalidClassSchedule, ...safe } = input;
+  void _invalidClassSchedule;
+  return Object.keys(safe).length ? safe : undefined;
+}
+
 /** POST /api/business/offers — matches createOfferSchema */
 export function buildOfferCreatePayload(
   data: OfferFormData,
@@ -712,7 +726,9 @@ export function buildOfferCreatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
-    ...(opts?.includeSchedule ? { schedule: buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
+    ...(opts?.includeSchedule ? { schedule: opts.status === "DRAFT"
+      ? draftSafeSchedule(buildScheduleInput(data.schedule, productType, data.classDuration))
+      : buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
@@ -940,9 +956,13 @@ export function buildOfferUpdatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
-    ...(opts?.includeSchedule ? { schedule: opts.previousSchedule
-      ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType, data.classDuration, opts.previousClassDuration)
-      : buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
+    ...(opts?.includeSchedule ? { schedule: opts.preserveClassPricingDraft
+      ? draftSafeSchedule(opts.previousSchedule
+        ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType, data.classDuration, opts.previousClassDuration)
+        : buildScheduleInput(data.schedule, productType, data.classDuration))
+      : opts.previousSchedule
+        ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType, data.classDuration, opts.previousClassDuration)
+        : buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
