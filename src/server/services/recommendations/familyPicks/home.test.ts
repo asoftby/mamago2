@@ -54,6 +54,7 @@ test("public home asks discovery for the current week before limiting to seven r
       assert.equal(actor, null);
       assert.equal(options?.take, 7);
       assert.deepEqual(options?.eventFilters?.dateRange, publicHomeWeekRange(now));
+      assert.equal(options?.eventFilters?.includeNextOccurrenceWithoutSessions, true);
       return [{ id: "weekly" }] as never;
     },
   }, true);
