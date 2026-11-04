@@ -236,8 +236,8 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
 
         {sectionAvailability.birthday && birthdayOffers.length > 0 ? (
           <>
-            <CityHomeBirthdayOffers offers={birthdayOffers} />
             <CityHomeBirthdayCta />
+            <CityHomeBirthdayOffers offers={birthdayOffers} />
           </>
         ) : null}
 
