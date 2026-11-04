@@ -60,9 +60,19 @@ const legacy = { ...offer, id: "legacy", locationType: null };
 const mobilePackage = { ...offsite, id: "mobile-package", productType: "PARTY_PACKAGE" as const, category: null };
 const unknownPackage = { ...legacy, id: "unknown-package", productType: "PARTY_PACKAGE" as const, category: null };
 const onsiteVenue = { ...onsite, id: "onsite-venue", category: "VENUE" as const };
-assert.equal(isLocationCompatible(onsite, "HOME"), false);
+// Fulfilment choices for cakes/catering do not exclude otherwise valid add-ons.
+for (const category of ["CAKE", "FOOD"] as const) {
+  for (const locationType of ["ON_SITE", "OFF_SITE", "BOTH"] as const) {
+    const service = { ...offer, category, locationType };
+    for (const placeType of ["VENUE", "PACKAGE", "HOME", "OUTDOOR"] as const) {
+      assert.equal(isLocationCompatible(service, placeType), true,
+        `${category}/${locationType} stays available for ${placeType}`);
+    }
+  }
+}
+assert.equal(isLocationCompatible({ ...onsite, category: "SHOW" }, "HOME"), false);
 assert.equal(isLocationCompatible(offsite, "HOME"), true);
-assert.equal(isLocationCompatible(offsite, "VENUE"), false);
+assert.equal(isLocationCompatible({ ...offsite, category: "SHOW" }, "VENUE"), false);
 assert.equal(isLocationCompatible(both, "OUTDOOR"), true);
 assert.equal(isLocationCompatible(both, "PACKAGE"), true);
 assert.equal(isLocationCompatible(legacy, "HOME"), true);
@@ -72,8 +82,8 @@ assert.equal(isAllowedBase(mobilePackage, "OUTDOOR"), true);
 assert.equal(isAllowedBase(unknownPackage, "HOME"), false);
 assert.equal(isAllowedBase(unknownPackage, "VENUE"), true);
 assert.equal(hasValidCatalogAnchor([mobilePackage], mobilePackage.id, "HOME"), true);
-assert.deepEqual(eligibleAddons([onsite, offsite, legacy], "mobile-package", "HOME").map((o) => o.id), ["off", "legacy"]);
-assert.deepEqual(eligibleAddons([onsite, offsite, legacy], "onsite-venue", "VENUE").map((o) => o.id), ["on", "legacy"]);
+assert.deepEqual(eligibleAddons([onsite, offsite, legacy], "mobile-package", "HOME").map((o) => o.id), ["on", "off", "legacy"]);
+assert.deepEqual(eligibleAddons([onsite, offsite, legacy], "onsite-venue", "VENUE").map((o) => o.id), ["on", "off", "legacy"]);
 // Changing location prunes an incompatible anchor as well as previously selected add-ons.
 const selectionOffers = [onsiteVenue, mobilePackage, offsite, onsite];
 assert.deepEqual(
@@ -82,7 +92,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   compatibleCatalogSelection(selectionOffers, "mobile-package", "HOME", ["off", "on"]),
-  { selectedBaseId: "mobile-package", selectedAddonIds: ["off"] },
+  { selectedBaseId: "mobile-package", selectedAddonIds: ["off", "on"] },
 );
 assert.deepEqual(
   compatibleCatalogSelection(selectionOffers, "mobile-package", "VENUE", ["off"]),

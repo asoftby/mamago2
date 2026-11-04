@@ -114,8 +114,10 @@ jobs:
       - name: Party delivery health metrics contract
         run: pnpm exec tsx src/server/ops/metrics/collectors/partyDelivery.test.ts
 
-      - name: Birthday suggested time preview regressions
-        run: pnpm exec tsx src/server/birthday/partyPublicSlots.test.ts
+      - name: Birthday suggested time preview and location compatibility regressions
+        run: |
+          pnpm exec tsx src/server/birthday/partyPublicSlots.test.ts
+          pnpm exec tsx src/features/birthday/builder/lib/realCatalog.test.ts
 
       - name: Birthday party API and outbox regressions
         run: |

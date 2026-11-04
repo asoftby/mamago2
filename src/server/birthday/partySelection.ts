@@ -55,6 +55,10 @@ export function isVenueOffer(offer: CatalogOffer): boolean {
 type PartyMode = "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
 
 export function isCompatiblePartyLocation(mode: PartyMode, offer: CatalogOffer): boolean {
+  // For cakes and catering this field represents pickup/delivery, not where the
+  // birthday takes place. Keep selection parity with the public builder.
+  if (offer.productType === "PARTY_SERVICE" &&
+    (offer.category === "CAKE" || offer.category === "FOOD")) return true;
   const location = offer.partyLocationType;
   if (!location || location === "BOTH") return true;
   const onsite = mode === "VENUE" || mode === "PACKAGE";
