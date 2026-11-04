@@ -64,7 +64,7 @@ async function main() {
     const persistence = {
       context: async () => (await loadHomeContext(user.id)).context,
       save: async (choice: string | null, version: string | null) => {
-        const result = await resolveHomeRequest({ action: "selection", city: city.slug, selectedChildId: choice, version }, user.id, null, undefined, true);
+        const result = await resolveHomeRequest({ action: "selection", city: city.slug, selectedChildId: choice, version }, user.id, null, undefined);
         if (result.status !== 200) throw new Error(`home_${result.status}`);
       },
     };
@@ -101,9 +101,9 @@ async function main() {
     assert.equal(await db.recommendationRun.count({ where: { userId: user.id } }), 1);
     assert.equal(await db.recommendationExposure.count({ where: { run: { userId: user.id } } }), 10);
     const picked = firstDelivery.items[0]!;
-    const invalid = await resolveHomeRequest({ action: "dismiss", city: city.slug, eventId: picked.id, exposureId: picked.exposureId, token: randomUUID() }, stranger.id, null, undefined, true);
+    const invalid = await resolveHomeRequest({ action: "dismiss", city: city.slug, eventId: picked.id, exposureId: picked.exposureId, token: randomUUID() }, stranger.id, null, undefined);
     assert.equal(invalid.status, 404);
-    const rejected = await resolveHomeRequest({ action: "dismiss", city: city.slug, eventId: picked.id, exposureId: picked.exposureId, token: randomUUID() }, user.id, null, undefined, true);
+    const rejected = await resolveHomeRequest({ action: "dismiss", city: city.slug, eventId: picked.id, exposureId: picked.exposureId, token: randomUUID() }, user.id, null, undefined);
     assert.equal(rejected.status, 200);
     assert.notEqual((await loadHomeContext(user.id)).context.signature, prepared.context.signature);
     await assert.rejects(deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...prepared, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }), /profile_changed/);
