@@ -36,7 +36,6 @@ import type { OfferFormData, OfferWizardMode, OfferWizardStepKey, OfferWizardVar
 import { describeContentColumns } from "@/lib/offers/offerPublishedEditGate";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { getOfferTypeSelection } from "./offerTypeChoices";
-import { OfferSubtypeClarifier } from "./components/OfferSubtypeClarifier";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
   getStepsForOfferType,
@@ -868,24 +867,9 @@ export function OfferWizard({
         case "type":
           return <Step1Type {...commonProps} showCategories={variant === "v2"} />;
         case "placements":
-          return (
-            <div className="space-y-6">
-              {variant === "v1" && mode === "create" && creationIntent === "parties" && (
-                <OfferSubtypeClarifier group="parties" data={formData} onChange={handleChange} />
-              )}
-              <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} v2={variant === "v2"} />
-            </div>
-          );
+          return <Step2Placements {...commonProps} showAdditionalPlacements={false} v2 />;
         case "details":
-          return (
-            <div className="space-y-6">
-              {variant === "v1" && mode === "create" &&
-                creationIntent === "classes" && (
-                  <OfferSubtypeClarifier group="classes" data={formData} onChange={handleChange} />
-                )}
-              <Step2Information {...commonProps} v2={variant === "v2"} />
-            </div>
-          );
+          return <Step2Information {...commonProps} v2 />;
         case "photo":
           return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
         case "conditions":
