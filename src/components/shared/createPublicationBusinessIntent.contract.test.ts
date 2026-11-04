@@ -9,7 +9,7 @@ const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.ts
 test("business creation distinguishes the place profile from its visit offer", () => {
   for (const label of [
     "Мероприятие",
-    "Страница места",
+    "Добавить место",
     "Предложение о посещении",
     "Занятия и кружки",
     "Дни рождения и услуги",
@@ -22,6 +22,18 @@ test("business creation distinguishes the place profile from its visit offer", (
   assert.ok(menu.includes('publicationMode === "full"'));
   assert.ok(menu.includes(": BUSINESS_INTENTS"));
   assert.ok(menu.includes("currentSurfaceReturnTo"));
+});
+
+test("place creation stays available but is visually separated after offer intents", () => {
+  const businessStart = menu.indexOf("const BUSINESS_INTENTS: Item[] = [");
+  const businessEnd = menu.indexOf("\n];", businessStart);
+  assert.ok(businessStart >= 0 && businessEnd > businessStart);
+  const intents = menu.slice(businessStart, businessEnd);
+  assert.ok(intents.indexOf('id: "visit-place"') > intents.indexOf('id: "camps"'));
+  assert.match(intents, /id: "visit-place",[\s\S]*?label: "Добавить место"/);
+  assert.match(menu, /publicationMode === "business" && item\.id === "visit-place"/);
+  assert.match(menu, /role="separator"/);
+  assert.match(menu, /aria-label=\{publicationMode === "business" \? "Добавить"/);
 });
 
 test("place visit offer uses the existing OFFER model and editor", () => {
