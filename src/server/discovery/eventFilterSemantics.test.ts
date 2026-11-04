@@ -7,6 +7,7 @@ import {
   effectiveEventSessionStart,
   isStructuredFreeEvent,
   matchesCanonicalStartingPrice,
+  matchesPublicFreePrice,
   resolveEventDateRange,
 } from "./eventFilterSemantics";
 
@@ -152,6 +153,16 @@ test("free price filter admits explicit legacy zero/free label but not unknown p
     { priceMode: "FREE" },
     { priceMode: "UNKNOWN", priceFrom: 0, priceText: { in: ["бесплатно", "free"], mode: "insensitive" } },
   ] }]);
+});
+
+test("FREE facet agrees with strict SQL rule and rejects imported zero-price placeholders", () => {
+  assert.equal(matchesPublicFreePrice({ priceMode: "FREE", priceFrom: null, priceText: null }), true);
+  assert.equal(matchesPublicFreePrice({ priceMode: "UNKNOWN", priceFrom: 0, priceText: "бесплатно" }), true);
+  assert.equal(matchesPublicFreePrice({ priceMode: "UNKNOWN", priceFrom: 0, priceText: " FREE " }), true);
+  assert.equal(matchesPublicFreePrice({ priceMode: "UNKNOWN", priceFrom: 0, priceText: null }), false);
+  assert.equal(matchesPublicFreePrice({ priceMode: "UNKNOWN", priceFrom: 0, priceText: "уточняется" }), false);
+  assert.equal(matchesPublicFreePrice({ priceMode: "EXACT", priceFrom: 0, priceText: "бесплатно" }), false);
+  assert.equal(matchesPublicFreePrice({ priceMode: "UNKNOWN", priceFrom: null, priceText: "бесплатно" }), false);
 });
 
 test("numeric max uses canonical starting price and excludes NONE and UNKNOWN", () => {
