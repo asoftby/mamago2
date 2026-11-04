@@ -82,7 +82,7 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
                 key={section.id}
                 href={buildSettingsSectionHref(context.surfaceScope, section.id)}
                 icon={icon}
-                label={section.title}
+                label={section.id === "profile" && context.surfaceScope === "USER" ? "Профиль" : section.title}
                 description={descriptions[section.id] ?? section.description ?? ""}
                 badge={
                   section.id === "email" && !context.viewer.emailVerifiedAt
