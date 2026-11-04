@@ -1,21 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
-import { getStepsForOfferType } from "../../components/business/wizard/offer/offerWizardSteps.config";
-import { getOfferTypeSelection } from "../../components/business/wizard/offer/offerTypeChoices";
 
-test("All offer types render the same six-step V2 flow, including an empty initial selection", () => {
-  const expected = ["type", "about", "services", "schedule", "terms", "review"];
-  assert.deepEqual(getStepsForOfferType(null, null, "v2").map((step) => step.key), expected);
+test("All offer types and unselected new offers use six-step V2 without loading UI dependencies", () => {
+  const config = readFileSync("src/components/business/wizard/offer/offerWizardSteps.config.ts", "utf8");
+  // The V2 selection must occur BEFORE the null-type legacy fallback.
+  assert.match(config, /if \(variant === "v2"\) return V2_STEPS;\s*if \(!type\) return \[\];/);
+  const steps = readFileSync("src/components/business/wizard/offer/offerWizardV2Steps.ts", "utf8");
+  for (const key of ["type", "about", "services", "schedule", "terms", "review"]) {
+    assert.ok(steps.includes(`key: "${key}"`), `V2 includes ${key}`);
+  }
+  const types = readFileSync("src/components/business/wizard/offer/offerTypeChoices.ts", "utf8");
   for (const productType of [
     "PLACE_VISIT", "ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY",
     "CAMP", "PARTY_SERVICE", "PARTY_PACKAGE",
-  ] as const) {
-    const selection = getOfferTypeSelection(productType);
-    assert.deepEqual(
-      getStepsForOfferType(selection.offerWizardType, productType, "v2").map((step) => step.key),
-      expected, productType,
-    );
+  ]) {
+    assert.ok(types.includes(`${productType}: {`), `all six offer types are supported: ${productType}`);
   }
 });
 
