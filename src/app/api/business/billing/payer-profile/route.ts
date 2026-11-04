@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const businessId = await ownerBusinessId();
-  if (!businessId) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (!businessId) return NextResponse.json({ error: "Business owner access required" }, { status: 403 });
   let payload: unknown;
   try { payload = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
