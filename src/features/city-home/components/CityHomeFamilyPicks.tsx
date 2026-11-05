@@ -19,7 +19,7 @@ import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { FAMILY_PERSONAS_CHANGED_EVENT } from "@/lib/family/familyPersonaEvents";
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
-import { FamilyHomeCache, readHomeDismissals, HOME_DISMISS_TTL_MS } from "../lib/familyHomeCache";
+import { getSharedFamilyHomeCache, clearSharedFamilyHomeCache, readHomeDismissals, HOME_DISMISS_TTL_MS } from "../lib/familyHomeCache";
 import { homeAgeLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import { homeRecommendationLabel } from "../lib/homeRecommendationLabel";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
@@ -48,7 +48,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [fallbackEvents, setFallbackEvents] = useState<ActivityMock[] | null>(null);
   const [impressed, setImpressed] = useState(new Set<string>());
-  const cache = useRef(new FamilyHomeCache<HomeFamilyDelivery>(actor));
+  const cache = useRef(getSharedFamilyHomeCache<HomeFamilyDelivery>(actor));
   const controller = useRef<AbortController | null>(null);
 
   const mounted = useRef(false);
@@ -180,8 +180,8 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   }, [load]);
 
   useEffect(() => {
-    const refresh = () => { cache.current.clear(); void load({ keepCurrent: true }); };
-    const logout = () => { allowedActor.current = false; controller.current?.abort(); cache.current.cancel(); setData(null); };
+    const refresh = () => { clearSharedFamilyHomeCache(); cache.current.clear(); void load({ keepCurrent: true }); };
+    const logout = () => { allowedActor.current = false; controller.current?.abort(); clearSharedFamilyHomeCache(); cache.current.cancel(); setData(null); };
     window.addEventListener(FAMILY_PERSONAS_CHANGED_EVENT, refresh);
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, logout);
     return () => {

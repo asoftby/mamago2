@@ -50,7 +50,11 @@ export class FamilyHomeCache<T extends { items: { id: string }[]; window: { hori
   clear() { this.entries.clear(); }
   cancel() { ++this.generation; this.clear(); }
   dismiss(id: string, until = Date.now() + HOME_DISMISS_TTL_MS, selectedChildId: string | null = null) {
-    this.denied.set(JSON.stringify([selectedChildId, id]), until);
+    const key = JSON.stringify([selectedChildId, id]);
+    // Rehydrating an already-known dismissal must not wipe valid feed entries
+    // when the home component remounts after navigating to another page.
+    if ((this.denied.get(key) ?? 0) >= until) return;
+    this.denied.set(key, until);
     this.clear();
   }
   filter(data: T, now = Date.now(), selectedChildId: string | null = null): T {
@@ -71,6 +75,31 @@ export class FamilyHomeCache<T extends { items: { id: string }[]; window: { hori
   }
   set(context: HomeFamilyContext, city: string, selected: string | null, data: T, now = Date.now()) {
     if (context.actorId !== this.actorId) return;
-    this.entries.set(familyHomeCacheKey(context, city, selected, data.window.horizonDays), { data, until: Math.min(now + HOME_CACHE_TTL_MS, ...data.items.map(item => "startsAt" in item ? Date.parse(String(item.startsAt)) : Infinity)) });
+    const upcoming = data.items.flatMap(item => {
+      if (!("startsAt" in item) || !item.startsAt) return [];
+      const timestamp = Date.parse(String(item.startsAt));
+      return Number.isFinite(timestamp) ? [timestamp] : [];
+    });
+    for (const [key, entry] of this.entries) if (entry.until <= now) this.entries.delete(key);
+    // Limit retained selections/cities even when a user keeps changing filters.
+    if (this.entries.size >= 32) this.entries.delete(this.entries.keys().next().value!);
+    this.entries.set(familyHomeCacheKey(context, city, selected, data.window.horizonDays), { data, until: Math.min(now + HOME_CACHE_TTL_MS, ...upcoming) });
   }
+}
+
+/** One bounded, tab-local cache survives home component remounts, but never
+ * keeps another account's recommendations after an actor switch. No storage. */
+let sharedHomeCache: FamilyHomeCache<{ items: { id: string }[]; window: { horizonDays: 7 | 30 } }> | null = null;
+export function getSharedFamilyHomeCache<T extends { items: { id: string }[]; window: { horizonDays: 7 | 30 } }>(actorId: string): FamilyHomeCache<T> {
+  // Never reuse private data between requests during server-side rendering.
+  if (typeof window === "undefined") return new FamilyHomeCache<T>(actorId);
+  if (!sharedHomeCache || sharedHomeCache.actorId !== actorId) {
+    sharedHomeCache?.cancel();
+    sharedHomeCache = new FamilyHomeCache(actorId);
+  }
+  return sharedHomeCache as FamilyHomeCache<T>;
+}
+export function clearSharedFamilyHomeCache() {
+  sharedHomeCache?.cancel();
+  sharedHomeCache = null;
 }
