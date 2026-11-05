@@ -527,12 +527,12 @@ export function Step5Pricing({
                     <div className="text-right">
                       {isValidOldPrice ? (
                         <div className="text-sm line-through text-muted-foreground">
-                          {renderCurrencyText(formatPrice(oldPriceNumber), { iconSize: "sm" })}
+                          {data.singleCurrency === "BYN" ? renderCurrencyText(formatPrice(oldPriceNumber), { iconSize: "sm" }) : `${oldPriceNumber} ${data.singleCurrency}`}
                         </div>
                       ) : null}
                       <div className="font-medium">
                         {isValidPrice
-                          ? renderCurrencyText(formatPrice(priceNumber), { iconSize: "sm" })
+                          ? (data.singleCurrency === "BYN" ? renderCurrencyText(formatPrice(priceNumber), { iconSize: "sm" }) : `${priceNumber} ${data.singleCurrency}`)
                           : renderCurrencyText(normalizeUiCurrencyText(option.price), { iconSize: "sm" })}
                       </div>
                     </div>

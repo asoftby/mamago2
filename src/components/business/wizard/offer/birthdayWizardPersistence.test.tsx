@@ -96,3 +96,15 @@ test("unchanged legacy numeric RANGE preserves both bounds without inventing var
   range.priceKind = "EXACT"; range.singlePrice = original.singlePrice;
   assert.equal(buildOfferUpdatePayload(range).singlePrice, 125.5);
 });
+
+test("multiple-price preview uses the restored offer currency", () => {
+  // The existing publication-access client barrel imports a phone stylesheet.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require.extensions[".css"] = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Step5Pricing } = require("./steps/Step5Pricing") as typeof import("./steps/Step5Pricing");
+  const data = restored(); data.pricingMode = "multiple"; data.priceKind = "RANGE";
+  data.pricingOptions = [{ id: "variant", title: "Программа", price: "150", oldPrice: "200", description: "" }];
+  const html = renderToStaticMarkup(createElement(Step5Pricing, { data, onChange: () => {}, isEditable: true, hideCta: true }));
+  assert.ok(html.includes("150 USD")); assert.ok(html.includes("200 USD"));
+});
