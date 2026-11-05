@@ -111,14 +111,14 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
         {exceptions.filter(e=>e.kind==="CLOSED"&&e.startMinutes===null).map(e=><div key={e.date} className="flex items-center gap-2 text-sm">
           <span>{e.date}</span><Button type="button" size="sm" variant="ghost" onClick={()=>setExceptions(list=>list.filter(x=>x!==e))}>Удалить</Button>
         </div>)}
-        <div className="flex items-center gap-2"><Input aria-label="Закрытая дата" className="max-w-44" type="date" value={date} onChange={e=>setDate(e.target.value)}/>
+        <div className="flex flex-wrap items-center gap-2"><Input aria-label="Закрытая дата" className="max-w-44" type="date" value={date} onChange={e=>setDate(e.target.value)}/>
           <Button type="button" size="sm" variant="outline" onClick={()=>{if(date&&!exceptions.some(e=>e.date===date)){setExceptions(list=>[...list,{date,kind:"CLOSED",startMinutes:null,endMinutes:null}]);setDate("");}}}>+ Закрыть день</Button>
         </div>
         {exceptions.some(e=>e.kind!=="CLOSED"||e.startMinutes!==null)&&<p className="text-xs text-muted-foreground">Особые интервалы сохранены без изменений.</p>}
         {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
         {message&&<p role="status" className="text-sm">{message}</p>}
-        <Button type="button" disabled={busy} onClick={()=>void save()}>{busy?"Сохранение…":"Сохранить расписание"}</Button>
-        <p className="text-xs text-muted-foreground">При будущих бронированиях изменение ресурса запрещено сервером. Конфликт вернёт ошибку.</p>
+        <Button type="button" className="h-auto min-h-11 max-w-full whitespace-normal" disabled={busy} onClick={()=>void save()}>{busy?"Сохранение…":"Сохранить расписание"}</Button>
+        <p className="text-xs text-muted-foreground">Если есть будущие бронирования, изменение расписания может быть недоступно. Сначала проверьте существующие записи.</p>
       </>}
     </section>
   );

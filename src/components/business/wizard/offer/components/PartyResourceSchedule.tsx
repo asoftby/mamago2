@@ -97,10 +97,10 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
         <>
           {units.length > 0 && <div className="space-y-1 text-sm">
             <p className="font-medium">Настроенное время</p>
-            {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex items-center gap-2"><span>{unit.name} — {unit.status === "ACTIVE" ? "доступен для записи" : "запись приостановлена"}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId!} onSaved={() => void refresh()} />}</div>)}
+            {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex flex-wrap items-center gap-2"><span className="min-w-0 break-words">{unit.name} — {unit.status === "ACTIVE" ? "доступен для записи" : "запись приостановлена"}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId!} onSaved={() => void refresh()} />}</div>)}
           </div>}
           <div className="space-y-2 rounded-xl border p-3">
-            <Button type="button" variant="outline" disabled={previewLoading} onClick={async () => {
+            <Button type="button" className="h-auto min-h-11 max-w-full whitespace-normal" variant="outline" disabled={previewLoading} onClick={async () => {
               setPreviewLoading(true); setError("");
               try {
                 const res = await fetch(`/api/business/offers/${encodeURIComponent(offerId)}/slot-preview`, {cache:"no-store"});
@@ -109,7 +109,7 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
                 setPreview(value);
               } catch (e) { setError(e instanceof Error ? e.message : "Ошибка предпросмотра"); }
               finally {setPreviewLoading(false);}
-            }}>{previewLoading ? "Загрузка…" : "Проверить свободные слоты на 7 дней"}</Button>
+            }}>{previewLoading ? "Загрузка…" : "Свободное время на неделю"}</Button>
             {preview && <div className="space-y-2 text-sm">
               <p>{preview.message}</p>
               {preview.configured && (preview.slots.length ? <ul className="space-y-1">
@@ -160,8 +160,8 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {success && <p role="status" className="text-sm">{success}</p>}
-          <Button type="button" onClick={() => void create()} disabled={pending}>
-            {pending ? "Сохранение…" : "Добавить ресурс и расписание"}
+          <Button type="button" className="h-auto min-h-11 max-w-full whitespace-normal" onClick={() => void create()} disabled={pending}>
+            {pending ? "Сохранение…" : "Сохранить свободное время"}
           </Button>
         </>
       )}

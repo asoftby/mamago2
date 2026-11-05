@@ -99,7 +99,6 @@ test("unchanged legacy numeric RANGE preserves both bounds without inventing var
 
 test("multiple-price preview uses the restored offer currency", () => {
   // The existing publication-access client barrel imports a phone stylesheet.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require.extensions[".css"] = () => {};
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Step5Pricing } = require("./steps/Step5Pricing") as typeof import("./steps/Step5Pricing");
