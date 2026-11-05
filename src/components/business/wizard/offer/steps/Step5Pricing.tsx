@@ -29,6 +29,13 @@ import { resolveOfferPricingCtaRenderMode } from "../ctaStepFeatureFlag";
 import type { OfferFormData, PricingOption } from "../types";
 import { ClassTariffsEditor } from "../components/ClassTariffsEditor";
 
+/** A newly entered single amount uses the existing fixed-price behaviour unless FROM was selected. */
+export function singlePriceUpdates(data: OfferFormData, field: "singlePrice" | "singleCurrency", value: string): Partial<OfferFormData> {
+  const party = data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE";
+  return { [field]: value, ...(party && field === "singlePrice" && data.priceKind &&
+    !["EXACT", "FROM"].includes(data.priceKind) ? { priceKind: "EXACT" as const } : {}) };
+}
+
 interface Step5PricingProps {
   data: OfferFormData;
   onChange: (updates: Partial<OfferFormData>) => void;
@@ -211,8 +218,8 @@ export function Step5Pricing({
     });
   };
 
-  const handleSinglePriceChange = (field: string, value: string) => {
-    onChange({ [field]: value });
+  const handleSinglePriceChange = (field: "singlePrice" | "singleCurrency", value: string) => {
+    onChange(singlePriceUpdates(data, field, value));
   };
 
   const handleAddPricingOption = () => {

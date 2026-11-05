@@ -107,3 +107,18 @@ test("multiple-price preview uses the restored offer currency", () => {
   const html = renderToStaticMarkup(createElement(Step5Pricing, { data, onChange: () => {}, isEditable: true, hideCta: true }));
   assert.ok(html.includes("150 USD")); assert.ok(html.includes("200 USD"));
 });
+
+test("entering a price replaces legacy unknown/none/free semantics, while a currency edit does not", () => {
+  require.extensions[".css"] = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { singlePriceUpdates } = require("./steps/Step5Pricing") as typeof import("./steps/Step5Pricing");
+  for (const kind of ["UNKNOWN", "NONE", "FREE"] as const) {
+    const data = restored(); data.priceKind = kind; data.singlePrice = "";
+    const edited = { ...data, ...singlePriceUpdates(data, "singlePrice", "150") };
+    const payload = buildOfferUpdatePayload(edited);
+    assert.equal(payload.priceMode, "EXACT"); assert.equal(payload.singlePrice, 150);
+    assert.equal(singlePriceUpdates(data, "singleCurrency", "EUR").priceKind, undefined);
+  }
+  const from = restored();
+  assert.equal(singlePriceUpdates(from, "singlePrice", "160").priceKind, undefined);
+});
