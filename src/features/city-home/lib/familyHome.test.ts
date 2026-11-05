@@ -90,6 +90,27 @@ test("remount reuses tab-local recommendations without re-clearing restored dism
   }
 });
 
+test("mounted refresh reattaches the replacement shared cache before request", () => {
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = {};
+  try {
+    clearSharedFamilyHomeCache();
+    const mounted = { current: getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a") };
+    const stale = mounted.current;
+    stale.begin();
+    clearSharedFamilyHomeCache();
+    mounted.current = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+    mounted.current.set(context, "minsk", null, delivery());
+    assert.notEqual(mounted.current, stale);
+    assert.equal(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a"), mounted.current);
+    assert.equal(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a").get(context, "minsk", null)?.runId, "same_run");
+  } finally {
+    clearSharedFamilyHomeCache();
+    if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});
+
 test("SSR never shares private recommendation caches", () => {
   const first = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
   assert.notEqual(first, getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a"));

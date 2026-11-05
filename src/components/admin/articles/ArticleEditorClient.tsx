@@ -57,6 +57,7 @@ import { usePublicationSlugField } from "@/hooks/usePublicationSlugField";
 import { PublicationSlugField } from "@/components/admin/publications/PublicationSlugField";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
+import { UnsavedPublicationChangesDialog } from "@/components/admin/publications/UnsavedPublicationChangesDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1379,22 +1380,12 @@ export function ArticleEditorClient({
         </div>
       ) : null}
 
-      <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
-        <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Несохранённые изменения</AlertDialogTitle>
-            <AlertDialogDescription>
-              Вы изменили статью. Уйти без сохранения? Несохранённые правки будут потеряны.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 [&_button]:min-h-11 sm:gap-0 sm:[&_button]:min-h-9">
-            <AlertDialogCancel type="button">Остаться</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={confirmLeave}>
-              Уйти без сохранения
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UnsavedPublicationChangesDialog
+        open={leaveDialogOpen}
+        onOpenChange={onLeaveDialogOpenChange}
+        onConfirmLeave={confirmLeave}
+        publicationName="статью"
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">

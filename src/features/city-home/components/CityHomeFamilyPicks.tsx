@@ -180,7 +180,13 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   }, [load]);
 
   useEffect(() => {
-    const refresh = () => { clearSharedFamilyHomeCache(); cache.current.clear(); void load({ keepCurrent: true }); };
+    const refresh = () => {
+      controller.current?.abort();
+      clearSharedFamilyHomeCache();
+      // The mounted ref must point at the new singleton before load() begins.
+      cache.current = getSharedFamilyHomeCache<HomeFamilyDelivery>(actor);
+      void load({ keepCurrent: true });
+    };
     const logout = () => { allowedActor.current = false; controller.current?.abort(); clearSharedFamilyHomeCache(); cache.current.cancel(); setData(null); };
     window.addEventListener(FAMILY_PERSONAS_CHANGED_EVENT, refresh);
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, logout);
@@ -188,7 +194,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       window.removeEventListener(FAMILY_PERSONAS_CHANGED_EVENT, refresh);
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, logout);
     };
-  }, [load]);
+  }, [actor, load]);
 
   useEffect(() => {
     const authorized = !auth.isLoading && auth.user?.id === actor;
