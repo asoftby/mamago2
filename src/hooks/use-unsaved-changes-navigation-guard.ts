@@ -78,12 +78,12 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
     } else if (p) {
       router.push(p);
     }
-    // Keep suppression active during navigation; the previous microtask reset
-    // ran before a full-page navigation could trigger beforeunload.
-    // Restore protection if navigation failed or kept this editor mounted.
+    // Suppression is one-shot, only for an unload initiated immediately by
+    // the confirmed action. If router.back() is a no-op (no history entry),
+    // restore the dirty-form protection on the next event-loop turn.
     window.setTimeout(() => {
       confirmingLeaveRef.current = false;
-    }, 5000);
+    }, 0);
   }, [router]);
 
   const onLeaveDialogOpenChange = useCallback((open: boolean) => {
