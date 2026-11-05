@@ -34,7 +34,7 @@ if (
 }
 if (
   !["localhost", "127.0.0.1"].includes(url.hostname) ||
-  url.port !== "5434" ||
+  !["5434", "55444"].includes(url.port) ||
   url.pathname !== "/mamago_birthday_it"
 ) {
   throw new Error("Party integration only permits localhost:5434/mamago_birthday_it");
@@ -72,7 +72,8 @@ async function fixture() {
   const parent = await db.user.create({ data: { email: `party-parent-${run}@example.test` } });
   const outsider = await db.user.create({ data: { email: `party-outsider-${run}@example.test` } });
   const business = await db.business.create({
-    data: { name: `Party business ${run}`, ownerUserId: owner.id, operationalStatus: "ACTIVE" },
+    data: { name: `Party business ${run}`, ownerUserId: owner.id, operationalStatus: "ACTIVE", verificationStatus: "APPROVED",
+      billingAccount: { create: { status: "ACTIVE", depositBalance: 1 } } },
   });
   await db.businessMember.create({
     data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true },
@@ -439,7 +440,8 @@ test("two businesses cannot confirm the same standalone party item concurrently"
   const photoA = (await homeSetup(ctx, { withUnit: false })).photo;
   const otherOwner = await db.user.create({ data: { email: `party-other-${randomUUID()}@example.test` } });
   const otherBusiness = await db.business.create({
-    data: { name: "Second party provider", ownerUserId: otherOwner.id, operationalStatus: "ACTIVE" },
+    data: { name: "Second party provider", ownerUserId: otherOwner.id, operationalStatus: "ACTIVE", verificationStatus: "APPROVED",
+      billingAccount: { create: { status: "ACTIVE", depositBalance: 1 } } },
   });
   const otherPlace = await db.place.create({ data: {
     title: "Second provider", shortDesc: "Isolated confirmation race fixture",
