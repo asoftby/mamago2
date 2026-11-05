@@ -434,6 +434,7 @@ export async function loadPersonalFamilyPicks(input: {
   userId: string | null;
   citySlug: string;
   selection: PersonalFamilySelection;
+  manualAgeRanges?: string[];
   /** Trusted same-request server snapshot only; never deserialize from an HTTP body. */
   serverProfile?: FamilyPicksProfile;
   excludeActivityIds?: string[];
@@ -482,13 +483,17 @@ export async function loadPersonalFamilyPicks(input: {
         priceTo: cardExtras.get(pick.candidate.id)?.priceTo ?? null,
         currency: cardExtras.get(pick.candidate.id)?.currency ?? null,
         startsAt: pick.startsAt.toISOString(), matchedChildIds: pick.matchedChildIds,
+        // Badge evidence is disabled in the portable build until a reviewed,
+        // independently deployable signal provider is available. Age alone is
+        // never sufficient to claim that an activity suits a specific child.
+        matchBadgeChildIds: [] as string[],
         allChildrenMatch: pick.allChildrenMatch, position: pick.position,
         score: pick.candidate.sharedScore, exposureId: null,
       })),
     };
   };
   if (profile.audience !== "personalized" || !profile.userId) {
-    return response(resolvePersonalShowWindow(now, 7), [], [], null);
+    return response(resolvePersonalShowWindow(now, 30), [], [], null);
   }
   const selectedChildren = selection.mode === "CHILD"
     ? profile.children.filter(child => child.id === selection.selectedChildId)
@@ -537,8 +542,14 @@ export async function loadPersonalFamilyPicks(input: {
         }),
       }];
     });
-    const items = selectPersonalFamilyPicks(candidates, profile.children, selection);
-    if (items.length || horizon === 30) return response(window, items, batch.suggestions, lastAlgorithmVersion);
+    const items = selectPersonalFamilyPicks(candidates, profile.children, selection, input.manualAgeRanges);
+    const activeAudience = selection.mode === "PERSONAS" ||
+      (selection.mode === "DISCOVERY" && (input.manualAgeRanges?.length ?? 0) > 0);
+    // Do not stop at 7 days merely because irrelevant child events exist.
+    // Search the 30-day horizon for actual audience matches before falling back.
+    if (horizon === 30 || (items.length > 0 && (!activeAudience || items.some(item => item.targetFit)))) {
+      return response(window, items, batch.suggestions, lastAlgorithmVersion);
+    }
   }
   throw new Error("unreachable_family_picks_horizon");
 }

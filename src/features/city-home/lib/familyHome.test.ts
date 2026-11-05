@@ -36,7 +36,11 @@ test("catalog is explicit canonical OR, round trips; no identity in URL", () => 
 });
 
 test("full age ranges and Minsk plan date", () => {
-  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 168 }), "3–14");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 168 }), "3–14 лет");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 0, ageMaxMonths: 12 }), "0–1 год");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 12, ageMaxMonths: 36 }), "1–3 года");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 192 }), "3–16 лет");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 216 }), "3+");
   assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: null }), "3+");
   assert.equal(minskPlanDate("2030-11-02T22:30:00Z"), "2030-11-03");
 });

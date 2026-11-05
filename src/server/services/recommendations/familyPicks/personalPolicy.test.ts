@@ -81,6 +81,33 @@ test("free global discovery keeps mismatched and adult events with no false chil
   assert.deepEqual(result.find(item => item.candidate.id === "adult-only")?.matchedChildIds, []);
 });
 
+test("manual 18+ choice ranks adult-compatible events first without hiding other events", () => {
+  const candidates = [
+    event("child", { ageMaxMonths: 120, sharedScore: 100 }),
+    event("adult", { agePolicy: "ADULT_ONLY", ageMinMonths: 216, ageMaxMonths: null, sharedScore: 1 }),
+    event("all-ages", { agePolicy: "UNRESTRICTED", ageMinMonths: null, ageMaxMonths: null, sharedScore: 2 }),
+  ];
+  const picks = selectPersonalFamilyPicks(candidates, children, { mode: "DISCOVERY" }, ["18+"]);
+  assert.deepEqual(picks.map(p => p.candidate.id), ["all-ages", "adult"]);
+  const childPicks = selectPersonalFamilyPicks(candidates, children, { mode: "DISCOVERY" }, ["3-5"]);
+  assert.equal(childPicks.at(-1)?.candidate.id, "adult");
+});
+
+test("strict adult-only header intent never returns child or teen events, including on repeats", () => {
+  const candidates = [
+    event("kid", { ageMinMonths: 0, ageMaxMonths: 120, sharedScore: 999 }),
+    event("teen", { ageMinMonths: 144, ageMaxMonths: 216 }),
+    event("adult", { agePolicy: "ADULT_ONLY", ageMinMonths: 216, ageMaxMonths: null }),
+    event("mixed", { ageMinMonths: 72, ageMaxMonths: 360 }),
+  ];
+  for (const selection of [{ mode: "DISCOVERY" } as const,
+    { mode: "PERSONAS", selectedChildIds: [], includeAdult: true } as const]) {
+    const result = selectPersonalFamilyPicks(candidates, children, selection,
+      selection.mode === "DISCOVERY" ? ["18+"] : []);
+    assert.deepEqual(result.map(item => item.candidate.id).sort(), ["adult", "mixed"]);
+  }
+});
+
 test("multi-persona global selection ranks verified child/adult fits first but never pretends a mismatch fits", () => {
   const candidates = [
     event("too-old", { ageMinMonths: 144, ageMaxMonths: 180, sharedScore: 100 }),
@@ -147,9 +174,8 @@ for (const dates of [[], [at], [at, new Date("2030-11-04Z")], [new Date("2030-11
   test(`loader fallback for ${dates.length} dated candidates`, async () => {
     const f = fixture(dates);
     const result = await loadPersonalFamilyPicks({ userId: "account_a", citySlug: "minsk", selection: all, now }, f.deps);
-    const narrowHasMatches = dates.some(date => date < new Date("2030-11-09T00:00:00+03:00"));
-    assert.equal(f.calls.length, narrowHasMatches ? 1 : 2);
-    assert.equal(result.window.horizonDays, narrowHasMatches ? 7 : 30);
+    assert.equal(f.calls.length, 1);
+    assert.equal(result.window.horizonDays, 30);
     assert.equal(result.items.length, dates.length);
     assert.equal(result.runId, null);
     assert.ok(result.items.every(item => item.exposureId === null));
@@ -189,7 +215,7 @@ test("unknown-age week cannot suppress the 30-day confirmed-age search", async (
     ...f.deps,
     loadExtras: async () => (await f.deps.loadExtras()).map(extra => ({ ...extra, agePolicy: "UNKNOWN" as const })),
   });
-  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls.length, 1);
   assert.equal(result.window.horizonDays, 30);
   assert.equal(result.status, "EMPTY");
   assert.deepEqual(result.items, []);

@@ -38,8 +38,8 @@ export function formatWhoHeaderSummary(params: {
     fallbackAgeValues,
   } = params;
 
-  if (selectedPersonaIds.length === 0 && personas.length > 0) {
-    return "Для всех";
+  if (selectedPersonaIds.length === 0) {
+    return fallbackAgeValues.length > 0 ? formatAgeLabels(fallbackAgeValues) : "Свободный поиск";
   }
 
   const byId = new Map(personas.map((p) => [p.id, p] as const));
@@ -57,7 +57,7 @@ export function formatWhoHeaderSummary(params: {
     return formatPersonaNames(names);
   }
 
-  if (fallbackAgeValues.length > 0) {
+  if (fallbackAgeValues.length > 0 && selectedPersonas.length === 0) {
     return formatAgeLabels(fallbackAgeValues);
   }
 

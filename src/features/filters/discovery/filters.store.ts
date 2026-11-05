@@ -373,7 +373,10 @@ export function getModalFilterCount(filters: DiscoveryFilters): number {
 export function useDiscoveryFilters() {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const rawSearchParams = useSearchParams();
+  // Next can return null in hybrid/SSR contexts before router search state exists.
+  const searchParams = useMemo(() => rawSearchParams ??
+    (new URLSearchParams() as unknown as ReadonlyURLSearchParams), [rawSearchParams]);
   const optionalCity = useOptionalCity();
   const hasMounted = useSyncExternalStore(
     () => () => {},

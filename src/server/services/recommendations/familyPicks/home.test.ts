@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadHomeEvents, publicHomeWeekRange } from "./home";
+import { loadHomeEvents, publicHomeMonthRange } from "./home";
 import { resolveHomeRequest } from "./homeRequest";
 import type { FamilyPicksProfile } from "./profile";
 import type { HomeFamilyContext } from "@/features/city-home/lib/familyHome";
@@ -30,20 +30,13 @@ for (const count of [0, 1, 2, 3]) {
   });
 }
 
-test("the public current week is bounded by Minsk Sunday, including timezone/year rollover", () => {
-  const monday = publicHomeWeekRange(new Date("2026-11-02T08:00:00Z"));
-  assert.equal(monday.start.toISOString(), "2026-11-01T21:00:00.000Z");
-  assert.equal(monday.end.toISOString(), "2026-11-08T21:00:00.000Z");
-
-  const sunday = publicHomeWeekRange(new Date("2026-11-07T22:30:00Z")); // Sunday in Minsk.
-  assert.equal(sunday.start.toISOString(), "2026-11-07T21:00:00.000Z");
-  assert.equal(sunday.end.toISOString(), "2026-11-08T21:00:00.000Z");
-
-  const newYear = publicHomeWeekRange(new Date("2026-12-31T12:00:00Z"));
-  assert.equal(newYear.end.toISOString(), "2027-01-03T21:00:00.000Z");
+test("public home uses a rolling 30-day Minsk-local window", () => {
+  const range = publicHomeMonthRange(new Date("2026-11-02T08:00:00Z"));
+  assert.equal(range.start.toISOString(), "2026-11-01T21:00:00.000Z");
+  assert.equal(range.end.toISOString(), "2026-12-01T21:00:00.000Z");
 });
 
-test("public home asks discovery for the current week before limiting to seven results", async () => {
+test("public home asks discovery for 30 days before limiting visible cards", async () => {
   let calls = 0;
   const now = new Date();
   const result = await loadHomeEvents(null, "city_a", "minsk", {
@@ -53,18 +46,18 @@ test("public home asks discovery for the current week before limiting to seven r
       calls++;
       assert.equal(actor, null);
       assert.equal(options?.take, 7);
-      assert.deepEqual(options?.eventFilters?.dateRange, publicHomeWeekRange(now));
+      assert.deepEqual(options?.eventFilters?.dateRange, publicHomeMonthRange(now));
       assert.equal(options?.eventFilters?.includeNextOccurrenceWithoutSessions, true);
       return [{ id: "weekly" }] as never;
     },
   });
   assert.equal(result.mode, "general");
-  assert.equal(result.periodLabel, "На этой неделе");
+  assert.equal(result.periodLabel, "На ближайшие 30 дней");
   assert.equal(result.activities.length, 1);
-  assert.equal(calls, 1, "no second query when events exist this week");
+  assert.equal(calls, 1, "no second query when events exist in 30 days");
 });
 
-test("empty week falls back to nearest afisha with an accurate subtitle", async () => {
+test("empty 30-day window falls back to nearest afisha with an accurate subtitle", async () => {
   const calls: Array<{ dateRange?: { start: Date; end: Date } | null }> = [];
   const result = await loadHomeEvents(null, "city_a", "minsk", {
     profile: async () => profile([], null),
@@ -77,7 +70,7 @@ test("empty week falls back to nearest afisha with an accurate subtitle", async 
   assert.equal(result.periodLabel, "Ближайшие события");
   assert.equal(result.activities[0]?.id, "next-month-event");
   assert.equal(calls.length, 2);
-  assert.ok(calls[0]?.dateRange?.start instanceof Date, "first query is week-constrained");
+  assert.ok(calls[0]?.dateRange?.start instanceof Date, "first query is 30-day-constrained");
   assert.equal(calls[1]?.dateRange, undefined, "fallback is the standard public discovery window");
 });
 
@@ -155,6 +148,24 @@ test("global header selection is ACL-validated and free search is distinct from 
   assert.equal((await request(["child_0001", "child_0001"])).status, 404);
   assert.equal((await request(["account_a", "child_0001", "foreign_01", "other_01"])).status, 400);
   assert.equal(seen.length, 3, "invalid selections must never reach recommendation engine");
+});
+
+test("manual 18+ header intent reaches discovery recommendation and cannot leak into family selection", async () => {
+  const { deps } = dependencies();
+  const seen: Array<{ selection: unknown; ageRanges?: string[] }> = [];
+  const deliver = async (input: { selection: unknown; ageRanges?: string[] }) => {
+    seen.push({ selection: input.selection, ageRanges: input.ageRanges });
+    return { runId: "test" } as HomeFamilyDelivery;
+  };
+  const base = { action: "recommend", city: "minsk", signature: context.signature };
+  const request = (patch: Record<string, unknown>) => resolveHomeRequest({ ...base, ...patch },
+    "account_a", null, { ...deps, deliver });
+  assert.equal((await request({ selectedPersonaIds: [], ageRanges: ["18+"] })).status, 200);
+  assert.deepEqual(seen[0], { selection: { mode: "DISCOVERY" }, ageRanges: ["18+"] });
+  assert.equal((await request({ selectedPersonaIds: ["child_0001"], ageRanges: ["18+"] })).status, 200);
+  assert.deepEqual(seen[1]?.ageRanges, []);
+  assert.equal((await request({ selectedPersonaIds: [], ageRanges: ["invalid"] })).status, 400);
+  assert.equal(seen.length, 2);
 });
 
 test("child scoped dismissal requires an owned child and preserves context in telemetry", async () => {

@@ -3,6 +3,7 @@ import { PERSONAL_FAMILY_PICKS_POLICY } from "./config";
 import { minskDateKey } from "./window";
 import { getSystemInterestLabel } from "@/lib/config/interests";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { EXPERIENCE_AFFINITY_MAX, MAX_INTEREST_BOOST } from "@/server/services/recommendations/rankingSignals";
 import { minskIsoWeekday } from "./window";
 import type { ShowWindow } from "./window";
@@ -536,6 +537,8 @@ export type PersonalFamilyPick = {
   startsAt: Date;
   matchedChildIds: string[];
   allChildrenMatch: boolean;
+  /** Explicit audience relevance; absent for legacy child/all-family selection. */
+  targetFit?: boolean;
   position: number;
 };
 
@@ -558,11 +561,18 @@ export function selectPersonalFamilyPicks(
   candidates: readonly PersonalFamilyCandidate[],
   children: readonly PersonalFamilyChild[],
   selection: PersonalFamilySelection,
+  manualAgeRanges: readonly string[] = [],
 ): PersonalFamilyPick[] {
   if (selection.mode === "DISCOVERY" || selection.mode === "PERSONAS") {
+    const strictAdult = (selection.mode === "DISCOVERY" && manualAgeRanges.length === 1 && manualAgeRanges[0] === "18+") ||
+      (selection.mode === "PERSONAS" && selection.includeAdult && selection.selectedChildIds.length === 0);
+    const eligible = strictAdult ? candidates.filter(candidate =>
+      candidate.agePolicy === "ADULT_ONLY" || candidate.agePolicy === "UNRESTRICTED" ||
+      (candidate.agePolicy !== "UNKNOWN" && candidate.ageMaxMonths != null && candidate.ageMaxMonths > 216))
+      : candidates;
     const chosenChildren = selection.mode === "PERSONAS" ? new Set(selection.selectedChildIds) : new Set<string>();
     const includesAdult = selection.mode === "PERSONAS" && selection.includeAdult;
-    const ranked = candidates.flatMap(candidate => {
+    const ranked = eligible.flatMap(candidate => {
       const occurrences = candidate.occurrences.map(startsAt => {
         const matchedChildIds = children.filter(child =>
           confirmedAgeMatchAt(child, candidate, startsAt) === "MATCH").map(child => child.id).sort();
@@ -570,8 +580,21 @@ export function selectPersonalFamilyPicks(
           candidate.agePolicy === "UNRESTRICTED" ||
           (candidate.ageMaxMonths != null && candidate.ageMaxMonths >= 216) ||
           (candidate.ageMinMonths != null && candidate.ageMinMonths >= 216);
+        // Manual header ages affect ranking, never hard-exclude scarce content.
+        const manualFit = manualAgeRanges.some(key => {
+          const group = AGE_GROUPS.find(value => value.value === key);
+          if (!group) return false;
+          if (candidate.agePolicy === "UNRESTRICTED") return true;
+          if (candidate.agePolicy === "UNKNOWN") return false;
+          if (candidate.agePolicy === "ADULT_ONLY") return group.value === "18+";
+          const min = candidate.ageMinMonths ?? 0;
+          const max = candidate.ageMaxMonths ?? Infinity;
+          const requestedMin = group.minMonths;
+          const requestedMax = group.maxMonths ?? Infinity;
+          return min <= requestedMax && max >= requestedMin;
+        });
         const targetFit = selection.mode === "DISCOVERY"
-          ? true
+          ? (manualAgeRanges.length === 0 || manualFit)
           : (includesAdult && adultFit) || matchedChildIds.some(id => chosenChildren.has(id));
         return { candidate, startsAt, matchedChildIds,
           allChildrenMatch: children.length > 0 && matchedChildIds.length === children.length,

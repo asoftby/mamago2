@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { SafeOpaqueIdSchema } from "@/lib/decision/identifiers";
+import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { saveHomeSelection, loadHomeContext } from "./homeContext";
 import { deliverHomeFamilyPicks } from "./delivery";
 import { verifyRecommendationAttribution } from "../RecommendationTraceService";
@@ -16,6 +17,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("recommend"), city, selectedChildId: choice, signature: z.string().length(64),
     /** Global header choice; IDs are validated against this actor's family ACL. */
     selectedPersonaIds: z.array(SafeOpaqueIdSchema).max(3).optional(),
+    ageRanges: z.array(z.enum(AGE_GROUPS.map(group => group.value) as [string, ...string[]])).max(10).optional(),
     dismissedIds: z.array(SafeOpaqueIdSchema).max(200).default([]) }),
   z.object({ action: z.literal("dismiss"), city, eventId: SafeOpaqueIdSchema, exposureId: SafeOpaqueIdSchema.nullable(), token: SafeOpaqueIdSchema,
     selectedChildId: choice }),
@@ -65,6 +67,6 @@ export async function resolveHomeRequest(raw: unknown, userId: string | null, se
     : data.selectedChildId ? { mode: "CHILD" as const, selectedChildId: data.selectedChildId }
       : { mode: "ALL_FAMILY" as const };
   const delivery = await deps.deliver({ userId, citySlug: data.city, profile, context, sessionId, signal, dismissedIds: data.dismissedIds,
-    selection });
+    selection, ageRanges: selection.mode === "DISCOVERY" ? data.ageRanges ?? [] : [] });
   return { status: 200, body: delivery };
 }

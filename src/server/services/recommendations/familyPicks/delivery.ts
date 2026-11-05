@@ -12,10 +12,10 @@ import type { PersonalFamilySelection } from "./select";
 
 export async function deliverHomeFamilyPicks(input: {
   userId: string; citySlug: string; profile: FamilyPicksProfile; context: HomeFamilyContext;
-  selection: PersonalFamilySelection; dismissedIds: string[]; sessionId: string | null; signal?: AbortSignal;
+  selection: PersonalFamilySelection; ageRanges?: string[]; dismissedIds: string[]; sessionId: string | null; signal?: AbortSignal;
 }) {
   const result = await loadPersonalFamilyPicks({ userId: input.userId, citySlug: input.citySlug,
-    selection: input.selection, serverProfile: input.profile, excludeActivityIds: input.dismissedIds });
+    selection: input.selection, manualAgeRanges: input.ageRanges, serverProfile: input.profile, excludeActivityIds: input.dismissedIds });
   // Reuse the recommendation candidate pool when available. Only if it is
   // empty, check the canonical public catalog once (not another client request).
   // A missing personal match is not proof that the public catalog is empty.
