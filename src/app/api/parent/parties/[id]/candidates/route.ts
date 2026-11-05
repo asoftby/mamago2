@@ -6,7 +6,9 @@ import { checkRateLimit } from "@/lib/security/rateLimit";
 import { findCandidatesForParty } from "@/server/birthday/partyOrderCandidates.service";
 import { partyRouteError, privatePartyResponse } from "@/server/birthday/partyRouteResponses";
 
-const querySchema = z.object({ category: z.nativeEnum(PartyCategory) }).strict();
+const querySchema = z.object({ category: z.nativeEnum(PartyCategory),
+  personaId: z.string().min(1).max(100).optional(), performerRole: z.enum(["ANIMATOR", "HOST"]).optional(), audience: z.enum(["ADULT", "CHILD"]).optional(),
+}).strict();
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +21,7 @@ export async function GET(
     if (!limit.allowed) return NextResponse.json({ error: "Слишком много запросов" }, { status: 429 });
     const input = querySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
     const { id } = await params;
-    return privatePartyResponse(await findCandidatesForParty(user.id, id, input.category));
+    return privatePartyResponse(await findCandidatesForParty(user.id, id, input.category, [], { personaIds: input.personaId ? [input.personaId] : [], performerRole: input.performerRole, audience: input.audience }));
   } catch (error) {
     return partyRouteError(error);
   }

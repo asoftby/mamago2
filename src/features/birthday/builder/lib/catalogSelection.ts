@@ -1,3 +1,4 @@
+import { birthdayLocationCompatibility } from "@/lib/birthday/compatibility";
 import type { BirthdayCatalogItem, PartyCategoryKey } from "./realCatalog";
 import type { PlaceType } from "../types/builder";
 
@@ -26,20 +27,13 @@ export function isLocationCompatible(
   offer: Pick<BirthdayCatalogItem, "locationType"> & Partial<Pick<BirthdayCatalogItem, "productType" | "category">>,
   placeType: PlaceType | null,
 ): boolean {
-  // Cake/catering fulfilment is pickup/delivery, not the celebration venue.
-  // Do not drop these add-ons when the family changes between home and venue.
-  if (offer.productType === "PARTY_SERVICE" &&
-    (offer.category === "CAKE" || offer.category === "FOOD")) return true;
-  if (placeType == null || offer.locationType == null) return true;
-  if (offer.locationType === "BOTH") return true;
-  const onSite = placeType === "VENUE" || placeType === "PACKAGE";
-  return offer.locationType === (onSite ? "ON_SITE" : "OFF_SITE");
+  return birthdayLocationCompatibility(offer,placeType) !== "MISMATCH";
 }
 
 export function isAllowedBase(offer: BirthdayCatalogItem, placeType: PlaceType | null): boolean {
   if (!isLocationCompatible(offer, placeType)) return false;
   if (placeType == null) return true;
-  if (placeType === "VENUE" || placeType === "PACKAGE") return isVenueOffer(offer);
+  if (placeType === "VENUE" || placeType === "PACKAGE") return offer.locationType !== "OFF_SITE" && isVenueOffer(offer);
   // A mobile party package can anchor a home/outdoor celebration; an untyped
   // legacy package must not be assumed mobile.
   if (offer.productType === "PARTY_PACKAGE") {
@@ -120,7 +114,8 @@ export function partyBudgetWarning(
 }
 
 /** Price text that respects how the business declared the price. Unknown never reads as zero. */
-export function catalogPriceLabel(offer: Pick<BirthdayCatalogItem, "priceFrom" | "priceMode" | "currency">): string {
+export function catalogPriceLabel(offer: Pick<BirthdayCatalogItem, "priceFrom" | "priceMode" | "currency"> & Partial<Pick<BirthdayCatalogItem,"priceResolution">>): string {
+  if (offer.priceResolution === "UNRESOLVED") return "Стоимость уточняется";
   if (offer.priceMode === "FREE") return "Бесплатно";
   if (offer.priceFrom == null) return "Цена по запросу";
   const amount = offer.priceFrom.toLocaleString("ru-RU") + " " + offer.currency;

@@ -25,19 +25,21 @@ export async function findCityBySlug(
     countryIsoCode?: string;
     onlyRealCities?: boolean;
     isActive?: boolean;
+    db?: Pick<Prisma.TransactionClient, "city">;
     select?: Prisma.CitySelect;
     include?: Prisma.CityInclude;
   },
 ) {
   const where = citySlugWhere(slug, opts);
+  const db = opts?.db ?? prisma;
 
   if (opts?.select) {
-    return prisma.city.findFirst({ where, select: opts.select });
+    return db.city.findFirst({ where, select: opts.select });
   }
   if (opts?.include) {
-    return prisma.city.findFirst({ where, include: opts.include });
+    return db.city.findFirst({ where, include: opts.include });
   }
-  return prisma.city.findFirst({ where });
+  return db.city.findFirst({ where });
 }
 
 export async function findCityBySlugOrThrow(

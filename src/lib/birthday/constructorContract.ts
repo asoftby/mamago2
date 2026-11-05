@@ -117,6 +117,15 @@ export const OfferForConstructorSchema = z.object({
   contractVersion: z.literal(BIRTHDAY_CONTRACT_VERSION), source: SourceRefSchema.refine(v => v.entity === "Offer"),
   offerId: id, businessId: id, productType: z.enum(["PARTY_SERVICE", "PARTY_PACKAGE"]),
   category: z.enum(PartyCategory).nullable(),
+  // Additive A3 evidence; role is meaningful only inside the existing ANIMATOR category.
+  performerRole: knownOrUnknown(z.enum(["ANIMATOR", "HOST"])).optional(),
+  resources: z.array(z.object({
+    source: SourceRefSchema.refine(v => v.entity === "BookingUnit"),
+    status: z.enum(["ACTIVE", "INACTIVE"]),
+    capacity: knownOrUnknown(z.number().int().positive()),
+    minimumDurationMinutes: knownOrUnknown(z.number().int().positive()),
+    stepMinutes: knownOrUnknown(z.number().int().min(5).max(240)),
+  }).strict()).optional(),
   location: z.object({ mode: knownOrUnknown(z.enum(PartyLocationType)),
     meaning: z.enum(["EVENT_LOCATION", "FULFILMENT"]) }).strict(),
   occasions: knownOrUnknown(z.array(z.enum(PartyOccasion))),
@@ -151,6 +160,8 @@ export const PartySelectionContextSchema = z.object({
   entry: z.enum(PartyOrderEntry), venueMode: z.enum(PartyVenueMode),
   subjects: z.array(SubjectSchema.strict()),
   ageMonthsOnEventDate: knownOrUnknown(count),
+  /** A3 preserves MONTH/legacy DOB uncertainty without exporting a birth date. */
+  ageMonthsRangeOnEventDate: knownOrUnknown(z.object({ min: count, max: count }).strict().refine(v => v.min <= v.max)).optional(),
   interests: knownOrUnknown(ProfileInterestsConstraintSchema.shape.value),
   destination: knownOrUnknown(z.object({ territoryId: id, placeId: id.nullable() }).strict()),
   budget: knownOrUnknown(z.object({ minimumByn: BynAmountSchema.nullable(),
@@ -163,7 +174,8 @@ export const PartySelectionContextSchema = z.object({
     .refine(v => v.from <= v.to, "Inverted date range"),
   interval: knownOrUnknown(ServiceIntervalSchema),
   guests: z.object({ children: count, adults: count }).strict(),
-}).strict();
+}).strict().refine(v => v.ageMonthsOnEventDate.state !== "KNOWN" || v.ageMonthsRangeOnEventDate?.state !== "KNOWN" ||
+  (v.ageMonthsOnEventDate.value >= v.ageMonthsRangeOnEventDate.value.min && v.ageMonthsOnEventDate.value <= v.ageMonthsRangeOnEventDate.value.max), "Conflicting exact/range age evidence");
 
 export const PartyProgramItemSchema = z.object({
   itemId: id, role: z.enum(PartyItemRole), offerId: id.nullable(),

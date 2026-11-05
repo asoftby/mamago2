@@ -1,3 +1,4 @@
+import { ageMonthsIntervalAt } from "@/lib/child/birth";
 import type { AnalyticsEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ageRangeAt } from "@/lib/decision/ageRangeAt";
@@ -16,6 +17,8 @@ export type BuildSubjectsSnapshotInput = {
   personaIds: string[];
   /** Date the decision/action applies to (yyyy-mm-dd or ISO). */
   targetDate: string;
+  /** Opt-in private server evidence; no DOB leaves this resolver and existing callers stay unchanged. */
+  includeAgeEvidence?: boolean;
 };
 
 /**
@@ -26,7 +29,7 @@ export type BuildSubjectsSnapshotInput = {
  */
 export async function buildSelectedProfileContext(
   input: BuildSubjectsSnapshotInput,
-): Promise<{ subjects: Subject[]; systemInterestSlugs: string[] }> {
+): Promise<{ subjects: Subject[]; systemInterestSlugs: string[]; ageMonthsInterval?: { min: number; max: number } | null }> {
   const personaIds = [...new Set(input.personaIds.filter((id) => id.trim().length > 0))];
   if (personaIds.length === 0) return { subjects: [], systemInterestSlugs: [] };
 
@@ -78,6 +81,7 @@ export async function buildSelectedProfileContext(
       }
     }
     return {
+      ...(input.includeAgeEvidence ? { ageMonthsInterval: children.length === 1 && subjects.length === 1 ? (() => { const interval = ageMonthsIntervalAt(children[0], targetDate); return interval && interval.min >= 0 ? interval : null; })() : null } : {}),
       subjects,
       systemInterestSlugs: [...systemInterestSlugs].sort().slice(0, SYSTEM_INTERESTS.length),
     };

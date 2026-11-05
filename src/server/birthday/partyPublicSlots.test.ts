@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { previewPartySlots, type PreviewUnit } from "./partyPublicSlots";
 
 const day = "2026-11-16"; // Monday in Europe/Minsk
@@ -43,20 +42,5 @@ assert.deepEqual(preview([unit, { ...unit, allocations: [blocked] }]), preview()
 assert.deepEqual(previewPartySlots({ day: "2026-02-30", durationMinutes: 180, guestCount: 3, now, units: [unit] }), []);
 assert.deepEqual(previewPartySlots({ day, durationMinutes: 10, guestCount: 3, now, units: [unit] }), []);
 assert.deepEqual(previewPartySlots({ day, durationMinutes: 180, guestCount: 3, now: new Date("2026-11-16T13:00:00Z"), units: [unit] }), [], "past service start must not show");
-const service = readFileSync("src/server/birthday/partyPublicSlots.service.ts", "utf8");
-const endpoint = readFileSync("src/app/api/public/birthday/availability/route.ts", "utf8");
-for (const s of [
-  "getPublicBirthdayOfferWhere(city.id)", "ownerBusinessId",
-  'status: "CONFIRMED"', 'status: "HELD", expiresAt: { gt: now }',
-  'return { mode: "REQUEST_ONLY" as const, slots: [] }',
-]) assert.ok(service.includes(s), "missing public visibility/booking safety guard " + s);
-assert.ok(endpoint.includes('"Cache-Control": "private, no-store"'), "availability is not cacheable");
-assert.ok(!endpoint.includes("unitId"), "never expose resource identifiers");
-const ui = readFileSync("src/features/birthday/builder/components/steps/StepReview.tsx", "utf8");
-for (const token of [
-  "/api/public/birthday/availability?", 'cache: "no-store"',
-  'controller.abort()', 'Возможное время праздника',
-  'onClick={() => { setTimeFrom(slot.start); setTimeTo(slot.end); }}',
-  "Это предварительная доступность, не бронь.",
-]) assert.ok(ui.includes(token), "Missing preview UI safety/wiring: " + token);
+// Real persistence and public-boundary guards are exercised in constructorMatching.postgres.integration.test.ts.
 console.log("partyPublicSlots.test.ts: OK");

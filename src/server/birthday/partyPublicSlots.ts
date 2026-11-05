@@ -1,4 +1,4 @@
-import { isWithinSchedule, minskBookingWindow } from "./partyConfirmationAvailability";
+import { isWithinSchedule, minskBookingWindow, isPartyStartOnStep } from "./partyConfirmationAvailability";
 
 export type PreviewUnit = {
   status: "ACTIVE" | "INACTIVE";
@@ -43,7 +43,7 @@ export function previewPartySlots(params: {
 }): PublicPartySlot[] {
   const { day, durationMinutes, guestCount, now, units } = params;
   const dayDate = new Date(day + "T00:00:00.000Z");
-  if (!Number.isInteger(durationMinutes) || durationMinutes < 30 || durationMinutes > 720 ||
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 1440 ||
       !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 1000 ||
       !Number.isFinite(dayDate.getTime()) || dayDate.toISOString().slice(0, 10) !== day) return [];
 
@@ -58,10 +58,9 @@ export function previewPartySlots(params: {
     // Each resource's step is relative to the opening of each weekly/override interval,
     // not necessarily midnight (e.g. 10:30 opening with 60-minute steps).
     const weekday = dayDate.getUTCDay() || 7;
-    const anchors = [
-      ...unit.rules.filter(rule => rule.weekday === weekday).map(rule => rule.startMinutes),
-      ...unit.exceptions.filter(item => item.kind === "OPEN_OVERRIDE").map(item => item.startMinutes ?? 0),
-    ];
+    const overrides = unit.exceptions.filter(item => item.kind === "OPEN_OVERRIDE");
+    const anchors = overrides.length ? overrides.map(item => item.startMinutes ?? 0)
+      : unit.rules.filter(rule => rule.weekday === weekday).map(rule => rule.startMinutes);
     // End at or before 23:59: 24:00 is not accepted by the final booking window.
     for (const anchor of new Set(anchors)) for (let start = anchor; start + durationMinutes < 1440; start += step) {
       const end = start + durationMinutes;
@@ -70,7 +69,7 @@ export function previewPartySlots(params: {
       const window = minskBookingWindow(dayDate, startTime, endTime,
         unit.prepMinutes, unit.cleanupMinutes);
       if (window.serviceStart <= now ||
-          !isWithinSchedule(window, unit.rules, unit.exceptions)) continue;
+          !isWithinSchedule(window, unit.rules, unit.exceptions) || !isPartyStartOnStep(window, unit.rules, unit.exceptions, step)) continue;
       if (unit.blocks.some(block => overlaps(block.blockStart, block.blockEnd, window.blockStart, window.blockEnd)) ||
           unit.allocations.some(item => overlaps(item.blockStart, item.blockEnd, window.blockStart, window.blockEnd))) continue;
       available.set(startTime, { start: startTime, end: endTime });
