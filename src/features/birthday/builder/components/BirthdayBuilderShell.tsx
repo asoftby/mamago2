@@ -100,9 +100,14 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   // Soft budget: compared with the whole party in review, never used to hide single offers.
   const maxBudget = budgetMaxByn(state.quiz.budgetGroup);
 
-  const ageMonths = useMemo(() => ageMonthsOnDate(
-    state.quiz.partyForChild?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom),
-  ), [state.quiz.partyForChild?.birthDateIso, state.quiz.dateRangeFrom]);
+  const ageMonths = useMemo(() => {
+    const person = state.quiz.partyForChild;
+    if (person?.recipientType === "adult") return null;
+    if (person?.recipientType === "guest" && person.statedAgeYears != null) {
+      return person.statedAgeYears >= 18 ? null : person.statedAgeYears * 12;
+    }
+    return ageMonthsOnDate(person?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom));
+  }, [state.quiz.partyForChild, state.quiz.dateRangeFrom]);
 
   const guests = GUESTS_RANGE[state.quiz.guestsGroup ?? ""] ?? null;
 
@@ -278,6 +283,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             quizDateKey={state.quiz.dateRangeFrom}
             maxBudget={maxBudget}
             childBirthDateIso={state.quiz.partyForChild?.birthDateIso ?? null}
+            statedAgeYears={state.quiz.partyForChild?.statedAgeYears ?? null}
             timeStart={state.partyPlanning.timeStart}
             timeEnd={state.partyPlanning.timeEnd}
             venueMode={state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : state.quiz.placeType === "PACKAGE" ? "PACKAGE" : "VENUE"}

@@ -495,7 +495,6 @@ function BookingCard({
               offerId={data.id}
               offerType={data.offerType}
               productType={data.productType}
-              className="h-14 rounded-full"
             />
           </SidebarCardTopSection>
         ) : null}

@@ -49,6 +49,11 @@ export type OfferConflict = {
 export type PartyForChild = {
   /** id из профиля; null если только в конструкторе или гость */
   profileChildId: string | null;
+  /** Взрослый из семейного профиля; не является Child. */
+  profileAdultId?: string | null;
+  recipientType?: "child" | "adult" | "guest";
+  /** Только свободный сценарий; не является вымышленной датой рождения. */
+  statedAgeYears?: number | null;
   name: string;
   /** Подпись для UI, напр. «5 лет» */
   ageLabel: string;

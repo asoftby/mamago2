@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
-import { splitUiPriceLabel } from "@/lib/formatters/format-price";
+import { getPublicationPriceParts } from "@/components/shared/PublicationPriceDisplay";
 import { Heart } from "lucide-react";
 
 export interface EventStickyActionBarProps {
@@ -95,9 +95,10 @@ export function EventStickyActionBar({
             </p>
           )}
           {(() => {
-            const { amount, suffix } = splitUiPriceLabel(priceLabel);
+            const { prefix, amount, suffix } = getPublicationPriceParts(priceLabel);
             return (
               <div className="flex items-baseline gap-1">
+                {prefix && <span className="font-pt-serif text-[17px]">{prefix}</span>}
                 <span style={{ fontFamily: "var(--font-display)", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
                   {amount}
                 </span>
@@ -184,12 +185,7 @@ export function EventStickyActionBar({
         )}
         <div className="mt-0.5 flex items-baseline gap-1">
           {(() => {
-            const { amount, suffix } = splitUiPriceLabel(priceLabel);
-            const fromMatch = amount.match(/^(от)\s+/i);
-            const fromPrefix = fromMatch?.[1] ?? "";
-            const amountWithoutPrefix = fromMatch
-              ? amount.slice(fromMatch[0].length)
-              : amount;
+            const { prefix: fromPrefix, amount: amountWithoutPrefix, suffix } = getPublicationPriceParts(priceLabel);
             return (
               <>
                 {fromPrefix ? (

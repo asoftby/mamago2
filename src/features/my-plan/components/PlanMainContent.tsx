@@ -1139,7 +1139,6 @@ export function PlanMainContent({
       value={selectedDate}
       onChange={onChangeDate}
       onOpenMonth={() => openNestedScreen("month")}
-      monthEnd={addDaysIso(`${selectedDate.slice(0, 7)}-01`, new Date(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5, 7)), 0).getDate() - 1)}
     />
   ) : null;
   const isPastDay = selectedDate < todayKey;
