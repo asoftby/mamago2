@@ -1,5 +1,7 @@
 "use client";
 
+import { isUnchangedLegacyRange } from "../mappers";
+
 import { useMemo } from "react";
 import { CtaStep } from "@/components/business/wizard/shared/CtaStep";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
@@ -196,15 +198,16 @@ export function Step5Pricing({
     );
   }
 
+  const isParty = data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE";
+  const legacyRange = isUnchangedLegacyRange(data);
+  const onRequest = isParty && data.priceKind === "ON_REQUEST";
   const hasPriceCaption = isRichTextMeaningful(data.priceCaption);
   const hasPromotionDetails = isRichTextMeaningful(data.promotionDetails);
 
   const handlePricingModeChange = (pricingMode: "single" | "multiple") => {
     onChange({
       pricingMode,
-      singlePrice: "",
-      priceCaption: "",
-      pricingOptions: [],
+      ...(isParty ? { priceKind: pricingMode === "multiple" ? "RANGE" as const : "EXACT" as const } : {}),
     });
   };
 
@@ -252,7 +255,18 @@ export function Step5Pricing({
         </p>
       </div>
 
-      <div className="space-y-3">
+      {isParty && <div className="space-y-2">
+        <Label>Как определяется стоимость?</Label>
+        <select aria-label="Как определяется стоимость?" className="w-full min-h-11 rounded-xl border bg-background px-3" disabled={!isEditable}
+          value={data.priceKind ?? "EXACT"} onChange={e => onChange({ priceKind: e.target.value as OfferFormData["priceKind"], pricingMode: e.target.value === "RANGE" ? "multiple" : "single" })}>
+          <option value="EXACT">Фиксированная цена</option><option value="FROM">Цена от указанной суммы</option>
+          <option value="ON_REQUEST">Рассчитаю по запросу</option><option value="RANGE">{legacyRange ? "Сохранённый диапазон стоимости" : "Несколько вариантов стоимости"}</option>
+          {data.priceKind === "FREE" && <option value="FREE">Бесплатно</option>}
+          {(data.priceKind === "NONE" || data.priceKind === "UNKNOWN") && <option value={data.priceKind}>Прежняя цена не указана</option>}
+        </select>
+        <p className="text-xs text-muted-foreground">Цена «от» — это минимум. Итог согласуете с клиентом. Для индивидуального заказа можно указать цену по запросу.</p>
+      </div>}
+      {!isParty && <div className="space-y-3">
         <Label>Режим ценообразования</Label>
         <StableCardSelector
           value={data.pricingMode}
@@ -272,9 +286,10 @@ export function Step5Pricing({
           isEditable={isEditable}
           className="grid grid-cols-2 gap-4"
         />
-      </div>
+      </div>}
 
-      {data.pricingMode === "single" && (
+      {legacyRange && <p className="rounded-xl border p-3 text-sm">Сохранённая стоимость: {data.persistedPriceRange?.from ?? "—"}–{data.persistedPriceRange?.to ?? "—"} {data.singleCurrency}. Обе границы сохраняются. Чтобы заменить цену, выберите способ расчёта выше.</p>}
+      {data.pricingMode === "single" && !onRequest && !legacyRange && (
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2 md:col-span-2">
@@ -307,6 +322,7 @@ export function Step5Pricing({
                   <SelectItem value="BYN">{renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" })}</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="EUR">EUR</SelectItem>
+                  {!["BYN", "USD", "EUR"].includes(data.singleCurrency) && <SelectItem value={data.singleCurrency}>{data.singleCurrency}</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

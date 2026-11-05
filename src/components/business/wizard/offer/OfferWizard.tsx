@@ -51,6 +51,7 @@ import {
 import {
   buildOfferCreatePayload,
   buildOfferUpdatePayload,
+  withSavedPackageComponents,
   mapOfferToFormData,
 } from "./mappers";
 
@@ -633,6 +634,7 @@ export function OfferWizard({
 
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
         const saved = await parseOfferMutationResponse<{
+          components?: OfferFormData["packageComponents"];
           updatedAt?: string;
           operationalVersion?: string;
           moderationNotice?: { message: string };
@@ -648,7 +650,9 @@ export function OfferWizard({
         // Контентные правки опубликованного предложения сервер сохранил как ревизию (ждёт модерации),
         // операционные применил сразу — форма считается сохранённой.
         if (saved?.moderationNotice?.message) toast.info(saved.moderationNotice.message);
-        setBaselineFormJson(JSON.stringify(formData));
+        const savedForm = saved.components ? withSavedPackageComponents(formData, saved.components) : formData;
+        if (saved.components) setFormData(savedForm);
+        setBaselineFormJson(JSON.stringify(savedForm));
         draft.markClean();
       } else {
         if (!placeId) {
@@ -849,7 +853,7 @@ export function OfferWizard({
     }
   };
 
-  const isEditable = true;
+  const isEditable = !isSaving && !isSubmitting;
 
   // Render current step
   const renderStep = () => {
@@ -900,8 +904,8 @@ export function OfferWizard({
                       <p className="text-sm text-muted-foreground">
                         Если у вас одна цена без допуслуг, можно сразу продолжить.
                       </p>
-                      <Button type="button" variant="outline" onClick={() => setAdvancedServicesOpen(true)}>
-                        Настроить дополнительные услуги и цены (необязательно)
+                      <Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal text-left" onClick={() => setAdvancedServicesOpen(true)}>
+                        Дополнительные услуги и часы
                       </Button>
                     </>
                   ) : !offerId ? (
@@ -987,10 +991,10 @@ export function OfferWizard({
                 {!partyScheduleOpen ? (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      Если вы принимаете заявки и подтверждаете время самостоятельно, этот блок не нужен.
+                      Можно согласовывать время вручную. Для точной проверки свободного зала или исполнителя настройте время здесь.
                     </p>
-                    <Button type="button" variant="outline" onClick={() => setPartyScheduleOpen(true)}>
-                      Настроить свободные интервалы для бронирования (необязательно)
+                    <Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal text-left" onClick={() => setPartyScheduleOpen(true)}>
+                      Настроить свободное время (необязательно)
                     </Button>
                   </>
                 ) : !offerId ? (

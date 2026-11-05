@@ -254,6 +254,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
   const warnings: string[] = [];
   const isCampOffer = data.offerWizardType === "CAMP";
   const isRegularClass = data.productType === "REGULAR_ACTIVITY";
+  const onRequest = (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") && data.priceKind === "ON_REQUEST";
   const groupTariffs = data.schedule.classSchedule.groups.flatMap((group) => group.tariffs ?? []);
   if (isRegularClass && groupTariffs.length === 0) {
     pricingErrors.push("Добавьте хотя бы один тариф в расписание группы");
@@ -266,13 +267,15 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
     pricingErrors.push("Выберите режим ценообразования");
   }
 
-  if (!isCampOffer && !isRegularClass && data.pricingMode === "single") {
+  if (!isCampOffer && !isRegularClass && data.pricingMode === "single" && !onRequest) {
     if (!data.singlePrice || data.singlePrice.trim().length === 0) {
       pricingErrors.push("Укажите цену");
+    } else if (!/^(?:0|[1-9]\d{0,7})(?:[.,]\d{1,2})?$/.test(data.singlePrice.trim())) {
+      pricingErrors.push("Проверьте стоимость: например 150 или 150,50");
     }
   }
 
-  if (!isCampOffer && !isRegularClass && data.pricingMode === "multiple") {
+  if (!isCampOffer && !isRegularClass && data.pricingMode === "multiple" && !onRequest) {
     if (data.pricingOptions.length === 0) {
       pricingErrors.push("Добавьте хотя бы один вариант цены");
     } else {
@@ -282,6 +285,8 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
         }
         if (!option.price || option.price.trim().length === 0) {
           pricingErrors.push(`Вариант ${index + 1}: укажите цену`);
+        } else if (!/^(?:0|[1-9]\d{0,7})(?:[.,]\d{1,2})?$/.test(option.price.trim())) {
+          pricingErrors.push(`Вариант ${index + 1}: проверьте стоимость`);
         }
       });
     }
@@ -323,7 +328,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
   }
 
   const isComplete = Boolean(
-    (isCampOffer ||
+    (onRequest || isCampOffer ||
       (isRegularClass && pricingErrors.length === 0) ||
       (data.pricingMode &&
         ((data.pricingMode === "single" && data.singlePrice.trim()) ||

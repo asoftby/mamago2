@@ -24,6 +24,9 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
   const [to, setTo] = useState("20:00");
   const [duration, setDuration] = useState(60);
   const [capacity, setCapacity] = useState(1);
+  const [step, setStep] = useState(30);
+  const [prep, setPrep] = useState(0);
+  const [cleanup, setCleanup] = useState(0);
   const [pending, setPending] = useState(false);
   const [preview, setPreview] = useState<{configured:boolean;message:string;slots:{startsAt:string;endsAt:string;remainingSeats:number|null}[]} | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -57,8 +60,8 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(), offerIds: [offerId], capacity,
-          prepMinutes: 0, cleanupMinutes: 0,
-          minDurationMinutes: duration, stepMinutes: 30,
+          prepMinutes: prep, cleanupMinutes: cleanup,
+          minDurationMinutes: duration, stepMinutes: step,
           rules: selected.map(weekday => ({
             weekday, startMinutes: minutes(from), endMinutes: minutes(to),
           })),
@@ -69,7 +72,7 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
         throw new Error(body.error || "Не удалось сохранить расписание ресурса");
       }
       await refresh();
-      setName(""); setSuccess("Ресурс и его расписание сохранены.");
+      setName(""); setSuccess("Свободное время сохранено.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка сохранения");
     } finally {
@@ -80,9 +83,9 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
   return (
     <section className="space-y-4 rounded-2xl border p-4" aria-label="Доступность праздничных ресурсов">
       <div>
-        <h3 className="text-base font-semibold">Ресурсы и доступные интервалы</h3>
+        <h3 className="text-base font-semibold">Залы, исполнители и свободное время</h3>
         <p className="text-sm text-muted-foreground">
-          Здесь настраивается календарный ресурс для бронирования, отдельно от общих часов работы.
+          Здесь настраивается свободное время зала или исполнителя, отдельно от общих часов работы.
           Фактические слоты рассчитываются с учётом занятости и блокировок.
         </p>
       </div>
@@ -93,8 +96,8 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
       ) : (
         <>
           {units.length > 0 && <div className="space-y-1 text-sm">
-            <p className="font-medium">Привязанные ресурсы</p>
-            {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex items-center gap-2"><span>{unit.name} — {unit.status}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId!} onSaved={() => void refresh()} />}</div>)}
+            <p className="font-medium">Настроенное время</p>
+            {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex items-center gap-2"><span>{unit.name} — {unit.status === "ACTIVE" ? "доступен для записи" : "запись приостановлена"}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId!} onSaved={() => void refresh()} />}</div>)}
           </div>}
           <div className="space-y-2 rounded-xl border p-3">
             <Button type="button" variant="outline" disabled={previewLoading} onClick={async () => {
@@ -119,10 +122,19 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
             </div>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="party-resource-name">Название ресурса</Label>
+            <Label htmlFor="party-resource-name">Название зала или исполнителя</Label>
             <Input id="party-resource-name" value={name} maxLength={120}
               placeholder="Например, праздничный зал" onChange={e => setName(e.target.value)} />
           </div>
+        <details className="rounded-xl border p-3">
+          <summary className="cursor-pointer min-h-11 text-sm font-medium">Настроить начало, подготовку и уборку</summary>
+          <p className="my-2 text-xs text-muted-foreground">Например, начало каждые 30 минут: 10:00, 10:30, 11:00. Время подготовки и уборки тоже будет занято, но не добавляется к цене автоматически.</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="text-sm">Начало каждые, мин<input className="mt-1 w-full min-h-11 rounded-lg border px-2" type="number" min={5} max={240} value={step} onChange={e=>setStep(Number(e.target.value))}/></label>
+            <label className="text-sm">До начала, мин<input className="mt-1 w-full min-h-11 rounded-lg border px-2" type="number" min={0} max={240} value={prep} onChange={e=>setPrep(Number(e.target.value))}/></label>
+            <label className="text-sm">После окончания, мин<input className="mt-1 w-full min-h-11 rounded-lg border px-2" type="number" min={0} max={240} value={cleanup} onChange={e=>setCleanup(Number(e.target.value))}/></label>
+          </div>
+        </details>
           <div className="space-y-2">
             <p className="text-sm font-medium">Дни доступности</p>
             <div className="flex flex-wrap gap-2">

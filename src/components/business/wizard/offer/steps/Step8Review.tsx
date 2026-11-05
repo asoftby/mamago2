@@ -57,6 +57,12 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation, varian
         </p>
       </div>
 
+      {(data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") && <section className="space-y-3 rounded-2xl border p-4" aria-label="Готовность предложения">
+        <h3 className="font-medium">Готовность предложения</h3>
+        <p className="text-sm"><strong>Публикация:</strong> {validation.isValid ? "основные данные заполнены — можно отправить на модерацию." : "проверьте замечания ниже."}</p>
+        <p className="text-sm"><strong>Участие в конструкторе:</strong> после одобрения предложения система проверит условия услуги и допуск компании. Необязательные интересы и точное расписание не мешают публикации.</p>
+        <p className="text-sm"><strong>Автоматическое подтверждение:</strong> не включается от заполнения визарда. Цена по запросу требует согласования; доступность проверяется перед подтверждением.</p>
+      </section>}
       {/* Completion Progress */}
       <Card className={completionPercentage === 100 ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"}>
         <CardContent className="p-4">

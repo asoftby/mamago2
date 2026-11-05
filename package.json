@@ -306,7 +306,9 @@
     "test:publication-media": "tsx src/components/offers/PublicOfferContent.test.tsx && tsx src/lib/media/publicationMediaOrder.test.ts && tsx src/components/media/MobileMediaCarousel.test.tsx && tsx src/lib/media/parseVideoUrl.test.ts && tsx src/lib/event/buildEventGalleryItems.test.ts",
     "test:upload-pipeline": "tsx src/lib/uploads/heicConversion.test.ts && tsx src/lib/uploads/uploadFilename.test.ts && tsx src/lib/uploads/uploadPipeline.contract.test.ts && tsx src/server/media/mediaDimensions.test.ts",
     "test:family-home-analytics": "node --import tsx --test src/features/city-home/lib/homeAnalytics.test.ts",
-    "test:family-home-analytics-integration": "FAMILY_PICKS_TEST_DB=1 node --conditions=react-server --import tsx src/server/services/recommendations/familyPicks/homeAnalytics.integration.test.ts"
+    "test:family-home-analytics-integration": "FAMILY_PICKS_TEST_DB=1 node --conditions=react-server --import tsx src/server/services/recommendations/familyPicks/homeAnalytics.integration.test.ts",
+    "test:birthday-wizard": "node --import tsx --test src/components/business/wizard/offer/birthdayWizardPersistence.test.tsx src/components/business/wizard/offer/birthdayOfferTerms.contract.test.ts src/components/business/wizard/offer/PartyDurationCapacityFields.test.tsx src/components/business/wizard/offer/offerWizardV2Steps.contract.test.ts src/components/business/wizard/offer/validation.final.test.ts",
+    "test:birthday-wizard-integration": "node --import tsx --test src/server/offers/packageComponents.integration.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
