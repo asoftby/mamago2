@@ -17,12 +17,28 @@ export function buildWorkItemWhere(
   return {
     ...(query.kind ? { kind: query.kind } : {}),
     ...(query.status ? { status: query.status } : {}),
+    ...(query.openOnly ? {
+      AND: [{ status: { notIn: ["DONE", "CANCELED"] as const } }],
+    } : {}),
     ...(query.assigneeId ? { assigneeId: query.assigneeId } : {}),
-    ...(query.search ? { title: { contains: query.search, mode: "insensitive" as const } } : {}),
+    // Filter on the server before the LIMIT/OFFSET in listWorkItems.
+    ...(query.search ? {
+      OR: [
+        { title: { contains: query.search, mode: "insensitive" as const } },
+        { nextAction: { contains: query.search, mode: "insensitive" as const } },
+        { business: { is: { name: { contains: query.search, mode: "insensitive" as const } } } },
+        { lead: { is: { name: { contains: query.search, mode: "insensitive" as const } } } },
+      ],
+    } : {}),
     ...(query.due === "TODAY" ? { dueAt: { gte: start, lt: end } } :
       query.due === "OVERDUE" ? {
         dueAt: { lt: now },
-        AND: [{ status: { notIn: ["DONE", "CANCELED"] as const } }],
+        ...(!query.openOnly ? { AND: [{ status: { notIn: ["DONE", "CANCELED"] as const } }] } : {}),
+      } :
+      query.due === "UPCOMING" ? {
+        // From tomorrow in Minsk (the "Ближайшие задачи" panel excludes today).
+        dueAt: { gte: end },
+        ...(!query.openOnly ? { AND: [{ status: { notIn: ["DONE", "CANCELED"] as const } }] } : {}),
       } :
       query.due === "NO_DUE" ? { dueAt: null } : {}),
   };

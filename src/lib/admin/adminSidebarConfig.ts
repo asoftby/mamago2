@@ -2,6 +2,7 @@ import { adminPath } from "@/lib/routing/surface";
 import type { AdminSidebarNavItem, AdminSidebarGroup } from "./adminSidebarTypes";
 import {
   LayoutDashboard,
+  ContactRound,
   Shield,
   Users,
   Briefcase,
@@ -28,6 +29,15 @@ import {
  * - Groups are collapsible sections with multiple sub-items
  * - Order determines display order in sidebar
  */
+
+// CRM is part of the existing admin shell, not a separate application.
+export const NAV_CRM: AdminSidebarNavItem = {
+  id: "crm",
+  label: "CRM",
+  href: adminPath("/work"),
+  icon: ContactRound,
+  matchers: [{ type: "prefix", value: adminPath("/work") }],
+};
 
 // === STANDALONE NAV ITEMS ===
 
@@ -561,6 +571,7 @@ export const GROUP_SYSTEM: AdminSidebarGroup = {
  */
 export const ADMIN_SIDEBAR_CONFIG: readonly (AdminSidebarNavItem | AdminSidebarGroup)[] = [
   NAV_MAIN,
+  NAV_CRM,
   GROUP_MODERATION,
   GROUP_USERS,
   GROUP_B2B,
