@@ -8,7 +8,6 @@ import { StoriesSection } from "@/features/stories/components/StoriesSection";
 import { CityHomeFamilyPicks } from "@/features/city-home/components/CityHomeFamilyPicks";
 import { CityHomeBirthdayCta } from "@/features/city-home/components/CityHomeBirthdayCta";
 import { CityHomeBirthdayOffers } from "@/features/city-home/components/CityHomeBirthdayOffers";
-import { selectHomeBirthdayOffers } from "@/features/city-home/lib/homeBirthdayPreview";
 import { getPublicBirthdayCatalog } from "@/server/birthday/catalog.service";
 import { ActivationBannerHost } from "@/features/city-home/components/ActivationBannerHost";
 import { getFallbackHeroModel, getHeroContext } from "@/features/hero-weather/lib/get-hero-context";
@@ -23,13 +22,16 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
 import { getCityNominativeName, getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
+import { listPopulatedCityBlogCategories } from "@/server/article/cityBlogCategories";
 import { listNearbyCities, type NearbyCity } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
+import { listDiscoveryClassChips } from "@/server/discovery/classChips";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getHomeSectionAvailability } from "@/features/city-home/config/homeSectionAvailability";
 
-const HOME_PERSONALIZATION_CANDIDATE_TAKE = 24;
+// Wider local candidate pool for audience ranking, without inflating the visible carousel.
+const HOME_PERSONALIZATION_CANDIDATE_TAKE = 96;
 
 export type CityHomePageCity = {
   id: string;
@@ -98,9 +100,11 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     ? listPublicRoutesByCity(city.id).catch(() => [])
     : Promise.resolve([]);
   const journalArticlesPromise = listCityHomeArticles(city);
+  const journalCategoriesPromise = listPopulatedCityBlogCategories(city).catch(() => []);
   const birthdayOffersPromise = sectionAvailability.birthday
-    ? getPublicBirthdayCatalog(city.slug, 120).then(items => selectHomeBirthdayOffers(items ?? [])).catch(() => [])
+    ? getPublicBirthdayCatalog(city.slug, 120).catch(() => [])
     : Promise.resolve([]);
+  const classChipsPromise = sectionAvailability.classes ? listDiscoveryClassChips().catch(() => []) : Promise.resolve([]);
   const localClassesPromise = sectionAvailability.classes
     ? getClassesDiscoveryFeed(city.id, city.slug, {
         take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"], homeGeoFallback: true,
@@ -132,8 +136,10 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     ,
     localRoutes,
     journalArticles,
+    journalCategories,
     birthdayOffers,
     localClasses,
+    classChips,
     nearbyRoutes,
     nearbyClasses,
   ] = await Promise.all([
@@ -141,8 +147,10 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     nearbyCitiesPromise,
     localRoutesPromise,
     journalArticlesPromise,
+    journalCategoriesPromise,
     birthdayOffersPromise,
     localClassesPromise,
+    classChipsPromise,
     nearbyRoutesPromise,
     nearbyClassesPromise,
   ]);
@@ -196,7 +204,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
 
   return (
     <div className="min-h-screen pb-20">
-      <Container className="space-y-10 pt-10">
+      <Container className="space-y-[53px] pt-[46px]">
         <Suspense fallback={<HeroGreetingShell initialModel={heroFallbackModel} />}>
           <HeroWeatherSection
             cityId={city.id}
@@ -227,6 +235,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           <CityHomeClassesSection
             cityName={getCityNominativeName(city.slug)}
             activities={classesMode === "local" ? localClasses : nearbyClasses}
+            classChips={classChips.filter(chip => chip.isActive && chip.slug !== "all").map(chip => ({ slug: chip.slug, title: chip.title }))}
             mode={classesMode}
           />
         ) : null}
@@ -245,7 +254,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           />
         ) : null}
 
-        <CityHomeJournalSection articles={journalArticles} />
+        <CityHomeJournalSection articles={journalArticles} categories={journalCategories} />
       </Container>
     </div>
   );

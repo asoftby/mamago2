@@ -6,12 +6,13 @@ import dynamic from "next/dynamic";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { CityHomeSection } from "./CityHomeSection";
+import { HomeEventsQuickChips } from "./HomeSectionQuickChips";
+import { HomeCarouselHeading, CityHomeAllLink } from "./SectionHeader";
 import { HorizontalCardRow } from "./HorizontalCardRow";
 import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { applyPersonaRanking } from "../lib/personaRanking";
-import { homeOfferRecommendationLabel } from "../lib/homeOfferRecommendationLabel";
 import type { ActivityMock } from "@/types/activity";
 
 const MAX_PREVIEW_EVENTS = 10;
@@ -21,10 +22,10 @@ const FamilyActivationEditChildBirthOverlay = dynamic(() => import("./FamilyActi
 
 /** Guests see the public afisha without age chips, registration prompts or additional filter requests. */
 export function CityHomeGeneralEvents({
-  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null, periodLabel = "На этой неделе",
+  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null,
 }: {
   activities: ActivityMock[]; citySlug: string; authenticated?: boolean; hasChildren?: boolean;
-  periodLabel?: "На этой неделе" | "Ближайшие события";
+  periodLabel?: "На ближайшие 30 дней" | "Ближайшие события";
   incompleteChild?: { id: string; name: string | null } | null;
   incompleteChildren?: { id: string; name: string | null }[];
 }) {
@@ -40,7 +41,12 @@ export function CityHomeGeneralEvents({
 
   return <CityHomeSection
     title={authenticated ? "События, которые подходят вашей семье" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
-    subtitle={periodLabel} reserveCarouselControls>
+    hideHeader>
+    <HorizontalCardRow
+      headerTitle={<HomeCarouselHeading title={authenticated ? "События, которые подходят вашей семье" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}  />}
+      navLeading={<CityHomeAllLink href={catalogHref} label="[все события]" />}
+      underHeader={<>
+        <HomeEventsQuickChips citySlug={citySlug} />
     {authenticated && (!hasChildren || incompleteChild) && <div className="mb-4 flex flex-wrap items-center gap-3">
       <span className="text-sm text-muted-foreground">
         {incompleteChild ? "Укажите возраст ребёнка для персональной афиши." : "Добавьте ребёнка — персонализируем афишу."}
@@ -51,7 +57,8 @@ export function CityHomeGeneralEvents({
       </button>
     </div>}
     {!activities.length && <p role="status" className="py-6 text-sm text-muted-foreground">Пока нет опубликованных событий. Загляните позже.</p>}
-    <HorizontalCardRow headerHasSubtitle>
+      </>}
+    >
       {preview.slice(0, MAX_PREVIEW_EVENTS).map((activity, index) => (
         <div key={activity.id} className={EVENT_CARD_SHELL + " flex flex-col"}>
           <AnalyticsCardViewTracker entityType="EVENT" entityId={activity.id} vertical="CITY" citySlug={citySlug}
@@ -59,10 +66,6 @@ export function CityHomeGeneralEvents({
             <EventCard {...activityMockToEventCard(activity, citySlug)} framing="fixed" coverRatio="2/3" coverFit="cover"
               className="h-full" imagePriority={index < 2} />
           </AnalyticsCardViewTracker>
-          {authenticated && homeOfferRecommendationLabel(activity, family?.personas ?? []) &&
-            <p className="pt-2 text-xs font-medium">
-              {homeOfferRecommendationLabel(activity, family?.personas ?? [])}
-            </p>}
         </div>
       ))}
       <HomeMoreEventsCard href={catalogHref} hasEvents={activities.length > 0} />

@@ -11,6 +11,8 @@ type CityHomeSectionProps = SectionHeaderProps & {
   innerClassName?: string;
   /** Keep desktop heading text clear of the carousel link and arrow controls. */
   reserveCarouselControls?: boolean;
+  /** A carousel owns its heading and controls in the same in-flow row. */
+  hideHeader?: boolean;
 };
 
 export function CityHomeSection({
@@ -26,10 +28,11 @@ export function CityHomeSection({
   className,
   innerClassName,
   reserveCarouselControls = false,
+  hideHeader = false,
 }: CityHomeSectionProps) {
   return (
     <section className={cn("space-y-0", className)}>
-      <SectionHeader
+      {!hideHeader && <SectionHeader
         title={title}
         titleCitySlug={titleCitySlug}
         subtitle={subtitle}
@@ -39,7 +42,7 @@ export function CityHomeSection({
         actionInlineText={actionInlineText}
         headerActionClassName={headerActionClassName}
         className={reserveCarouselControls ? "lg:pr-[250px]" : undefined}
-      />
+      />}
       <div className={cn(innerClassName)}>{children}</div>
     </section>
   );

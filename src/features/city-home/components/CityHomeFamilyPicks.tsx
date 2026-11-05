@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { EventCard, EVENT_CARD_SHELL, activityMockToEventCard } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { CityHomeSection } from "./CityHomeSection";
+import { HomeCarouselHeading, CityHomeAllLink } from "./SectionHeader";
+import { HomeEventsQuickChips } from "./HomeSectionQuickChips";
 import { HorizontalCardRow } from "./HorizontalCardRow";
 import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
@@ -17,11 +20,13 @@ import { FAMILY_PERSONAS_CHANGED_EVENT } from "@/lib/family/familyPersonaEvents"
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
 import { FamilyHomeCache, readHomeDismissals, HOME_DISMISS_TTL_MS } from "../lib/familyHomeCache";
-import { homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
+import { homeAgeLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import { homeRecommendationLabel } from "../lib/homeRecommendationLabel";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
 import { postFamilyPicks as post } from "../lib/familyPicksRequest";
 import { loadHomePublicFallback } from "../lib/loadHomePublicFallback";
+import { homeAudienceSections, homeAgeEligible } from "../lib/rankHomeByAudience";
+import { SoftAudienceNotice } from "./SoftAudienceNotice";
 import type { ActivityMock } from "@/types/activity";
 
 /** One read-only family recommendation feed. Audience filtering belongs in the header/catalog. */
@@ -29,10 +34,15 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const router = useRouter();
   const auth = useAuthMe();
   const family = useFamilyPersona();
+  const { applied } = useDiscoveryFilters();
   // One source of truth: the global header selection. No chips in this block.
   const selectedPersonaIdsKey = family && !family.loading
     ? JSON.stringify([...family.selectedPersonaIds].sort())
     : null;
+  // Manually selected age is part of global discovery intent when no persona is selected.
+  const manualAgeKey = family && !family.loading && family.selectedPersonaIds.length === 0
+    ? JSON.stringify([...applied.age].sort())
+    : "[]";
   const actor = initialContext.actorId!;
   const [data, setData] = useState<HomeFamilyDelivery | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -77,7 +87,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
           router.refresh();
           return;
         }
-        const cacheScope = "personas:" + selectedPersonaIdsKey;
+        const cacheScope = "personas:" + selectedPersonaIdsKey + ":ages:" + manualAgeKey;
         const cached = cache.current.get(fresh, citySlug, cacheScope);
         if (cached) {
           setData(cached);
@@ -89,6 +99,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
           const response = await post({
             action: "recommend", city: citySlug, selectedChildId: null,
             selectedPersonaIds: JSON.parse(selectedPersonaIdsKey) as string[],
+            ageRanges: JSON.parse(manualAgeKey) as string[],
             signature: fresh.signature,
             dismissedIds: stored.filter(entry => entry.selectedChildId == null).map(entry => entry.id),
           }, abort.signal) as HomeFamilyDelivery | null;
@@ -130,7 +141,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       }
       setState("error");
     }
-  }, [actor, citySlug, router, selectedPersonaIdsKey]);
+  }, [actor, citySlug, router, selectedPersonaIdsKey, manualAgeKey]);
 
   useEffect(() => {
     mounted.current = true;
@@ -192,45 +203,62 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   }, [initialContext, initialContext.signature, load]);
 
   const actorMatches = !auth.isLoading && auth.user?.id === actor;
+  const headerAudience = { personas: family?.personas ?? [], selectedPersonaIds: family?.selectedPersonaIds ?? [], manualAgeRanges: applied.age };
+  const safeFallbackEvents = fallbackEvents === null ? null : homeAgeEligible(fallbackEvents, headerAudience,
+    event => ({ ageFrom: event.ageFrom, ageTo: event.ageTo, agePolicy: event.agePolicy }));
   const catalogHref = `/${citySlug}/events`;
-  return <CityHomeSection title="События, которые подходят вашей семье"
-    subtitle={data ? homePeriodLabel(data.window) : "На ближайшие 7 дней"} reserveCarouselControls>
+  const carouselHeader = <HomeCarouselHeading title="События, которые подходят вашей семье" />;
+  const carouselLink = <CityHomeAllLink href={catalogHref} label="[все события]" />;
+  const carouselChips = <HomeEventsQuickChips citySlug={citySlug} />;
+  return <CityHomeSection title="События, которые подходят вашей семье" hideHeader>
     <div className="min-h-40" data-placement="HOME_FOR_FAMILY" aria-busy={state === "loading" && !data}>
       {!actorMatches || (state === "loading" && !data) ? (
         <div role="status"><span className="sr-only">Подбираем события…</span>
-          <HorizontalCardRow>{[0, 1, 2, 3].map(id =>
+          <HorizontalCardRow headerTitle={carouselHeader} navLeading={carouselLink} underHeader={carouselChips}>{[0, 1, 2, 3].map(id =>
             <div key={id} className={EVENT_CARD_SHELL}>
               <div className="aspect-[2/3] animate-pulse rounded-2xl bg-muted" />
               <div className="mt-3 h-16 rounded bg-muted/50" />
             </div>)}</HorizontalCardRow>
         </div>
-      ) : fallbackEvents !== null && !data ? (
-        <HorizontalCardRow headerHasSubtitle>
-          {fallbackEvents.map((event, index) => (
+      ) : safeFallbackEvents !== null && !data ? (
+        <HorizontalCardRow headerTitle={carouselHeader} navLeading={carouselLink} underHeader={carouselChips}>
+          {safeFallbackEvents.map((event, index) => (
             <div key={event.id} className={EVENT_CARD_SHELL}>
               <EventCard {...activityMockToEventCard(event, citySlug)}
                 framing="fixed" coverRatio="2/3" coverFit="cover" imagePriority={index < 2} />
             </div>
           ))}
-          <HomeMoreEventsCard href={catalogHref} hasEvents={fallbackEvents.length > 0} />
+          {safeFallbackEvents.length === 0 && <SoftAudienceNotice noAlternatives />}
+          {safeFallbackEvents.length > 0 && <HomeMoreEventsCard href={catalogHref} hasEvents />}
         </HorizontalCardRow>
       ) : state === "error" && !data ? (
-        <HorizontalCardRow headerHasSubtitle>
+        <HorizontalCardRow headerTitle={carouselHeader} navLeading={carouselLink} underHeader={carouselChips}>
           <HomeMoreEventsCard href={catalogHref} hasEvents={false} />
         </HorizontalCardRow>
       ) : data ? (
-        <FamilyHomeResults data={data} context={data.context} citySlug={citySlug} impressed={impressed}
+        <>
+          <FamilyHomeResults showHomeHeader audienceSections={homeAudienceSections(data.items, {
+            personas: family?.personas ?? [], selectedPersonaIds: family?.selectedPersonaIds ?? [], manualAgeRanges: applied.age,
+          }, item => ({
+            ageFrom: item.ageMinMonths == null ? null : item.ageMinMonths / 12,
+            ageTo: item.ageMaxMonths == null ? null : item.ageMaxMonths / 12,
+            agePolicy: item.agePolicy,
+          }))} data={data} context={data.context} citySlug={citySlug} impressed={impressed}
           onImpression={identity => setImpressed(previous => new Set([...previous, identity]))} />
+        </>
       ) : null}
     </div>
   </CityHomeSection>;
 }
 
-export function FamilyHomeResults({ data, context, citySlug, impressed, onImpression }: {
+export function FamilyHomeResults({ data, context, citySlug, impressed, onImpression, audienceSections, showHomeHeader = false }: {
   data: HomeFamilyDelivery; context: HomeFamilyContext; citySlug: string;
   impressed: Set<string>; onImpression: (identity: string) => void;
+  audienceSections?: { primary: HomeFamilyDelivery["items"]; alternatives: HomeFamilyDelivery["items"]; active: boolean };
+  showHomeHeader?: boolean;
 }) {
-  const items = data.items;
+  const sections = audienceSections ?? { primary: data.items, alternatives: [], active: false };
+  const items = [...sections.primary, ...sections.alternatives];
   const href = `/${citySlug}/events`;
   function meta(item: HomeFamilyDelivery["items"][number]) {
     return { source: item.exposureId ? "recommendation" as const : "listing" as const,
@@ -239,11 +267,19 @@ export function FamilyHomeResults({ data, context, citySlug, impressed, onImpres
       ...(data.runId ? { recommendationRunId: data.runId } : {}),
       ...(item.exposureId ? { recommendationExposureId: item.exposureId } : {}) };
   }
-  return <HorizontalCardRow headerHasSubtitle>
+  return <HorizontalCardRow
+    headerTitle={showHomeHeader ? <HomeCarouselHeading title="События, которые подходят вашей семье" /> : undefined}
+    navLeading={showHomeHeader ? <CityHomeAllLink href={href} label="[все события]" /> : undefined}
+    underHeader={showHomeHeader ? <HomeEventsQuickChips citySlug={citySlug} /> : undefined}
+  >
+    {sections.active && items.length === 0 && <SoftAudienceNotice noAlternatives />}
+    {sections.active && sections.primary.length === 0 && items.length > 0 && <SoftAudienceNotice label="события" />}
     {items.slice(0, 10).map((item, index) => {
       const recommendation = homeRecommendationLabel(item, context);
       const identity = item.exposureId ?? `${context.signature}:all:${item.id}`;
-      return <div key={identity} className={EVENT_CARD_SHELL + " flex flex-col"} data-recommendation-run={data.runId ?? undefined}>
+      return <Fragment key={identity}>
+        {sections.active && sections.primary.length > 0 && sections.alternatives.length > 0 && index === sections.primary.length && <SoftAudienceNotice label="события" afterMatches />}
+        <div className={EVENT_CARD_SHELL + " flex flex-col"} data-recommendation-run={data.runId ?? undefined}>
         <AnalyticsCardViewTracker entityType="EVENT" entityId={item.id} vertical="CITY" citySlug={citySlug}
           threshold={0.5} dwellMs={1000} meta={meta(item)} wasImpressed={impressed.has(identity)}
           onImpression={() => onImpression(identity)}>
@@ -264,9 +300,10 @@ export function FamilyHomeResults({ data, context, citySlug, impressed, onImpres
             {recommendation && <p className="pt-2 text-xs font-medium">{recommendation}</p>}
           </div>
         </AnalyticsCardViewTracker>
-      </div>;
+      </div>
+      </Fragment>;
     })}
-    <HomeMoreEventsCard href={href} hasEvents={data.hasCatalogEvents}
-      onClick={() => void postAnalyticsEvent(homeCatalogEvent(null, citySlug))} />
+    {(!sections.active || items.length > 0) && <HomeMoreEventsCard href={href} hasEvents={data.hasCatalogEvents}
+      onClick={() => void postAnalyticsEvent(homeCatalogEvent(null, citySlug))} />}
   </HorizontalCardRow>;
 }

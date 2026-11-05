@@ -109,8 +109,8 @@ export function SectionHeader({
       <div
         className={cn(
           useInlineText
-            ? "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 mb-4"
-            : "flex flex-wrap items-center gap-x-2.5 gap-y-2 px-1 mb-4",
+            ? "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 mb-[18px]"
+            : "flex flex-wrap items-center gap-x-2.5 gap-y-2 px-1 mb-[18px]",
           className,
         )}
       >
@@ -125,7 +125,7 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4 px-1 mb-4",
+        "flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4 px-1 mb-[18px]",
         className,
       )}
     >
@@ -140,6 +140,16 @@ export function SectionHeader({
         ) : null}
       </div>
       {actionLink}
+    </div>
+  );
+}
+
+/** Shared in-flow carousel heading; action and arrows belong to the same row. */
+export function HomeCarouselHeading({ title, subtitle }: { title: string; subtitle?: string | null }) {
+  return (
+    <div className="min-w-0 space-y-1 px-1">
+      <h2 className="text-neutral-900 leading-tight" style={{ fontFamily: ptSerifHome.style.fontFamily, fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" }}>{title}</h2>
+      {subtitle && <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">{subtitle}</p>}
     </div>
   );
 }

@@ -5,13 +5,14 @@ import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 
 test("one poster-height end card, only links when catalog has available events", () => {
   const empty = renderToStaticMarkup(<HomeMoreEventsCard href="/minsk/events" hasEvents={false} />);
-  assert.match(empty, /Нет событий/);
+  assert.match(empty, /По вашему запросу мы ничего не нашли/);
+  assert.match(empty, /Попробуйте другие варианты/);
   assert.doesNotMatch(empty, /href=|Ещё варианты/);
   const more = renderToStaticMarkup(<HomeMoreEventsCard href="/minsk/events" hasEvents />);
   assert.match(more, /Ещё варианты/);
   assert.match(more, /Куда пойти/);
   assert.match(more, /href="\/minsk\/events"/);
-  assert.doesNotMatch(more, /Нет событий/);
+  assert.doesNotMatch(more, /По вашему запросу мы ничего не нашли/);
   assert.match(empty, /aspect-\[2\/3\]/);
   assert.match(more, /aspect-\[2\/3\]/);
   assert.match(empty, /bg-card/);

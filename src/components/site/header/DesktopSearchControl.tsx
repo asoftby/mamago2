@@ -469,7 +469,7 @@ function DiscoveryDesktopSearchControl({
   });
 
   const whoPrimaryLine = useMemo(() => {
-    if (ageMode === "free" && showChildrenPreset) {
+    if (ageMode === "free" && showChildrenPreset && formDisplayFilters.age.length === 0) {
       return "Свободный поиск";
     }
     return formatWhoHeaderSummary({

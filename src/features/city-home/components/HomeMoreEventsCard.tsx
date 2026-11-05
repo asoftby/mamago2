@@ -15,7 +15,7 @@ export function HomeMoreEventsCard({ href, hasEvents = true, onClick }: {
       </Link>
     ) : (
       <div role="status" className="flex aspect-[2/3] w-full items-center justify-center rounded-2xl border border-border/70 bg-card px-4 text-center">
-        <div className="flex flex-col items-center gap-3 text-muted-foreground"><CalendarX2 className="size-7" aria-hidden /><span className="text-base font-medium">Нет событий</span></div>
+        <div className="flex flex-col items-center gap-3 text-muted-foreground"><CalendarX2 className="size-7" aria-hidden /><span className="text-base font-semibold text-foreground">По вашему запросу мы ничего не нашли</span><span className="text-sm">Попробуйте другие варианты</span></div>
       </div>
     )}
   </div>;

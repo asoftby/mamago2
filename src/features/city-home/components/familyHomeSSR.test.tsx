@@ -22,10 +22,10 @@ test("guest afisha has no age chips or extra registration flow", () => {
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" />
   </AuthProvider></AppRouterContext.Provider>);
   assert.match(html, /Куда пойти с ребёнком в Минске/);
-  assert.match(html, /На этой неделе/);
+  assert.doesNotMatch(html, /На этой неделе|На ближайшие 7 дней/);
   assert.doesNotMatch(html, /Выберите возраст|Возраст ребёнка|3–5 лет|Для кого:|Добавить ребёнка/);
   assert.match(html, /Пока нет опубликованных событий/);
-  assert.match(html, /Нет событий/);
+  assert.match(html, /По вашему запросу мы ничего не нашли/);
   assert.match(html, /Куда пойти/);
   assert.doesNotMatch(html, /Для вашей семьи|child_000|Зарегистрируйтесь/);
 });
@@ -44,7 +44,7 @@ test("public fallback is labeled as nearest events, not this week", () => {
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={null}>
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" periodLabel="Ближайшие события" />
   </AuthProvider></AppRouterContext.Provider>);
-  assert.match(html, /Ближайшие события/);
+  assert.doesNotMatch(html, /На ближайшие 7 дней/);
   assert.doesNotMatch(html, /На этой неделе/);
 });
 
@@ -53,7 +53,7 @@ test("logged-in no-child state shows add-child action, but never age filters", (
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" authenticated />
   </AuthProvider></AppRouterContext.Provider>);
   assert.match(html, /События, которые подходят вашей семье/);
-  assert.match(html, /На этой неделе/);
+  assert.doesNotMatch(html, /На этой неделе|На ближайшие 7 дней/);
   assert.match(html, /Добавить ребёнка/);
   assert.doesNotMatch(html, /Возраст ребёнка|3–5 лет|Выберите возраст/);
 });
@@ -90,8 +90,7 @@ for (const count of [1, 2, 3, 5, 7]) {
       <CityHomeFamilyPicks citySlug="minsk" initialContext={context} />
     </AuthProvider></AppRouterContext.Provider>);
     assert.match(html, /События, которые подходят вашей семье/);
-    assert.match(html, /На ближайшие 7 дней/, "loading state must describe the rolling personal window");
-    assert.doesNotMatch(html, /На этой неделе/, "rolling 7 days can cross calendar weeks");
+    assert.doesNotMatch(html, /На ближайшие 7 дней/, "the visible heading must not impose a 7-day window");
     assert.match(html, /aria-busy="true"/);
     assert.match(html, /Подбираем события/);
     assert.doesNotMatch(html, /Для кого:|Для всех|aria-pressed|>Я</);
@@ -115,12 +114,12 @@ for (const count of [0, 1, 2, 7, 8, 10, 11]) {
     assert.doesNotMatch(html, /В мой план|Не подходит/);
     assert.equal((html.match(/Сохранить в план или в идеи/g) ?? []).length, visible);
     assert.equal((html.match(/data-masonry-media=/g) ?? []).length, visible);
-    assert.equal((html.match(count ? /Ещё варианты</g : /Нет событий</g) ?? []).length, 1);
-    if (count) assert.ok(html.lastIndexOf("Ещё варианты") > html.lastIndexOf("Подходит Ане"));
+    assert.equal((html.match(count ? /Ещё варианты</g : /По вашему запросу мы ничего не нашли</g) ?? []).length, 1);
+    if (count) assert.ok(html.lastIndexOf("Ещё варианты") > html.lastIndexOf("Тестовое событие"));
     assert.doesNotMatch(html, /child_0001|profile=|kids=/);
-    if (!count) assert.match(html, /Нет событий/);
-    else { assert.match(html, /3–14 · 3 ноя./); assert.match(html, /Бесплатно/); assert.match(html, /Подходит Ане/);
+    if (!count) assert.match(html, /По вашему запросу мы ничего не нашли/);
+    else { assert.match(html, /3–14 лет · 3 ноя./); assert.match(html, /Бесплатно/); assert.doesNotMatch(html, /Подходит Ане/);
       assert.match(html, /aspect-ratio:2\/3/); }
-    if (count > 1) { assert.match(html, /Подходит Ане/); assert.match(html, /от 10/); }
+    if (count > 1) { assert.doesNotMatch(html, /Подходит Ане/); assert.match(html, /от 10/); }
   });
 }
