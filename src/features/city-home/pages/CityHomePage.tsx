@@ -29,6 +29,7 @@ import { listDiscoveryClassChips } from "@/server/discovery/classChips";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getHomeSectionAvailability } from "@/features/city-home/config/homeSectionAvailability";
+import { loadNearbyOnlyWhenEmpty } from "@/features/city-home/lib/loadNearbyOnlyWhenEmpty";
 
 // Wider local candidate pool for audience ranking, without inflating the visible carousel.
 const HOME_PERSONALIZATION_CANDIDATE_TAKE = 96;
@@ -92,10 +93,6 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
   // Independent server work starts immediately; nothing here waits on the
   // external weather call (see HeroWeatherSection below).
   const userPromise = getCurrentUser();
-  const nearbyCitiesPromise: Promise<NearbyCity[]> =
-    sectionAvailability.classes || sectionAvailability.routes
-      ? listNearbyCities(city)
-      : Promise.resolve([]);
   const localRoutesPromise = sectionAvailability.routes
     ? listPublicRoutesByCity(city.id).catch(() => [])
     : Promise.resolve([]);
@@ -111,21 +108,19 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
       }).catch(() => [])
     : Promise.resolve([]);
 
+  // Nearby candidates are a fallback, not another unconditional home feed.
+  // Share the city lookup when both local sections are empty.
+  let nearbyCitiesPromise: Promise<NearbyCity[]> | undefined;
+  const nearbyCities = () => nearbyCitiesPromise ??= listNearbyCities(city).catch(() => []);
   const nearbyRoutesPromise = sectionAvailability.routes
-    ? nearbyCitiesPromise.then((nearby) =>
-        listPublicRoutesByCityIds(nearby.map((c) => c.id)).catch(() => []),
-      )
+    ? loadNearbyOnlyWhenEmpty(localRoutesPromise, () => nearbyCities().then(nearby =>
+        nearby.length ? listPublicRoutesByCityIds(nearby.map(c => c.id)).catch(() => []) : []))
     : Promise.resolve([]);
   const nearbyClassesPromise = sectionAvailability.classes
-    ? nearbyCitiesPromise.then((nearby) =>
-        Promise.all(
-          nearby.map((nearbyCity) =>
-            getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, {
-              take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"],
-            }).catch(() => []),
-          ),
-        ).then((groups) => groups.flat()),
-      )
+    ? loadNearbyOnlyWhenEmpty(localClassesPromise, () => nearbyCities().then(nearby =>
+        Promise.all(nearby.map(nearbyCity => getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, {
+          take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"],
+        }).catch(() => []))).then(groups => groups.flat())))
     : Promise.resolve([]);
 
   const eventsPromise = userPromise.then(user => loadHomeEvents(user?.id ?? null, city.id, city.slug))
@@ -133,7 +128,6 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
 
   const [
     user,
-    ,
     localRoutes,
     journalArticles,
     journalCategories,
@@ -144,7 +138,6 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     nearbyClasses,
   ] = await Promise.all([
     userPromise,
-    nearbyCitiesPromise,
     localRoutesPromise,
     journalArticlesPromise,
     journalCategoriesPromise,
