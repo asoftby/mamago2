@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, homePeriodLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
-import { FamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
+import { FamilyHomeCache, getSharedFamilyHomeCache, clearSharedFamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 
 const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02", policyVersion: "v2", audience: "personalized",
@@ -62,6 +62,66 @@ test("cache hits retain run; no cross-account, TTL or profile leak", () => {
   cache.set(context, "minsk", null, delivery());
   assert.equal(cache.get({ ...context, actorId: "account_b" }, "minsk", null), null);
   assert.equal(cache.get(context, "minsk", null), null, "wrong actor cancels all prior entries");
+});
+
+test("remount reuses tab-local recommendations without re-clearing restored dismissals", () => {
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = {};
+  try {
+    clearSharedFamilyHomeCache();
+    const first = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+    first.set(context, "minsk", "personas:[]:ages:[]", delivery());
+    first.dismiss("event_a", 9_999_999_999_999);
+    first.set(context, "minsk", "personas:[]:ages:[]", delivery());
+    const remounted = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+    assert.equal(remounted, first);
+    remounted.dismiss("event_a", 9_999_999_999_999);
+    assert.equal(remounted.get(context, "minsk", "personas:[]:ages:[]")?.runId, "same_run");
+    assert.deepEqual(remounted.get(context, "minsk", "personas:[]:ages:[]")?.items, [{ id: "event_b" }]);
+    const other = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_b");
+    assert.notEqual(other, first);
+    assert.equal(first.get(context, "minsk", "personas:[]:ages:[]"), null);
+    clearSharedFamilyHomeCache();
+    assert.notEqual(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_b"), other);
+  } finally {
+    clearSharedFamilyHomeCache();
+    if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});
+
+test("mounted refresh reattaches the replacement shared cache before request", () => {
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = {};
+  try {
+    clearSharedFamilyHomeCache();
+    const mounted = { current: getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a") };
+    const stale = mounted.current;
+    stale.begin();
+    clearSharedFamilyHomeCache();
+    mounted.current = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+    mounted.current.set(context, "minsk", null, delivery());
+    assert.notEqual(mounted.current, stale);
+    assert.equal(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a"), mounted.current);
+    assert.equal(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a").get(context, "minsk", null)?.runId, "same_run");
+  } finally {
+    clearSharedFamilyHomeCache();
+    if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});
+
+test("SSR never shares private recommendation caches", () => {
+  const first = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+  assert.notEqual(first, getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a"));
+});
+
+test("null start time does not poison cache expiration", () => {
+  const cache = new FamilyHomeCache<{ items: { id: string; startsAt: string | null }[]; window: { horizonDays: 7 } }>("account_a");
+  const value = { items: [{ id: "a", startsAt: null }], window: { horizonDays: 7 as const } };
+  cache.set(context, "minsk", null, value, 1_000);
+  assert.deepEqual(cache.get(context, "minsk", null, 1_001), value);
+  assert.equal(cache.get(context, "minsk", null, 121_001), null);
 });
 
 test("expired occurrence invalidates cache before the ordinary TTL", () => {
