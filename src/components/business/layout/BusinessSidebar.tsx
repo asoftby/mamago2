@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { Building2 } from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
@@ -9,6 +10,7 @@ import { useBookingsMenuBadge } from "@/components/business/bookings/useBookings
 import {
   BUSINESS_BOOKINGS_HREF,
   BUSINESS_DASHBOARD_HREF,
+  BUSINESS_BILLING_REQUISITES_HREF,
   businessNavigation,
 } from "@/lib/business/navigation";
 import type { BuildInfo } from "@/lib/system/buildInfo";
@@ -44,11 +46,12 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
           chromeTone="business"
         />
         {businessNavigation
-          .filter((item) =>
-            process.env.NEXT_PUBLIC_BILLING_ENABLED === "true"
-              ? true
-              : !(item.type === "item" && item.href.includes("/billing"))
-          )
+          .flatMap((item) => {
+            if (item.type === "item" && item.href.includes("/billing") && process.env.NEXT_PUBLIC_BILLING_ENABLED !== "true") {
+              return [{ type: "item" as const, label: "Реквизиты", href: BUSINESS_BILLING_REQUISITES_HREF, icon: Building2 }];
+            }
+            return [item];
+          })
           .map((item, index) => {
           if (item.type === "item") {
             const patterns = item.match ?? [item.href];
