@@ -36,12 +36,13 @@ const timeFormatter = new Intl.DateTimeFormat("ru-RU", {
   timeZone: "Europe/Minsk", hour: "2-digit", minute: "2-digit", hour12: false,
 });
 
-export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, tariffs = [] }: {
+export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, tariffs = [], onRequestInstead }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   offerId: string;
   offerTitle: string;
   tariffs?: PriceItem[];
+  onRequestInstead?: () => void;
 }) {
   const [slots, setSlots] = useState<ClassSlot[]>([]);
   const [groups, setGroups] = useState<ClassGroup[]>([]);
@@ -347,7 +348,16 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Дата и время (Минск)</legend>
             {loading && <p role="status" className="text-sm text-muted-foreground">Загружаем расписание…</p>}
-            {!loading && visibleSlots.length === 0 && !error && <p className="text-sm text-muted-foreground">Пока нет доступных занятий на ближайшие 30 дней.</p>}
+            {!loading && visibleSlots.length === 0 && !error && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Пока нет доступных занятий на ближайшие 30 дней.</p>
+                {onRequestInstead && (
+                  <Button type="button" variant="outline" className="w-full rounded-full" onClick={onRequestInstead}>
+                    Отправить запрос на запись организатору
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="max-h-52 space-y-2 overflow-y-auto">
               {visibleSlots.map((slot) => (
                 <label key={slot.startsAt} className="flex cursor-pointer items-center gap-3 rounded-xl border p-3 has-[:checked]:border-primary">

@@ -52,6 +52,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const controller = useRef<AbortController | null>(null);
 
   const mounted = useRef(false);
+  const hasScheduledInitialLoad = useRef(false);
   const lastCheckedAt = useRef(0);
   const initialSignatureRef = useRef(initialContext.signature);
   const signedContext = useRef<HomeFamilyContext | null>(initialContext);
@@ -147,11 +148,20 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     mounted.current = true;
     allowedActor.current = !auth.isLoading && auth.user?.id === actor;
     for (const entry of readHomeDismissals(actor)) cache.current.dismiss(entry.id, entry.at + HOME_DISMISS_TTL_MS, entry.selectedChildId ?? null);
-    void load();
+    // First render can start immediately. Subsequent header changes are
+    // coalesced so rapidly toggled personas do not trigger costly ranking runs.
+    const delayMs = hasScheduledInitialLoad.current ? 180 : 0;
+    hasScheduledInitialLoad.current = true;
+    const pending = window.setTimeout(() => { void load(); }, delayMs);
     const liveCache = cache.current;
-    // Switching the global header selection invalidates the in-flight request,
-    // not the short-lived results cached for previously selected participants.
-    return () => { mounted.current = false; controller.current?.abort(); liveCache.begin(); };
+    // Invalidate in-flight responses immediately; the deferred request owns
+    // the latest stable header choice, not an intermediate selection.
+    return () => {
+      window.clearTimeout(pending);
+      mounted.current = false;
+      controller.current?.abort();
+      liveCache.begin();
+    };
   }, [actor, load, auth.isLoading, auth.user?.id]);
 
   useEffect(() => {

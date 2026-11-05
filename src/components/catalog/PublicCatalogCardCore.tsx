@@ -75,10 +75,10 @@ export function PublicCatalogCardMeta({ label, priceLabel }: {
 }) {
   if (!label && !priceLabel) return null;
   const isFree = Boolean(priceLabel && /бесплатно|^free$/i.test(priceLabel.trim()));
-  return <div className="mt-0.5 flex flex-wrap items-center gap-x-1 font-mono text-[12px] leading-none text-[rgba(20,18,16,0.55)]">
-    {label && <span className="inline-flex items-center leading-none">{label}</span>}
-    {label && priceLabel && <span className="inline-flex items-center leading-none" aria-hidden="true">·</span>}
-    {priceLabel && <span className={cn("inline-flex items-center leading-none",
+  return <div className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-1 font-mono text-[12px] leading-[1.5] text-[rgba(20,18,16,0.55)]">
+    {label && <span className="inline-flex items-center leading-[1.5]">{label}</span>}
+    {label && priceLabel && <span className="inline-flex items-center leading-[1.5]" aria-hidden="true">·</span>}
+    {priceLabel && <span className={cn("inline-flex items-center leading-[1.5]",
       isFree ? "font-medium text-[var(--success)]" : "text-[#141210]")}>
       {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "card" })}
     </span>}

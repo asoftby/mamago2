@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MODAL_HEADING_STYLE } from "@/components/shared/ModalHeadingStyle";
 
 const TelegramIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -47,7 +48,6 @@ const T = {
   line2: "rgba(20,18,16,.16)",
   paper: "#FAF7F1",
   bg: "#F0EBE0",
-  accentDeep: "#C2522A",
 } as const;
 
 export type ShareAnalyticsChannel = "telegram" | "whatsapp" | "copy" | "native";
@@ -166,30 +166,8 @@ function ShareContent({
         ✕
       </button>
 
-      <h2
-        style={{
-          margin: "0 0 6px",
-          fontSize: 38,
-          lineHeight: 1,
-          letterSpacing: "-.025em",
-          color: T.ink,
-          paddingRight: 40,
-          fontFamily: "var(--font-sans), sans-serif",
-          fontStyle: "normal",
-          fontWeight: 400,
-        }}
-      >
-        Поде&shy;литься{" "}
-        <span
-          style={{
-            fontFamily: "var(--font-editorial)",
-            fontStyle: "italic",
-            fontWeight: 400,
-            color: T.accentDeep,
-          }}
-        >
-          {entityNoun}
-        </span>
+      <h2 style={{ ...MODAL_HEADING_STYLE, margin: "0 0 8px", paddingRight: 40, color: T.ink }}>
+        Поделиться {entityNoun}
       </h2>
       <p style={{ margin: "0 0 22px", fontSize: 13, color: T.ink3, lineHeight: 1.5 }}>
         Отправьте друзьям или скопируйте ссылку

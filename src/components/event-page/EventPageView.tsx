@@ -435,6 +435,7 @@ export function EventPageView({
             body: JSON.stringify({
               activityId: data.id,
               date: result.dateISO,
+              ...(result.selectedPersonaIds ? { selectedPersonaIds: result.selectedPersonaIds } : {}),
               activitySessionId: result.timeSlotId ?? null,
               ...(result.visibility ? { visibility: result.visibility } : {}),
               title: data.title,

@@ -10,7 +10,7 @@ interface BelarusianRubleIconProps {
 const ICON_SIZE = {
   default: { width: "0.81em", height: "1em", align: "-0.12em", translateY: undefined },
   /** Рядом с tabular-nums / font-bold (text-base) */
-  text: { width: "0.56em", height: "0.7em", align: "-0.06em", translateY: undefined },
+  text: { width: "0.60em", height: "0.75em", align: "middle", translateY: "0.025em" },
   /** Крупные суммы (text-3xl / text-4xl) */
   xs: { width: "0.5em", height: "0.62em", align: "-0.05em", translateY: undefined },
   sm: { width: "0.56em", height: "0.72em", align: "middle", translateY: "-0.03em" },
@@ -43,6 +43,9 @@ export function BelarusianRubleIcon({ className, size = "default" }: BelarusianR
         flexShrink: 0,
       }}
       fill="currentColor"
+      stroke={size === "text" ? "currentColor" : undefined}
+      strokeWidth={size === "text" ? 28 : undefined}
+      strokeLinejoin="round"
     >
       {/* Outer contour + inner counter (hole) extracted from nbrb.ttf glyph "BYN" */}
       <path
