@@ -26,7 +26,7 @@ const articleDetailData = readFileSync("src/lib/article/articleMvpRenderData.ts"
 assert.match(listSource, /unstable_cache/);
 assert.match(
   listSource,
-  /\["public-article-list:city", city\.id, city\.slug, city\.regionId \?\? ""\]/,
+  /\["public-article-list:city(?::[^\"]+)?", city\.id, city\.slug, city\.regionId \?\? ""\]/,
   "city cache key must include every geography dimension that shapes membership or hrefs",
 );
 assert.match(listSource, /\["public-article-list:national"\]/);
