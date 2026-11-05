@@ -104,8 +104,9 @@ export function PublicFooter({ withStickyCtaClearance = false, withPlanStickyCle
               <FooterSocialLinks />
             </div>
           </div>
-          <p className={cn("w-full text-center", FOOTER_META_TEXT_CLASS)}>
-            © {currentYear} made in Belarus with 🧡
+          <p className={cn("flex w-full items-center justify-center gap-1 text-center", FOOTER_META_TEXT_CLASS)}>
+            <span className="inline-block shrink-0 text-[18px] leading-none" aria-label="Copyright">©</span>
+            <span>{currentYear} made in Belarus with 🧡</span>
           </p>
         </div>
       </Container>
