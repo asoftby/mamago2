@@ -6,6 +6,8 @@ import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
 import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferCardBlock";
 import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed";
+import { CollectionOfferCard } from "@/components/article/collection/CollectionOfferCard";
+import { CollectionEventCard } from "@/components/article/collection/CollectionEventCard";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleCalloutBlock } from "@/components/article/blocks/ArticleCalloutBlock";
@@ -322,6 +324,13 @@ export function ArticleMvpView({
                     return wrap(<ArticleLivePlaceBlock card={c} />);
                   }
                   if (!c) return <p className="text-sm text-muted-foreground my-6">Карточка: сущность не найдена</p>;
+                  const isCollection = publicationType === "COLLECTION";
+                  if (isCollection && block.entityType === "EVENT" && c.kind === "basic" && c.event) {
+                    return wrap(<div className="my-6"><CollectionEventCard card={c} activityId={block.entityId} /></div>);
+                  }
+                  if (isCollection && c.kind === "offer-embed") {
+                    return wrap(<div className="my-6"><CollectionOfferCard card={c} /></div>);
+                  }
                   if (block.entityType === "EVENT" && c.kind === "basic") {
                     return wrap(
                       <ArticleEventCardBlock title={c.title} href={c.href} dateLabel={c.meta ?? ""} location="" ageLabel="" badge="" />,

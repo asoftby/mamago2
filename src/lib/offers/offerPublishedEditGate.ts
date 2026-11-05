@@ -142,6 +142,8 @@ export function shouldBlockPublishedOfferEdit(params: {
 export const CONTENT_COLUMN_LABELS: Record<string, string> = {
   title: "название",
   description: "описание",
+  venuePitch: "подпись площадки",
+  visitorNote: "условия «Учтите»",
   coverImage: "фото",
   galleryImages: "фото",
   videoUrl: "видео",

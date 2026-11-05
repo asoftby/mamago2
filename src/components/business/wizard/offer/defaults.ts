@@ -44,6 +44,8 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     title: "",
     shortDescription: "",
     description: "",
+    venuePitch: "",
+    visitorNote: "",
     ageGroups: [],
     agePolicy: AgePolicy.UNRESTRICTED,
     campProgramType: null,

@@ -670,6 +670,8 @@ export function buildOfferCreatePayload(
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
     description: data.description?.trim() || "",
+    venuePitch: data.venuePitch?.trim() || null,
+    visitorNote: data.visitorNote?.trim() || null,
     ageMinMonths: data.agePolicy === "SPECIFIC" ? ages.ageMinMonths ?? null : null,
     ageMaxMonths: data.agePolicy === "SPECIFIC" ? ages.ageMaxMonths ?? null : null,
     agePolicy: data.agePolicy,
@@ -900,6 +902,8 @@ export function buildOfferUpdatePayload(
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
     description: data.description?.trim() || "",
+    venuePitch: data.venuePitch?.trim() || null,
+    visitorNote: data.visitorNote?.trim() || null,
     ageMinMonths: data.agePolicy === "SPECIFIC" ? ages.ageMinMonths ?? null : null,
     ageMaxMonths: data.agePolicy === "SPECIFIC" ? ages.ageMaxMonths ?? null : null,
     agePolicy: data.agePolicy,
@@ -1124,6 +1128,8 @@ export function mapOfferToFormData(offer: {
   placements?: Array<{ key: OfferPlacementKey; status?: OfferPlacementStatus | null }> | null;
   title: string;
   description: string | null;
+  venuePitch?: string | null;
+  visitorNote?: string | null;
   coverImage: string | null;
   galleryImages?: unknown; // JsonValue from Prisma
   videoUrl?: string | null;
@@ -1294,6 +1300,8 @@ export function mapOfferToFormData(offer: {
     title: offer.title,
     shortDescription: shortDescriptionFromDescription(offer.description),
     description: normalizeRichTextEditorValue(offer.description),
+    venuePitch: offer.venuePitch ?? "",
+    visitorNote: offer.visitorNote ?? "",
     ageGroups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths),
     agePolicy: offer.agePolicy,
     coverImage: offer.coverImage,
