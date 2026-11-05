@@ -4,7 +4,6 @@
  */
 import { Prisma, type GeoScope } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
   buildArticleMvpResolvedBlocks,
   type ArticleMvpResolvedBlock,
@@ -224,7 +223,7 @@ export async function findNextArticleInSection(
       cityId: input.cityId === null ? null : input.cityId,
       publishedAt: { lte: now, not: null },
       slug: { not: null },
-      OR: [{ subtitle: null }, { subtitle: { not: BREAKING_NEWS_SUBTITLE } }],
+      publicationType: { not: "BREAKING_NEWS" },
     },
     select: { id: true, categoryId: true, geoScope: true, cityId: true },
   });
@@ -307,7 +306,7 @@ export async function findNextArticlePreviewInSection(
       cityId: input.cityId === null ? null : input.cityId,
       publishedAt: { lte: now },
       slug: { not: null },
-      OR: [{ subtitle: null }, { subtitle: { not: BREAKING_NEWS_SUBTITLE } }],
+      publicationType: { not: "BREAKING_NEWS" },
     },
     select: { id: true, categoryId: true, geoScope: true, cityId: true },
   });
@@ -368,6 +367,7 @@ export async function loadArticleContinuousContext(articleId: string): Promise<{
     select: {
       status: true,
       subtitle: true,
+      publicationType: true,
       geoScope: true,
       cityId: true,
       categoryId: true,
@@ -377,7 +377,7 @@ export async function loadArticleContinuousContext(articleId: string): Promise<{
   });
   if (!row) return null;
 
-  const isBreaking = row.subtitle === BREAKING_NEWS_SUBTITLE;
+  const isBreaking = row.publicationType === "BREAKING_NEWS";
   const section =
     row.categoryId && row.category && !row.category.archivedAt && row.category.isActive
       ? {

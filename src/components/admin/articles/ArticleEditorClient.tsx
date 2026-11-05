@@ -26,9 +26,7 @@ import { cn } from "@/lib/utils";
 import type { ArticleEditorSnapshot, ArticleLinkedItemSnapshot } from "@/lib/article/articleAdminTypes";
 import { ArticleLinkedItemsEditor } from "@/components/admin/articles/ArticleLinkedItemsEditor";
 import {
-  BREAKING_NEWS_DEFAULT_TTL_DAYS,
   COLLECTION_MIN_ITEMS,
-  defaultBreakingNewsExpiresAt,
 } from "@/lib/journal/publicationType";
 import { geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 import {
@@ -142,7 +140,6 @@ function applySnapshot(setters: {
 const PUBLICATION_TYPE_OPTIONS: Array<{ value: ArticlePublicationType; label: string; hint: string }> = [
   { value: "ARTICLE", label: "Статья", hint: "Обычный материал журнала, без бейджа." },
   { value: "COLLECTION", label: "Подборка", hint: `Бейдж «Подборка», блок «Подборки mamaGo». Минимум ${COLLECTION_MIN_ITEMS} элемента.` },
-  { value: "BREAKING_NEWS", label: "Новость", hint: `Бейдж «Новость», блок «Новости» до даты «Актуально до» (по умолчанию +${BREAKING_NEWS_DEFAULT_TTL_DAYS} дней).` },
 ];
 
 export function ArticleEditorClient({
@@ -1234,7 +1231,7 @@ export function ArticleEditorClient({
           <div
             role="radiogroup"
             aria-label="Тип публикации"
-            className="grid gap-2 sm:grid-cols-3"
+            className="grid gap-2 sm:grid-cols-2"
           >
             {PUBLICATION_TYPE_OPTIONS.map((option) => (
               <button
@@ -1242,15 +1239,7 @@ export function ArticleEditorClient({
                 type="button"
                 role="radio"
                 aria-checked={publicationType === option.value}
-                onClick={() => {
-                  setPublicationType(option.value);
-                  if (option.value === "BREAKING_NEWS" && !expiresAtLocal) {
-                    const base = fromLocalDatetimeValue(publishedAtLocal);
-                    setExpiresAtLocal(toLocalDatetimeValue(
-                      defaultBreakingNewsExpiresAt(base ? new Date(base) : new Date()).toISOString(),
-                    ));
-                  }
-                }}
+                onClick={() => setPublicationType(option.value)}
                 className={cn(
                   "min-h-11 rounded-lg border px-3 py-2.5 text-left transition-colors",
                   publicationType === option.value

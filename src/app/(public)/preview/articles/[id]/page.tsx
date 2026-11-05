@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canAccessArticlePreview } from "@/lib/auth/articlePreviewAccess";
 import { loadArticleMvpById } from "@/lib/article/articleMvpRenderData";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
+import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
 import { ArticlePreviewBar } from "@/components/article/mvp/ArticlePreviewBar";
 import { Button } from "@/components/ui/button";
 import { PencilLine } from "lucide-react";
@@ -35,7 +35,7 @@ export default async function ArticlePreviewPage({
 
   const publicSlug = data.status === "PUBLISHED" ? (data.slug?.trim() || null) : null;
   const canReturnToEdit = user.role === "ADMIN" || isAuthor;
-  const isBreakingNews = data.subtitle === BREAKING_NEWS_SUBTITLE;
+  const isBreakingNews = data.publicationType === "BREAKING_NEWS";
   const editHref = isBreakingNews
     ? `/admin/content/publications/new?type=news&id=${id}`
     : `/admin/content/articles/${id}/edit`;
@@ -55,9 +55,26 @@ export default async function ArticlePreviewPage({
           </Link>
         </Button>
       ) : null}
+      {isBreakingNews ? (
+        <BreakingNewsView
+          articleId={data.id}
+          title={data.title}
+          excerpt={data.excerpt}
+          publishedAt={data.publishedAt}
+          blocks={data.blocks}
+          author={data.author}
+          tags={data.tags}
+          related={[]}
+          editHref={canReturnToEdit ? editHref : undefined}
+          draftWatermark={data.status !== "PUBLISHED"}
+          articleHref={`/preview/articles/${id}`}
+          coverImageUrl={data.heroUrl}
+        />
+      ) : (
       <ArticleMvpView
         title={data.title}
         subtitle={data.subtitle}
+        publicationType={data.publicationType}
         excerpt={data.excerpt}
         publishedAt={data.publishedAt}
         blocks={data.blocks}
@@ -66,6 +83,7 @@ export default async function ArticlePreviewPage({
         author={data.author}
         readingScrollPaddingExtraRem={2.75}
       />
+      )}
     </>
   );
 }

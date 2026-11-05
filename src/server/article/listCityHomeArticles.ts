@@ -159,7 +159,7 @@ export function toJournalArticle(
   group: JournalGeographyGroup | null,
 ): CityHomeJournalArticle {
   const slug = row.slug!;
-  const isNews = row.publicationType === "BREAKING_NEWS" || row.subtitle === BREAKING_NEWS_SUBTITLE;
+  const isNews = row.publicationType === "BREAKING_NEWS";
   return {
     id: row.id,
     slug,

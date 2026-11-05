@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { buildPublicPath } from "@/lib/routing/surface";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import type { CityBlogCategory } from "@/server/article/cityBlogCategories";
+import { JOURNAL_CHIP, JOURNAL_CHIP_THUMB } from "@/components/journal/journalCategoryChipStyles";
 
 const JOURNAL_SEEN_KEY = "mamago.journal.article-seen.v1";
 
@@ -41,6 +42,8 @@ export function BlogPersistentNav({ citySlug, categories }: {
   useEffect(() => {
     const sync = () => setSeenArticles(readSeenArticles());
     const initialSeen = readSeenArticles();
+    // Local storage is an external snapshot and is unavailable during SSR.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSeenArticles(initialSeen);
     // Snapshot priority once per journal visit: chips never jump while reading.
     setPriorityOrder([...categories]
@@ -75,6 +78,8 @@ export function BlogPersistentNav({ citySlug, categories }: {
     if (matches.every((id) => next.has(id))) return;
     matches.forEach((id) => next.add(id));
     try { window.localStorage.setItem(JOURNAL_SEEN_KEY, JSON.stringify([...next])); } catch { /* Storage unavailable */ }
+    // Synchronize the read marker after writing to browser storage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSeenArticles(next);
   }, [pathname, categories]);
 
@@ -141,7 +146,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
   return (
     <section className="border-b border-border" aria-label="Разделы журнала">
       <div className="site-wrap relative">
-      <nav ref={scrollRef} className="no-scrollbar flex h-[72px] items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap px-6 sm:px-7" aria-label="Разделы журнала">
+      <nav ref={scrollRef} className="no-scrollbar flex h-[56px] items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap px-6 sm:px-7" aria-label="Разделы журнала">
         {pills.map((pill) => {
           const active = pill.slug === activeSlug;
           return (
@@ -151,9 +156,9 @@ export function BlogPersistentNav({ citySlug, categories }: {
               href={pill.slug ? buildPublicPath(`${base}/category/${pill.slug}`) : base}
               prefetch
               aria-current={active ? "page" : undefined}
-              className={`inline-flex h-14 shrink-0 items-center gap-3 rounded-full border pl-1.5 pr-5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary/50"}`}
+              className={`${JOURNAL_CHIP} ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary/50"}`}
             >
-              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
+              <span className={JOURNAL_CHIP_THUMB} aria-hidden="true">
                   <span className="h-full w-full overflow-hidden rounded-full">
                     {!pill.slug && collageCovers.length > 0 ? (
                       <span className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px bg-background">
@@ -169,7 +174,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
                       <span className="flex h-full w-full items-center justify-center text-base">{pill.slug ? pill.name.slice(0, 1) : "Все".slice(0, 1)}</span>
                     )}
                   </span>
-                  {pill.hasNewArticle && <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary" />}
+                  {pill.hasNewArticle && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />}
                 </span>
               {pill.name}
             </Link>

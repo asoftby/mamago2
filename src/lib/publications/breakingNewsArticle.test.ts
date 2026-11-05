@@ -10,9 +10,11 @@ import {
   buildBreakingNewsContent,
   BREAKING_NEWS_SUBTITLE,
   parseBreakingNewsFromSnapshot,
+  isBreakingNewsSnapshot,
   type BreakingNewsFormState,
 } from "./breakingNewsArticle";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
+import { buildEmptyBreakingNewsEditorSnapshot } from "@/lib/article/articleEditorEmptySnapshots";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,6 +113,9 @@ const opts = { publishedAtIso: null, scheduledAtIso: null };
   });
   assert.equal(parsed.pricingHtml, "Бесплатно", "manual cost round-trips from snapshot");
   assert.equal(parsed.linkedEntityId, "place-456", "linked place round-trips from snapshot");
+  const snapshot = { ...buildEmptyBreakingNewsEditorSnapshot(), subtitle: null };
+  assert.equal(isBreakingNewsSnapshot(snapshot), true, "news type always selects the one news editor");
+  assert.equal(isBreakingNewsSnapshot({ ...snapshot, publicationType: "ARTICLE", subtitle: BREAKING_NEWS_SUBTITLE }), false, "legacy marker cannot override canonical article type");
 }
 
 // ── subtitle marker is always preserved ──────────────────────────────────────
