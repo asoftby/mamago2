@@ -159,7 +159,7 @@ export function toJournalArticle(
   group: JournalGeographyGroup | null,
 ): CityHomeJournalArticle {
   const slug = row.slug!;
-  const isNews = row.publicationType === "BREAKING_NEWS" || row.subtitle === BREAKING_NEWS_SUBTITLE;
+  const isNews = row.publicationType === "BREAKING_NEWS";
   return {
     id: row.id,
     slug,
@@ -271,12 +271,23 @@ export async function countJournalArticles(additionalWhere?: Prisma.ArticleWhere
   });
 }
 
+/** Homepage article cards must not be displaced by Breaking News,
+ * which has its own Stories/news surface. The journal itself remains mixed.
+ */
+export async function queryCityHomePreviewArticles(
+  city: CityHomeArticleCity,
+): Promise<CityHomeJournalArticle[]> {
+  return queryCityHomeArticles(city, {
+    additionalWhere: { publicationType: { not: "BREAKING_NEWS" } },
+  });
+}
+
 export async function listCityHomeArticles(
   city: CityHomeArticleCity,
 ): Promise<CityHomeJournalArticle[]> {
   return unstable_cache(
-    () => queryCityHomeArticles(city),
-    ["public-article-list:city", city.id, city.slug, city.regionId ?? ""],
+    () => queryCityHomePreviewArticles(city),
+    ["public-article-list:city:home-preview-v2", city.id, city.slug, city.regionId ?? ""],
     {
       tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
       revalidate: PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,

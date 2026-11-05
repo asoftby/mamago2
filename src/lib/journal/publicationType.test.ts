@@ -11,12 +11,12 @@ import {
 
 const items = (n: number) => Array.from({ length: n }, (_, i) => ({ kind: "EVENT" as const, id: `e${i}` }));
 
-test("news expiresAt defaults to publishedAt + 7 days", () => {
+test("news expiresAt defaults to publishedAt + 14 days", () => {
   const publishedAt = new Date("2026-10-01T10:00:00Z");
-  assert.equal(defaultBreakingNewsExpiresAt(publishedAt).toISOString(), "2026-10-08T10:00:00.000Z");
+  assert.equal(defaultBreakingNewsExpiresAt(publishedAt).toISOString(), "2026-10-15T10:00:00.000Z");
   assert.equal(
     resolveJournalExpiresAt({ publicationType: "BREAKING_NEWS", expiresAt: null, publishedAt })?.toISOString(),
-    "2026-10-08T10:00:00.000Z",
+    "2026-10-15T10:00:00.000Z",
   );
 });
 
@@ -29,10 +29,10 @@ test("explicit expiresAt is kept; non-news types keep their value", () => {
 
 test("publishing news sets a fresh default when expiry is missing or past", () => {
   const publishedAt = new Date("2026-10-20T00:00:00Z");
-  assert.equal(resolveBreakingNewsExpiresAtOnPublish(null, publishedAt).toISOString(), "2026-10-27T00:00:00.000Z");
+  assert.equal(resolveBreakingNewsExpiresAtOnPublish(null, publishedAt).toISOString(), "2026-11-03T00:00:00.000Z");
   assert.equal(
     resolveBreakingNewsExpiresAtOnPublish(new Date("2026-10-01T00:00:00Z"), publishedAt).toISOString(),
-    "2026-10-27T00:00:00.000Z",
+    "2026-11-03T00:00:00.000Z",
   );
   const future = new Date("2026-11-30T00:00:00Z");
   assert.equal(resolveBreakingNewsExpiresAtOnPublish(future, publishedAt), future);

@@ -834,6 +834,8 @@ export interface BreakingNewsViewProps {
   citySlug?: string | null;
   articleHref: string;
   coverImageUrl?: string | null;
+  /** The ticker belongs to the opening article, never to appended news. */
+  showBreakingTicker?: boolean;
 }
 
 export function BreakingNewsView({
@@ -849,6 +851,7 @@ export function BreakingNewsView({
   citySlug,
   articleHref,
   coverImageUrl,
+  showBreakingTicker = true,
 }: BreakingNewsViewProps) {
   useEffect(() => {
     if (draftWatermark) return;
@@ -884,8 +887,8 @@ export function BreakingNewsView({
         opacity: .055, mixBlendMode: "multiply",
       }} aria-hidden />
 
-      {/* Breaking ticker */}
-      <Marquee items={marqueeItems} />
+      {/* One ticker immediately below the journal navigation, only for the opening article. */}
+      {showBreakingTicker ? <Marquee items={marqueeItems} /> : null}
 
       {draftWatermark && (
         <div className="mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6">

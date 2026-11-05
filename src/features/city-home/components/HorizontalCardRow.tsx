@@ -13,8 +13,12 @@ type HorizontalCardRowProps = {
   navLeading?: React.ReactNode;
   /** Align the desktop controls with the title even when the header has a subtitle. */
   headerHasSubtitle?: boolean;
+  /** A quick-chip strip immediately precedes the carousel: keep desktop controls beside the heading. */
+  headerHasQuickChips?: boolean;
   /** Render a shared, in-flow header; avoids positioned controls overlapping links. */
   headerTitle?: React.ReactNode;
+  /** In-flow chips or shortcuts between the shared heading and the cards. */
+  underHeader?: React.ReactNode;
 };
 
 /**
@@ -26,7 +30,9 @@ export function HorizontalCardRow({
   padded = true,
   navLeading,
   headerHasSubtitle = false,
+  headerHasQuickChips = false,
   headerTitle,
+  underHeader,
 }: HorizontalCardRowProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
@@ -118,34 +124,38 @@ export function HorizontalCardRow({
   return (
     <div className={cn("relative -mx-4 px-4 sm:mx-0 sm:px-0", padded && "pb-1")}>
       {headerTitle ? (
-        <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
+        <div className="mb-[18px] flex min-h-11 flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">{headerTitle}</div>
           <div className="flex shrink-0 items-center gap-4">
             {navLeading}
-            <div className="hidden sm:block">{navigationControls}</div>
+            <div>{navigationControls}</div>
           </div>
         </div>
       ) : navLeading ? (
         <div className={cn(
           "mb-4 flex min-h-9 items-center justify-between gap-3 px-1 sm:px-0",
           "lg:absolute lg:right-0 lg:mb-0 lg:px-0",
-          headerHasSubtitle ? "lg:-top-[70px]" : "lg:-top-[52px]",
+          headerHasQuickChips
+            ? headerHasSubtitle ? "lg:-top-[130px]" : "lg:-top-[112px]"
+            : headerHasSubtitle ? "lg:-top-[70px]" : "lg:-top-[52px]",
         )}>
           <div className="min-w-0">{navLeading}</div>
           {navigationControls}
         </div>
       ) : (
-        <div className="absolute right-0 -top-12 hidden lg:flex">
+        <div className={cn("absolute right-0 hidden lg:flex", headerHasQuickChips ? "-top-[108px]" : "-top-12")}>
           {navigationControls}
         </div>
       )}
 
+      {underHeader ? <div>{underHeader}</div> : null}
       <div
         ref={scrollerRef}
         className={cn(
-          // Add end gutter so last card doesn't feel clipped (Airbnb-style).
+          // A flex pseudo-item creates a real scrollable end gutter on every breakpoint.
+          // Padding alone may be swallowed by the scroll container, clipping the last card.
           "flex flex-nowrap gap-3 sm:gap-4 lg:gap-6 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory",
-          "scroll-ps-4 scroll-pe-4 pe-4 sm:pe-0",
+          "scroll-ps-4 scroll-pe-4 after:content-[''] after:block after:w-4 after:shrink-0 sm:after:w-6 lg:after:w-8",
           className,
         )}
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}

@@ -552,7 +552,7 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     const row = await tx.article.create({
       data: {
         title: input.title,
-        subtitle: input.subtitle,
+        subtitle: publicationType === "BREAKING_NEWS" ? BREAKING_NEWS_SUBTITLE : (input.subtitle === BREAKING_NEWS_SUBTITLE ? null : input.subtitle),
         excerpt: input.excerpt,
         contentJson: serializeArticleContent(input.content) as object,
         heroImage: coverUrl,
@@ -702,7 +702,7 @@ export async function saveArticleDraft(
       where: { id },
       data: {
         title: input.title,
-        subtitle: input.subtitle,
+        subtitle: publicationType === "BREAKING_NEWS" ? BREAKING_NEWS_SUBTITLE : (input.subtitle === BREAKING_NEWS_SUBTITLE ? null : input.subtitle),
         excerpt: input.excerpt,
         contentJson: serializeArticleContent(input.content) as object,
         heroImage: coverUrl,

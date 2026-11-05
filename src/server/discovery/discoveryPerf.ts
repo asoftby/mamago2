@@ -24,7 +24,11 @@ const NON_PRODUCTION_APP_ENVS = new Set([
  * DEBUG_DISCOVERY_PERF=true is accidentally retained.
  */
 export function isDiscoveryPerfEnabled(
-  env: DiscoveryPerfEnv = process.env,
+  env: DiscoveryPerfEnv = {
+    APP_ENV: process.env.APP_ENV,
+    NODE_ENV: process.env.NODE_ENV,
+    DEBUG_DISCOVERY_PERF: process.env.DEBUG_DISCOVERY_PERF,
+  },
 ): boolean {
   const appEnv = normalizeEnv(env.APP_ENV);
   const nodeEnv = normalizeEnv(env.NODE_ENV);

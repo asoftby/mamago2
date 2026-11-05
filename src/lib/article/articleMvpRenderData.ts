@@ -36,6 +36,7 @@ const articleMvpBaseSelect = {
   title: true,
   excerpt: true,
   subtitle: true,
+  publicationType: true,
   slug: true,
   status: true,
   publishedAt: true,
@@ -542,6 +543,7 @@ export async function loadArticleMvpBySlugPublic(
     title: article.title,
     excerpt: article.excerpt,
     subtitle: article.subtitle,
+    publicationType: article.publicationType,
     slug: article.slug,
     status: article.status,
     publishedAt: article.publishedAt,
@@ -559,12 +561,12 @@ export async function loadArticleMvpBySlugPublic(
   };
 }
 
-/** Fetch 3 recent breaking news articles (by subtitle marker) excluding `excludeId`. */
+/** Fetch 3 recent breaking news articles by canonical publication type. */
 export async function loadRelatedBreakingNews(excludeId: string) {
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
-      subtitle: "__breaking_news__",
+      publicationType: "BREAKING_NEWS",
       id: { not: excludeId },
     },
     orderBy: { publishedAt: "desc" },
@@ -604,6 +606,7 @@ export async function loadArticleMvpById(articleId: string) {
     title: article.title,
     excerpt: article.excerpt,
     subtitle: article.subtitle,
+    publicationType: article.publicationType,
     slug: article.slug,
     status: article.status,
     publishedAt: article.publishedAt,

@@ -19,7 +19,7 @@ import { JournalCollectionsCarousel } from "./JournalCollectionsCarousel";
 const NEWS_CARD_SHELL = "shrink-0 snap-start w-[33.6vw] min-w-[112px] max-w-[160px] lg:w-[16%] lg:max-w-none";
 
 /**
- * Страница журнала: H1 + подзаголовок → «Главное» → «Breaking News» → «Подборки mamaGo»
+ * Страница журнала: H1 + подзаголовок → «Breaking News» → «Главное» → «Подборки mamaGo»
  * → «Свежие материалы». Каждый пустой блок скрыт целиком. Чипы рубрик — в layout.
  */
 export function JournalPageView({
@@ -92,20 +92,6 @@ export function JournalPageView({
         {intro}
       </header>
 
-      {main ? (
-        <section aria-label="Главное">
-          <AnalyticsCardViewTracker
-            entityType="ARTICLE"
-            entityId={main.id}
-            vertical="CITY"
-            citySlug={citySlug}
-            meta={{ section: "journal", block: "main", position: 0 }}
-          >
-            <JournalMainCard article={main} saveStatus={saveStatuses[main.id]} />
-          </AnalyticsCardViewTracker>
-        </section>
-      ) : null}
-
       {news.length > 0 ? (
         <section aria-labelledby="journal-news-title" className="space-y-4">
           <HorizontalCardRow
@@ -137,6 +123,20 @@ export function JournalPageView({
               </div>
             ))}
           </HorizontalCardRow>
+        </section>
+      ) : null}
+
+      {main ? (
+        <section aria-label="Главное">
+          <AnalyticsCardViewTracker
+            entityType="ARTICLE"
+            entityId={main.id}
+            vertical="CITY"
+            citySlug={citySlug}
+            meta={{ section: "journal", block: "main", position: 0 }}
+          >
+            <JournalMainCard article={main} saveStatus={saveStatuses[main.id]} />
+          </AnalyticsCardViewTracker>
         </section>
       ) : null}
 
@@ -174,9 +174,19 @@ export function JournalPageView({
 
       {typeFilter !== "BREAKING_NEWS" && feed.length > 0 ? (
         <section aria-labelledby="journal-feed-title" className="space-y-2">
-          <h2 id="journal-feed-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
-            {typeFilter ? "Все материалы" : "Свежие материалы"}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="journal-feed-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
+              {typeFilter ? "Все материалы" : "Свежие материалы"}
+            </h2>
+            {!typeFilter && (
+              <Link
+                href={typeHref("ARTICLE")}
+                className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap text-sm font-semibold text-brand-ink hover:underline"
+              >
+                Все статьи и обзоры →
+              </Link>
+            )}
+          </div>
           <div className="flex flex-col gap-12 pt-5 md:hidden">
             {feed.map((article, index) => (
               <AnalyticsCardViewTracker
@@ -241,12 +251,6 @@ export function JournalPageView({
               </AnalyticsCardViewTracker>
             ))}
           </div>
-          <Link
-            href={typeHref("BREAKING_NEWS")}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink hover:underline"
-          >
-            Все новости →
-          </Link>
         </section>
       ) : null}
 

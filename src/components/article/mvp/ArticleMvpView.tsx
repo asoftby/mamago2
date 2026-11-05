@@ -26,7 +26,6 @@ import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleRea
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleInfoCard } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
@@ -92,6 +91,7 @@ function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
 export function ArticleMvpView({
   title,
   subtitle,
+  publicationType,
   excerpt,
   publishedAt,
   blocks,
@@ -113,6 +113,7 @@ export function ArticleMvpView({
 }: {
   title: string;
   subtitle: string | null;
+  publicationType?: "ARTICLE" | "COLLECTION" | "BREAKING_NEWS";
   excerpt: string | null;
   publishedAt: Date | null | string;
   blocks: ArticleMvpResolvedBlock[];
@@ -132,7 +133,7 @@ export function ArticleMvpView({
   coverCaption?: string | null;
   author?: ArticleAuthor;
 }) {
-  const isBreakingNews = subtitle === BREAKING_NEWS_SUBTITLE;
+  const isBreakingNews = publicationType === "BREAKING_NEWS";
   const headingEntries = extractHeadingEntriesFromArticleBlocks(blocks as ArticleBlockMvp[]);
   const showToc = shouldShowArticleToc(headingEntries);
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
@@ -200,7 +201,7 @@ export function ArticleMvpView({
           coverImageUrl={coverImageUrl}
           source={`article-detail-${continuousVariant}`}
           citySlug={citySlug}
-          className="mb-6 md:mb-8"
+          className="pt-[5px] pb-0"
         />
 
         <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />

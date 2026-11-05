@@ -30,11 +30,11 @@ assert.ok(
   "HeroWeatherSection must be wrapped in a Suspense boundary with a deterministic fallback",
 );
 
-// Kuda ranking must use the deterministic fallback context, not the awaited
-// weather model — i.e. it must not depend on HeroWeatherSection resolving.
+// The events feed is derived from the user promise, independently of the
+// weather Suspense boundary; rendering does not await external weather.
 assert.ok(
-  source.includes("getFallbackHeroModel({") && /kudaPreviewPromise = userPromise\.then/.test(source),
-  "Kuda ranking context must come from the deterministic fallback, not a blocking weather await",
+  source.includes("getFallbackHeroModel({") && /eventsPromise = userPromise\.then/.test(source),
+  "Home events must load independently of external weather using the deterministic hero fallback",
 );
 
 console.log("CityHomePage weather-non-blocking test: OK");

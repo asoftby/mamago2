@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Prisma } from "@prisma/client";
+import { PartyCategory, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { listPublicCitySelectorOptions } from "@/server/city/publicCitySelector";
@@ -98,7 +98,10 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
     // Only published party-specific offers approved for this section.
     const rawPage = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page;
     const requestedPage = Number(rawPage);
-    const result = await getBirthdayDiscoveryPage(city.id, city.slug, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+    const requestedCategory = Array.isArray(searchParams.category) ? searchParams.category[0] : searchParams.category;
+    const partyCategory = requestedCategory && Object.values(PartyCategory).includes(requestedCategory as PartyCategory)
+      ? requestedCategory as PartyCategory : null;
+    const result = await getBirthdayDiscoveryPage(city.id, city.slug, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1, 24, partyCategory);
     if (result.page > result.totalPages && result.total > 0) notFound();
     discoveryActivities = result.activities;
     birthdayPagination = { page: result.page, totalPages: result.totalPages, total: result.total };

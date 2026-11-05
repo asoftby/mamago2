@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { queryCityHomeArticles } from "./listCityHomeArticles";
+import { queryCityHomeArticles, queryCityHomePreviewArticles } from "./listCityHomeArticles";
 
 async function main() {
   const marker = randomUUID();
@@ -98,6 +98,28 @@ async function main() {
       select: { id: true },
     });
     createdArticleIds.push(additionalArticle.id);
+
+    // Breaking News is present in the general journal but never fills home article slots.
+    const breaking = await prisma.article.create({
+      data: {
+        title: `Breaking News ${marker}`,
+        slug: `breaking-news-${marker}`,
+        geoScope: "CITY",
+        cityId: cityInVitebskRegion.id,
+        status: "PUBLISHED",
+        publicationType: "BREAKING_NEWS",
+        publishedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 86400_000),
+      },
+      select: { id: true },
+    });
+    createdArticleIds.push(breaking.id);
+    const homePreview = await queryCityHomePreviewArticles(cityInVitebskRegion);
+    assert.ok(homePreview.some((a) => a.id === regionArticle.id), "home preview includes articles");
+    assert.ok(homePreview.every((a) => a.publicationType !== "BREAKING_NEWS"),
+      "home article block excludes Breaking News even when recent");
+    const mixedJournal = await queryCityHomeArticles(cityInVitebskRegion);
+    assert.ok(mixedJournal.some((a) => a.id === breaking.id), "journal feed still includes Breaking News");
 
     // Visible for a city in the SAME region.
     const forVitebskCity = await queryCityHomeArticles(cityInVitebskRegion, { take: 1000 });

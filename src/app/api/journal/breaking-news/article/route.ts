@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { loadArticleMvpBySlugPublic } from "@/lib/article/articleMvpRenderData";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { activeBreakingNewsContinuationWhere } from "@/lib/journal/breakingNewsContinuation";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const article = await loadArticleMvpBySlugPublic(row.slug, row.geoScope === "CITY" ? row.cityId : null);
-  if (!article || article.id !== id || article.subtitle !== BREAKING_NEWS_SUBTITLE) {
+  if (!article || article.id !== id || article.publicationType !== "BREAKING_NEWS") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   return NextResponse.json({

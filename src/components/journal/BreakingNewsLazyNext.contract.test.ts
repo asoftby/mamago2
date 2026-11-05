@@ -26,6 +26,20 @@ test("archive is shown only after the last article, not between articles", () =>
   assert.ok(!reader.includes("Далее в Breaking News"), "there is no intermediate next-news card");
 });
 
+test("Breaking News ticker appears only on the opening article", () => {
+  const reader = source("./BreakingNewsLazyNext.tsx");
+  const view = source("../article/mvp/BreakingNewsView.tsx");
+  const city = source("../../app/(public)/[city]/blog/[slug]/page.tsx");
+  const country = source("../../app/(public)/blog/[slug]/page.tsx");
+  assert.match(view, /showBreakingTicker = true/);
+  assert.match(view, /showBreakingTicker \? <Marquee items=\{marqueeItems\} \/> : null/);
+  assert.match(reader, /<BreakingNewsView \{\.\.\.article\} showBreakingTicker=\{false\} \/>/);
+  for (const page of [city, country]) {
+    assert.match(page, /<BreakingNewsView/);
+    assert.ok(!page.includes("showBreakingTicker={false}"), "opening article shows the ticker");
+  }
+});
+
 test("continuation preserves canonical URLs for city and national news", () => {
   const nextEndpoint = source("../../app/api/journal/breaking-news/next/route.ts");
   const articleEndpoint = source("../../app/api/journal/breaking-news/article/route.ts");

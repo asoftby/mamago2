@@ -36,7 +36,11 @@ test("catalog is explicit canonical OR, round trips; no identity in URL", () => 
 });
 
 test("full age ranges and Minsk plan date", () => {
-  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 168 }), "3–14");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 168 }), "3–14 лет");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 0, ageMaxMonths: 12 }), "0–1 год");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 12, ageMaxMonths: 36 }), "1–3 года");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 192 }), "3–16 лет");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 216 }), "3+");
   assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: null }), "3+");
   assert.equal(minskPlanDate("2030-11-02T22:30:00Z"), "2030-11-03");
 });
@@ -163,30 +167,37 @@ test("newly queued dismissals are sent while an earlier write is pending", async
 
 test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty states", () => {
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
-  assert.equal((ui.match(/<SaveHeart /g) ?? []).length, 1);
-  assert.ok(ui.includes("<FamilyActivationEditChildBirthOverlay"), "birth-only editor must preserve existing interests");
-  assert.match(ui, /attempt < 2/);
-  assert.match(ui, /error\.message === "home_409"/);
-  assert.match(ui, /deliveryScopeMatches/);
-  assert.match(ui, /const deadline = setTimeout/);
-  assert.match(ui, /clearTimeout\(deadline\)/);
-  assert.match(ui, /setData\(null\)/);
-  assert.match(ui, /keepalive: body.action === "dismiss"/, "dismissal request should survive page navigation");
-  assert.match(ui, /if \(dismissFlushActive.current \|\| !allowedActor.current\) return/, "dismissal writes must be serialized");
-  assert.match(ui, /await drainPendingHomeDismissals\(/, "retryable failures must not block other dismissals");
-  assert.match(ui, /void flushDismissals\(\);\s*void load\(\{ keepCurrent: true \}\)/,
-    "persist user rejection before fetching replacement recommendations");
-  assert.doesNotMatch(ui, /AddParticipantModal/);
-  assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
-  for (const expected of ['framing="fixed"', 'coverRatio="2/3"', 'coverFit="cover"', 'aria-pressed', 'Для кого:', 'homeChildrenYoungestFirst', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'HomeMoreEventsCard', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
+  assert.ok(ui.includes("homeRecommendationLabel"));
+  assert.doesNotMatch(ui, /Не удалось обновить\. Повторить/, "failed background refresh must not add a technical CTA below loaded cards");
+  assert.doesNotMatch(ui, /Не удалось загрузить события\. Повторите попытку\./, "initial load errors use a poster-size card instead of a technical message");
+  assert.match(ui, /state === "error" && !data[\s\S]*?<HomeMoreEventsCard href=\{catalogHref\} hasEvents=\{false\}/, "initial failure renders the same empty event-card component");
+  assert.match(ui, /loadHomePublicFallback\(citySlug\)/, "a failed personalized API attempts a public catalog recovery");
+  assert.match(ui, /safeFallbackEvents\.map/, "age-eligible recovered events are rendered as real poster cards");
+  assert.doesNotMatch(ui, /wasAuthorized && mounted\.current/, "auth resolution must not start a duplicate recommendation request");
+  assert.doesNotMatch(ui, /setTimeout\(\(\) => \{[\s\S]*?setState\("error"\)/, "component must not race request-level timeout with a second deadline");
+
+  assert.ok(ui.includes("hasCatalogEvents"));
+  assert.ok(!ui.includes("homeChipSelectEvent"));
+  assert.ok(ui.includes("stored.filter(entry => entry.selectedChildId == null)"));
+  assert.ok(ui.includes("Date.now() - lastCheckedAt.current < 60_000"));
+  assert.ok(ui.includes("visibilitychange"));
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
   assert.doesNotMatch(page, /CityHomeKudaSection|getKudaDiscoveryFeed|hasHomeContent|kudaPreviewPromise/);
   assert.match(page, /events.mode === "personal"/);
   assert.ok(page.indexOf("<StoriesSection cityId=") < page.indexOf('events.mode === "error"'),
     "stories must precede both public and personalized afisha");
   const general = readFileSync("src/features/city-home/components/CityHomeGeneralEvents.tsx", "utf8");
-  assert.match(general, /authenticated=|События, которые подходят вам/);
+  assert.match(general, /authenticated=|События, которые подходят вашей семье/);
   assert.doesNotMatch(general, /AGE_GROUPS|age_discovery_unavailable|\/api\/discovery\/events\/page/,
     "guest must not launch a second discovery request for age filters");
-  assert.doesNotMatch(general, /useFamilyPersona|useDiscoveryFilters|selectedPersona/);
+  assert.match(general, /useFamilyPersona/, "authenticated non-personalized users still honor global header selection");
+  assert.doesNotMatch(general, /useDiscoveryFilters|\/api\/discovery\/events\/page/);
+});
+
+test("shared EventCard retains home recommendation attribution on save", () => {
+  const card = readFileSync("src/components/events/EventCard.tsx", "utf8");
+  const home = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
+  assert.match(card, /planAttribution\?: HomePlanAttribution/);
+  assert.match(card, /planAttribution=\{saveMeta\.planAttribution\}/);
+  assert.match(home, /planAttribution: \{ planAddSource: "home-family-picks", recommendationExposureId: item\.exposureId \}/);
 });

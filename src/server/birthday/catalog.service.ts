@@ -8,13 +8,13 @@ import { extractPartyDetails, publicPriceFrom, type BirthdayCatalogItem } from "
 const BIRTHDAY_CATALOG_CAP = 500;
 
 /** Real published offers with approved birthday placement only. No mock results. */
-export async function getPublicBirthdayCatalog(citySlug: string): Promise<BirthdayCatalogItem[] | null> {
+export async function getPublicBirthdayCatalog(citySlug: string, limit = BIRTHDAY_CATALOG_CAP): Promise<BirthdayCatalogItem[] | null> {
   const city = await findCityBySlug(citySlug, { select: { id: true }, isActive: true });
   if (!city) return null;
   const offers = await prisma.offer.findMany({
     where: getPublicBirthdayOfferWhere(city.id),
     select: {
-      id: true, title: true, productType: true, category: true,
+      id: true, slug: true, title: true, productType: true, category: true,
       placeId: true, coverImage: true, priceFrom: true, priceMode: true, currency: true,
       ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
       partyLocationType: true, details: true,
@@ -22,7 +22,7 @@ export async function getPublicBirthdayCatalog(citySlug: string): Promise<Birthd
       place: { select: { title: true, ownerBusiness: { select: { id: true, name: true } } } },
     },
     orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
-    take: BIRTHDAY_CATALOG_CAP,
+    take: Math.min(BIRTHDAY_CATALOG_CAP, Math.max(1, limit)),
   });
   if (offers.length === BIRTHDAY_CATALOG_CAP) {
     // A bounded result may have omitted later offers, even after stable DB filtering.
@@ -40,6 +40,7 @@ export async function getPublicBirthdayCatalog(citySlug: string): Promise<Birthd
     const commonDetails = extractPartyDetails(offer.details, []);
     return [{
       id: offer.id,
+      slug: offer.slug,
       title: offer.title,
       productType: offer.productType,
       category: offer.category,

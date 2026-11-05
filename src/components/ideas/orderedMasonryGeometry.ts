@@ -10,15 +10,15 @@ export function getOrderedMasonryRowSpan(heightPx: number, rowPx: number, gapPx:
 
 export type MasonryColumnsConfig = { columns: number; gap: number };
 
-/** <640px — 2 columns (12px), 640–1024 — 3 (16px), >1024 — 4 (20px). */
+/** <640px — 2 columns (20px), 640–1024 — 3 (24px), >1024 — 4 (32px). */
 export function masonryColumnsForWidth(viewportWidth: number): MasonryColumnsConfig {
-  if (viewportWidth > 1024) return { columns: 4, gap: 20 };
-  if (viewportWidth >= 640) return { columns: 3, gap: 16 };
-  return { columns: 2, gap: 12 };
+  if (viewportWidth > 1024) return { columns: 4, gap: 32 };
+  if (viewportWidth >= 640) return { columns: 3, gap: 24 };
+  return { columns: 2, gap: 20 };
 }
 
 /** SSR has no viewport: the first portion is laid out for the mobile config. */
-export const SSR_MASONRY_CONFIG: MasonryColumnsConfig = { columns: 2, gap: 12 };
+export const SSR_MASONRY_CONFIG: MasonryColumnsConfig = { columns: 2, gap: 20 };
 
 /** Text block estimate (category + 2-line title + meta) until it is measured. */
 export const MASONRY_TEXT_ESTIMATE_PX = 84;

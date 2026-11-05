@@ -1,13 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { PublicCatalogCardCover, PublicCatalogCardDetails, PublicCatalogCardCategory } from "@/components/catalog/PublicCatalogCardCore";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
-import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
-import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
-import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 export type OfferCardProps = {
   id: string;
@@ -55,77 +51,14 @@ export function OfferCard({
   return (
     <div className={cn("group relative flex flex-col gap-3", className)}>
       <Link href={href} className="block focus:outline-none">
-        {/* Image / placeholder */}
-        <div
-          className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
-          style={{ aspectRatio: "4/5" }}
-        >
-          {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
-            <Image
-              src={imageUrl}
-              alt={title}
-              fill
-              sizes={EVENT_CARD_IMAGE_SIZES}
-              loading={imagePriority ? "eager" : "lazy"}
-              fetchPriority={imagePriority ? "high" : undefined}
-              className="object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
-            />
-          ) : imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
-            <img
-              src={imageUrl}
-              alt={title}
-              loading={imagePriority ? "eager" : "lazy"}
-              fetchPriority={imagePriority ? "high" : undefined}
-              className="h-full w-full object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
-            />
-          ) : (
-            <div
-              className="flex h-full w-full items-center justify-center"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(-45deg, transparent, transparent 9px, rgba(20,18,16,0.07) 9px, rgba(20,18,16,0.07) 10px)",
-              }}
-            >
-              {(placeholderLabel ?? categoryLabel) && (
-                <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[rgba(20,18,16,0.30)]">
-                  {placeholderLabel ?? categoryLabel}
-                </span>
-              )}
-            </div>
-          )}
+        <PublicCatalogCardCover imageUrl={imageUrl} title={title} imagePriority={imagePriority}
+          animateOnHover
+          placeholder={(placeholderLabel ?? categoryLabel) ? <PublicCatalogCardCategory label={placeholderLabel ?? categoryLabel ?? ""} placeholder /> : null}>
+          {promoBadge && <span className="absolute left-3 top-3 inline-flex h-7 max-w-[calc(100%-4.5rem)] items-center truncate rounded-full bg-[#E86A3A] px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(232,106,58,0.35)] sm:max-w-[calc(100%-3.75rem)]">{promoBadge}</span>}
+        </PublicCatalogCardCover>
 
-          {/* Promo badge — top right */}
-          {promoBadge && (
-            <span className="absolute left-3 top-3 inline-flex h-7 max-w-[calc(100%-4.5rem)] items-center truncate rounded-full bg-[#E86A3A] px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(232,106,58,0.35)] sm:max-w-[calc(100%-3.75rem)]">
-              {promoBadge}
-            </span>
-          )}
-
-          {/* Price badge — bottom right */}
-          {priceLabel && (
-            <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(20,18,16,0.72)] text-white">
-              {renderPriceWithIcon(normalizeUiCurrencyText(priceLabel ?? ""))}
-            </span>
-          )}
-        </div>
-
-        {/* Text */}
-        <div className="mt-3 flex flex-col gap-1 px-0.5">
-          {categoryLabel && (
-            <div className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-              {categoryLabel}
-            </div>
-          )}
-          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors group-hover:text-[#C24E22]">
-            {title}
-          </div>
-          {dateLabel && (
-            <div className="mt-0.5 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-              {dateLabel}
-            </div>
-          )}
-        </div>
+        <PublicCatalogCardDetails title={title} label={dateLabel} priceLabel={priceLabel}
+          category={categoryLabel ? <PublicCatalogCardCategory label={categoryLabel} /> : null} />
       </Link>
 
       {/* SaveHeart outside Link to prevent navigation */}

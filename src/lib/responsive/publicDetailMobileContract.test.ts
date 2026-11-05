@@ -2,7 +2,7 @@
  * Responsive contract for public discovery cards and Place detail.
  *
  * Protects the mobile UX fixes from the 2026-09 responsive audit:
- * - 320px discovery uses one readable column; 2 columns start at 360px;
+ * - discovery uses the shared 2-column phone masonry at 320px–639px;
  * - public card save actions expose 44px touch targets on mobile;
  * - Offer promo and save action never occupy the same corner;
  * - Place detail uses one 16/24/28px responsive gutter contract;
@@ -19,6 +19,7 @@ function read(path: string): string {
 }
 
 const discovery = read("src/components/discovery/DiscoveryActivitiesGrid.tsx");
+const masonryGeometry = read("src/components/ideas/orderedMasonryGeometry.ts");
 const eventCard = read("src/components/events/EventCard.tsx");
 const offerCard = read("src/components/offers/OfferCard.tsx");
 const activityCard = read("src/components/activity/ActivityCard.tsx");
@@ -33,12 +34,14 @@ const placeStickyActionBar = read("src/components/place/marketplace/PlaceStickyA
 const locationBlock = read("src/components/shared/LocationBlock.tsx");
 const eventRichDescription = read("src/components/event-page/EventRichDescription.tsx");
 
-const discoveryGridContract =
-  /grid grid-cols-1 gap-5 min-\[360px\]:grid-cols-2 lg:grid-cols-4/g;
-assert.ok(
-  (discovery.match(discoveryGridContract) ?? []).length >= 2,
-  "Primary and secondary discovery grids must stay one-column below 360px",
-);
+assert.match(masonryGeometry, /if \(viewportWidth >= 640\) return \{ columns: 3, gap: 24 \}/,
+  "shared masonry uses three columns from 640px");
+assert.match(masonryGeometry, /return \{ columns: 2, gap: 20 \}/,
+  "shared masonry uses two columns on phone viewports");
+assert.ok((discovery.match(/<OrderedMasonryGrid/g) ?? []).length >= 2,
+  "primary and secondary discovery sections use the same masonry component");
+assert.ok((discovery.match(/grid grid-cols-2 gap-/g) ?? []).length >= 2,
+  "both discovery skeleton layouts match the two-column phone masonry");
 
 for (const [name, source] of [
   ["EventCard", eventCard],

@@ -60,7 +60,7 @@ async function main() {
     await event("Unconfirmed on demand", null, { scheduleMode: "ON_DEMAND" });
     await event("Already past today", "01");
     const result = await load();
-    assert.equal(result.window.horizonDays, 7);
+    assert.equal(result.window.horizonDays, 30);
     assert.deepEqual(new Set(result.items.map(item => item.id)), new Set([closed.id, multi.id]));
     assert.equal(result.items.find(item => item.id === multi.id)?.startsAt, date("07").toISOString());
     assert.deepEqual(result.items.find(item => item.id === multi.id)?.matchedChildIds, [first.id]);
@@ -87,7 +87,7 @@ async function main() {
     const planned = await db.planItem.create({ data: { userId: owner.id, familyId: family.id, activityId: closed.id, title: "Already planned" } });
     assert.deepEqual((await load()).items.map(item => item.id), [multi.id]);
     await db.planItem.delete({ where: { id: planned.id } });
-    // No known age matches in week: fallback only after excluding all week candidates.
+    // No known age matches remain; 30-day eligibility still applies.
     await db.activity.updateMany({ where: { id: { in: [closed.id, multi.id] } }, data: { status: "ARCHIVED" } });
     const later = await event("Thirty day fallback", "20");
     const expanded = await load();
