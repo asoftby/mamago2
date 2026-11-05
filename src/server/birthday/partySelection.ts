@@ -15,7 +15,7 @@ export type CatalogOffer = {
   priceMode: string;
   currency: string;
   details: Prisma.JsonValue | null;
-  components: { category: PartyCategory; isOptional: boolean }[];
+  components: { category: PartyCategory; isOptional: boolean; id?: string; title?: string; refOfferId?: string | null; priceSnapshot?: Prisma.Decimal | null; priceDelta?: Prisma.Decimal | null }[];
   place: { ownerBusinessId: string | null } | null;
   agePolicy?: AgePolicy;
   ageMinMonths?: number | null;

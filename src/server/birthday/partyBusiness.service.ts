@@ -167,7 +167,7 @@ export async function replyToPartyRequest(params: {
       // a withdrawn or reassigned publication must not become a confirmed booking.
       if (autoConfirm) {
         const offerId = existing.offerId;
-        const verified = offerId ? await verifyPartyOffers(order.citySlug, [offerId], tx) : null;
+        const verified = offerId ? await verifyPartyOffers(order.citySlug, [offerId], tx, order.venueMode) : null;
         if (!offerId || verified?.get(offerId)?.place?.ownerBusinessId !== businessId) {
           throw new PartyApiError(422, "Услуга больше не доступна у этого исполнителя");
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -73,6 +73,23 @@ export function Step2Placements({
     : photoService
       ? [{ value: "ON_SITE" as const, label: "В студии" }, { value: "OFF_SITE" as const, label: "С выездом" }, { value: "BOTH" as const, label: "И там, и там" }]
       : LOCATION_OPTIONS;
+  const zonePurpose = isService && ["CAKE", "FOOD", "DECOR"].includes(data.partyCategory ?? "") ? "delivery" : "travel";
+  const showZones = (isService || isPackage) && (birthday.locationType === "OFF_SITE" || birthday.locationType === "BOTH");
+  const [territories, setTerritories] = useState<{ id: string; name: string; parent: { name: string } | null }[]>([]);
+  const [territoryError, setTerritoryError] = useState(false);
+  useEffect(() => {
+    if (!showZones) return;
+    const controller = new AbortController();
+    void fetch("/api/business/offers/service-territories", { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error("territories");
+        return response.json();
+      })
+      .then(setTerritories)
+      .catch(() => { if (!controller.signal.aborted) setTerritoryError(true); });
+    return () => controller.abort();
+  }, [showZones]);
+  const selectedZones = birthday.serviceAreas?.[zonePurpose] ?? [];
   const [showMore, setShowMore] = useState(false);
   const hasAdditionalData = Boolean(
     birthday.program.trim() || birthday.note.trim() || birthday.includedCategories.length ||
@@ -161,6 +178,26 @@ export function Step2Placements({
           ))}
         </div>
       </div>
+
+      {showZones && <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">{zonePurpose === "delivery" ? "Города доставки" : "Города выезда"}</legend>
+        <p className="text-xs text-muted-foreground">Если список пуст, возможность обслуживания нужно уточнить.</p>
+        {territoryError && <p role="alert">Не удалось загрузить города.</p>}
+        <select aria-label="Добавить город обслуживания" disabled={!isEditable || selectedZones.length >= 50} value=""
+          className="min-h-11 w-full rounded-md border bg-card px-2"
+          onChange={event => {
+            if (!event.target.value) return;
+            updateBirthdayDetails({ serviceAreas: { travel: [], delivery: [], ...birthday.serviceAreas, [zonePurpose]: [...selectedZones, event.target.value] } });
+          }}>
+          <option value="">Добавить город</option>
+          {territories.filter(city => !selectedZones.includes(city.id)).map(city => <option key={city.id} value={city.id}>{city.name}{city.parent ? " · " + city.parent.name : ""}</option>)}
+        </select>
+        <ul>{selectedZones.map(id => <li key={id} className="flex items-center justify-between">
+          <span>{territories.find(city => city.id === id)?.name ?? "Сохранённый город"}</span>
+          <button type="button" className="min-h-11 px-2 underline" disabled={!isEditable}
+            onClick={() => updateBirthdayDetails({ serviceAreas: { travel: [], delivery: [], ...birthday.serviceAreas, [zonePurpose]: selectedZones.filter(zone => zone !== id) } })}>Убрать</button>
+        </li>)}</ul>
+      </fieldset>}
 
       {((advancedDuration && existingDuration) || (advancedChildren && existingChildren)) && (
         <p className="text-sm text-muted-foreground">

@@ -1,3 +1,5 @@
+import { partyTariffConditions } from "@/lib/offers/partyTariff";
+import { validatePartyServiceAreas } from "@/server/offers/partyServiceAreas";
 import { explicitWizardPrice, wizardPriceModeSchema, packageComponentInputSchema, validatePartyWizardInput, PartyWizardInputError } from "@/lib/offers/partyWizardInput";
 import { savePackageComponents } from "@/server/offers/packageComponents";
 import { NextRequest, NextResponse } from "next/server";
@@ -104,6 +106,7 @@ const createOfferSchema = z.object({
     price: z.number().finite().nonnegative(),
     oldPrice: z.number().optional(),
     description: z.string().optional(),
+    partyConditions: partyTariffConditions.optional(),
   })).default([]),
   ctaType: z.enum(["BOOK", "RESERVE", "BUY_TICKET", "SEND_REQUEST", "VISIT_WEBSITE"]),
   phone: z.string().optional(),
@@ -362,6 +365,7 @@ export async function POST(request: NextRequest) {
       }
 
       validatePartyWizardInput({ ...data, productType });
+      if (productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") await validatePartyServiceAreas(prisma, data.details);
       const explicitPrice = explicitWizardPrice(data.priceMode, data.singlePrice);
       if (explicitPrice && (productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE")) { priceMode = explicitPrice.mode; priceFrom = explicitPrice.min; priceTo = explicitPrice.max; priceItems = Prisma.DbNull; }
       assertScheduleValid(data.schedule);

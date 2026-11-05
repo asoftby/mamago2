@@ -93,7 +93,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
       }
 
       // A business cannot confirm a withdrawn or reassigned publication.
-      const verified = await verifyPartyOffers(order.citySlug, [req.offerId], tx);
+      const verified = await verifyPartyOffers(order.citySlug, [req.offerId], tx, order.venueMode);
       const offer = verified.get(req.offerId);
       if (!offer || offer.place?.ownerBusinessId !== businessId) {
         throw new PartyApiError(422, "Услуга больше не доступна у этого исполнителя");

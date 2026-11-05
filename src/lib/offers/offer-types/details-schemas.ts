@@ -33,10 +33,16 @@ export const campDetails = z.object({
   medicalInfo: z.string().optional(),
 });
 
+export const partyServiceAreas = z.object({
+  travel: z.array(z.string().min(1).max(100)).max(50),
+  delivery: z.array(z.string().min(1).max(100)).max(50),
+}).strict();
+
 // PARTY_SERVICE — услуга для праздника (Phase 3b-2)
 // Descriptive tail in details JSON; filterable fields (category, partyLocationType, min/maxChildren, occasions) → Offer columns.
 // Replaces orphan serviceDescription/serviceDuration/serviceDeliveryArea (never persisted before).
 export const serviceDetails = z.object({
+  serviceAreas: partyServiceAreas.optional(),
   performerRole: z.enum(["ANIMATOR", "HOST"]).optional(),
   acceptsCustomOrders: z.boolean().nullable().optional(),
   acceptsReferences: z.boolean().nullable().optional(),
@@ -51,6 +57,7 @@ export const serviceDetails = z.object({
 // PARTY_PACKAGE — праздник под ключ
 // location uses placeId (Place business unit), not a PLACE-type offer reference
 export const packageDetails = z.object({
+  serviceAreas: partyServiceAreas.optional(),
   performerRole: z.enum(["ANIMATOR", "HOST"]).optional(),
   acceptsCustomOrders: z.boolean().nullable().optional(),
   acceptsReferences: z.boolean().nullable().optional(),

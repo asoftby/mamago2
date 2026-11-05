@@ -1,3 +1,5 @@
+import { partyTariffConditions } from "@/lib/offers/partyTariff";
+import { validatePartyServiceAreas } from "@/server/offers/partyServiceAreas";
 import { explicitWizardPrice, wizardPriceModeSchema, packageComponentInputSchema, validatePartyWizardInput, PartyWizardInputError } from "@/lib/offers/partyWizardInput";
 import { savePackageComponents } from "@/server/offers/packageComponents";
 import { NextRequest, NextResponse } from "next/server";
@@ -117,6 +119,7 @@ const updateOfferSchema = z.object({
     price: z.number().finite().nonnegative(),
     oldPrice: z.number().optional(),
     description: z.string().optional(),
+    partyConditions: partyTariffConditions.optional(),
   })).optional(),
   ctaType: z.enum(["BOOK", "RESERVE", "BUY_TICKET", "SEND_REQUEST", "VISIT_WEBSITE"]).optional(),
   phone: z.string().optional(),
@@ -216,7 +219,7 @@ export async function GET(
           },
         },
         placements: true,
-        components: { orderBy: { position: "asc" } },
+        components: { where: { archivedAt: null }, orderBy: { position: "asc" } },
       },
     });
 
@@ -557,6 +560,7 @@ export async function PATCH(
     }
 
     validatePartyWizardInput({ productType: data.productType ?? existingOffer.productType, details: data.details === undefined ? existingOffer.details : data.details, minChildren: data.minChildren === undefined ? existingOffer.minChildren : data.minChildren, maxChildren: data.maxChildren === undefined ? existingOffer.maxChildren : data.maxChildren });
+    if (["PARTY_SERVICE", "PARTY_PACKAGE"].includes(data.productType ?? existingOffer.productType ?? "")) await validatePartyServiceAreas(prisma, data.details);
     const explicitPrice = explicitWizardPrice(data.priceMode, data.singlePrice);
     if (explicitPrice && ["PARTY_SERVICE", "PARTY_PACKAGE"].includes(data.productType ?? existingOffer.productType ?? "")) { priceMode = explicitPrice.mode; priceFrom = explicitPrice.min; priceTo = explicitPrice.max; priceItems = Prisma.DbNull; }
     // Update price fields if they were recalculated
@@ -920,7 +924,7 @@ export async function PATCH(
           updatedAt: true,
           productType: true,
           placements: true,
-          components: { orderBy: { position: "asc" }, select: { id: true, title: true, category: true } },
+          components: { where: { archivedAt: null }, orderBy: { position: "asc" }, select: { id: true, title: true, category: true } },
           place: {
             select: {
               id: true,

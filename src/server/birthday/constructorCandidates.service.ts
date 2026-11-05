@@ -1,3 +1,4 @@
+import { constructorIntervalPrice } from "./constructorIntervalPrice";
 import { getAgeRangeMonths } from "@/lib/config/ages";
 import "server-only";
 import { type PartyCategory, type Prisma } from "@prisma/client";
@@ -87,6 +88,10 @@ export async function loadConstructorCandidates(input: ConstructorCandidateQuery
     const evidence = await loadPartyAvailability(db, admitted.map(({row}) => ({ id: row.id, businessId: row.place!.ownerBusinessId! })), interval, requirements.guests.children + requirements.guests.adults, now);
     for (const { row, offer } of admitted) {
       offer.availability = evidence.get(row.id)?.availability ?? { state: "UNKNOWN", reason: "CHECK_FAILED" };
+      offer.price = constructorIntervalPrice(row, interval, offer.availability, requirements.guests.children + requirements.guests.adults,
+        requirements.ageMonthsOnEventDate.state === "KNOWN"
+          ? { min: requirements.ageMonthsOnEventDate.value, max: requirements.ageMonthsOnEventDate.value }
+          : requirements.ageRangeMonths);
       const units = evidence.get(row.id)?.units ?? [];
       offer.resources = units.map(unit => ({ source: { entity: "BookingUnit", id: unit.id, revision: unit.updatedAt.toISOString() }, status: unit.status,
         capacity: unit.capacity !== null && unit.capacity > 0 ? { state: "KNOWN", value: unit.capacity } : unknown,

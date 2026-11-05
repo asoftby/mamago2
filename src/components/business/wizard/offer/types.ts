@@ -1,3 +1,4 @@
+import type { PartyTariffConditions } from "@/lib/offers/partyTariff";
 // Offer Wizard Types
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
@@ -106,6 +107,7 @@ export interface OfferFormData {
   placementStatuses: Partial<Record<OfferPlacementKey, OfferPlacementStatus>>;
   birthdayDetails: {
     locationType: BirthdayLocationType | null;
+    serviceAreas?: { travel: string[]; delivery: string[] };
     performerRole?: "ANIMATOR" | "HOST";
     acceptsCustomOrders?: boolean | null;
     acceptsReferences?: boolean | null;
@@ -256,6 +258,7 @@ export interface OfferFormData {
 }
 
 export interface PricingOption {
+  partyConditions?: PartyTariffConditions;
   id: string;
   title: string;
   price: string;

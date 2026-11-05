@@ -3000,6 +3000,7 @@ model PackageComponent {
   priceDelta    Decimal?      @db.Decimal(10, 2)
   position      Int
 
+  archivedAt DateTime?
   partyOrderItems PartyOrderItem[]
 
   @@index([packageId, position])
@@ -5980,6 +5981,7 @@ model PartyOrderItem {
   offerId String?
   businessId String?
   packageComponentId String?
+  packageComponentSnapshot Json?
   role PartyItemRole
   parentItemId String?
   offerPriceSnapshot Decimal? @db.Decimal(10, 2)

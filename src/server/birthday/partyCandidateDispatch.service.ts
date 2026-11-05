@@ -43,7 +43,7 @@ export async function dispatchPartyCandidateWave(input: {
         confirmedBookingRequestId: true,
         providerInvites: { select: { id: true }, take: 1 },
         partyOrder: { select: {
-          id: true, status: true, version: true, ownerUserId: true, citySlug: true,
+          id: true, status: true, version: true, ownerUserId: true, citySlug: true, venueMode: true,
           eventDate: true, timeFrom: true, timeTo: true,
           childrenCount: true, adultsCount: true, childAge: true,
         } },
@@ -85,7 +85,7 @@ export async function dispatchPartyCandidateWave(input: {
     let sent = 0;
     for (const candidate of wave.selected) {
       // Recheck current publication and business ownership inside transaction.
-      const published = await verifyPartyOffers(order.citySlug, [candidate.offerId], tx);
+      const published = await verifyPartyOffers(order.citySlug, [candidate.offerId], tx, order.venueMode);
       const offer = published.get(candidate.offerId);
       if (!offer || offer.category !== current.category ||
           offer.place?.ownerBusinessId !== candidate.businessId ||

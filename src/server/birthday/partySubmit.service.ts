@@ -52,7 +52,7 @@ export async function submitPartyAnchor(
   }
   const eventStart = partyStartAt(party.eventDate, party.timeFrom);
   const responseDueAt = validateSubmissionWindow(eventStart, now);
-  const verified = await verifyPartyOffers(party.citySlug, [anchor.offerId]);
+  const verified = await verifyPartyOffers(party.citySlug, [anchor.offerId], undefined, party.venueMode);
   const published = verified.get(anchor.offerId);
   if (!published || published.place?.ownerBusinessId !== anchor.businessId) {
     throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
@@ -110,7 +110,7 @@ export async function submitPartyAnchor(
 
     // Re-check publication under the submitting transaction: client snapshots
     // and the preflight query cannot authorize a currently withdrawn offer.
-    const checked = await verifyPartyOffers(party.citySlug, [anchorOfferId], tx);
+    const checked = await verifyPartyOffers(party.citySlug, [anchorOfferId], tx, party.venueMode);
     const currentOffer = checked.get(anchorOfferId);
     if (!currentOffer || currentOffer.place?.ownerBusinessId !== anchorBusinessId ||
         partyAnchorProblem(party.venueMode, currentOffer)) {

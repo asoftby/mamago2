@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicBirthdayOfferWhere } from "./birthdayOfferVisibility";
 import { extractPartyDetails, type BirthdayCatalogItem } from "@/features/birthday/builder/lib/realCatalog";
-import { constructorOfferSelect, toConstructorOffer } from "./constructorOffer";
+import { constructorOfferSelect, constructorPartyDetails, toConstructorOffer } from "./constructorOffer";
 import { isEligibleForConstructor } from "./constructorEligibility";
 import { assessConstructorGeography } from "./constructorMatching";
 
@@ -27,7 +27,7 @@ export async function getPublicBirthdayCatalog(citySlug: string, limit = BIRTHDA
       // Mobile geography remains unknown without structured zones, not the business's city.
       const geography = assessConstructorGeography(contract,destination ? { state: "KNOWN", value: { territoryId: destination.territoryId, placeId: null } } : { state: "UNKNOWN", reason: "NOT_PROVIDED" },"VENUE");
       if (geography === "MISMATCH") continue;
-      const details = extractPartyDetails(row.details,row.productType === "PARTY_PACKAGE" ? row.components : []);
+      const details = extractPartyDetails(constructorPartyDetails(row),row.productType === "PARTY_PACKAGE" ? row.components : []);
       const price = contract.price;
       const target = geography === "MATCH" ? result : unknown;
       if (target.length >= cap) continue;

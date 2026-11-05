@@ -1,3 +1,4 @@
+import { hasPartyTariffConditions, partyTariffConditions } from "@/lib/offers/partyTariff";
 import type { OfferKind, OfferStatus, PartyCategory, PartyOccasion } from "@prisma/client";
 import type {
   OfferFormData,
@@ -76,6 +77,7 @@ function parsePlaceVisitDetailsFromDb(
 }
 
 function parseServiceDetailsFromDb(details: unknown): {
+  serviceAreas?: OfferFormData["birthdayDetails"]["serviceAreas"];
   program: string;
   included: string;
   note: string;
@@ -94,6 +96,7 @@ function parseServiceDetailsFromDb(details: unknown): {
     "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
   ]);
   return {
+    serviceAreas: d?.serviceAreas,
     program: d?.program ?? "",
     included: d?.included ?? "",
     note: d?.note ?? "",
@@ -708,6 +711,7 @@ export function buildOfferCreatePayload(
             price: (() => { const price = parsePrice(o.price); if (price === undefined) throw new Error("Укажите цену варианта"); return price; })(),
             oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
             description: o.description?.trim() || undefined,
+            partyConditions: o.partyConditions,
           })),
     ctaType: accessFields.ctaType,
     phone: accessFields.phone,
@@ -781,6 +785,7 @@ function buildTypeDetails(
     const bd = data.birthdayDetails;
     const result: Record<string, unknown> = {};
     Object.assign(result, data.persistedDetails ?? {});
+    if (bd.serviceAreas !== undefined) result.serviceAreas = bd.serviceAreas;
     if (bd.performerRole !== undefined) result.performerRole = bd.performerRole;
     if (bd.acceptsCustomOrders !== undefined) result.acceptsCustomOrders = bd.acceptsCustomOrders;
     if (bd.acceptsReferences !== undefined) result.acceptsReferences = bd.acceptsReferences;
@@ -948,6 +953,7 @@ export function buildOfferUpdatePayload(
             price: (() => { const price = parsePrice(o.price); if (price === undefined) throw new Error("Укажите цену варианта"); return price; })(),
             oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
             description: o.description?.trim() || undefined,
+            partyConditions: o.partyConditions,
           })),
     ctaType: accessFields.ctaType,
     phone: accessFields.phone,
@@ -1291,6 +1297,7 @@ export function mapOfferToFormData(offer: {
     // birthdayDetails: PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON;
     // the plain BIRTHDAY-checkbox case (non-party types) has no extra fields to persist.
     birthdayDetails: {
+      serviceAreas: usesPartyColumns ? serviceDetails?.serviceAreas : undefined,
       locationType: usesPartyColumns ? (offer.partyLocationType ?? null) : null,
       performerRole: (offer.details as Record<string, unknown> | null)?.performerRole === "HOST" ? "HOST" : undefined,
       acceptsCustomOrders: typeof (offer.details as Record<string, unknown> | null)?.acceptsCustomOrders === "boolean" ? (offer.details as Record<string, boolean>).acceptsCustomOrders : undefined,
@@ -1351,10 +1358,10 @@ export function mapOfferToFormData(offer: {
         : offer.promotionalOffer
           ? plainTextToRichTextHtml(normalizeRichTextCurrency(offer.promotionalOffer))
           : "",
-    pricingMode: offer.priceMode === "RANGE" && Array.isArray(offer.priceItems) ? "multiple" : "single",
+    pricingMode: (offer.priceMode === "RANGE" && Array.isArray(offer.priceItems)) || hasPartyTariffConditions(offer.priceItems) ? "multiple" : "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
     singleCurrency: offer.currency ?? "BYN",
-    priceKind: offer.priceMode ?? "UNKNOWN",
+    priceKind: hasPartyTariffConditions(offer.priceItems) ? "RANGE" : offer.priceMode ?? "UNKNOWN",
     persistedPriceRange: offer.priceMode === "RANGE" && (!Array.isArray(offer.priceItems) || offer.priceItems.length === 0)
       ? { from: offer.priceFrom, to: offer.priceTo ?? null, productType } : undefined,
     pricingOptions: Array.isArray(offer.priceItems)
@@ -1368,6 +1375,7 @@ export function mapOfferToFormData(offer: {
             price: String(row.price),
             oldPrice: typeof row.oldPrice === "number" ? String(row.oldPrice) : undefined,
             description: typeof row.description === "string" ? row.description : "",
+            partyConditions: partyTariffConditions.safeParse(row.partyConditions).data,
           }];
         })
       : [],
