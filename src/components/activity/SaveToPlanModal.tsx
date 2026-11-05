@@ -659,7 +659,7 @@ function TimeChipRow({ sessions, selectedId, onSelect }: TimeChipRowProps) {
 // ─── Dark confirmation bar ────────────────────────────────────────────────────
 function ConfirmBar({ iso, time, onConfirm, label = "Сохранить" }: { iso: string; time?: string | null; onConfirm: () => void; label?: string }) {
   const audience = React.useContext(SaveAudienceContext);
-  const disabled = !audience || audience.selectedIds.length === 0;
+  const disabled = Boolean(audience?.personas.length && audience.selectedIds.length === 0);
   const chip = fmtDateChip(iso);
   const DOW_FULL: Record<string, string> = {
     вс: "Воскресенье", пн: "Понедельник", вт: "Вторник",
@@ -1680,7 +1680,7 @@ export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
         {...props}
         onCollectionStepChange={setCollectionStep}
         onCommit={(result) => {
-          if (result.action === "plan" && selectedIds.length === 0) return;
+          if (result.action === "plan" && personas.length > 0 && selectedIds.length === 0) return;
           onCommit(
             toggleActive && result.action === "plan"
               ? { ...result, visibility: visibleToFamily ? "FAMILY" : "PRIVATE", selectedPersonaIds: selectedIds }

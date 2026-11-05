@@ -8,7 +8,8 @@ assert.match(source, /useFamilyPersona\(\)/);
 assert.match(source, /globalIds\.filter/);
 assert.match(source, /setSelectedIds\(allSelected \? \[\] : allIds\)/);
 assert.match(source, /selectedPersonaIds: selectedIds/);
-assert.match(source, /result\.action === "plan"/);
+assert.match(source, /result\.action === "plan" && personas\.length > 0 && selectedIds\.length === 0/, "only block unselected registered family audiences");
+assert.match(source, /audience\?\.personas\.length && audience\.selectedIds\.length === 0/, "guests must be able to proceed to authentication");
 assert.match(source, /aria-pressed=\{active\}/);
 
 for (const filename of [
