@@ -30,7 +30,7 @@ export async function deliverHomeFamilyPicks(input: {
     }
   }
   const hydrated = await withImageDimensions(result.items, item => item.imageUrl);
-  const fresh = await loadHomeContext(input.userId);
+  const fresh = await loadHomeContext(input.userId, undefined, { includeSelectionPreference: false });
   if (fresh.context.signature !== input.context.signature) throw new Error("profile_changed");
   if (input.signal?.aborted) throw new Error("delivery_aborted");
   const trace = hydrated.length ? await recordRecommendationRun({
