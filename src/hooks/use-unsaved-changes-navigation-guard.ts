@@ -21,6 +21,8 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
   useEffect(() => {
     if (!dirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Once leaving was confirmed in our own dialog, never show a second browser prompt.
+      if (confirmingLeaveRef.current) return;
       e.preventDefault();
       e.returnValue = "";
     };
@@ -31,7 +33,7 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
   useEffect(() => {
     if (!dirty) return;
     const onClickCapture = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       const a = el?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a?.href) return;
@@ -76,9 +78,12 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
     } else if (p) {
       router.push(p);
     }
-    queueMicrotask(() => {
+    // Suppression is one-shot, only for an unload initiated immediately by
+    // the confirmed action. If router.back() is a no-op (no history entry),
+    // restore the dirty-form protection on the next event-loop turn.
+    window.setTimeout(() => {
       confirmingLeaveRef.current = false;
-    });
+    }, 0);
   }, [router]);
 
   const onLeaveDialogOpenChange = useCallback((open: boolean) => {

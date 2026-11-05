@@ -36,6 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { BREAKING_NEWS_DEFAULT_TTL_DAYS } from "@/lib/journal/publicationType";
 import { ArticleBlocksEditor, ArticleTocToggle } from "@/components/admin/publications/ArticleBlocksEditor";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
+import { UnsavedPublicationChangesDialog } from "@/components/admin/publications/UnsavedPublicationChangesDialog";
 import { PlaceLinkedContactsEditor } from "@/components/admin/publications/PlaceLinkedContactsEditor";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
@@ -55,16 +56,6 @@ import {
   clearBreakingNewsLocalDrafts,
   type BreakingNewsLocalDraft,
 } from "@/lib/publications/breakingNewsLocalDraft";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
 import { resolveContentSuccessState } from "@/lib/content-success/resolver";
 import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
@@ -1003,22 +994,12 @@ export function NewsPublicationEditor({
         state={successState}
       />
 
-      <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Несохранённые изменения</AlertDialogTitle>
-            <AlertDialogDescription>
-              Вы изменили Breaking news. Уйти без сохранения? Несохранённые правки будут потеряны.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel type="button">Остаться</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={confirmLeave}>
-              Уйти без сохранения
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UnsavedPublicationChangesDialog
+        open={leaveDialogOpen}
+        onOpenChange={onLeaveDialogOpenChange}
+        onConfirmLeave={confirmLeave}
+        publicationName="Breaking News"
+      />
     </div>
   );
 }
