@@ -1,3 +1,5 @@
+import { explicitWizardPrice, wizardPriceModeSchema, packageComponentInputSchema, validatePartyWizardInput, PartyWizardInputError } from "@/lib/offers/partyWizardInput";
+import { savePackageComponents } from "@/server/offers/packageComponents";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -93,6 +95,10 @@ const createOfferSchema = z.object({
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]),
   singlePrice: z.number().finite().nonnegative().optional(),
   singlePriceLabel: z.string().optional(),
+  priceMode: wizardPriceModeSchema.optional(),
+  currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  packageComponents: packageComponentInputSchema.optional(),
+  packageComponentsBaseline: packageComponentInputSchema.optional(),
   pricingOptions: z.array(z.object({
     title: z.string(),
     price: z.number().finite().nonnegative(),
@@ -355,6 +361,9 @@ export async function POST(request: NextRequest) {
         priceText = formatPriceFrom(priceFrom);
       }
 
+      validatePartyWizardInput({ ...data, productType });
+      const explicitPrice = explicitWizardPrice(data.priceMode, data.singlePrice);
+      if (explicitPrice && (productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE")) { priceMode = explicitPrice.mode; priceFrom = explicitPrice.min; priceTo = explicitPrice.max; priceItems = Prisma.DbNull; }
       assertScheduleValid(data.schedule);
 
       const offer = await prisma.$transaction(async (tx) => {
@@ -387,7 +396,7 @@ export async function POST(request: NextRequest) {
             priceFrom,
             priceTo,
             priceMode,
-            currency: "BYN",
+            currency: data.currency ?? "BYN",
             priceItems,
             priceText,
             ...(() => {
@@ -460,6 +469,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        if (data.packageComponents !== undefined) await savePackageComponents(tx, createdOffer.id, data.packageComponents, [], true);
         await applyOfferSchedule({
           db: tx,
           offerId: createdOffer.id,
@@ -548,6 +558,7 @@ export async function POST(request: NextRequest) {
     timer.log({ error: 1 });
     console.error("Create offer error:", error);
     
+    if (error instanceof PartyWizardInputError) return NextResponse.json({ error: error.message }, { status: 422 });
     if (error instanceof OfferCategoriesError) {
       return NextResponse.json(
         {

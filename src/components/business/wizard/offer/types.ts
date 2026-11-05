@@ -106,6 +106,9 @@ export interface OfferFormData {
   placementStatuses: Partial<Record<OfferPlacementKey, OfferPlacementStatus>>;
   birthdayDetails: {
     locationType: BirthdayLocationType | null;
+    performerRole?: "ANIMATOR" | "HOST";
+    acceptsCustomOrders?: boolean | null;
+    acceptsReferences?: boolean | null;
     durationMinutes: number | null;
     minChildren: number | null;
     maxChildren: number | null;
@@ -120,6 +123,16 @@ export interface OfferFormData {
     cancellationTerms: string;
   };
   
+  /** Existing persisted values retained until the corresponding controls change. */
+  persistedOfferStatus?: string;
+  persistedPriceRange?: { from: number | null; to: number | null; productType: OfferProductType | null };
+  persistedAge?: { policy: import("@prisma/client").AgePolicy; min: number | null; max: number | null; groups: string[] };
+  persistedDetails?: Record<string, unknown>;
+  priceKind?: "EXACT" | "FROM" | "ON_REQUEST" | "FREE" | "RANGE" | "NONE" | "UNKNOWN";
+  packageComponentsEdited?: boolean;
+  packageComponentsBaseline?: Array<{ id?: string; title: string; category: PartyCategory }>;
+  packageComponents?: Array<{ id?: string; title: string; category: PartyCategory }>;
+
   // Legacy fields (for backward compatibility)
   offerKind: "course" | "birthday" | "service" | null;
   durationType: "single" | "recurring" | "camp" | null;
@@ -181,7 +194,7 @@ export interface OfferFormData {
   // Step 5/6: Pricing
   pricingMode: "single" | "multiple";
   singlePrice: string;
-  singleCurrency: "BYN" | "USD" | "EUR";
+  singleCurrency: string;
   priceCaption: string;
   pricingOptions: PricingOption[];
   promotionDetails: string;
