@@ -13,15 +13,15 @@ assert.equal(getOrderedMasonryRowSpan(160, 8, 8), 11);
 assert.equal(getOrderedMasonryRowSpan(Number.NaN, 8, 8), 1);
 
 // Breakpoints: <640 → 2/12, 640–1024 → 3/16, >1024 → 4/20.
-assert.deepEqual(masonryColumnsForWidth(390), { columns: 2, gap: 12 });
-assert.deepEqual(masonryColumnsForWidth(639), { columns: 2, gap: 12 });
-assert.deepEqual(masonryColumnsForWidth(640), { columns: 3, gap: 16 });
-assert.deepEqual(masonryColumnsForWidth(1024), { columns: 3, gap: 16 });
-assert.deepEqual(masonryColumnsForWidth(1025), { columns: 4, gap: 20 });
-assert.deepEqual(SSR_MASONRY_CONFIG, { columns: 2, gap: 12 });
-assert.equal(masonryColumnWidth(358, { columns: 2, gap: 12 }), 173);
+assert.deepEqual(masonryColumnsForWidth(390), { columns: 2, gap: 20 });
+assert.deepEqual(masonryColumnsForWidth(639), { columns: 2, gap: 20 });
+assert.deepEqual(masonryColumnsForWidth(640), { columns: 3, gap: 24 });
+assert.deepEqual(masonryColumnsForWidth(1024), { columns: 3, gap: 24 });
+assert.deepEqual(masonryColumnsForWidth(1025), { columns: 4, gap: 32 });
+assert.deepEqual(SSR_MASONRY_CONFIG, { columns: 2, gap: 20 });
+assert.equal(masonryColumnWidth(358, { columns: 2, gap: 20 }), 169);
 
-const cfg = { columns: 2, gap: 12, columnWidth: 100 };
+const cfg = { columns: 2, gap: 20, columnWidth: 100 };
 const item = (key: string, ratio: number) => ({ key, ratio, textHeight: 50 });
 
 // Shortest column, feed order, ties → leftmost.
@@ -48,7 +48,7 @@ for (const keys of appended.columnKeys) {
 }
 
 // Column count change → full re-layout (previous ignored).
-const three = layoutMasonry([item("a", 1), item("b", 1), item("c", 1)], { columns: 3, gap: 16, columnWidth: 100 }, first);
+const three = layoutMasonry([item("a", 1), item("b", 1), item("c", 1)], { columns: 3, gap: 24, columnWidth: 100 }, first);
 assert.deepEqual(three.columnKeys, [["a"], ["b"], ["c"]]);
 
 // Source contracts.

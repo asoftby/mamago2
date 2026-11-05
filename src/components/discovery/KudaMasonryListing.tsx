@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
+import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
 import { resolvePosterFrame } from "@/lib/media/posterFrame";
 import {
   buildNextPageParams,
@@ -275,7 +276,10 @@ export function KudaMasonryListing({
         <div className="space-y-4">
           <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">{listing.secondaryHeading}</h2>
           <OrderedMasonryGrid
-            items={toMasonry(secondary, listing.offset + primary.length)}
+            items={[
+              ...(!hasMore && primary.length === 0 ? [{ key: "__audience-alternatives__", ratio: 1.5, content: <SoftAudienceNotice inGrid label="события" /> }] : []),
+              ...toMasonry(secondary, listing.offset + primary.length),
+            ]}
             persistKey={`${storeKey}:secondary`}
           />
         </div>

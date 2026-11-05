@@ -1,13 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { PublicCatalogCardCover, PublicCatalogCardDetails, PublicCatalogCardCategory } from "@/components/catalog/PublicCatalogCardCore";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
-import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
-import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
-import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 import { resolvePosterFrame } from "@/lib/media/posterFrame";
 
 // ─── Public props ────────────────────────────────────────────────────────────
@@ -48,54 +44,6 @@ export type EventCardProps = {
   className?: string;
 };
 
-const ONLINE_SEGMENT = /^онлайн$/i;
-
-function OnlinePulseDot() {
-  return (
-    <span
-      className="relative mx-1.5 inline-flex h-1.5 w-1.5 shrink-0 self-center"
-      aria-hidden
-    >
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--success)] opacity-60" />
-      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
-    </span>
-  );
-}
-
-function EventCardCategoryLabel({
-  label,
-  className,
-}: {
-  label: string;
-  className?: string;
-}) {
-  const parts = label
-    .split(" · ")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  return (
-    <div
-      className={cn(
-        "font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]",
-        className,
-      )}
-    >
-      {parts.map((part, index) => {
-        const isOnline = ONLINE_SEGMENT.test(part);
-
-        return (
-          <span key={`${part}-${index}`} className="inline-flex items-center">
-            {index > 0 &&
-              (isOnline ? <OnlinePulseDot /> : <span className="mx-1">·</span>)}
-            <span className={isOnline ? "text-[var(--success)]" : undefined}>{part}</span>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function EventCard({
@@ -120,74 +68,19 @@ export function EventCard({
   const aspectRatio = poster ? poster.aspectRatio : coverRatio;
   // Fixed framing keeps the legacy default (center) without extra classes.
   const objectPositionClass = poster?.objectPosition === "top" ? "object-top" : undefined;
-  const isFree = Boolean(priceLabel && /бесплатно|^free$/i.test(priceLabel.trim()));
   return (
     <div className={cn("group relative select-none", className)}>
       <Link href={href} className="block focus:outline-none">
-        {/* Cover */}
-        <div
-          className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
-          style={{ aspectRatio }}
-          data-masonry-media
-          data-poster-crop={poster ? (poster.cropped ? poster.objectPosition : "none") : undefined}
-        >
-          {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
-            <Image
-              src={imageUrl}
-              alt={title}
-              fill
-              sizes={imageSizes ?? EVENT_CARD_IMAGE_SIZES}
-              loading={imagePriority ? "eager" : "lazy"}
-              fetchPriority={imagePriority ? "high" : undefined}
-              className={cn(coverFit === "contain" ? "object-contain" : "object-cover", objectPositionClass)}
-            />
-          ) : imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
-            <img
-              src={imageUrl}
-              alt={title}
-              loading={imagePriority ? "eager" : "lazy"}
-              fetchPriority={imagePriority ? "high" : undefined}
-              className={cn("h-full w-full", coverFit === "contain" ? "object-contain" : "object-cover", objectPositionClass)}
-            />
-          ) : (
-            <div
-              className="flex h-full w-full items-center justify-center"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(-45deg, transparent, transparent 9px, rgba(20,18,16,0.07) 9px, rgba(20,18,16,0.07) 10px)",
-              }}
-            >
-              {categoryLabel && (
-                <EventCardCategoryLabel
-                  label={categoryLabel}
-                  className="text-[11px] tracking-[0.18em] text-[rgba(20,18,16,0.30)]"
-                />
-              )}
-            </div>
-          )}
+        <PublicCatalogCardCover
+          imageUrl={imageUrl} title={title} aspectRatio={aspectRatio}
+          imagePriority={imagePriority} coverFit={coverFit}
+          imageSizes={imageSizes} objectPositionClass={objectPositionClass}
+          posterCrop={poster ? (poster.cropped ? poster.objectPosition : "none") : undefined}
+          placeholder={categoryLabel ? <PublicCatalogCardCategory label={categoryLabel} placeholder /> : null}
+        />
 
-
-        </div>
-
-        {/* Text */}
-        <div className="mt-3 flex flex-col gap-1 px-0.5">
-          {categoryLabel && <EventCardCategoryLabel label={categoryLabel} />}
-          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
-            {title}
-          </div>
-          {(metaLabel || priceLabel) && (
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-1 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-              {metaLabel && <span>{metaLabel}</span>}
-              {metaLabel && priceLabel && <span aria-hidden="true">·</span>}
-              {priceLabel && (
-                <span className={isFree ? "font-medium text-[var(--success)]" : "text-[#141210]"}>
-                  {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "card" })}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        <PublicCatalogCardDetails title={title} label={metaLabel} priceLabel={priceLabel}
+          category={categoryLabel ? <PublicCatalogCardCategory label={categoryLabel} /> : null} />
       </Link>
 
       {/* SaveHeart — outside Link to prevent navigation */}

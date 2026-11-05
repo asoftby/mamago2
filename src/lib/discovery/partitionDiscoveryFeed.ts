@@ -104,8 +104,10 @@ export function partitionDiscoveryFeed(
     filters.age.some((age) => age !== "18+") &&
     !filters.age.includes("18+");
 
-  const eligibleActivities =
-    childPersonaContext || manualChildOnlyContext
+  const manualAdultOnly = !personaDriven && filters.age.length === 1 && filters.age[0] === "18+";
+  const eligibleActivities = manualAdultOnly
+    ? activities.filter(activity => matchesManualAgeRanges(activity, [{ id: "18+", min: 18, max: 99 }]))
+    : childPersonaContext || manualChildOnlyContext
       ? activities.filter((activity) => activity.agePolicy !== "ADULT_ONLY")
       : activities;
   const formatFiltered = eligibleActivities.filter((activity) =>
@@ -143,7 +145,7 @@ export function partitionDiscoveryFeed(
     selectedPersonas.every((persona) => persona.kind === "adult");
 
   // В self-контексте детский контент не возвращаем вторичным блоком.
-  if (selfOnly) {
+  if (selfOnly || manualAdultOnly) {
     return {
       primary,
       secondary: [],

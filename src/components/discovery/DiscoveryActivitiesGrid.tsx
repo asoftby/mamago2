@@ -6,6 +6,7 @@ import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { KudaMasonryListing, type KudaListingProps } from "@/components/discovery/KudaMasonryListing";
+import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
 import {
   discoveryFiltersSignature,
   withImplicitListingFilters,
@@ -30,6 +31,8 @@ import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import { formatCardAge } from "@/lib/discovery/formatCardAge";
+import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
 // NOTE: formatRuShortDayMonthRange, getActivityFormatLabel, publicActivityPath
 // are still used by the OfferCard branch below — do not remove.
 
@@ -181,7 +184,7 @@ export function DiscoveryActivitiesGrid({
             .filter(Boolean)
             .join(" · ") || undefined}
           dateLabel={[
-            activity.ageFrom != null ? `${activity.ageFrom}+` : null,
+            formatCardAge(activity.ageFrom, activity.ageTo) ?? null,
             activity.dateStart
               ? formatRuShortDayMonthRange(activity.dateStart, activity.dateEnd ?? null)
               : null,
@@ -193,7 +196,6 @@ export function DiscoveryActivitiesGrid({
           }
           saveDateISO={activity.dateStart ?? null}
           saveDateEndISO={activity.dateEnd ?? null}
-          className="h-full"
           imagePriority={feedBucket === "primary" && position <= 4}
         />
       ) : (
@@ -212,7 +214,6 @@ export function DiscoveryActivitiesGrid({
             const href = activityMockToEventCard(activity, citySlug).href;
             return scopedEvents ? `${href}${href.includes("?") ? "&" : "?"}explore=1` : href;
           })()}
-          className="h-full"
           imagePriority={feedBucket === "primary" && position <= 4}
         />
       )}
@@ -262,41 +263,36 @@ export function DiscoveryActivitiesGrid({
       )}
 
       {!kudaListing && !showEmpty && (
-      <div
-        className={cn(
-          "grid grid-cols-1 gap-5 min-[360px]:grid-cols-2 lg:grid-cols-4",
-          className,
-        )}
-      >
-        {isPending
-          ? Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "overflow-hidden rounded-[28px] bg-neutral-100 animate-pulse",
-                  ratio === "1/1" ? "aspect-square" : masonrySkeletonAspect(i),
-                )}
-                aria-hidden
-              />
-            ))
-          : primary.map((activity, index) =>
-              renderCard(activity, index + 1, "primary"),
-            )}
-      </div>
+        isPending ? (
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4 lg:gap-8" aria-hidden>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={cn("overflow-hidden rounded-[18px] bg-neutral-100 animate-pulse", ratio === "1/1" ? "aspect-square" : masonrySkeletonAspect(i))} />
+            ))}
+          </div>
+        ) : (
+          <OrderedMasonryGrid
+            items={primary.map((activity, index) => ({
+              key: activity.id,
+              ratio: activity.analyticsEntityType === "OFFER" ? 5 / 4 : ratio === "1/1" ? 1 : 5 / 4,
+              content: renderCard(activity, index + 1, "primary"),
+            }))}
+          />
+        )
       )}
 
       {!kudaListing && !isPending && !showEmpty && secondary.length > 0 && secondaryHeading && (
         <div className="space-y-4">
-          <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">
-            {secondaryHeading}
-          </h2>
-          <div
-            className="grid grid-cols-1 gap-5 min-[360px]:grid-cols-2 lg:grid-cols-4"
-          >
-            {secondary.map((activity, index) =>
-              renderCard(activity, primary.length + index + 1, "secondary"),
-            )}
-          </div>
+          <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">{secondaryHeading}</h2>
+          <OrderedMasonryGrid
+            items={[
+              ...(primary.length === 0 ? [{ key: "__audience-alternatives__", ratio: 1.5, content: <SoftAudienceNotice inGrid label="варианты" /> }] : []),
+              ...secondary.map((activity, index) => ({
+              key: activity.id,
+              ratio: activity.analyticsEntityType === "OFFER" ? 5 / 4 : ratio === "1/1" ? 1 : 5 / 4,
+              content: renderCard(activity, primary.length + index + 1, "secondary"),
+            })),
+            ]}
+          />
         </div>
       )}
     </div>
