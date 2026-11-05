@@ -101,7 +101,7 @@ test("strict adult-only header intent never returns child or teen events, includ
     event("mixed", { ageMinMonths: 72, ageMaxMonths: 360 }),
   ];
   for (const selection of [{ mode: "DISCOVERY" } as const,
-    { mode: "PERSONAS", selectedChildIds: [], includeAdult: true } as const]) {
+    { mode: "PERSONAS", selectedChildIds: [] as string[], includeAdult: true } as const]) {
     const result = selectPersonalFamilyPicks(candidates, children, selection,
       selection.mode === "DISCOVERY" ? ["18+"] : []);
     assert.deepEqual(result.map(item => item.candidate.id).sort(), ["adult", "mixed"]);

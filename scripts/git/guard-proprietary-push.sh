@@ -44,7 +44,7 @@ if [ "$private" != 'true' ]; then
   src/server/services/recommendations/familyPicks/homeRequest.ts) expected="7b671c00249db5f178ad545c1b62c5e60726e84d" ;;
   src/server/services/recommendations/familyPicks/load.ts) expected="6ee59e3dec1e7253ce2612614bbde9c8ae177713" ;;
   src/server/services/recommendations/familyPicks/personalPolicy.integration.test.ts) expected="507e89632a484d80f07e0c948ab85c5196aadfe4" ;;
-  src/server/services/recommendations/familyPicks/personalPolicy.test.ts) expected="d7562a912435ef91dfce2b60fe33408747cec098" ;;
+  src/server/services/recommendations/familyPicks/personalPolicy.test.ts) expected="4c7871292815add615e64467cd2272608db3292d" ;;
   src/server/services/recommendations/familyPicks/select.ts) expected="d5263960911260c98bc25e8f534012c46136eb25" ;;
       *) echo "[security] Push blocked: unreviewed recommendation path: $path" >&2; exit 1 ;;
     esac

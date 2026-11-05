@@ -240,10 +240,10 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           />
         ) : null}
 
-        {sectionAvailability.birthday && birthdayOffers.length > 0 ? (
+        {sectionAvailability.birthday && (birthdayOffers?.length ?? 0) > 0 ? (
           <>
             <CityHomeBirthdayCta />
-            <CityHomeBirthdayOffers offers={birthdayOffers} />
+            <CityHomeBirthdayOffers offers={birthdayOffers ?? []} />
           </>
         ) : null}
 

@@ -64,7 +64,6 @@ export default async function ArticlePreviewPage({
           blocks={data.blocks}
           author={data.author}
           tags={data.tags}
-          related={[]}
           editHref={canReturnToEdit ? editHref : undefined}
           draftWatermark={data.status !== "PUBLISHED"}
           articleHref={`/preview/articles/${id}`}
