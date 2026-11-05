@@ -291,7 +291,8 @@ export function FamilyHomeResults({ data, context, citySlug, impressed, onImpres
           }}>
             <EventCard id={item.id} title={item.title} href={item.href} imageUrl={item.imageUrl}
               imageWidth={item.imageWidth} imageHeight={item.imageHeight} framing="fixed" coverRatio="2/3"
-              coverFit="cover" imagePriority={index < 2} saveMeta={{ dateISO: minskPlanDate(item.startsAt), source: "home-family-picks" }} categoryLabel={item.categoryName ?? undefined}
+              coverFit="cover" imagePriority={index < 2} saveMeta={{ dateISO: minskPlanDate(item.startsAt), source: "home-family-picks",
+                planAttribution: { planAddSource: "home-family-picks", recommendationExposureId: item.exposureId } }} categoryLabel={item.categoryName ?? undefined}
               metaLabel={`${homeAgeLabel(item)} · ${formatRuShortDayMonth(item.startsAt)}`}
               priceLabel={formatPublicCardPrice(item) ?? undefined} />
             {item.physicalCitySlug && item.physicalCitySlug !== citySlug && <p className="pt-2 text-xs text-muted-foreground">

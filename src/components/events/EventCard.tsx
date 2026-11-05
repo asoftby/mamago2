@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PublicCatalogCardCover, PublicCatalogCardDetails, PublicCatalogCardCategory } from "@/components/catalog/PublicCatalogCardCore";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
+import type { HomePlanAttribution } from "@/features/save/planAttribution";
 import { resolvePosterFrame } from "@/lib/media/posterFrame";
 
 // ─── Public props ────────────────────────────────────────────────────────────
@@ -40,6 +41,8 @@ export type EventCardProps = {
     dateISO?: string | null;
     dateEndISO?: string | null;
     source?: string;
+    /** Preserve recommendation conversion attribution through shared EventCard. */
+    planAttribution?: HomePlanAttribution;
   };
   className?: string;
 };
@@ -93,6 +96,7 @@ export function EventCard({
           eventPlanDateISO={saveMeta.dateISO ?? null}
           eventPlanDateEndISO={saveMeta.dateEndISO ?? null}
           source={saveMeta.source}
+          planAttribution={saveMeta.planAttribution}
           className="absolute right-3 top-3 h-11 w-11 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px] sm:h-8 sm:w-8"
           iconClassName="h-5 w-5 sm:h-4 sm:w-4"
         />

@@ -229,3 +229,19 @@ test("mixed businesses/categories cannot displace AND or override shared relevan
   ], children, all);
   assert.deepEqual(result.map(pick => pick.candidate.id), ["and_a", "and_b", "or"]);
 });
+
+test("adult-only persona and manual 18+ retain open-ended 18+ and 21+ sessions", () => {
+  const candidates = [
+    event("adult18-open", { ageMinMonths: 216, ageMaxMonths: null }),
+    event("adult21-open", { ageMinMonths: 252, ageMaxMonths: null }),
+    event("child-only", { ageMinMonths: 36, ageMaxMonths: 144 }),
+    event("unknown", { agePolicy: "UNKNOWN", ageMinMonths: null, ageMaxMonths: null }),
+  ];
+  const expected = ["adult18-open", "adult21-open"];
+  const manual = selectPersonalFamilyPicks(candidates, children, { mode: "DISCOVERY" }, ["18+"]);
+  const adult = selectPersonalFamilyPicks(candidates, children, { mode: "PERSONAS", selectedChildIds: [], includeAdult: true });
+  assert.deepEqual(manual.map(item => item.candidate.id), expected);
+  assert.deepEqual(adult.map(item => item.candidate.id), expected);
+  assert.ok(manual.every(item => item.targetFit));
+  assert.ok(adult.every(item => item.targetFit));
+});

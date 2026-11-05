@@ -193,3 +193,11 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   assert.match(general, /useFamilyPersona/, "authenticated non-personalized users still honor global header selection");
   assert.doesNotMatch(general, /useDiscoveryFilters|\/api\/discovery\/events\/page/);
 });
+
+test("shared EventCard retains home recommendation attribution on save", () => {
+  const card = readFileSync("src/components/events/EventCard.tsx", "utf8");
+  const home = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
+  assert.match(card, /planAttribution\?: HomePlanAttribution/);
+  assert.match(card, /planAttribution=\{saveMeta\.planAttribution\}/);
+  assert.match(home, /planAttribution: \{ planAddSource: "home-family-picks", recommendationExposureId: item\.exposureId \}/);
+});

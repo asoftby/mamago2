@@ -568,7 +568,9 @@ export function selectPersonalFamilyPicks(
       (selection.mode === "PERSONAS" && selection.includeAdult && selection.selectedChildIds.length === 0);
     const eligible = strictAdult ? candidates.filter(candidate =>
       candidate.agePolicy === "ADULT_ONLY" || candidate.agePolicy === "UNRESTRICTED" ||
-      (candidate.agePolicy !== "UNKNOWN" && candidate.ageMaxMonths != null && candidate.ageMaxMonths > 216))
+      (candidate.agePolicy !== "UNKNOWN" && (
+        (candidate.ageMaxMonths != null && candidate.ageMaxMonths > 216) ||
+        (candidate.ageMaxMonths == null && candidate.ageMinMonths != null && candidate.ageMinMonths >= 216))))
       : candidates;
     const chosenChildren = selection.mode === "PERSONAS" ? new Set(selection.selectedChildIds) : new Set<string>();
     const includesAdult = selection.mode === "PERSONAS" && selection.includeAdult;

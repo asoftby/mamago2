@@ -61,3 +61,22 @@ test("same adult choice produces stable filtered results on repeated evaluation"
   const audience = { personas: [adult], selectedPersonaIds: [], manualAgeRanges: ["18+"] };
   assert.deepEqual(rankHomeByAudience(offers, audience, age), rankHomeByAudience(offers, audience, age));
 });
+
+test("18+ intent preserves open-ended adult offerings but rejects child-only and unknown age", async () => {
+  const { homeAudienceSections } = await import("./rankHomeByAudience");
+  const values = [
+    { id: "adult18", ageFrom: 18, ageTo: null, agePolicy: "SPECIFIC" },
+    { id: "adult21", ageFrom: 21, ageTo: null, agePolicy: "SPECIFIC" },
+    { id: "child", ageFrom: 3, ageTo: 12, agePolicy: "SPECIFIC" },
+    { id: "unknown", ageFrom: null, ageTo: null, agePolicy: "UNKNOWN" },
+  ];
+  for (const audience of [
+    { personas: [adult], selectedPersonaIds: [adult.id] },
+    { personas: [adult], selectedPersonaIds: [], manualAgeRanges: ["18+"] },
+  ]) {
+    assert.deepEqual(rankHomeByAudience(values, audience, item => item).map(item => item.id), ["adult18", "adult21"]);
+    const sections = homeAudienceSections(values, audience, item => item);
+    assert.deepEqual([...sections.primary, ...sections.alternatives].map(item => item.id), ["adult18", "adult21"]);
+    assert.equal(sections.primary[0]?.id, "adult18");
+  }
+});

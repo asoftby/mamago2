@@ -58,12 +58,12 @@ export function homeAgeEligible<T>(items: readonly T[], audience: HomeAudience,
   getAge: (item: T) => AgeBoundOffer): T[] {
   if (!isAdultOnlyHomeAudience(audience)) return [...items];
   return items.filter(item => {
-    const { ageTo, agePolicy, ageTags } = getAge(item);
+    const { ageFrom, ageTo, agePolicy, ageTags } = getAge(item);
     if (agePolicy === "ADULT_ONLY" || agePolicy === "UNRESTRICTED") return true;
     if (agePolicy === "UNKNOWN") return false;
     if ((ageTags ?? []).length > 0) return ageTags!.includes("18+");
     // An inclusive upper bound of 18 is often a child/teen bracket, not adult suitability.
-    return ageTo != null && ageTo > 18;
+    return (ageTo != null && ageTo > 18) || (ageTo == null && ageFrom != null && ageFrom >= 18);
   });
 }
 
