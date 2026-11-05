@@ -4,8 +4,8 @@ import { PrismaClient } from "@prisma/client";
 import { savePackageComponents } from "./packageComponents";
 
 const url = process.env.DATABASE_URL;
-if (!url || new URL(url).hostname !== "127.0.0.1" || new URL(url).pathname !== "/mamago_a2_test")
-  throw new Error("Requires the disposable mamago_a2_test database on 127.0.0.1");
+if (!url || new URL(url).hostname !== "127.0.0.1" || !["/mamago_a2_test", "/mamago_a3_test"].includes(new URL(url).pathname))
+  throw new Error("Requires a disposable mamaGo test database on 127.0.0.1");
 const db = new PrismaClient({ datasourceUrl: url });
 test("canonical composition transactions preserve pricing, reject stale/foreign input, and support draft type change", async () => {
   const user = await db.user.create({ data: { email: `a2-${Date.now()}@example.test` } });
@@ -27,6 +27,22 @@ test("canonical composition transactions preserve pricing, reject stale/foreign 
     await db.offer.update({ where: { id: offer.id }, data: { status: "PUBLISHED" } });
     await assert.rejects(db.$transaction(tx => savePackageComponents(tx, offer.id, [], current)), /согласования/);
     await db.$transaction(tx => savePackageComponents(tx, offer.id, current, current));
+    const order = await db.partyOrder.create({ data: { ownerUserId: user.id, citySlug: "synthetic", venueMode: "PACKAGE" } });
+    try {
+      const snapshot = { id: component.id, title: saved.title, category: saved.category, priceSnapshot: "100.00" };
+      const item = await db.partyOrderItem.create({ data: { partyOrderId: order.id, category: saved.category, role: "INCLUDED",
+        packageComponentId: component.id, packageComponentSnapshot: snapshot } });
+      await db.offer.update({ where: { id: offer.id }, data: { status: "DRAFT" } });
+      await db.$transaction(tx => savePackageComponents(tx, offer.id, [], current));
+      assert.ok((await db.packageComponent.findUniqueOrThrow({ where: { id: component.id } })).archivedAt);
+      assert.equal(await db.packageComponent.count({ where: { packageId: offer.id, archivedAt: null } }), 0);
+      await db.offer.delete({ where: { id: offer.id } });
+      const historical = await db.partyOrderItem.findUniqueOrThrow({ where: { id: item.id } });
+      assert.equal(historical.packageComponentId, null);
+      assert.deepEqual(historical.packageComponentSnapshot, snapshot);
+    } finally {
+      await db.partyOrder.delete({ where: { id: order.id } });
+    }
     const service = await db.offer.create({ data: { placeId, title: "Was service", kind: "SERVICE", productType: "PARTY_SERVICE", status: "DRAFT" } });
     await db.$transaction(async tx => {
       await savePackageComponents(tx, service.id, [{ title: "Торт", category: "CAKE" }], [], false, "PARTY_PACKAGE");

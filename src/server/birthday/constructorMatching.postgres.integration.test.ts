@@ -1,3 +1,4 @@
+import { constructorIntervalPrice } from "./constructorIntervalPrice";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -93,6 +94,23 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
       assert.ok(!ranked.some(r=>r.offer.offerId===childId));assert.ok(!ranked.some(r=>r.offer.offerId===blockedId));
       assert.ok(ranked.findIndex(r=>r.offer.offerId===scienceId)<ranked.findIndex(r=>r.offer.offerId===musicId));
     });
+    await t.test('draft captures each mandatory package component independently of the offer',async()=>{
+      const packageOrder=await db.partyOrder.create({data:{ownerUserId:parent.id,citySlug:city.slug,venueMode:'PACKAGE'}});
+      try {
+        const result=await updatePartyDraft(parent.id,packageOrder.id,{version:packageOrder.version,anchorOfferId:packageId});
+        const included=result.items.filter(item=>item.role==='INCLUDED');
+        assert.equal(included.length,2);
+        for (const item of included) {
+          assert.ok(item.packageComponentId);
+          assert.equal((item.packageComponentSnapshot as {id:string}).id,item.packageComponentId);
+        }
+        const first=included[0];
+        await db.packageComponent.update({where:{id:first.packageComponentId!},data:{title:'Edited catalogue title'}});
+        const historical=await db.partyOrderItem.findUniqueOrThrow({where:{id:first.id}});
+        assert.deepEqual(historical.packageComponentSnapshot,first.packageComponentSnapshot);
+        assert.equal(result.items.find(item=>item.role==='ANCHOR')?.offerPriceSnapshot?.toFixed(2),'150.00');
+      } finally { await db.partyOrder.delete({where:{id:packageOrder.id}}); }
+    });
     await t.test('geography stays real across catalog, explicit selection and public slots',async()=>{
       const catalog=await getPublicBirthdayCatalog(city.slug);assert.ok(catalog?.some(c=>c.id===travelId));assert.ok(!catalog?.some(c=>c.id===onsiteId));assert.ok(!catalog?.some(c=>c.id===blockedId));
       await verifyPartyOffers(city.slug,[travelId],db);await assert.rejects(verifyPartyOffers(city.slug,[onsiteId],db));
@@ -100,6 +118,29 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
       assert.equal(found.find(c=>c.offer.offerId===travelId)?.assessments.find(a=>a.dimension==='GEOGRAPHY')?.outcome,'UNKNOWN');
       assert.ok(await getPublicPartySlotPreview({citySlug:city.slug,offerId:travelId,day,durationMinutes:60,guestCount:5}));
       assert.equal(await getPublicPartySlotPreview({citySlug:city.slug,offerId:blockedId,day,durationMinutes:60,guestCount:5}),null);
+      const path = '/api/business/offers/' + travelId;
+      const form = mapOfferToFormData(await request(travel,path));
+      form.birthdayDetails.serviceAreas = {travel:[territory.id,otherTerritory.id],delivery:[]};
+      form.pricingMode = 'multiple';
+      form.priceKind = 'RANGE';
+      form.pricingOptions = [{id:'conditional', title:'Для шести гостей', price:'90', description:'', partyConditions:{durationMinutes:60,minGuests:6}}];
+      await db.offer.update({where:{id:travelId},data:{status:'DRAFT'}});
+      await request(travel,path,'PATCH',buildOfferUpdatePayload(form));
+      const reopened = mapOfferToFormData(await request(travel,path));
+      assert.deepEqual(reopened.birthdayDetails.serviceAreas,form.birthdayDetails.serviceAreas);
+      assert.deepEqual(reopened.pricingOptions[0]?.partyConditions,form.pricingOptions[0].partyConditions);
+      const priced=await db.offer.findUniqueOrThrow({where:{id:travelId},select:constructorOfferSelect});
+      assert.equal(toConstructorOffer(priced).price.state,'UNRESOLVED');
+
+      await db.offer.update({where:{id:travelId},data:{status:'PUBLISHED'}});
+      const matching = await loadConstructorCandidates({...query,selectionContext:context},db);
+      assert.equal(matching.find(c=>c.offer.offerId===travelId)?.assessments.find(a=>a.dimension==='GEOGRAPHY')?.outcome,'MATCH');
+      reopened.birthdayDetails.serviceAreas = {travel:[otherTerritory.id],delivery:[]};
+      await db.offer.update({where:{id:travelId},data:{status:'DRAFT'}});
+      await request(travel,path,'PATCH',buildOfferUpdatePayload(reopened));
+      await db.offer.update({where:{id:travelId},data:{status:'PUBLISHED'}});
+      assert.ok(!(await loadConstructorCandidates({...query,selectionContext:context},db)).some(c=>c.offer.offerId===travelId));
+
     });
     await t.test('conflicts, unpriced semantics and unsupported currency are never exact zero',async()=>{
       await db.offerBooking.create({data:{offerId:musicId,basePriceByn:200,pricingRevision:2}});
@@ -133,6 +174,30 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
       const window=evidence.get(scienceId)!.availability;if(window.state==='AVAILABLE'){assert.equal(new Date(window.windows[0].occupied.startAt).getTime(),new Date(interval.startAt).getTime()-20*60000);assert.equal(new Date(window.windows[0].occupied.endAt).getTime(),new Date(interval.endAt).getTime()+30*60000);}
       const block=await db.calendarBlock.create({data:{bookingUnitId:unitId,blockStart:new Date(new Date(interval.endAt).getTime()+10*60000),blockEnd:new Date(new Date(interval.endAt).getTime()+60*60000)}});
       evidence=await loadPartyAvailability(db,inputs,interval,5,new Date());assert.equal(evidence.get(scienceId)?.availability.state,'PARTIAL');await db.calendarBlock.delete({where:{id:block.id}});
+      await db.offerBooking.create({data:{offerId:scienceId,scheduleKind:'ON_REQUEST_WINDOWS',durationMin:60,basePriceByn:120,maxExtensionHours:2,extensionHourPriceByn:30}});
+      try {
+        const row=await db.offer.findUniqueOrThrow({where:{id:scienceId},select:constructorOfferSelect});
+        const base=constructorIntervalPrice(row,interval,window,5);
+        assert.equal(base.state==='RESOLVED' && base.price.kind==='EXACT' && base.price.amountByn,'120.00');
+        const extended={...interval,endAt:new Date(Date.parse(interval.endAt)+60*60000).toISOString()};
+        const available=(await loadPartyAvailability(db,inputs,extended,5,new Date())).get(scienceId)!.availability;
+        const conditional={...row,priceMode:'RANGE' as const,priceItems:[
+          {price:100,partyConditions:{durationMinutes:120,maxGuests:4}},
+          {price:170,partyConditions:{durationMinutes:120,minGuests:5}},
+          {price:160,partyConditions:{durationMinutes:120,minGuests:5}},
+        ]};
+        const tariff=constructorIntervalPrice(conditional,extended,available,5);
+        assert.equal(tariff.state==='RESOLVED' && tariff.price.kind==='EXACT' && tariff.price.amountByn,'160.00');
+        assert.equal(constructorIntervalPrice({...conditional,offerBooking:{...conditional.offerBooking!,maxExtensionHours:0}},extended,available,5).state,'UNRESOLVED');
+        const quote=constructorIntervalPrice(row,extended,available,5);
+        assert.equal(quote.state==='RESOLVED' && quote.price.kind==='EXACT' && quote.price.amountByn,'150.00');
+        const buffer=await db.calendarBlock.create({data:{bookingUnitId:unitId,blockStart:new Date(Date.parse(extended.endAt)+10*60000),blockEnd:new Date(Date.parse(extended.endAt)+40*60000)}});
+        try {
+          const busy=(await loadPartyAvailability(db,inputs,extended,5,new Date())).get(scienceId)!.availability;
+          assert.notEqual(busy.state,'AVAILABLE');
+          assert.equal(constructorIntervalPrice(row,extended,busy,5).state,'UNRESOLVED');
+        } finally { await db.calendarBlock.delete({where:{id:buffer.id}}); }
+      } finally { await db.offerBooking.delete({where:{offerId:scienceId}}); }
       const booking=await db.bookingRequest.create({data:{businessId:science.b.id,offerId:scienceId,publicationType:'OFFER',customerName:'Synthetic',customerPhone:'+375000000000'}});
       let allocation=await db.bookingAllocation.create({data:{bookingUnitId:unitId,bookingRequestId:booking.id,blockStart:new Date(interval.startAt),blockEnd:new Date(interval.endAt),status:'HELD',expiresAt:new Date(Date.now()-60000)}});
       assert.equal((await loadPartyAvailability(db,inputs,interval,5,new Date())).get(scienceId)?.availability.state,'AVAILABLE');await db.bookingAllocation.delete({where:{id:allocation.id}});
