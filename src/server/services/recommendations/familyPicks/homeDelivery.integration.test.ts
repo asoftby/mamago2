@@ -92,6 +92,9 @@ async function main() {
     await db.activity.createMany({ data: activityIds.map((id, index) => ({ id, ownerUserId: user.id, cityId: city.id, title: `Synthetic ${index}`, shortDesc: "Disposable benchmark", type: "EVENT", status: "PUBLISHED", agePolicy: index < 100 ? "UNKNOWN" : "SPECIFIC", ageMinMonths: index < 100 ? null : 0, ageMaxMonths: index < 100 ? null : 216, ageTags: [], scheduleMode: "MULTI_DATE", nextOccurrenceAt: day(1), priceMode: "FREE" })) });
     await db.activitySession.createMany({ data: activityIds.map(id => ({ activityId: id, startsAt: day(1) })) });
     const prepared = await loadHomeContext(user.id);
+    const signatureOnly = await loadHomeContext(user.id, undefined, { includeSelectionPreference: false });
+    assert.equal(signatureOnly.context.signature, prepared.context.signature, "final delivery validation must retain the complete signed ACL/profile fingerprint");
+    assert.equal(signatureOnly.context.selectedChildId, null, "signature-only path does not load the independent selection preference");
     const firstDelivery = await measure("800-candidate 30-day final delivery", () => deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...prepared, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }));
     assert.equal(firstDelivery.items.length, 10);
     assert.equal(firstDelivery.candidateCount, 800);

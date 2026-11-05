@@ -9,7 +9,11 @@ import { PERSONAL_FAMILY_PICKS_POLICY } from "./config";
 import { minskDateKey } from "./window";
 import type { HomeFamilyContext } from "@/features/city-home/lib/familyHome";
 
-export async function loadHomeContext(userId: string | null, snapshot?: FamilyPicksProfile) {
+export async function loadHomeContext(
+  userId: string | null,
+  snapshot?: FamilyPicksProfile,
+  options: { includeSelectionPreference?: boolean } = {},
+) {
   const profile = snapshot ?? await loadFamilyPicksProfile(userId);
   if (profile.userId !== userId) throw new Error("profile_actor_mismatch");
   const now = new Date();
@@ -37,7 +41,9 @@ export async function loadHomeContext(userId: string | null, snapshot?: FamilyPi
         return range ? ageFilterKeysForChildren([{ ageMonths: range.min }, { ageMonths: range.max }]) : [];
       })() })),
   };
-  if (userId) {
+  // Final delivery validation needs the fresh signed profile, membership and
+  // plan/dismissal fingerprint, but not the independent legacy home preference.
+  if (userId && options.includeSelectionPreference !== false) {
     const preference = await prisma.userHomePreference.findUnique({ where: { userId } });
     const selected = preference?.selectedChildId ?? null;
     if (selected && !children.some(child => child.id === selected)) {
