@@ -112,6 +112,17 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
       const onRequest=toConstructorOffer(row).price;assert.equal(onRequest.state,'RESOLVED');if(onRequest.state==='RESOLVED')assert.deepEqual(onRequest.price,{kind:'ON_REQUEST'});
       await db.offer.update({where:{id:musicId},data:{currency:'USD'}});row=await db.offer.findUniqueOrThrow({where:{id:musicId},select:constructorOfferSelect});assert.equal(toConstructorOffer(row).price.state,'UNRESOLVED');
       await db.offer.update({where:{id:musicId},data:{currency:'BYN'}});
+      await db.offer.update({where:{id:musicId},data:{priceMode:'FROM',priceFrom:150}});
+      try {
+        const ranked = await loadConstructorCandidates({...query,selectionContext:context},db);
+        assert.equal(ranked.find(c=>c.offer.offerId===musicId)?.budgetFit,'UNKNOWN');
+        await updatePartyDraft(parent.id,party.id,{version:party.version,anchorOfferId:musicId});
+        const from = await db.partyOrderItem.findFirstOrThrow({where:{partyOrderId:party.id,role:'ANCHOR'}});
+        assert.equal(from.offerPriceSnapshot,null);
+        party.version++;context.partyVersion=party.version;
+      } finally {
+        await db.offer.update({where:{id:musicId},data:{priceMode:'EXACT'}});
+      }
     });
     await t.test('BookingUnit after real API save: step, buffers, partial and shared allocations',async()=>{
       const created=await request(science,'/api/business/booking-units','POST',{name:'A3 resource',offerIds:[scienceId,siblingId],capacity:12,minDurationMinutes:60,stepMinutes:60,prepMinutes:20,cleanupMinutes:30,rules:[1,2,3,4,5,6,7].map(weekday=>({weekday,startMinutes:600,endMinutes:1080}))});

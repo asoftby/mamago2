@@ -40,7 +40,7 @@ test("hard mismatch vs soft ranking: interests first, optional omissions neutral
   low.price = { state: "RESOLVED", source: low.source, price: { kind: "EXACT", amountByn: "1100.00" } };
   assert.equal(assessConstructorOffer(low,q).budgetFit,'SOFT_OVERRUN');
   low.price = { state: 'RESOLVED', source: low.source, price: { kind: 'EXACT', amountByn: '1100.01' } };assert.equal(assessConstructorOffer(low,q).eligible,true);
-  q.budget.value.maximumByn=null;assert.equal(assessConstructorOffer(high,q).budgetFit,'WITHIN');
+  q.budget.value.maximumByn=null;assert.equal(assessConstructorOffer(high,q).budgetFit,'UNKNOWN');
 });
 
 test("performer role and category-specific hidden fields", () => {
@@ -110,4 +110,28 @@ test("pickup uses the real place and a delivery zone cannot become a travel zone
 test("known chronological adulthood is not lost when the profile is stored as Child", () => {
   const o=constructorFixture();o.age.agePolicy="ADULT_ONLY";const q=requirementsFixture();q.subjects=[{kind:"child",refId:"grown-child",source:"profile"}];q.ageMonthsOnEventDate={state:"KNOWN",value:240};
   assert.equal(assessConstructorOffer(o,q).eligible,true);
+});
+
+test("FROM only disproves budget fit when its lower bound exceeds the ceiling", () => {
+  const q = requirementsFixture();
+  q.budget = { state: "KNOWN", value: { minimumByn: "500.00", maximumByn: "1000.00" } };
+  const exact = constructorFixture("z-exact");
+  const outside = constructorFixture("a-outside");
+  const from = constructorFixture("m-from");
+  const unpriced = constructorFixture("unpriced");
+  exact.price = { state: "RESOLVED", source: exact.source, price: { kind: "EXACT", amountByn: "800.00" } };
+  outside.price = { state: "RESOLVED", source: outside.source, price: { kind: "EXACT", amountByn: "1200.00" } };
+  assert.equal(assessConstructorOffer(exact, q).budgetFit, "WITHIN");
+  assert.equal(assessConstructorOffer(outside, q).budgetFit, "OUTSIDE_RANGE");
+  assert.equal(assessConstructorOffer(unpriced, q).budgetFit, "UNKNOWN");
+  for (const [minimumByn, expected] of [["400.00", "UNKNOWN"], ["700.00", "UNKNOWN"], ["1000.00", "UNKNOWN"], ["1100.00", "OUTSIDE_RANGE"]]) {
+    from.price = { state: "RESOLVED", source: from.source, price: { kind: "FROM", minimumByn } };
+    const assessment = assessConstructorOffer(from, q);
+    assert.equal(assessment.budgetFit, expected);
+    assert.equal(assessment.eligible, true);
+  }
+  assert.equal(assessConstructorOffer(from, { ...q, budget: { state: "KNOWN", value: { minimumByn: "500.00", maximumByn: null } } }).budgetFit, "UNKNOWN");
+  from.price = { state: "RESOLVED", source: from.source, price: { kind: "FROM", minimumByn: "700.00" } };
+  const ranked = rankConstructorOffers([outside, from, exact].map(offer => ({ offer, ...assessConstructorOffer(offer, q) })));
+  assert.deepEqual(ranked.map(({ offer }) => offer.offerId), [exact.offerId, from.offerId, outside.offerId]);
 });

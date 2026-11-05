@@ -35,7 +35,10 @@ export function assessConstructorOffer(offer: OfferForConstructor, q: Constructo
   if (q.budget.state === "KNOWN" && offer.price.state === "RESOLVED" && offer.price.price.kind !== "ON_REQUEST") {
     const value = BigInt((offer.price.price.kind === "EXACT" ? offer.price.price.amountByn : offer.price.price.minimumByn).replace(".",""));
     const max = q.budget.value.maximumByn, min = q.budget.value.minimumByn;
-    if (min !== null && value < BigInt(min.replace(".",""))) budgetFit = "OUTSIDE_RANGE";
+    if (offer.price.price.kind === "FROM") {
+      // A lower bound can disprove fit against a ceiling, but cannot prove fit.
+      if (max !== null && value > BigInt(max.replace(".",""))) budgetFit = "OUTSIDE_RANGE";
+    } else if (min !== null && value < BigInt(min.replace(".",""))) budgetFit = "OUTSIDE_RANGE";
     else if (max === null) budgetFit = "WITHIN";
     else { const ceiling = BigInt(max.replace(".","")); budgetFit = value <= ceiling ? "WITHIN" : value * BigInt(100) <= ceiling * BigInt(100 + BIRTHDAY_MATCHING_CONFIG.budgetSoftOverrunPct) ? "SOFT_OVERRUN" : "OUTSIDE_RANGE"; }
   }
