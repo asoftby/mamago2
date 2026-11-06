@@ -26,6 +26,7 @@ export function buildContinuousArticleSeed(args: {
   citySlug: string | null;
   documentTitle?: string;
   readTimeMinutes?: number;
+  publicationType?: "ARTICLE" | "COLLECTION" | "BREAKING_NEWS";
 }): PublicContinuousArticleDto {
   const href = buildArticlePublicPath({
     slug: args.slug,
@@ -51,5 +52,6 @@ export function buildContinuousArticleSeed(args: {
     blocks: args.blocks,
     geoScope: args.geoScope,
     cityId: args.cityId,
+    publicationType: args.publicationType,
   };
 }

@@ -20,6 +20,8 @@ export type ArticleIntermissionProps = {
   className?: string;
   /** Показать подпись перед следующей статьёй */
   showNextLabel?: boolean;
+  /** Вопрос над оценкой; по умолчанию «Была полезна статья?». */
+  ratingTitle?: string;
 };
 
 export function ArticleIntermission({
@@ -27,6 +29,7 @@ export function ArticleIntermission({
   analytics,
   className,
   showNextLabel = true,
+  ratingTitle = "Была полезна статья?",
 }: ArticleIntermissionProps) {
   const onRate = (type: EmojiRatingType) => {
     void postProductTelemetryEvent({
@@ -62,7 +65,7 @@ export function ArticleIntermission({
       <ContentEmojiRating
         entityType="ARTICLE"
         entityId={article.id}
-        title="Была полезна статья?"
+        title={ratingTitle}
         getPath={`/api/articles/ratings/${article.id}`}
         postPath="/api/articles/rate"
         postBodyKey="articleId"

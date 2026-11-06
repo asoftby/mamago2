@@ -11,6 +11,7 @@ import {
 import type { GeoScope } from "@prisma/client";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { ArticleSectionExhausted } from "@/components/article/continuous/ArticleContinuationDivider";
+import { articleRatingTitle } from "@/lib/article/articleRatingTitle";
 import { ArticleIntermission } from "@/components/article/continuous/ArticleIntermission";
 import type {
   NextArticlePreviewDto,
@@ -450,6 +451,7 @@ export function ContinuousArticleReader({
 
       <ArticleIntermission
         article={{ id: seed.id, slug: seed.slug }}
+        ratingTitle={articleRatingTitle(seed.publicationType)}
         analytics={{
           articleId: seed.id,
           articleSlug: seed.slug,
