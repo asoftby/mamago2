@@ -735,6 +735,8 @@ export function EventPageView({
           open={bookingModalOpen}
           onOpenChange={setBookingModalOpen}
           eventTitle={data.title}
+          eventImageUrl={data.media?.posterUrl}
+          eventVenue={data.venue?.name}
           eventCategory={data.categoryLabel}
           priceLabel={data.priceLabel}
           booking={data.cta.simpleBooking}
