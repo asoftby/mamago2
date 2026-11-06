@@ -43,6 +43,7 @@ import {
   type PersonalShowWindow,
   collectUpcomingOccurrences,
   resolveShowWindow,
+  minskDateKey,
   type ShowWindow,
 } from "./window";
 
@@ -379,6 +380,27 @@ type PersonalExtras = {
   _count: { sessions: number };
 };
 
+/** An old plan visit must never suppress a future session of the same event. */
+export function upcomingPlanBlocksFamilyPick(
+  row: { date: string | null; startsAt: Date | null; childId: string | null; assigneeUserId: string | null },
+  selection: PersonalFamilySelection, actorId: string, now: Date,
+): boolean {
+  if (row.date !== null && row.date < minskDateKey(now)) return false;
+  if (row.date === null && row.startsAt !== null && row.startsAt.getTime() < now.getTime()) return false;
+  // A child-specific visit of a sibling is not already planned for the chosen child.
+  if (row.childId) {
+    if (selection.mode === "CHILD") return row.childId === selection.selectedChildId;
+    if (selection.mode === "PERSONAS") return selection.selectedChildIds.includes(row.childId);
+  }
+  // Adult-assigned plan items do not suppress a child's individual feed.
+  if (row.assigneeUserId) {
+    if (selection.mode === "CHILD") return false;
+    if (selection.mode === "PERSONAS") return selection.includeAdult && row.assigneeUserId === actorId;
+  }
+  // Legacy unassigned plans are shared, and remain conservative for future dates.
+  return true;
+}
+
 type PersonalLoadDependencies = {
   loadProfile: typeof loadFamilyPicksProfile;
   rank: typeof rankPlanSuggestionsForCity;
@@ -391,8 +413,17 @@ const personalDependencies: PersonalLoadDependencies = {
   rank: rankPlanSuggestionsForCity,
   loadAffinity: resolveSelectedExperienceAffinity,
   loadExcluded: async (userId, now, selection) => {
+    const today = minskDateKey(now);
     const [planned, dismissed] = await Promise.all([
-      prisma.planItem.findMany({ where: { ...(await activePlanScopeFor(userId)), activityId: { not: null } }, select: { activityId: true } }),
+      prisma.planItem.findMany({
+        where: {
+          ...(await activePlanScopeFor(userId)), activityId: { not: null },
+          // A historic visit is an experience signal, not an upcoming booking.
+          // Date-only plans use Minsk local calendar days, not the server TZ.
+          OR: [{ date: { gte: today } }, { date: null }],
+        },
+        select: { activityId: true, date: true, startsAt: true, childId: true, assigneeUserId: true },
+      }),
       // HOME dismissal is scoped to the account AND optional owned child.
       // Legacy dismissals with no child remain account-wide.
       prisma.userEvent.findMany({ where: {
@@ -401,7 +432,8 @@ const personalDependencies: PersonalLoadDependencies = {
       }, orderBy: { createdAt: "desc" }, take: 2000, select: { entityId: true, meta: true } }),
     ]);
     return [
-      ...planned.flatMap(row => row.activityId ? [row.activityId] : []),
+      ...planned.flatMap(row => row.activityId && upcomingPlanBlocksFamilyPick(row, selection, userId, now)
+        ? [row.activityId] : []),
       ...dismissed.flatMap(row => {
         if (!row.entityId) return [];
         const meta = row.meta && typeof row.meta === "object" && !Array.isArray(row.meta) ? row.meta : {};

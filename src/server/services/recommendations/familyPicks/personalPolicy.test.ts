@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { confirmedAgeMatchAt, selectPersonalFamilyPicks, type PersonalFamilyCandidate, type PersonalFamilyChild } from "./select";
 import { collectConfirmedOccurrences, resolvePersonalShowWindow } from "./window";
-import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError } from "./load";
+import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError, upcomingPlanBlocksFamilyPick } from "./load";
 import { PLAN_SUGGESTION_ALGORITHM_VERSION, type RankedPlanSuggestion, type PlanSuggestionRankedBatch } from "@/server/services/planSuggestions.service";
 import { readFileSync } from "node:fs";
 
@@ -262,4 +262,18 @@ test("adult-only persona and manual 18+ retain open-ended 18+ and 21+ sessions",
   assert.deepEqual(adult.map(item => item.candidate.id), expected);
   assert.ok(manual.every(item => item.targetFit));
   assert.ok(adult.every(item => item.targetFit));
+});
+
+test("past family visits do not exclude future sessions; future bookings respect audience", () => {
+  const now = new Date("2026-11-06T10:00:00+03:00");
+  const base = { date: "2026-10-27", startsAt: null, childId: null, assigneeUserId: null };
+  const forTaya = { mode: "PERSONAS" as const, selectedChildIds: ["taya"], includeAdult: false };
+  assert.equal(upcomingPlanBlocksFamilyPick(base, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-06" }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", childId: "stepa" }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", childId: "taya" }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: null, startsAt: new Date("2026-10-27T10:00:00Z") }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: null }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, { ...forTaya, includeAdult: true }, "owner", now), true);
 });
