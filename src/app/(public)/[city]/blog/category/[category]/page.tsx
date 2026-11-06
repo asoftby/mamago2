@@ -162,7 +162,6 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
         subtitle={category.journalIntro?.trim() || `Статьи, обзоры и полезные материалы для семей с детьми в ${cityName}.`}
         main={journal.main}
         news={journal.news}
-        collections={journal.collections}
         feed={journal.feed}
         typeFilter={typeFilter}
         basePath={basePath}

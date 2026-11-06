@@ -14,20 +14,18 @@ import {
   type JournalTypeFilter,
 } from "@/lib/journal/journalCardMeta";
 import { JournalFeedGridCard, JournalFeedRow, JournalMainCard, JournalMobileCard, JournalNewsCard } from "./JournalCards";
-import { JournalCollectionsCarousel } from "./JournalCollectionsCarousel";
 
 const NEWS_CARD_SHELL = "shrink-0 snap-start w-[33.6vw] min-w-[112px] max-w-[160px] lg:w-[16%] lg:max-w-none";
 
 /**
- * Страница журнала: H1 + подзаголовок → «Breaking News» → «Главное» → «Подборки mamaGo»
- * → «Свежие материалы». Каждый пустой блок скрыт целиком. Чипы рубрик — в layout.
+ * Страница журнала: H1 + подзаголовок → «Breaking News» → «Главное»
+ * → «Свежие материалы» (статьи и подборки вместе). Чипы рубрик — в layout.
  */
 export function JournalPageView({
   title,
   subtitle,
   main,
   news,
-  collections,
   feed,
   typeFilter,
   newsArchive = false,
@@ -39,7 +37,6 @@ export function JournalPageView({
   subtitle: string;
   main: CityHomeJournalArticle | null;
   news: CityHomeJournalArticle[];
-  collections: CityHomeJournalArticle[];
   feed: CityHomeJournalArticle[];
   typeFilter: JournalTypeFilter | null;
   newsArchive?: boolean;  /** Путь страницы (с query рубрики/темы, без type/page): «Все →» и «Смотреть все →» добавляют `?type=`. */
@@ -64,7 +61,7 @@ export function JournalPageView({
     return () => { window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); window.removeEventListener("storage", refresh); };
   }, []);
   const displayedNews = typeFilter === "BREAKING_NEWS" && !newsArchive ? orderBreakingNewsBySeen(feed, seenNewsIds) : feed;
-  const empty = !main && news.length === 0 && collections.length === 0 && feed.length === 0;
+  const empty = !main && news.length === 0 && feed.length === 0;
 
   return (
     <div className="site-wrap space-y-10 px-4 pb-16 pt-6 sm:space-y-14 sm:px-7 sm:pt-10">
@@ -139,12 +136,6 @@ export function JournalPageView({
           </AnalyticsCardViewTracker>
         </section>
       ) : null}
-
-      <JournalCollectionsCarousel
-        collections={collections}
-        allHref={typeHref("COLLECTION")}
-        citySlug={citySlug}
-      />
 
       {typeFilter === "BREAKING_NEWS" ? (
         <section aria-label={newsArchive ? "Архив Breaking News" : "Актуальные Breaking News"}>
