@@ -401,10 +401,42 @@ export function upcomingPlanBlocksFamilyPick(
   return true;
 }
 
+export type PlannedActivityExclusions = {
+  excludedActivityIds: string[];
+  plannedDatesByActivity: Record<string, string[]>;
+};
+
+/** Deduplicate a booked session/day, not every future session of its event. */
+export function partitionPlannedFamilyPickExclusions(
+  rows: readonly { activityId: string | null; date: string | null; startsAt: Date | null; childId: string | null; assigneeUserId: string | null }[],
+  selection: PersonalFamilySelection, userId: string, now: Date,
+): PlannedActivityExclusions {
+  const excludedActivityIds = new Set<string>();
+  const plannedDatesByActivity: Record<string, string[]> = {};
+  for (const row of rows) {
+    if (!row.activityId || !upcomingPlanBlocksFamilyPick(row, selection, userId, now)) continue;
+    const day = row.date ?? (row.startsAt ? minskDateKey(row.startsAt) : null);
+    if (!day) {
+      // A truly undated intention has no session to distinguish: remain conservative.
+      excludedActivityIds.add(row.activityId);
+    } else {
+      (plannedDatesByActivity[row.activityId] ??= []).push(day);
+    }
+  }
+  return { excludedActivityIds: [...excludedActivityIds], plannedDatesByActivity };
+}
+
+export function excludePlannedFamilyPickDates(
+  activityId: string, occurrences: readonly Date[], plannedDatesByActivity: Readonly<Record<string, readonly string[]>>,
+): Date[] {
+  const blocked = new Set(plannedDatesByActivity[activityId] ?? []);
+  return occurrences.filter(date => !blocked.has(minskDateKey(date)));
+}
+
 type PersonalLoadDependencies = {
   loadProfile: typeof loadFamilyPicksProfile;
   rank: typeof rankPlanSuggestionsForCity;
-  loadExcluded: (userId: string, now: Date, selection: PersonalFamilySelection) => Promise<string[]>;
+  loadExcluded: (userId: string, now: Date, selection: PersonalFamilySelection) => Promise<PlannedActivityExclusions>;
   loadAffinity: typeof resolveSelectedExperienceAffinity;
   loadExtras: (ids: string[], now: Date, range: { start: Date; end: Date }) => Promise<PersonalExtras[]>;
 };
@@ -431,9 +463,9 @@ const personalDependencies: PersonalLoadDependencies = {
         createdAt: { gte: new Date(now.getTime() - DEFAULT_FAMILY_PICKS_CONFIG.dismissCooldownDays * 86_400_000) },
       }, orderBy: { createdAt: "desc" }, take: 2000, select: { entityId: true, meta: true } }),
     ]);
-    return [
-      ...planned.flatMap(row => row.activityId && upcomingPlanBlocksFamilyPick(row, selection, userId, now)
-        ? [row.activityId] : []),
+    const plannedExclusions = partitionPlannedFamilyPickExclusions(planned, selection, userId, now);
+    return {
+      excludedActivityIds: [...plannedExclusions.excludedActivityIds,
       ...dismissed.flatMap(row => {
         if (!row.entityId) return [];
         const meta = row.meta && typeof row.meta === "object" && !Array.isArray(row.meta) ? row.meta : {};
@@ -442,8 +474,9 @@ const personalDependencies: PersonalLoadDependencies = {
         if (childScope && !(selection.mode === "CHILD" && childScope === selection.selectedChildId)
           && !(selection.mode === "PERSONAS" && selection.selectedChildIds.includes(childScope))) return [];
         return [row.entityId];
-      }),
-    ];
+      })],
+      plannedDatesByActivity: plannedExclusions.plannedDatesByActivity,
+    };
   },
   loadExtras: (ids, now, range) => prisma.activity.findMany({
     // Recheck visibility at hydration, not only at shared candidate generation.
@@ -536,7 +569,7 @@ export async function loadPersonalFamilyPicks(input: {
   const [storedExcluded, experienceAffinity] = await Promise.all([
     deps.loadExcluded(profile.userId, now, selection), deps.loadAffinity({ userId: profile.userId, subjects, now }),
   ]);
-  const excluded = [...new Set([...storedExcluded, ...(input.excludeActivityIds ?? [])])];
+  const excluded = [...new Set([...storedExcluded.excludedActivityIds, ...(input.excludeActivityIds ?? [])])];
   let lastAlgorithmVersion: string | null = null;
   for (const horizon of PERSONAL_FAMILY_PICKS_POLICY.horizons) {
     const window = resolvePersonalShowWindow(now, horizon);
@@ -568,10 +601,10 @@ export async function loadPersonalFamilyPicks(input: {
         id: extra.id, categoryId: suggestion.activity.eventCategory?.id ?? null, businessId: extra.businessId,
         agePolicy: extra.agePolicy, ageMinMonths: extra.ageMinMonths, ageMaxMonths: extra.ageMaxMonths,
         sharedScore: suggestion.score,
-        occurrences: collectConfirmedOccurrences({
+        occurrences: excludePlannedFamilyPickDates(extra.id, collectConfirmedOccurrences({
           sessions: extra.sessions, hasStoredSessions: extra._count.sessions > 0,
           nextOccurrenceAt: extra.nextOccurrenceAt, rangeStart: range.start, rangeEnd: range.end, now,
-        }),
+        }), storedExcluded.plannedDatesByActivity),
       }];
     });
     const items = selectPersonalFamilyPicks(candidates, profile.children, selection, input.manualAgeRanges);
