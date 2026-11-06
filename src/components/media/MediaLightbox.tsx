@@ -84,14 +84,18 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
     return () => cancelAnimationFrame(frame);
   }, [transition]);
 
+  const finishSlide = useCallback(() => {
+    if (!transition?.moving) return;
+    setIdx(transition.to);
+    setTransition(null);
+  }, [transition]);
+
   useEffect(() => {
     if (!transition?.moving) return;
-    const timer = window.setTimeout(() => {
-      setIdx(transition.to);
-      setTransition(null);
-    }, 260);
+    // Keep the outgoing/incoming images until the CSS transition really ends.
+    const timer = window.setTimeout(finishSlide, 380);
     return () => window.clearTimeout(timer);
-  }, [transition]);
+  }, [finishSlide, transition]);
 
   function handleTouchStart(event: React.TouchEvent) {
     const touch = event.touches[0];
@@ -213,6 +217,9 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
             </div>
             <div
               data-lightbox-slide="incoming"
+              onTransitionEnd={(event) => {
+                if (event.target === event.currentTarget && event.propertyName === "transform") finishSlide();
+              }}
               className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
               style={{ transform: transition.moving ? "translateX(0)" : `translateX(${transition.direction * 100}%)` }}
             >
