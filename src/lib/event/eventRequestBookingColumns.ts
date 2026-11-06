@@ -12,14 +12,18 @@ export type EventBookingColumns = {
  *
  * Возвращает патч колонок или `null`, если менять ничего не нужно:
  * - режим «заявка» → включить REQUEST_ONLY (если ещё не так);
+ * - нет бизнеса (событие без владельца-бизнеса) → не включать, а ранее включённое выключить;
  * - другой режим → выключить только то, что включили сами (REQUEST_ONLY). Запись, настроенная иначе
  *   (импорт, админ, слоты), не трогается.
  */
 export function deriveEventRequestBookingColumns(input: {
   participationMode: unknown;
   current: EventBookingColumns;
+  /** У события есть бизнес-получатель заявок. Без него запись включать нельзя: сервер отклонит заявку. */
+  hasBusiness: boolean;
 }): EventBookingColumns | null {
-  const wantsRequest = typeof input.participationMode === "string" && input.participationMode.trim() === "request";
+  const wantsRequest =
+    input.hasBusiness && typeof input.participationMode === "string" && input.participationMode.trim() === "request";
   const { bookingEnabled, bookingMode } = input.current;
   if (wantsRequest) {
     if (bookingEnabled && bookingMode === BookingMode.REQUEST_ONLY) return null;

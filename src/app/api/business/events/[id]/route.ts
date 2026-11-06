@@ -547,6 +547,7 @@ export async function PATCH(
     const requestBookingPatch = deriveEventRequestBookingColumns({
       participationMode: nextScheduleJson.participationMode,
       current: { bookingEnabled: existing.bookingEnabled, bookingMode: existing.bookingMode },
+      hasBusiness: Boolean(nextBusinessId !== undefined ? nextBusinessId : existing.businessId),
     });
     if (requestBookingPatch) {
       updateData.bookingEnabled = requestBookingPatch.bookingEnabled;

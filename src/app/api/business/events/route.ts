@@ -266,6 +266,7 @@ export async function POST(request: NextRequest) {
         ...(deriveEventRequestBookingColumns({
           participationMode: scheduleJsonWithOrganizer.participationMode,
           current: { bookingEnabled: false, bookingMode: null },
+          hasBusiness: Boolean(resolvedBusinessId),
         }) ?? {}),
         
         // Event category (leaf: subcategory if selected, otherwise root)
