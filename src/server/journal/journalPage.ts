@@ -23,7 +23,6 @@ type JournalCity = { id: string; slug: string; regionId?: string | null };
 export type JournalPageData = {
   main: CityHomeJournalArticle | null;
   news: CityHomeJournalArticle[];
-  collections: CityHomeJournalArticle[];
   feed: CityHomeJournalArticle[];
   page: number;
   totalPages: number;
@@ -31,7 +30,8 @@ export type JournalPageData = {
 };
 
 /**
- * Данные страницы журнала: «Главное», «Новости», «Подборки mamaGo», «Свежие материалы».
+ * Данные страницы журнала: «Главное», «Новости», «Свежие материалы».
+ * Подборки остаются частью общей ленты; отдельный запрос для блока не нужен.
  * Территория — город страницы (= выбор в шапке): материалы города выше, сортировка по
  * дате публикации; в ленте закреплённые первыми. Истёкшие новости не попадают никуда.
  * Короткий TTL кэша: срок новостей истекает по времени, без события инвалидации.
@@ -51,13 +51,12 @@ export async function loadJournalPage(input: {
   const load = async (): Promise<JournalPageData> => {
     const top = showJournalTopBlocks(page, input.typeFilter);
     const base = journalBlockWheres({ scopeWhere: input.scopeWhere, typeFilter: input.typeFilter, mainId: null });
-    const [mainRows, news, collections] = top
+    const [mainRows, news] = top
       ? await Promise.all([
           queryJournalArticles(null, { additionalWhere: base.main, take: 1 }),
           queryJournalArticles(input.city, { additionalWhere: base.news, take: JOURNAL_NEWS_LIMIT }),
-          listJournalCollections({ city: input.city, scopeWhere: input.scopeWhere, limit: JOURNAL_COLLECTIONS_LIMIT }),
         ])
-      : [[], [], []];
+      : [[], []];
     const main = mainRows[0] ?? null;
     // «Главное» исключаем из ленты целиком, чтобы пагинация оставалась стабильной.
     const { feed: feedWhere } = journalBlockWheres({
@@ -82,11 +81,11 @@ export async function loadJournalPage(input: {
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
-    return { main, news, collections, feed, page, totalPages, total };
+    return { main, news, feed, page, totalPages, total };
   };
   return unstable_cache(
     load,
-    ["journal-page", input.city?.id ?? "national", input.city?.regionId ?? "", input.scopeKey, input.typeFilter ?? "all", input.newsArchive ? "archive" : "current", String(page), String(pageSize)],
+    ["journal-page-v2", input.city?.id ?? "national", input.city?.regionId ?? "", input.scopeKey, input.typeFilter ?? "all", input.newsArchive ? "archive" : "current", String(page), String(pageSize)],
     { tags: [PUBLIC_ARTICLE_LIST_CACHE_TAG, PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG], revalidate: 300 },
   )();
 }
