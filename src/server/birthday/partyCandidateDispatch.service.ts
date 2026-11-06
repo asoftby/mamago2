@@ -1,3 +1,4 @@
+import { childAgeForBusiness } from "./partyRecipientProfile";
 import "server-only";
 import { BookingKind, BookingStatus, PartyItemRole, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -99,7 +100,7 @@ export async function dispatchPartyCandidateWave(input: {
           partyStage: "SENT", status: BookingStatus.NEW,
           requestedDate: order.eventDate, requestedTime: order.timeFrom,
           adultsCount: order.adultsCount, childrenCount: order.childrenCount,
-          childAge: order.recipientAudience === "ADULT" || (order.childAge ?? 0) >= 18 ? null : order.childAge, customerName: null,
+          childAge: childAgeForBusiness(order), customerName: null,
           customerPhone: null, customerComment: null, responseDueAt: due,
         },
         select: { id: true },

@@ -1,4 +1,4 @@
-import { assertPartyRecipientProfile } from "./partyRecipientProfile";
+import { assertPartyRecipientProfile, childAgeForBusiness } from "./partyRecipientProfile";
 import { childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { createPartyPlan } from "./partyPlan.service";
 import { PartyOrderStatus } from "@prisma/client";
@@ -148,7 +148,7 @@ export async function submitPartyAnchor(
         customerPhone: null,
         adultsCount: adultsCount,
         childrenCount: childrenCount,
-        childAge: party.recipientAudience === "ADULT" || (party.childAge ?? 0) >= 18 ? null : party.childAge,
+        childAge: childAgeForBusiness(party),
         customerComment: anchor.note,
         responseDueAt,
       },

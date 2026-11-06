@@ -56,7 +56,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
                 id: true, ownerUserId: true, status: true, venueMode: true,
                 version: true, citySlug: true, eventDate: true,
                 timeFrom: true, timeTo: true, childrenCount: true,
-                adultsCount: true, childAge: true,
+                adultsCount: true, childAge: true, recipientAudience: true,
               } },
             },
           },

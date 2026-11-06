@@ -17,3 +17,8 @@ export function assertPartyRecipientProfile(
     throw new PartyApiError(422, "Возраст не соответствует выбранному профилю на дату праздника");
   }
 }
+
+/** Business DTOs call this field childAge, so adult recipient ages stay in the order. */
+export function childAgeForBusiness(order: { childAge: number | null; recipientAudience?: string | null }) {
+  return order.recipientAudience === "ADULT" || (order.childAge ?? 0) >= 18 ? null : order.childAge;
+}

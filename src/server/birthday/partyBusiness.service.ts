@@ -91,7 +91,7 @@ export async function replyToPartyRequest(params: {
           partyOrder: { select: {
             id: true, ownerUserId: true, citySlug: true, eventDate: true,
             timeFrom: true, timeTo: true, venueMode: true, status: true,
-            childrenCount: true, adultsCount: true, childAge: true,
+            childrenCount: true, adultsCount: true, childAge: true, recipientAudience: true,
           } },
         },
       },

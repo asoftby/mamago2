@@ -1,3 +1,4 @@
+import { childAgeForBusiness } from "./partyRecipientProfile";
 import "server-only";
 import {
   BookingKind, BookingStatus, PartyItemRole, PartyItemStatus, type Prisma,
@@ -17,6 +18,7 @@ export type AnchorConfirmedOrder = {
   childrenCount: number | null;
   adultsCount: number | null;
   childAge: number | null;
+  recipientAudience?: string | null;
 };
 
 /**
@@ -81,7 +83,7 @@ export async function requestPartyAddonsAfterAnchor(
         partyStage: "SENT", status: BookingStatus.NEW,
         requestedDate: order.eventDate, requestedTime: order.timeFrom,
         adultsCount: order.adultsCount ?? 0, childrenCount: order.childrenCount ?? 0,
-        childAge: order.childAge,
+        childAge: childAgeForBusiness(order),
         customerName: null, customerPhone: null, customerComment: null,
         responseDueAt: due,
       },

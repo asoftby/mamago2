@@ -1,3 +1,4 @@
+import { childAgeForBusiness } from "./partyRecipientProfile";
 import "server-only";
 
 import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
@@ -90,7 +91,7 @@ export async function dispatchQueuedPartyInvites(itemId: string) {
           partyStage: "SENT", status: BookingStatus.NEW,
           requestedDate: order.eventDate, requestedTime: order.timeFrom,
           adultsCount: order.adultsCount, childrenCount: order.childrenCount,
-          childAge: order.recipientAudience === "ADULT" || (order.childAge ?? 0) >= 18 ? null : order.childAge, customerName: null,
+          childAge: childAgeForBusiness(order), customerName: null,
           customerPhone: null, customerComment: null, responseDueAt: due,
         },
         select: { id: true },
