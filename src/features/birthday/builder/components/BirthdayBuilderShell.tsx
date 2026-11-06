@@ -114,9 +114,9 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   const visibleOffers = useMemo(() => catalog.offers.filter((offer) =>
     isLocationCompatible(offer, state.quiz.placeType) &&
     matchesBirthdayRequirements(offer, {
-      ageMonths, ageRangeMonths: statedAge === null ? undefined : { min: statedAge * 12, max: statedAge * 12 + 11 }, audience: audience ?? "UNKNOWN", childrenMin: guests?.min, childrenMax: guests?.max,
+      ageMonths, ageRangeMonths: statedAge === null ? undefined : { min: statedAge * 12, max: statedAge * 12 + 11 }, audience: audience ?? "UNKNOWN", childrenMin: 0, childrenMax: guests?.max,
     })),
-    [catalog.offers, state.quiz.placeType, ageMonths, statedAge, audience, guests?.min, guests?.max]);
+    [catalog.offers, state.quiz.placeType, ageMonths, statedAge, audience, guests?.max]);
 
   const validBase = hasValidCatalogAnchor(
     visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,

@@ -128,8 +128,14 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
         childrenCount: 0, adultsCount: 5, contactName: 'Test parent', contactPhone: '+375291234567' } });
       let planId: string | null = null;
       try {
-        const selected = await updatePartyDraft(parent.id, draft.id, { version: draft.version, anchorOfferId: hostId,
-          childAge: null, recipientAudience: 'ADULT', selectedChildId: null });
+        const child = await db.child.create({data:{parentId:parent.id,birthDate:new Date('2019-01-01')}});
+        const previous = await updatePartyDraft(parent.id, draft.id, { version: draft.version, childAge: 7,
+          recipientAudience: 'CHILD', selectedChildId: child.id });
+        await assert.rejects(updatePartyDraft(parent.id,draft.id,{version:previous.version,childAge:7,recipientAudience:'ADULT'}), /Возраст не соответствует/);
+        const selected = await updatePartyDraft(parent.id, draft.id, { version: previous.version, anchorOfferId: hostId,
+          recipientAudience: 'ADULT' });
+        assert.equal(selected.childAge,null);
+        assert.equal(selected.selectedChildId,null);
         const candidates = await findCandidatesForParty(parent.id, draft.id, 'ANIMATOR', [], {performerRole:'HOST'});
         assert.ok(candidates.candidates.some(candidate => candidate.offerId === hostId));
         await submitPartyAnchor(parent.id, draft.id, selected.version, 'integration-adult-no-dob');

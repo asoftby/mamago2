@@ -89,7 +89,7 @@ export async function updatePartyDraft(
 ) {
   const existing = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
-    select: { citySlug: true, status: true, version: true, venueMode: true },
+    select: { citySlug: true, status: true, version: true, venueMode: true, childAge: true, recipientAudience: true },
   });
   if (!existing) throw new PartyApiError(404, "Праздник не найден");
   if (existing.status !== PartyOrderStatus.DRAFT || existing.version !== input.version) {
@@ -99,6 +99,14 @@ export async function updatePartyDraft(
   if (input.selectedChildId && !await prisma.child.findFirst({
     where: { id: input.selectedChildId, ...(await childScopeFor(ownerUserId)) }, select: { id: true },
   })) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
+
+  const recipientAudience = input.recipientAudience === undefined ? existing.recipientAudience : input.recipientAudience;
+  const childAge = input.childAge === undefined ? existing.childAge : input.childAge;
+  const conflictingAge = childAge !== null && recipientAudience !== null &&
+    (childAge >= 18 ? "ADULT" : "CHILD") !== recipientAudience;
+  if (conflictingAge && input.childAge !== undefined) {
+    throw new PartyApiError(422, "Возраст не соответствует выбранному получателю");
+  }
 
   const selectionChange = input.anchorOfferId !== undefined;
   const newMode = input.venueMode ?? existing.venueMode;
@@ -124,6 +132,9 @@ export async function updatePartyDraft(
   void addonCategories;
   const data: Prisma.PartyOrderUpdateManyMutationInput = {
     ...changes,
+    ...(conflictingAge ? { childAge: null } : {}),
+    ...(input.recipientAudience === "ADULT" && input.selectedChildId === undefined
+      ? { selectedChildId: null } : {}),
     eventDate: changes.eventDate === undefined
       ? undefined : changes.eventDate === null ? null : new Date(changes.eventDate + "T00:00:00Z"),
     budgetByn: changes.budgetByn === undefined
