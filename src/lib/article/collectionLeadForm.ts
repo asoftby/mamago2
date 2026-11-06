@@ -48,11 +48,13 @@ export function leadStartsAt(form: Pick<CollectionLeadForm, "eventDate" | "timeF
   return new Date(`${form.eventDate}T${form.timeFrom}:00+03:00`);
 }
 
-/** Самая ранняя допустимая дата (YYYY-MM-DD, Минск): праздник должен быть позже чем через 24 часа. */
+/**
+ * Самая ранняя календарная дата (YYYY-MM-DD, Минск): день, на который приходится граница «через 24 часа».
+ * Это только ограничение календаря; точное правило (старт строго позже 24 часов) проверяет `validateLeadForm`.
+ */
 export function earliestLeadDate(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Minsk", year: "numeric", month: "2-digit", day: "2-digit" })
-    .format(new Date(now.getTime() + 48 * 3600_000));
-  return parts;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Minsk", year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(new Date(now.getTime() + 24 * 3600_000));
 }
 
 export function validateLeadForm(form: CollectionLeadForm, limits: CollectionLeadLimits, now: Date = new Date()): CollectionLeadErrors {

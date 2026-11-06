@@ -166,7 +166,7 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
             <Check className="size-8" strokeWidth={2.4} />
           </span>
           <h3 className="mb-2 mt-4 font-serif text-[30px] font-normal leading-none">Заявка отправлена</h3>
-          <p className="m-0 max-w-[300px] text-[15px] text-[#3A332B]">{`${card.placeName ?? "Площадка"} свяжется с вами по телефону из заявки.`}</p>
+          <p className="m-0 max-w-[320px] text-[15px] text-[#3A332B]">{`${card.placeName ?? "Площадка"} пришлёт предложение с ценой и условиями — оно появится в вашей заявке. Телефон площадка увидит только после того, как вы подтвердите праздник.`}</p>
           <Link href={`/me/birthdays/${sent.partyId}`} className="mt-5 inline-flex min-h-12 items-center rounded-full bg-[#E86A3A] px-6 text-[15px] font-semibold text-white hover:bg-[#C24E22]">
             Открыть мою заявку
           </Link>

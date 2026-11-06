@@ -38,7 +38,13 @@ export async function submitCollectionLead(input: {
   const json = { "Content-Type": "application/json" };
   const p = input.progress;
 
-  if (!p.partyId) {
+  let alreadySubmitted = false;
+  if (p.partyId) {
+    // Повтор после неоднозначного сбоя (ответ потерян): сверяем фактическое состояние черновика.
+    const current = await readJson(await f(`/api/parent/parties/${p.partyId}`, { method: "GET", credentials: "include", cache: "no-store" }));
+    p.version = Number(current.version);
+    alreadySubmitted = current.status !== "DRAFT";
+  } else {
     const created = await readJson(await f("/api/parent/parties", {
       method: "POST", headers: json, credentials: "include",
       body: JSON.stringify({ citySlug: input.citySlug, venueMode: input.mode }),
@@ -48,24 +54,27 @@ export async function submitCollectionLead(input: {
   }
 
   const { form } = input;
-  const updated = await readJson(await f(`/api/parent/parties/${p.partyId}`, {
-    method: "PATCH", headers: json, credentials: "include",
-    body: JSON.stringify({
-      version: p.version,
-      anchorOfferId: input.offerId,
-      addonOfferIds: [],
-      anchorNote: form.comment.trim() || null,
-      eventDate: form.eventDate,
-      timeFrom: form.timeFrom,
-      timeTo: form.timeTo,
-      childrenCount: form.children,
-      adultsCount: form.adults,
-      childAge: form.childAge,
-      contactName: form.contactName.trim(),
-      contactPhone: form.contactPhone.trim(),
-    }),
-  }));
-  p.version = Number(updated.version);
+  if (!alreadySubmitted) {
+    const updated = await readJson(await f(`/api/parent/parties/${p.partyId}`, {
+      method: "PATCH", headers: json, credentials: "include",
+      body: JSON.stringify({
+        version: p.version,
+        anchorOfferId: input.offerId,
+        addonOfferIds: [],
+        anchorNote: form.comment.trim() || null,
+        eventDate: form.eventDate,
+        timeFrom: form.timeFrom,
+        timeTo: form.timeTo,
+        childrenCount: form.children,
+        adultsCount: form.adults,
+        childAge: form.childAge,
+        contactName: form.contactName.trim(),
+        contactPhone: form.contactPhone.trim(),
+      }),
+    }));
+    p.version = Number(updated.version);
+  }
+  // Отправка идемпотентна по Idempotency-Key: если заявка уже ушла, сервер вернёт её же.
 
   const submitted = await readJson(await f(`/api/parent/parties/${p.partyId}/submit`, {
     method: "POST", credentials: "include",

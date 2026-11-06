@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CollectionLeadError, submitCollectionLead, type CollectionLeadProgress } from "./collectionLeadApi";
 import {
-  clampChildren, DEFAULT_LEAD_FORM, initialLeadForm, LEAD_DRAFT_TTL_MS, parseLeadDraft, serializeLeadDraft,
+  clampChildren, DEFAULT_LEAD_FORM, earliestLeadDate, initialLeadForm, LEAD_DRAFT_TTL_MS, parseLeadDraft, serializeLeadDraft,
   validateLeadForm, withLeadReturnParam, type CollectionLeadForm,
 } from "./collectionLeadForm";
 
@@ -88,11 +88,43 @@ test("retry after a failed step reuses the created draft", async () => {
   );
   assert.equal(progress.partyId, "p2");
   const second = fakeFetch([
+    { status: 200, body: { id: "p2", status: "DRAFT", version: 0 } },
     { status: 200, body: { version: 1 } },
     { status: 201, body: { request: { id: "r2" } } },
   ]);
   await submitCollectionLead({ offerId: "o1", citySlug: "minsk", mode: "VENUE", form: ok, progress, fetchImpl: second.impl });
+  assert.deepEqual(second.calls.map((c) => c.init?.method), ["GET", "PATCH", "POST"]);
   assert.equal(second.calls[0].url, "/api/parent/parties/p2");
+});
+
+test("lost submit response: retry skips the patch and reuses the same idempotency key", async () => {
+  const progress: CollectionLeadProgress = { idempotencyKey: "k3", partyId: "p3", version: 1 };
+  const { calls, impl } = fakeFetch([
+    { status: 200, body: { id: "p3", status: "ANCHOR_PENDING", version: 2 } },
+    { status: 200, body: { request: { id: "r3" } } },
+  ]);
+  const res = await submitCollectionLead({ offerId: "o1", citySlug: "minsk", mode: "HOME", form: ok, progress, fetchImpl: impl });
+  assert.deepEqual(res, { partyId: "p3", requestId: "r3" });
+  assert.deepEqual(calls.map((c) => c.init?.method), ["GET", "POST"]);
+  assert.equal((calls[1].init?.headers as Record<string, string>)["Idempotency-Key"], "k3");
+  assert.equal(JSON.parse(String(calls[1].init?.body)).version, 2);
+});
+
+test("lost patch response: retry refreshes a stale version from the server", async () => {
+  const progress: CollectionLeadProgress = { idempotencyKey: "k4", partyId: "p4", version: 0 };
+  const { calls, impl } = fakeFetch([
+    { status: 200, body: { id: "p4", status: "DRAFT", version: 1 } },
+    { status: 200, body: { version: 2 } },
+    { status: 201, body: { request: { id: "r4" } } },
+  ]);
+  await submitCollectionLead({ offerId: "o1", citySlug: "minsk", mode: "HOME", form: ok, progress, fetchImpl: impl });
+  assert.equal(JSON.parse(String(calls[1].init?.body)).version, 1);
+});
+
+test("calendar minimum is the day of the 24h boundary, tomorrow stays selectable", () => {
+  assert.equal(earliestLeadDate(new Date("2026-11-06T06:00:00Z")), "2026-11-07");
+  assert.equal(validateLeadForm({ ...ok, eventDate: "2026-11-07", timeFrom: "12:00", timeTo: "14:00" }, limits, new Date("2026-11-06T06:00:00Z")).eventDate, undefined);
+  assert.ok(validateLeadForm({ ...ok, eventDate: "2026-11-07", timeFrom: "09:00", timeTo: "11:00" }, limits, new Date("2026-11-06T06:00:00Z")).eventDate);
 });
 
 test("401 is surfaced as an error with status for the login redirect", async () => {
