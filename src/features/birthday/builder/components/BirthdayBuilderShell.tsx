@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuthMe } from "../hooks/useAuthMe";
 import { useBirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { useBirthdayAgeSignals } from "../hooks/useBirthdayAgeSignals";
 import { BirthdayAgeSignalHydration } from "./BirthdayAgeSignalHydration";
@@ -276,6 +277,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             />
           )}
           {currentStep === "done" && <StepReview
+            key={selectedOffers[0]?.id}
             offers={selectedOffers}
             addonCategories={categoryRequests.filter(category => !selectedOffers.slice(1).some(offer => offer.category === category))}
             citySlug={citySlug}
@@ -320,10 +322,16 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   );
 }
 
+function ScopedBirthdayBuilder({ citySlug }: Props) {
+  const { user, isLoading } = useAuthMe();
+  if (isLoading && !user) return null;
+  return <BirthdayBuilderShellInner key={JSON.stringify([citySlug, user?.id])} citySlug={citySlug} />;
+}
+
 export function BirthdayBuilderShell({ citySlug }: Props) {
   return (
     <BirthdayBuilderAuthProvider>
-      <BirthdayBuilderShellInner citySlug={citySlug} />
+      <ScopedBirthdayBuilder citySlug={citySlug} />
     </BirthdayBuilderAuthProvider>
   );
 }

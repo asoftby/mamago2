@@ -281,10 +281,18 @@ export function useBirthdayBuilderWithGate(citySlug: string) {
   const resetBuilder = useCallback(() => {
     clearBirthdayBuilderDraft();
     clearPendingBirthdayBuilderAction();
+    if (user?.id) {
+      const reviewPrefix = `mamago:party-review:${user.id}:${citySlug}:`;
+      try {
+        for (const key of Object.keys(sessionStorage)) {
+          if (key.startsWith(reviewPrefix)) sessionStorage.removeItem(key);
+        }
+      } catch { /* Storage is optional. */ }
+    }
     setPostLoginChildModalOpen(false);
     setPostLoginChildrenList([]);
     builder.resetBuilder();
-  }, [builder]);
+  }, [builder, citySlug, user]);
 
   return {
     ...builder,
