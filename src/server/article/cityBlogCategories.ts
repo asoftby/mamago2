@@ -1,4 +1,6 @@
 import { EventCategoryPublicationType, Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
+import { PUBLIC_ARTICLE_LIST_CACHE_TAG, PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG } from "@/server/article/publicArticleCache";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { buildPublicPath } from "@/lib/routing/surface";
 import prisma from "@/lib/prisma";
@@ -39,6 +41,16 @@ function indexableArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
 }
 
 export async function listPopulatedCityBlogCategories(city: CityRef): Promise<CityBlogCategory[]> {
+  // Isolated integration tests mutate Prisma directly without triggering Next cache invalidation.
+  if (process.env.SEO_ISOLATED_TEST_DB === "true") return loadPopulatedCityBlogCategories(city);
+  return unstable_cache(
+    () => loadPopulatedCityBlogCategories(city),
+    ["journal-nav-categories-v1", city.id, city.slug, city.regionId ?? ""],
+    { revalidate: 300, tags: [PUBLIC_ARTICLE_LIST_CACHE_TAG, PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG] },
+  )();
+}
+
+async function loadPopulatedCityBlogCategories(city: CityRef): Promise<CityBlogCategory[]> {
   const articleWhere = indexableArticleWhere(city);
   const categories = await prisma.eventCategory.findMany({
     where: {
@@ -58,7 +70,7 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
   // additional category assignments, independent of current journal pagination.
   const freshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   return Promise.all(categories.map(async (category) => {
-    const latest = await prisma.article.findFirst({
+    const [latest, recentArticles] = await Promise.all([prisma.article.findFirst({
       where: { AND: [articleWhere, categoryScopeWhere([category.id])] },
       orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
       select: {
@@ -66,8 +78,8 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
         heroImage: true,
         coverImage: { select: { publicUrl: true } },
       },
-    });
-    const recentArticles = await prisma.article.findMany({
+    }),
+    prisma.article.findMany({
       where: {
         AND: [
           articleWhere,
@@ -78,7 +90,7 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
       select: { id: true, slug: true, publishedAt: true, geoScope: true, city: { select: { slug: true } } },
       orderBy: { publishedAt: "desc" },
       take: 200,
-    });
+    })]);
     const recentCover = latest?.coverImage?.publicUrl ?? latest?.heroImage ?? null;
     const illustrated = recentCover ? null : await prisma.article.findFirst({
       where: {
