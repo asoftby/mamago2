@@ -680,6 +680,7 @@ export function EventPageView({
             onSelect={setSelectedId}
             onPlan={handlePlan}
             onBook={hasSimpleBooking ? handleBook : undefined}
+            bookLabel={data.cta.simpleBooking?.label}
             isPlanned={saveStatus.inPlan}
             priceLabel={data.priceLabel}
             purchaseUrl={data.cta.purchaseUrl}
@@ -724,6 +725,7 @@ export function EventPageView({
         isPlanLoading={isSecondaryLoading}
         onPrimary={handleBuy}
         onBook={hasSimpleBooking ? handleBook : undefined}
+        bookLabel={data.cta.simpleBooking?.label}
         onPlan={handlePlan}
         hasPurchaseUrl={hasPurchaseUrl}
       />

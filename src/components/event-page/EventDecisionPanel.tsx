@@ -266,7 +266,7 @@ export function EventDecisionPanel({
               onClick={() => setBookingOpen(true)}
               className={PUBLICATION_PRIMARY_ACTION_CLASS}
             >
-              Записаться
+              {data.cta.simpleBooking.label ?? "Записаться"}
             </button>
           )}
 

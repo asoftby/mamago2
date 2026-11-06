@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { AgePolicy, ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
@@ -262,6 +263,10 @@ export async function POST(request: NextRequest) {
         scheduleMode: ScheduleMode.MULTI_DATE,
         schedulingKind: requestedSchedulingKind,
         scheduleJson: scheduleJsonWithOrganizer as Prisma.InputJsonValue,
+        ...(deriveEventRequestBookingColumns({
+          participationMode: scheduleJsonWithOrganizer.participationMode,
+          current: { bookingEnabled: false, bookingMode: null },
+        }) ?? {}),
         
         // Event category (leaf: subcategory if selected, otherwise root)
         eventCategoryId:

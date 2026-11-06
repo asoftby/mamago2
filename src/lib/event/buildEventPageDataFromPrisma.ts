@@ -47,6 +47,9 @@ export type ActivityForEventPageInput = {
   priceDetails: string | null;
   faqItems?: unknown | null;
   scheduleJson?: unknown | null;
+  /** Серверная запись (режим «Оставить заявку» включает REQUEST_ONLY). */
+  bookingEnabled?: boolean | null;
+  bookingMode?: string | null;
   /** Денормализованный URL обложки; может дублировать запись по coverImageId в images */
   coverImageUrl: string | null;
   /** Primary media asset id for cover image. */
@@ -301,7 +304,7 @@ export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "sc
 
 function resolveSimpleBooking(
   activityId: string,
-  activity: Pick<ActivityForEventPageInput, "scheduleJson">,
+  activity: Pick<ActivityForEventPageInput, "scheduleJson" | "bookingEnabled" | "bookingMode">,
 ): import("@/lib/event/eventPageTypes").EventSimpleBookingData | undefined {
   const json = getScheduleJsonRecord(activity);
   if (!json) return undefined;
@@ -313,6 +316,12 @@ function resolveSimpleBooking(
       date: typeof json.simpleBookingDate === "string" ? json.simpleBookingDate : undefined,
       time: typeof json.simpleBookingTime === "string" ? json.simpleBookingTime : undefined,
     };
+  }
+
+  // «Оставить заявку»: без слотов и даты. Кнопка нужна только при включённой серверной записи, иначе API
+  // отклонит заявку (старые события с этим режимом в scheduleJson колонок не имеют).
+  if (mode === "request") {
+    return activity.bookingEnabled ? { activityId, label: "Оставить заявку" } : undefined;
   }
 
   if (mode === "time-slots") {
@@ -341,6 +350,8 @@ function resolveEventCanonicalCta(activity: ActivityForEventPageInput) {
     entity: {
       id: activity.id,
       participationMode: getScheduleJsonString(activity, "participationMode"),
+      bookingEnabled: activity.bookingEnabled ?? null,
+      bookingMode: activity.bookingMode ?? null,
       ticketLink: decorateStoredTicketLink(getScheduleJsonString(activity, "ticketLink")),
       prebookMethod: getScheduleJsonString(activity, "prebookMethod"),
       prebookPhone: getScheduleJsonString(activity, "prebookPhone") ?? primaryPhone,

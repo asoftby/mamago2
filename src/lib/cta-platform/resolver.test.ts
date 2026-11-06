@@ -47,6 +47,19 @@ assert.equal(eventRequest.actionKind, "DISCOVER");
 assert.equal(eventRequest.primaryLabel, "Подробнее");
 assert.equal(eventRequest.contactFallback?.[0]?.href, "tel:+375291100002");
 
+// «Оставить заявку» с включённой серверной записью — настоящая заявка без выбора даты.
+const eventRequestEnabled = EventCtaAdapter.toCanonical({
+  id: "event-request-enabled",
+  participationMode: "request",
+  bookingEnabled: true,
+  bookingMode: "REQUEST_ONLY",
+  bookingPhone: "+375291100002",
+});
+assert.equal(eventRequestEnabled.actionKind, "REQUEST");
+assert.equal(eventRequestEnabled.primaryLabel, "Оставить заявку");
+assert.equal(eventRequestEnabled.requestConfig?.selectionMode, "NONE");
+assert.equal(eventRequestEnabled.contactFallback?.[0]?.href, "tel:+375291100002");
+
 const eventWalkIn = EventCtaAdapter.toCanonical({
   id: "event-walk-in",
   participationMode: "walk-in",

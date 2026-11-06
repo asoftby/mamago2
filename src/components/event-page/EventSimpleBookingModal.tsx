@@ -135,6 +135,8 @@ export function EventSimpleBookingModal({
   booking,
 }: Props) {
   const slots = booking.slots ?? [];
+  // «Оставить заявку»: заявка на участие без выбора времени — другие слова, чем у записи на слот.
+  const isRequest = booking.label === "Оставить заявку";
   const dateGroups = useMemo(() => groupSlotsByDate(slots), [slots]);
 
   const [phase, setPhase]       = useState<Phase>("form");
@@ -194,7 +196,7 @@ export function EventSimpleBookingModal({
   /* ── success screen ── */
   if (phase === "success") {
     return (
-      <ResponsiveOverlay open={open} onOpenChange={handleClose} a11yTitle="Заявка принята" variant="chromeless">
+      <ResponsiveOverlay open={open} onOpenChange={handleClose} a11yTitle={isRequest ? "Заявка отправлена" : "Заявка принята"} variant="chromeless">
         <div style={{
           display: "flex", flexDirection: "column", alignItems: "center",
           gap: 20, padding: "44px 32px", textAlign: "center",
@@ -210,7 +212,11 @@ export function EventSimpleBookingModal({
           </div>
           <div>
             <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 32, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-              Вы <em style={{ fontStyle: "italic", color: "#C24E22" }}>записаны</em>!
+              {isRequest ? (
+                <>Заявка <em style={{ fontStyle: "italic", color: "#C24E22" }}>отправлена</em>!</>
+              ) : (
+                <>Вы <em style={{ fontStyle: "italic", color: "#C24E22" }}>записаны</em>!</>
+              )}
             </h2>
             <p style={{ margin: "10px 0 0", fontSize: 14, color: "rgba(20,18,16,.55)", lineHeight: 1.55, maxWidth: 300 }}>
               Организатор свяжется с вами для подтверждения.
@@ -249,7 +255,7 @@ export function EventSimpleBookingModal({
 
   /* ── main form ── */
   return (
-    <ResponsiveOverlay open={open} onOpenChange={handleClose} a11yTitle="Записаться на событие" variant="chromeless" heightMode="tall">
+    <ResponsiveOverlay open={open} onOpenChange={handleClose} a11yTitle={isRequest ? "Оставить заявку на событие" : "Записаться на событие"} variant="chromeless" heightMode="tall">
       <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#F6F2EA", borderRadius: 24, overflow: "hidden" }}>
 
         {/* Header */}
@@ -260,7 +266,7 @@ export function EventSimpleBookingModal({
           flexShrink: 0,
         }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-            Записаться <em style={{ fontStyle: "italic", color: "#C24E22" }}>на событие</em>
+            {isRequest ? "Оставить " : "Записаться "}<em style={{ fontStyle: "italic", color: "#C24E22" }}>{isRequest ? "заявку" : "на событие"}</em>
           </h2>
           <XBtn onClick={() => handleClose(false)} />
         </div>
@@ -444,7 +450,7 @@ export function EventSimpleBookingModal({
             {phase === "submitting"
               ? <Loader2 size={20} style={{ animation: "spin 1s linear infinite" }} />
               : <>
-                  Записаться
+                  {isRequest ? "Отправить заявку" : "Записаться"}
                   {selectedSlot && <span style={{ opacity: .85 }}>→ {slotTimeLabel(selectedSlot)}</span>}
                 </>
             }

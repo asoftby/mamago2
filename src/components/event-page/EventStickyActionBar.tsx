@@ -15,6 +15,8 @@ export interface EventStickyActionBarProps {
   onPrimary: () => void;
   /** Открыть модалку записи (режим simple-booking / time-slots) */
   onBook?: () => void;
+  /** Подпись кнопки записи; по умолчанию «Записаться». */
+  bookLabel?: string;
   /** Если передан — показывает сердечко-кнопку рядом с primary */
   onPlan?: () => void;
   isPlanned?: boolean;
@@ -34,6 +36,7 @@ export function EventStickyActionBar({
   primaryHref,
   onPrimary,
   onBook,
+  bookLabel = "Записаться",
   onPlan,
   isPlanned = false,
   isPrimaryLoading = false,
@@ -134,7 +137,7 @@ export function EventStickyActionBar({
                 onClick={onBook}
                 className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover"
               >
-                Записаться
+                {bookLabel}
               </button>
             )
           )}
@@ -237,7 +240,7 @@ export function EventStickyActionBar({
             onClick={onBook}
             className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
           >
-            Записаться
+            {bookLabel}
           </button>
         ) : null}
       </div>
