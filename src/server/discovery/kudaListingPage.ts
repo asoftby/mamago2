@@ -1,3 +1,4 @@
+import { parseQuickFilterPreset } from "@/features/filters/discovery/quickFilterPresets";
 import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
 import { unstable_cache } from "next/cache";
 import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
@@ -51,7 +52,7 @@ export function buildKudaEventFilters(
     occasionSlug: halloweenEnabled && params.get("occasion") === "halloween" ? "halloween" : null,
     genreSlugs: params.get("genre")?.split(",").filter(Boolean) ?? [],
     dateRange: resolveEventDateRange({
-      preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null,
+      preset: parseQuickFilterPreset(preset),
       from: params.get("from") ?? params.get("dateFrom") ?? null,
       to: params.get("to") ?? params.get("dateTo") ?? null,
     }),
