@@ -87,6 +87,17 @@ export function PlanItemCard({
     : (!presentation.isCatalog ? "Весь день" : null);
   const metaLine = [age, timeLabel, price].filter(Boolean).join(" · ");
 
+  if (item.partyOrderId) {
+    return <article className="space-y-1 rounded-2xl border border-border bg-card p-4">
+      <Link className="font-semibold text-foreground underline-offset-4 hover:underline"
+        href={`/me/birthdays/${encodeURIComponent(item.partyOrderId)}`}>{title}</Link>
+      {timeLabel && <p className="text-sm text-muted-foreground">{timeLabel}</p>}
+      {item.childName && <p className="text-sm text-muted-foreground">{item.childName}</p>}
+      {item.notes && <p className="text-sm text-muted-foreground">{item.notes}</p>}
+      {item.partyPriceByn != null && <p className="text-sm">Согласовано: {item.partyPriceByn} BYN</p>}
+    </article>;
+  }
+
   const handleRemove = async () => {
     if (removing) return;
     setRemoving(true);

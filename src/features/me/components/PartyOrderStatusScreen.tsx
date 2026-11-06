@@ -212,6 +212,12 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             );
           })}
         </div>
+        {party.items.some(item => item.role === "INCLUDED") && <section className="space-y-2 rounded-2xl border border-border bg-card p-4">
+          <h2 className="font-semibold">Входит в пакет</h2>
+          <ul className="list-inside list-disc text-sm">
+            {party.items.filter(item => item.role === "INCLUDED").map(item => <li key={item.id}>{item.title}</li>)}
+          </ul>
+        </section>}
         {!cancelled && party.giftsHref ? (
           <section className="space-y-2 border-t border-border pt-5">
             <h2 className="text-lg font-semibold text-foreground">Подарки</h2>
