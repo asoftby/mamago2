@@ -8,6 +8,8 @@ export type ResolvedEventCardData = {
   priceLabel: string | null;
   isFree: boolean;
   posterUrl: string | null;
+  ageMinMonths: number | null;
+  ageMaxMonths: number | null;
 };
 
 const EVENT_DATE_FORMAT = new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "numeric", month: "long", timeZone: "Europe/Minsk" });
@@ -40,5 +42,7 @@ export function buildEventCardData(a: {
           : null,
     isFree: free,
     posterUrl: a.coverImageUrl,
+    ageMinMonths: a.ageMinMonths,
+    ageMaxMonths: a.ageMaxMonths,
   };
 }
