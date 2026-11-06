@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { confirmedAgeMatchAt, selectPersonalFamilyPicks, type PersonalFamilyCandidate, type PersonalFamilyChild } from "./select";
 import { collectConfirmedOccurrences, resolvePersonalShowWindow } from "./window";
-import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError, upcomingPlanBlocksFamilyPick } from "./load";
+import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError, upcomingPlanBlocksFamilyPick, partitionPlannedFamilyPickExclusions, excludePlannedFamilyPickDates } from "./load";
 import { PLAN_SUGGESTION_ALGORITHM_VERSION, type RankedPlanSuggestion, type PlanSuggestionRankedBatch } from "@/server/services/planSuggestions.service";
 import { readFileSync } from "node:fs";
 
@@ -177,7 +177,7 @@ function fixture(dates: Date[]) {
     children: children.map(child => ({ ...child, name: null, birthDate: child.birthDate as Date, systemInterests: [] })) };
   return { calls, profile, deps: {
     loadProfile: async () => profile,
-    loadExcluded: async () => [],
+    loadExcluded: async () => ({ excludedActivityIds: [], plannedDatesByActivity: {} }),
     loadAffinity: async () => ({ subjects: [], outcomeEventCount: 0, horizonDays: 365 }),
     rank: async (input: { dateFrom?: string; dateTo?: string }): Promise<PlanSuggestionRankedBatch> => {
       calls.push(input.dateTo!);
@@ -276,4 +276,34 @@ test("past family visits do not exclude future sessions; future bookings respect
   assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: null }, forTaya, "owner", now), true);
   assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, forTaya, "owner", now), false);
   assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, { ...forTaya, includeAdult: true }, "owner", now), true);
+});
+
+test("Cyberclass: planned Nov 9 session does not hide available Nov 7/8 sessions for Taya", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+  const selection = { mode: "CHILD" as const, selectedChildId: "taya" };
+  const plan = partitionPlannedFamilyPickExclusions([
+    { activityId: "cyberclass", date: "2026-10-14", startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "cyberclass", date: "2026-10-27", startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "cyberclass", date: "2026-11-09", startsAt: null, childId: null, assigneeUserId: null },
+  ], selection, "owner", now);
+  assert.deepEqual(plan.excludedActivityIds, []);
+  assert.deepEqual(plan.plannedDatesByActivity, { cyberclass: ["2026-11-09"] });
+  const sessions = [7, 8, 9].map(day => new Date(`2026-11-${String(day).padStart(2,"0")}T08:30:00Z`));
+  assert.deepEqual(excludePlannedFamilyPickDates("cyberclass", sessions, plan.plannedDatesByActivity), sessions.slice(0, 2));
+  const child = { id: "taya", birthDate: new Date("2015-01-01Z"), birthPrecision: "DAY" as const };
+  const picks = selectPersonalFamilyPicks([{ ...event("cyberclass", { ageMinMonths: 108, ageMaxMonths: 216 }), occurrences: sessions.slice(0, 2) }], [child], selection);
+  assert.equal(picks[0]?.candidate.id, "cyberclass");
+  assert.equal(picks[0]?.startsAt.toISOString(), sessions[0]!.toISOString());
+});
+
+test("undated plans still block entirely; sibling plans do not block Taya", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+  const selection = { mode: "CHILD" as const, selectedChildId: "taya" };
+  const plans = partitionPlannedFamilyPickExclusions([
+    { activityId: "undated", date: null, startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "sibling", date: "2026-11-07", startsAt: null, childId: "stepa", assigneeUserId: null },
+    { activityId: "taya-event", date: "2026-11-07", startsAt: null, childId: "taya", assigneeUserId: null },
+  ], selection, "owner", now);
+  assert.deepEqual(plans.excludedActivityIds, ["undated"]);
+  assert.deepEqual(plans.plannedDatesByActivity, { "taya-event": ["2026-11-07"] });
 });
