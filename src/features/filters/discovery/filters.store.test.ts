@@ -37,6 +37,7 @@ test("event filters survive URL serialization and parsing", () => {
   assert.equal(getDiscoveryFilterActiveCount(filters), 8);
   assert.equal(params.get("category"), "theatre,workshops");
   assert.equal(params.get("genre"), "puppet,musical");
+  assert.equal(params.get("preset"), "weekend");
 });
 
 test("persona identifiers never survive public discovery URL serialization or parsing", () => {
@@ -204,4 +205,14 @@ test("optimisticFiltersSettled is false while a real difference remains (not jus
 test("optimisticFiltersSettled: identical filters settle", () => {
   const filters = { ...defaultFilters, free: true, metro: "metro-1" };
   assert.equal(optimisticFiltersSettled(filters, { ...filters }), true);
+});
+
+test("lowercase public presets round-trip, legacy uppercase links still parse", () => {
+  for (const [urlValue, internalValue] of [["today", "TODAY"], ["tomorrow", "TOMORROW"], ["weekend", "WEEKEND"]] as const) {
+    const parsed = parseAppliedFromUrl(new URLSearchParams(`preset=${urlValue}`));
+    assert.equal(parsed.whenPreset, internalValue);
+    assert.equal(parseAppliedFromUrl(new URLSearchParams(`preset=${internalValue}`)).whenPreset, internalValue);
+    assert.equal(serializeAppliedToSearchParams(new URLSearchParams(), parsed).get("preset"), urlValue);
+  }
+  assert.equal(parseAppliedFromUrl(new URLSearchParams("preset=unknown")).whenPreset, null);
 });

@@ -296,7 +296,7 @@ export function serializeAppliedToSearchParams(
   params.delete("dateFrom");
   params.delete("dateTo");
 
-  if (next.whenPreset) params.set("preset", next.whenPreset);
+  if (next.whenPreset) params.set("preset", next.whenPreset.toLowerCase());
   else params.delete("preset");
 
   if (next.age.length > 0) params.set("age", next.age.join(","));

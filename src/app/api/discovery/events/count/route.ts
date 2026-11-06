@@ -1,3 +1,4 @@
+import { parseQuickFilterPreset } from "@/features/filters/discovery/quickFilterPresets";
 import { NextRequest, NextResponse } from "next/server";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { countKudaDiscoveryEvents } from "@/server/discovery/kudaDiscoveryFeed";
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],
       genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
       occasionSlug: p.get("occasion") === "halloween" ? "halloween" : null,
-      dateRange: resolveEventDateRange({ preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null, from: p.get("from"), to: p.get("to") }),
+      dateRange: resolveEventDateRange({ preset: parseQuickFilterPreset(preset), from: p.get("from"), to: p.get("to") }),
       free: p.get("free") === "true",
       priceMin: p.get("free") === "true" || p.get("priceMin") == null ? null : (() => { const value = Number(p.get("priceMin")); return Number.isFinite(value) && value > 0 ? value : null; })(),
       priceMax: p.get("free") === "true" || p.get("priceMax") == null ? null : (() => { const value = Number(p.get("priceMax")); return Number.isFinite(value) && value >= 0 ? value : null; })(),

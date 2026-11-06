@@ -250,7 +250,7 @@ export function DiscoveryFilters({
     params.delete("dateTo");
     
     // When Preset
-    if (nextApplied.whenPreset) params.set("preset", nextApplied.whenPreset); else params.delete("preset");
+    if (nextApplied.whenPreset) params.set("preset", nextApplied.whenPreset.toLowerCase()); else params.delete("preset");
     
     // Age
     if (nextApplied.age.length > 0) params.set("age", nextApplied.age.join(",")); else params.delete("age");

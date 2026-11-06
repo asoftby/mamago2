@@ -5,6 +5,7 @@
  */
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
+import { parseQuickFilterPreset } from "./quickFilterPresets";
 
 export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
 
@@ -117,15 +118,7 @@ export function parseAppliedFromUrl(
   const priceMax = !free && Number.isFinite(parsedPriceMax) && parsedPriceMax >= 0 ? parsedPriceMax : null;
   const adultOnly = searchParams.get("adultOnly") === "true";
 
-  const presetParam = searchParams.get("preset");
-  let whenPreset: WhenPreset = null;
-  if (
-    presetParam === "TODAY" ||
-    presetParam === "TOMORROW" ||
-    presetParam === "WEEKEND"
-  ) {
-    whenPreset = presetParam;
-  }
+  const whenPreset: WhenPreset = parseQuickFilterPreset(searchParams.get("preset"));
 
   return {
     categories: [...new Set(categories)],

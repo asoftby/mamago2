@@ -13,6 +13,17 @@ import { DEFAULT_TZ } from "@/server/geo/geoConstants";
  */
 export type QuickFilterPreset = "TODAY" | "TOMORROW" | "WEEKEND";
 
+/** Public URL values are lowercase; internal preset enum stays unchanged. */
+export function parseQuickFilterPreset(value: string | null | undefined): QuickFilterPreset | null {
+  const normalized = value?.toUpperCase();
+  return normalized === "TODAY" || normalized === "TOMORROW" || normalized === "WEEKEND" ? normalized : null;
+}
+
+export function quickFilterPresetUrlValue(value: QuickFilterPreset): string {
+  return value.toLowerCase();
+}
+
+
 export type PresetDateRange = { from: string; to: string };
 
 /** Civil YYYY-MM-DD «сегодня» в `timeZone` — единая точка перевода `now` → «сегодня». */
