@@ -333,6 +333,19 @@ test("fixed-price auto-confirmation at home requests each add-on exactly once", 
   assert.equal((await addonRequests()).length, 1);
 });
 
+test("confirmations for independent resources both succeed concurrently", async () => {
+  const ctx = await fixture();
+  const [first, second] = await Promise.all([homeSetup(ctx), homeSetup(ctx)]);
+  const [a, b] = await Promise.all([
+    homeOrder(ctx, first, "10:00", "11:00"),
+    homeOrder(ctx, second, "10:00", "11:00"),
+  ]);
+  await Promise.all([fixedPriceReply(ctx, a.request.id, 60), fixedPriceReply(ctx, b.request.id, 60)]);
+  assert.equal(await db.bookingAllocation.count({
+    where: { bookingUnitId: { in: [first.performer!.id, second.performer!.id] }, status: "CONFIRMED" },
+  }), 2);
+});
+
 test("one performer cannot be auto-confirmed for two overlapping parties", async () => {
   const ctx = await fixture();
   const setup = await homeSetup(ctx, { cleanupMinutes: 30 });
