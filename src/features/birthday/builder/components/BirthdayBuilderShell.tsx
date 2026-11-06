@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { useBirthdayAgeSignals } from "../hooks/useBirthdayAgeSignals";
 import { BirthdayAgeSignalHydration } from "./BirthdayAgeSignalHydration";
@@ -70,7 +70,8 @@ interface Props {
 
 function BirthdayBuilderShellInner({ citySlug }: Props) {
   const router = useRouter();
-  const builder = useBirthdayBuilderWithGate();
+  const builder = useBirthdayBuilderWithGate(citySlug);
+  const { clearSessionDraft } = builder;
   const ageSignals = useBirthdayAgeSignals();
   // Keep the draft ID and idempotency key alive across review-step unmount/remount.
   const submissionFlowRef = useRef<PartyFlowState>({
@@ -78,6 +79,11 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   });
   const [submissionBusy, setSubmissionBusy] = useState(false);
   const [submissionSent, setSubmissionSent] = useState(false);
+  const [compositionSaved, setCompositionSaved] = useState(false);
+  const markSubmissionSent = useCallback(() => {
+    clearSessionDraft();
+    setSubmissionSent(true);
+  }, [clearSessionDraft]);
   const closeFallbackHref = `/${citySlug}/birthday`;
 
   const handleClose = () => {
@@ -136,7 +142,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   // Persisted selections must be pruned when a party format or base changes.
   const { pruneCatalogSelection } = builder;
   useEffect(() => {
-    if (catalog.status !== "ready") return;
+    if (catalog.status !== "ready" || currentStep === "done") return;
     const compatible = compatibleCatalogSelection(
       visibleOffers, state.selection.selectedBaseId, state.quiz.placeType, state.selection.selectedAddonIds,
     );
@@ -144,11 +150,12 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
         compatible.selectedAddonIds.length !== state.selection.selectedAddonIds.length) {
       pruneCatalogSelection(visibleOffers, state.quiz.placeType);
     }
-  }, [catalog.status, visibleOffers, state.selection.selectedBaseId,
+  }, [catalog.status, currentStep, visibleOffers, state.selection.selectedBaseId,
     state.selection.selectedAddonIds, state.quiz.placeType, pruneCatalogSelection]);
 
   const prices = catalogPriceSummary(selectedOffers);
   const totalPrice = prices.minimumByn;
+  const reviewLocked = compositionSaved && validBase;
   const overBudget = maxBudget != null && totalPrice > maxBudget;
   const canNext = currentStep === "pick"
     ? catalog.status === "ready" && validBase
@@ -276,7 +283,12 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             />
           )}
           {currentStep === "done" && <StepReview
+            key={JSON.stringify([builder.submissionOwnerId, state.selection.selectedBaseId, state.selection.selectedAddonIds])}
             offers={selectedOffers}
+            selectedBaseId={state.selection.selectedBaseId}
+            onCompositionSaved={setCompositionSaved}
+            candidates={eligibleAddons(visibleOffers, state.selection.selectedBaseId, state.quiz.placeType)}
+            ownerId={builder.submissionOwnerId}
             addonCategories={categoryRequests.filter(category => !selectedOffers.slice(1).some(offer => offer.category === category))}
             citySlug={citySlug}
             dateIso={state.partyPlanning.dateIso}
@@ -295,18 +307,18 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             busy={submissionBusy}
             onBusyChange={setSubmissionBusy}
             sent={submissionSent}
-            onSent={() => setSubmissionSent(true)}
+            onSent={markSubmissionSent}
           />}
         </main>
 
         {/* Summary sticky bar */}
         <BuilderSummaryBar
           state={state}
-          totalPrice={totalPrice}
+          totalPrice={currentStep === "done" ? 0 : totalPrice}
           overBudget={overBudget}
           currentStep={currentStep}
-          onBack={() => { if (!submissionBusy && !submissionSent) prevStep(); }}
-          backDisabled={submissionBusy || submissionSent}
+          onBack={() => { if (!submissionBusy && !submissionSent && !reviewLocked) prevStep(); }}
+          backDisabled={submissionBusy || submissionSent || reviewLocked}
           onNext={nextStep}
           canNext={canNext && !submissionBusy}
           nextLabel={nextLabel}
