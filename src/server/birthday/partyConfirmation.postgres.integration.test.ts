@@ -1,3 +1,5 @@
+import { createPartyPlan } from "./partyPlan.service";
+import { familyIdForWrite } from "@/server/family/familyAccess";
 /**
  * Real PostgreSQL booking confirmation integration.
  *
@@ -160,6 +162,11 @@ test("forced 40P01 rolls back all effects and retries confirmation at most three
         IF NEW."dedupeKey" LIKE '%:a5-forced-retry' AND nextval('a5_confirm_attempts') < 3 THEN
           RAISE EXCEPTION 'synthetic conflict' USING ERRCODE = '40P01';
         END IF;
+        IF NEW."dedupeKey" LIKE '%:a5-sla-retry' THEN
+          PERFORM nextval('a5_confirm_attempts');
+          PERFORM pg_sleep(3.1);
+          RAISE EXCEPTION 'synthetic conflict after SLA' USING ERRCODE = '40P01';
+        END IF;
         RETURN NEW;
       END;
     $$`);
@@ -173,6 +180,19 @@ test("forced 40P01 rolls back all effects and retries confirmation at most three
     assert.equal(sequence.last_value, BigInt(3));
     assert.equal(await db.bookingAllocation.count({ where: { bookingRequestId: request.id } }), 1);
     assert.equal(await db.partyOutbox.count({ where: { aggregateId: request.id, eventType: "PARTY_BOOKING_CONFIRMED" } }), 1);
+    const expiringCtx = await fixture();
+    const expiring = await expiringCtx.requestWithQuote();
+    await acceptPartyQuote({ userId: expiringCtx.parent.id, orderId: expiring.order.id, requestId: expiring.request.id, quoteId: expiring.quote.id, expectedVersion: 1 });
+    await db.bookingRequest.update({ where: { id: expiring.request.id }, data: { responseDueAt: new Date(Date.now() + 3000) } });
+    await assert.rejects(confirmPartyRequest({
+      requestId: expiring.request.id, businessId: expiringCtx.business.id, actorUserId: expiringCtx.owner.id,
+      expectedQuoteVersion: 1, bookingUnitId: expiringCtx.unit.id, idempotencyKey: "a5-sla-retry",
+    }), isPartyError(409));
+    const [afterExpiry] = await db.$queryRaw<{ last_value: bigint }[]>`SELECT last_value FROM a5_confirm_attempts`;
+    assert.equal(afterExpiry.last_value, BigInt(4), "retry must stop before the outbox when SLA expired");
+    assert.equal(await db.bookingAllocation.count({ where: { bookingRequestId: expiring.request.id } }), 0);
+    assert.equal(await db.partyOutbox.count({ where: { aggregateId: expiring.request.id, eventType: "PARTY_BOOKING_CONFIRMED" } }), 0);
+
   } finally {
     await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS a5_force_confirmation_deadlock ON "PartyOutbox"');
     await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS a5_force_confirmation_deadlock()');
@@ -183,6 +203,11 @@ test("forced 40P01 rolls back all effects and retries confirmation at most three
 test("quote acceptance and concurrent room confirmation are exclusive and idempotent", async () => {
   const ctx = await fixture();
   const [first, second] = await Promise.all([ctx.requestWithQuote(), ctx.requestWithQuote()]);
+  const familyId = await familyIdForWrite(ctx.parent.id);
+  const plans = await Promise.all([first, second].map(entry => db.$transaction(tx => createPartyPlan(tx, {
+    id: entry.order.id, ownerUserId: ctx.parent.id, selectedChildId: null,
+    eventDate, timeFrom: "10:00", timeTo: "11:00",
+  }, familyId))));
 
   await assert.rejects(
     acceptPartyQuote({
@@ -243,8 +268,15 @@ test("quote acceptance and concurrent room confirmation are exclusive and idempo
   assert.equal((await db.partyOrder.findUniqueOrThrow({
     where: { id: winner.entry.order.id },
   })).status, "ANCHOR_CONFIRMED");
+  const winnerPlanId = plans[winner.entry === first ? 0 : 1];
+  const confirmedPlan = await db.planItem.findUniqueOrThrow({ where: { id: winnerPlanId } });
+  assert.equal(confirmedPlan.notes, "Праздник подготовлен");
+  assert.equal(confirmedPlan.priceAmount?.toFixed(2), "450.00");
   assert.equal((await confirm(winner.entry.request.id,
     winner.entry === first ? "first-confirm" : "second-confirm")).alreadyConfirmed, true);
+  const replayedPlan = await db.planItem.findUniqueOrThrow({ where: { id: winnerPlanId } });
+  assert.equal(replayedPlan.updatedAt.getTime(), confirmedPlan.updatedAt.getTime());
+
   assert.equal(await db.bookingAllocation.count({
     where: { bookingUnitId: ctx.unit.id, status: "CONFIRMED" },
   }), 1);
