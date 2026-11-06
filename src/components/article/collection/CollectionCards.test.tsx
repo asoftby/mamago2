@@ -13,6 +13,12 @@ test("event card data: free / paid / unknown price", () => {
   assert.equal(buildEventCardData({ ...base, priceFrom: 0 }).isFree, true);
 });
 
+test("event card data: free+paid range is not labelled free", () => {
+  const d = buildEventCardData({ ...base, priceFrom: 0, priceTo: 15 });
+  assert.equal(d.isFree, false);
+  assert.equal(d.priceLabel, "до 15 BYN");
+});
+
 test("event card data: no age or date leaves empty labels", () => {
   const d = buildEventCardData(base);
   assert.equal(d.ageLabel, null);

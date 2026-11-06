@@ -18,15 +18,6 @@ export function CollectionEventCard({ card, activityId }: { card: ResolvedActivi
             <Calendar className="size-9" aria-hidden="true" />
           </div>
         )}
-        <div className="absolute right-3 top-3 z-[2]">
-          <SaveHeart
-            activityId={activityId}
-            activityTitle={card.title}
-            coverImageUrl={e?.posterUrl}
-            source="article-collection-event"
-            className="h-11 w-11 !rounded-full !bg-[rgba(250,247,241,.96)] !shadow-[0_4px_14px_rgba(20,18,16,.18)]"
-          />
-        </div>
       </div>
       <div className="px-4 pb-3.5 pt-4 md:px-6 md:pb-4 md:pt-[22px]">
         <div className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6259]">Афиша</div>

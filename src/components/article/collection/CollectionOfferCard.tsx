@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { Baby, ChevronLeft, ChevronRight, MapPin, Phone, Plus } from "lucide-react";
 import { SaveHeart } from "@/features/save/SaveHeart";
+import { CampShiftBookingOverlay } from "@/components/offers/CampShiftBookingOverlay";
 import { cn } from "@/lib/utils";
 import type { ResolvedOfferEmbedCard } from "@/lib/article/articleMvpRenderData";
 import { CollectionChip, CollectionNote, CollectionRating, CollectionVenueQuote } from "./CollectionCardParts";
@@ -67,7 +68,11 @@ function Gallery({ card }: { card: ResolvedOfferEmbedCard }) {
 /** Карточка предложения внутри подборки: одинаково устроена для платных и бесплатных участников. */
 export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) {
   const [open, setOpen] = useState(false);
-  const phone = card.ctaMode === "phone" ? card.ctaPhone : card.ctaPhone ?? null;
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const phone = card.ctaPhone ?? null;
+  const primaryClass = "inline-flex min-h-12 items-center justify-center rounded-full bg-[#E86A3A] px-5 text-[15px] font-semibold text-white hover:bg-[#C24E22]";
+  const primaryLabel = card.ctaLabel || "Подробнее";
+  const shift = card.ctaMode === "camp-shift" ? card.schedulePreview[0] ?? null : null;
   return (
     <article aria-label={card.title} className="not-prose overflow-hidden rounded-3xl border border-[rgba(20,18,16,.1)] bg-[#FAF7F1] font-sans text-[#141210] shadow-[0_24px_50px_-38px_rgba(20,18,16,.3)]">
       <Gallery card={card} />
@@ -95,9 +100,15 @@ export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) 
           </div>
         ) : null}
         <div className="mt-4 grid grid-cols-[1fr_auto] gap-2 md:grid-cols-[auto_auto] md:justify-start">
-          <Link href={card.href} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#E86A3A] px-5 text-[15px] font-semibold text-white hover:bg-[#C24E22]">
-            {card.ctaLabel || "Подробнее"}
-          </Link>
+          {card.ctaMode === "camp-shift" && shift ? (
+            <button type="button" onClick={() => setBookingOpen(true)} className={primaryClass}>{primaryLabel}</button>
+          ) : card.ctaMode === "phone" && phone ? (
+            <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} className={primaryClass}>{primaryLabel}</a>
+          ) : card.ctaMode === "external" && card.ctaHref ? (
+            <a href={card.ctaHref} target="_blank" rel="noopener noreferrer" className={primaryClass}>{primaryLabel}</a>
+          ) : (
+            <Link href={card.href} className={primaryClass}>{primaryLabel}</Link>
+          )}
           <Link href={card.href} className="inline-flex min-h-12 items-center justify-center rounded-full border border-[rgba(20,18,16,.18)] px-5 text-[15px] font-semibold hover:border-[#141210]">
             Подробнее
           </Link>
@@ -111,6 +122,9 @@ export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) 
           </div>
         ) : null}
       </div>
+      {card.ctaMode === "camp-shift" && shift ? (
+        <CampShiftBookingOverlay open={bookingOpen} onOpenChange={setBookingOpen} offerId={card.offerId} offerTitle={card.title} shift={shift} shifts={card.schedulePreview} />
+      ) : null}
     </article>
   );
 }
