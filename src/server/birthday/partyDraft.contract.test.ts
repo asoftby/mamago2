@@ -91,3 +91,9 @@ assert.equal(partyRequirementsProblem({}, { childrenCount: 200, childAge: 0 }), 
 assert.match(submit, /partyRequirementsProblem\(published, requirements\)/);
 assert.match(submit, /role: "STANDALONE"/);
 console.log("partySelection checks: OK");
+
+
+const adultsOnly = { agePolicy: "ADULT_ONLY" as const };
+assert.equal(partyRequirementsProblem(adultsOnly, { childrenCount: 0, childAge: null, recipientAudience: "ADULT" }), null);
+assert.match(partyRequirementsProblem(adultsOnly, { childrenCount: 1, childAge: null, recipientAudience: "CHILD" }) ?? "", /по возрасту/);
+assert.equal(partyRequirementsProblem(adultsOnly, { childrenCount: 0, childAge: 42, recipientAudience: "ADULT" }), null);

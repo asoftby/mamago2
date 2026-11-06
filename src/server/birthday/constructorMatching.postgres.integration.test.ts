@@ -102,6 +102,12 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
         assert.ok(planId);
         const plan = await db.planItem.findUniqueOrThrow({ where: { id: planId } });
         assert.equal(plan.visibility, 'PRIVATE');
+        assert.equal(plan.userId, sent.ownerUserId);
+        assert.equal(plan.familyId, sent.familyId);
+        const linkAttempt = { ownerUserId: parent.id, citySlug: city.slug, venueMode: 'HOME' as const };
+        await assert.rejects(db.partyOrder.create({data:{...linkAttempt,planItemId:planId}}), {code:'P2002'});
+        await assert.rejects(db.partyOrder.create({data:{...linkAttempt,planItemId:'missing-plan-fixture'}}), {code:'P2003'});
+
         assert.equal(plan.date, day);
         assert.equal(plan.childId, child.id);
         assert.equal(plan.assigneeUserId, null);
@@ -114,6 +120,28 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
       } finally {
         await db.partyOrder.delete({ where: { id: draft.id } });
         if (planId) await db.planItem.delete({ where: { id: planId } });
+      }
+    });
+    await t.test('adult recipient without DOB reaches ADULT_ONLY matching and submission', async () => {
+      const draft = await db.partyOrder.create({ data: { ownerUserId: parent.id, citySlug: city.slug,
+        venueMode: 'HOME', eventDate: new Date(day), timeFrom: '12:00', timeTo: '13:00',
+        childrenCount: 0, adultsCount: 5, contactName: 'Test parent', contactPhone: '+375291234567' } });
+      let planId: string | null = null;
+      try {
+        const selected = await updatePartyDraft(parent.id, draft.id, { version: draft.version, anchorOfferId: hostId,
+          childAge: null, recipientAudience: 'ADULT', selectedChildId: null });
+        const candidates = await findCandidatesForParty(parent.id, draft.id, 'ANIMATOR', [], {performerRole:'HOST'});
+        assert.ok(candidates.candidates.some(candidate => candidate.offerId === hostId));
+        await submitPartyAnchor(parent.id, draft.id, selected.version, 'integration-adult-no-dob');
+        const submitted = await db.partyOrder.findUniqueOrThrow({ where: { id: draft.id } });
+        planId = submitted.planItemId;
+        assert.ok(planId);
+        const plan = await db.planItem.findUniqueOrThrow({where:{id:planId}});
+        assert.equal(plan.childId,null);
+        assert.equal(plan.assigneeUserId,null);
+      } finally {
+        await db.partyOrder.delete({where:{id:draft.id}});
+        if(planId) await db.planItem.delete({where:{id:planId}});
       }
     });
     await t.test('real saved data reaches A1; adult-only, hidden category data, prices and package IDs',async()=>{
