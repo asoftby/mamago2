@@ -1,20 +1,4 @@
-import type { ReactNode } from "react";
 import { Sparkles } from "lucide-react";
-
-/** Чип факта (возраст, место, цена) — одинаковый для всех участников подборки. */
-export function CollectionChip({ icon, children, strong }: { icon?: ReactNode; children: ReactNode; strong?: boolean }) {
-  return (
-    <span
-      className={
-        "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13.5px] " +
-        (strong ? "border-[#141210] font-semibold text-[#141210]" : "border-[rgba(20,18,16,.18)] text-[#3A332B]")
-      }
-    >
-      {icon ? <span className="shrink-0 text-[#6B6259] [&>svg]:size-3.5">{icon}</span> : null}
-      {children}
-    </span>
-  );
-}
 
 export function CollectionRating({ value, count }: { value: number | null | undefined; count: number | null | undefined }) {
   if (!count || !value) {

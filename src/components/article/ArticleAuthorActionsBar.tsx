@@ -29,7 +29,7 @@ export function ArticleAuthorActionsBar({
   const authorInitial = authorName.charAt(0).toUpperCase();
 
   return (
-    <div className={cn("flex flex-nowrap items-center gap-2 sm:flex-wrap sm:gap-4", className)}>
+    <div className={cn("flex flex-wrap items-center justify-between gap-x-4 gap-y-3", className)}>
       <div className="flex min-w-0 items-center gap-2.5">
         {author?.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

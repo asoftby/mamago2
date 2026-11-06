@@ -9,6 +9,7 @@ import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed
 import { CollectionOfferCard } from "@/components/article/collection/CollectionOfferCard";
 import { CollectionPersonalList } from "@/components/article/collection/CollectionPersonalList";
 import { CollectionEventCard } from "@/components/article/collection/CollectionEventCard";
+import { collectionDuplicateHeadingIds } from "@/lib/article/collectionDuplicateHeadings";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleCalloutBlock } from "@/components/article/blocks/ArticleCalloutBlock";
@@ -137,7 +138,8 @@ export function ArticleMvpView({
   author?: ArticleAuthor;
 }) {
   const isBreakingNews = publicationType === "BREAKING_NEWS";
-  const headingEntries = extractHeadingEntriesFromArticleBlocks(blocks as ArticleBlockMvp[]);
+  const duplicateHeadingIds = publicationType === "COLLECTION" ? collectionDuplicateHeadingIds(blocks) : new Set<string>();
+  const headingEntries = extractHeadingEntriesFromArticleBlocks(blocks.filter((block) => !duplicateHeadingIds.has(block.id)) as ArticleBlockMvp[]);
   const showToc = shouldShowArticleToc(headingEntries);
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
   const firstBodyBlockIndex = blocks.findIndex((b) => b.type !== "intro");
@@ -172,15 +174,28 @@ export function ArticleMvpView({
           return wrap(<ArticleOfferCardBlock title={c.title} href={c.href} image={c.imageUrl ?? undefined} />);
   };
 
-  // Подборка: подряд идущие связанные карточки переупорядочиваются на клиенте под возраст детей.
-  // Серверная выдача одинакова для всех (общий кеш), персональный порядок строится только в браузере.
+  // The editor may embed an activity and also link it as an ArticleLinkedItem.
+  // Render each unique activity exactly once, immediately after the editorial introduction.
+  // This lets the family selector control the complete collection, not just appended linked cards.
   const collectionRun = publicationType === "COLLECTION"
-    ? blocks.filter(
-        (b): b is Extract<ArticleMvpResolvedBlock, { type: "activityCard" }> =>
-          b.type === "activityCard" && b.id.startsWith("linked-") && !!b.card,
-      )
+    ? (() => {
+        const seen = new Set<string>();
+        return blocks.filter(
+          (b): b is Extract<ArticleMvpResolvedBlock, { type: "activityCard" }> => {
+            if (b.type !== "activityCard" || !b.card) return false;
+            const key = `${b.entityType}:${b.entityId}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          },
+        );
+      })()
     : [];
-  const collectionRunIds = new Set(collectionRun.map((b) => b.id));
+  const collectionRunIds = new Set(
+    publicationType === "COLLECTION"
+      ? blocks.filter((b) => b.type === "activityCard").map((b) => b.id)
+      : [],
+  );
   const collectionRunItems = collectionRun.map((b) => {
     const c = b.card;
     const age =
@@ -255,7 +270,7 @@ export function ArticleMvpView({
           coverImageUrl={coverImageUrl}
           source={`article-detail-${continuousVariant}`}
           citySlug={citySlug}
-          className="pt-[5px] pb-0"
+          className="py-2 md:py-3"
         />
 
         <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
@@ -295,10 +310,10 @@ export function ArticleMvpView({
               }
 
               const block = group.block;
-              if (block.type === "intro") return null;
+              if (block.type === "intro" || duplicateHeadingIds.has(block.id)) return null;
 
               if (collectionRunIds.has(block.id)) {
-                if (block.id !== collectionRun[0].id) return null;
+                if (!collectionRun.length || block.id !== collectionRun[0].id) return null;
                 return (
                   <Fragment key={block.id}>
                     {tocBeforeBody}
@@ -344,7 +359,14 @@ export function ArticleMvpView({
                   const cls = block.level === 2
                     ? "not-prose font-serif text-2xl md:text-[1.75rem] font-bold tracking-tight text-foreground mt-10 md:mt-12 mb-4 scroll-mt-28 md:scroll-mt-32"
                     : "not-prose font-serif text-xl md:text-[1.35rem] font-semibold tracking-tight text-foreground mt-8 md:mt-10 mb-3 scroll-mt-28 md:scroll-mt-32";
-                  return <Tag id={articleHeadingAnchorId(block.id)} className={cls}>{block.text}</Tag>;
+                  return (
+                    <Tag
+                      id={articleHeadingAnchorId(block.id)}
+                      className={cn(cls, group.index === firstBodyBlockIndex && !tocBeforeBody && "!mt-4 md:!mt-6")}
+                    >
+                      {block.text}
+                    </Tag>
+                  );
                 }
                 if (block.type === "image") {
                   return (
@@ -373,7 +395,12 @@ export function ArticleMvpView({
                   const descriptor = structuredBlockRenders(block) ? [structuredDescriptor(block)] : [];
                   return <ArticlePerformanceScope blocks={descriptor} mode="info"><ArticleInfoCard data={block.data} /></ArticlePerformanceScope>;
                 }
-                if (block.type === "activityCard") return renderActivityCard(block);
+                if (block.type === "activityCard") {
+                  const card = renderActivityCard(block);
+                  // Editorial cards in collections are not part of CollectionPersonalList;
+                  // give them the same deliberate vertical rhythm after duplicate headings are hidden.
+                  return publicationType === "COLLECTION" ? <div className="my-8 md:my-10">{card}</div> : card;
+                }
                 return null;
               })();
 

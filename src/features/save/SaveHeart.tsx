@@ -214,7 +214,8 @@ export function SaveHeart({
             className,
           )}
         >
-          {saveStatus.inPlan ? "В плане" : triggerLabel}
+          {triggerLabel === "Сохранить" ? <Heart aria-hidden="true" className={cn("h-5 w-5 shrink-0", isSaved && "fill-current")} /> : null}
+          {saveStatus.inPlan ? "Сохранено" : isSaved && triggerLabel === "Сохранить" ? "Сохранено" : triggerLabel}
         </button>
       ) : (
       <button
