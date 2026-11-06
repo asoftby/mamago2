@@ -89,7 +89,8 @@ export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) 
     setLeadOpen(true);
   }, [hasLead, card.offerId]);
   const phone = card.ctaPhone ?? null;
-  const primaryClass = "inline-flex min-h-12 items-center justify-center rounded-full bg-[#E86A3A] px-5 text-[15px] font-semibold text-white hover:bg-[#C24E22]";
+  // `!`: стили ссылок статьи (text-primary, underline) иначе перебивают кнопки внутри карточки.
+  const primaryClass = "inline-flex min-h-12 items-center justify-center rounded-full bg-[#E86A3A] px-5 text-[15px] font-semibold !text-white !no-underline hover:bg-[#C24E22] hover:!text-white";
   const primaryLabel = card.ctaLabel || "Подробнее";
   const shift = card.ctaMode === "camp-shift" ? card.schedulePreview[0] ?? null : null;
   return (
@@ -130,13 +131,13 @@ export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) 
           ) : (
             <Link href={card.href} className={primaryClass}>{primaryLabel}</Link>
           )}
-          <Link href={card.href} className="inline-flex min-h-12 items-center justify-center rounded-full border border-[rgba(20,18,16,.18)] px-5 text-[15px] font-semibold hover:border-[#141210]">
+          <Link href={card.href} className="inline-flex min-h-12 items-center justify-center rounded-full border border-[rgba(20,18,16,.18)] px-5 text-[15px] font-semibold !text-[#141210] !no-underline hover:border-[#141210]">
             Подробнее
           </Link>
         </div>
         {phone ? (
           <div className="mt-1.5">
-            <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} className="inline-flex min-h-11 items-center gap-1.5 text-[13.5px] text-[#6B6259] hover:text-[#141210]">
+            <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} className="inline-flex min-h-11 items-center gap-1.5 text-[13.5px] !text-[#6B6259] !no-underline hover:!text-[#141210]">
               <Phone className="size-[15px]" aria-hidden="true" />
               {phone}
             </a>

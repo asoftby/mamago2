@@ -34,7 +34,7 @@ export function CollectionEventCard({ card, activityId }: { card: ResolvedActivi
           {e?.priceLabel ? <CollectionChip strong>{e.priceLabel}</CollectionChip> : null}
         </div>
         <div className="mt-4 grid grid-cols-[1fr_auto] gap-2 md:grid-cols-[auto_auto] md:justify-start">
-          <Link href={card.href} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#E86A3A] px-5 text-[15px] font-semibold text-white hover:bg-[#C24E22]">
+          <Link href={card.href} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#E86A3A] px-5 text-[15px] font-semibold !text-white !no-underline hover:bg-[#C24E22] hover:!text-white">
             {e?.isFree ? "Записаться" : "Подробнее"}
           </Link>
           <SaveHeart
