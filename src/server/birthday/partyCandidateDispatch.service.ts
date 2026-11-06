@@ -99,7 +99,7 @@ export async function dispatchPartyCandidateWave(input: {
           partyStage: "SENT", status: BookingStatus.NEW,
           requestedDate: order.eventDate, requestedTime: order.timeFrom,
           adultsCount: order.adultsCount, childrenCount: order.childrenCount,
-          childAge: order.childAge, customerName: null,
+          childAge: order.recipientAudience === "ADULT" || (order.childAge ?? 0) >= 18 ? null : order.childAge, customerName: null,
           customerPhone: null, customerComment: null, responseDueAt: due,
         },
         select: { id: true },

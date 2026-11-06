@@ -132,12 +132,13 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
         const previous = await updatePartyDraft(parent.id, draft.id, { version: draft.version, childAge: 7,
           recipientAudience: 'CHILD', selectedChildId: child.id });
         await assert.rejects(updatePartyDraft(parent.id,draft.id,{version:previous.version,childAge:7,recipientAudience:'ADULT'}), /Возраст не соответствует/);
-        const selected = await updatePartyDraft(parent.id, draft.id, { version: previous.version, anchorOfferId: hostId,
-          recipientAudience: 'ADULT' });
-        assert.equal(selected.childAge,null);
-        assert.equal(selected.selectedChildId,null);
+        await assert.rejects(updatePartyDraft(parent.id,draft.id,{version:previous.version,selectedChildId:child.id,recipientAudience:'ADULT'}), /Возраст не соответствует/);
+        const adult = await updatePartyDraft(parent.id, draft.id, { version: previous.version, recipientAudience: 'ADULT' });
+        assert.equal(adult.childAge,null);
+        assert.equal(adult.selectedChildId,null);
         const candidates = await findCandidatesForParty(parent.id, draft.id, 'ANIMATOR', [], {performerRole:'HOST'});
         assert.ok(candidates.candidates.some(candidate => candidate.offerId === hostId));
+        const selected = await updatePartyDraft(parent.id,draft.id,{version:adult.version,anchorOfferId:hostId});
         await submitPartyAnchor(parent.id, draft.id, selected.version, 'integration-adult-no-dob');
         const submitted = await db.partyOrder.findUniqueOrThrow({ where: { id: draft.id } });
         planId = submitted.planItemId;

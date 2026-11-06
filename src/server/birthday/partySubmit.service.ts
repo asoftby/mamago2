@@ -1,3 +1,4 @@
+import { assertPartyRecipientProfile } from "./partyRecipientProfile";
 import { childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { createPartyPlan } from "./partyPlan.service";
 import { PartyOrderStatus } from "@prisma/client";
@@ -121,9 +122,13 @@ export async function submitPartyAnchor(
       throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
     }
 
-    if (party.selectedChildId && !await tx.child.findFirst({
-      where: { id: party.selectedChildId, ...childScope }, select: { id: true },
-    })) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
+    if (party.selectedChildId) {
+      const profile = await tx.child.findFirst({
+        where: { id: party.selectedChildId, ...childScope }, select: { birthDate: true, birthPrecision: true },
+      });
+      if (!profile) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
+      assertPartyRecipientProfile(profile, eventDate, party.recipientAudience, party.childAge);
+    }
     await createPartyPlan(tx, { id: partyId, ownerUserId, selectedChildId: party.selectedChildId,
       eventDate, timeFrom: partyTimeFrom, timeTo: partyTimeTo }, familyId);
 
@@ -143,7 +148,7 @@ export async function submitPartyAnchor(
         customerPhone: null,
         adultsCount: adultsCount,
         childrenCount: childrenCount,
-        childAge: party.childAge,
+        childAge: party.recipientAudience === "ADULT" || (party.childAge ?? 0) >= 18 ? null : party.childAge,
         customerComment: anchor.note,
         responseDueAt,
       },

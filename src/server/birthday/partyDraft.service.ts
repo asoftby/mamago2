@@ -1,3 +1,4 @@
+import { assertPartyRecipientProfile } from "./partyRecipientProfile";
 import { childScopeFor } from "@/server/family/familyAccess";
 import { partyOrderReadModel } from "./partyOrderReadModel";
 import { isEligibleForConstructor } from "./constructorEligibility";
@@ -89,16 +90,12 @@ export async function updatePartyDraft(
 ) {
   const existing = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
-    select: { citySlug: true, status: true, version: true, venueMode: true, childAge: true, recipientAudience: true },
+    select: { citySlug: true, status: true, version: true, venueMode: true, childAge: true, recipientAudience: true, selectedChildId: true, eventDate: true },
   });
   if (!existing) throw new PartyApiError(404, "Праздник не найден");
   if (existing.status !== PartyOrderStatus.DRAFT || existing.version !== input.version) {
     throw new PartyApiError(409, "Черновик изменился. Обновите страницу");
   }
-
-  if (input.selectedChildId && !await prisma.child.findFirst({
-    where: { id: input.selectedChildId, ...(await childScopeFor(ownerUserId)) }, select: { id: true },
-  })) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
 
   const recipientAudience = input.recipientAudience === undefined ? existing.recipientAudience : input.recipientAudience;
   const childAge = input.childAge === undefined ? existing.childAge : input.childAge;
@@ -106,6 +103,19 @@ export async function updatePartyDraft(
     (childAge >= 18 ? "ADULT" : "CHILD") !== recipientAudience;
   if (conflictingAge && input.childAge !== undefined) {
     throw new PartyApiError(422, "Возраст не соответствует выбранному получателю");
+  }
+
+  const selectedChildId = input.selectedChildId !== undefined ? input.selectedChildId
+    : input.recipientAudience === "ADULT" && existing.recipientAudience !== "ADULT" ? null : existing.selectedChildId;
+  if (selectedChildId) {
+    const profile = await prisma.child.findFirst({
+      where: { id: selectedChildId, ...(await childScopeFor(ownerUserId)) },
+      select: { birthDate: true, birthPrecision: true },
+    });
+    if (!profile) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
+    const date = input.eventDate === undefined ? existing.eventDate
+      : input.eventDate === null ? null : new Date(input.eventDate + "T00:00:00Z");
+    assertPartyRecipientProfile(profile, date, recipientAudience, conflictingAge ? null : childAge);
   }
 
   const selectionChange = input.anchorOfferId !== undefined;
@@ -133,8 +143,7 @@ export async function updatePartyDraft(
   const data: Prisma.PartyOrderUpdateManyMutationInput = {
     ...changes,
     ...(conflictingAge ? { childAge: null } : {}),
-    ...(input.recipientAudience === "ADULT" && input.selectedChildId === undefined
-      ? { selectedChildId: null } : {}),
+    ...(selectedChildId !== existing.selectedChildId ? { selectedChildId } : {}),
     eventDate: changes.eventDate === undefined
       ? undefined : changes.eventDate === null ? null : new Date(changes.eventDate + "T00:00:00Z"),
     budgetByn: changes.budgetByn === undefined
