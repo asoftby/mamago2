@@ -42,7 +42,7 @@ export function useBirthdayBuilderWithGate() {
     toggleAddon: toggleAddonDirect,
   } = builder;
 
-  const { isAuthenticated, isLoading, refetch, isEmailVerified } = useAuthMe();
+  const { user, isAuthenticated, isLoading, refetch, isEmailVerified } = useAuthMe();
   const { openAuthModal } = useBirthdayBuilderAuth();
 
   const guestHydratedRef = useRef(false);
@@ -264,6 +264,7 @@ export function useBirthdayBuilderWithGate() {
     nextStep,
     resetBuilder,
     isAuthenticated,
+    submissionOwnerId: user?.id ?? null,
     isEmailVerified,
     isAuthLoading: isLoading,
     requestLoginToSubmit: openAuthModal,

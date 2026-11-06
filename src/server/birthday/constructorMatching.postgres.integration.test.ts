@@ -1,3 +1,5 @@
+import { submitPartyAnchor } from "./partySubmit.service";
+import { cancelPartyBeforeConfirmation } from "./partyCancel.service";
 import { constructorIntervalPrice } from "./constructorIntervalPrice";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -80,6 +82,36 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
     const onsiteId=await save(onsite,'onsite',d=>{d.birthdayDetails.locationType='ON_SITE';});
     const party=await db.partyOrder.create({data:{ownerUserId:parent.id,citySlug:city.slug,venueMode:'HOME',eventDate:new Date(day),timeFrom:'12:00',timeTo:'13:00',childrenCount:0,adultsCount:5,budgetByn:500}});partyId=party.id;
     const context=PartySelectionContextSchema.parse({contractVersion:1,partyOrderId:party.id,partyVersion:party.version,entry:'FULL',venueMode:'HOME',subjects:[{kind:'adult',refId:parent.id,source:'profile'}],ageMonthsOnEventDate:{state:'UNKNOWN',reason:'NOT_PROVIDED'},interests:{state:'KNOWN',value:['science']},destination:{state:'KNOWN',value:{territoryId:territory.id,placeId:null}},budget:{state:'KNOWN',value:{minimumByn:null,maximumByn:'500.00'}},dateRange:{from:day,to:day},interval:{state:'KNOWN',value:interval},guests:{children:0,adults:5}});
+    await t.test('submit replay produces exactly one private plan item and cancellation preserves history', async () => {
+      const draft = await db.partyOrder.create({ data: { ownerUserId: parent.id, citySlug: city.slug,
+        venueMode: 'HOME', eventDate: new Date(day), timeFrom: '12:00', timeTo: '13:00',
+        childrenCount: 0, adultsCount: 5, contactName: "Test parent", contactPhone: "+375291234567" } });
+      let planId: string | null = null;
+      try {
+        assert.equal(draft.planItemId, null);
+        const updated = await updatePartyDraft(parent.id, draft.id, { version: draft.version, anchorOfferId: scienceId });
+        const first = await submitPartyAnchor(parent.id, draft.id, updated.version, 'a5-test-replay');
+        const replay = await submitPartyAnchor(parent.id, draft.id, updated.version, 'a5-test-replay');
+        assert.equal(first.request.id, replay.request.id);
+        const sent = await db.partyOrder.findUniqueOrThrow({ where: { id: draft.id } });
+        planId = sent.planItemId;
+        assert.ok(planId);
+        const plan = await db.planItem.findUniqueOrThrow({ where: { id: planId } });
+        assert.equal(plan.visibility, 'PRIVATE');
+        assert.equal(plan.date, day);
+        assert.equal(plan.childId, null);
+        assert.equal(plan.assigneeUserId, null);
+        assert.equal(await db.planItem.count({ where: { partyOrder: { is: { id: draft.id } } } }), 1);
+        await assert.rejects(cancelPartyBeforeConfirmation(host.user.id, draft.id, sent.version));
+        await cancelPartyBeforeConfirmation(parent.id, draft.id, sent.version);
+        const cancelled = await db.planItem.findUniqueOrThrow({ where: { id: planId } });
+        assert.equal(cancelled.status, 'CANCELLED');
+        assert.ok(cancelled.cancelledAt);
+      } finally {
+        await db.partyOrder.delete({ where: { id: draft.id } });
+        if (planId) await db.planItem.delete({ where: { id: planId } });
+      }
+    });
     await t.test('real saved data reaches A1; adult-only, hidden category data, prices and package IDs',async()=>{
       const rows=await db.offer.findMany({where:{id:{in:offers}},select:constructorOfferSelect});
       for(const row of rows)assert.ok(OfferForConstructorSchema.safeParse(toConstructorOffer(row)).success);

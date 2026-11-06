@@ -11,7 +11,7 @@ export type PartyOrderScreenData = {
   childName: string;
   status: string;
   version: number;
-  summary?: { stage: string; confirmedAmountByn: string | null; confirmedPriceUnknownCount: number; awaitingCount: number };
+  summary?: { stage: string; confirmedAmountByn: string | null; confirmedPriceUnknownCount: number; awaitingCount: number; estimate: { knownMinimumByn: string | null; unknownCount: number }; proposed: { knownAmountByn: string | null; withoutPriceCount: number } };
   /** Why the parent cannot cancel at once (confirmed services); null when cancellation is allowed. */
   cancelBlocker: string | null;
   date: string | null;
@@ -140,6 +140,11 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
           </p>
           {party.summary && <div className="space-y-1 text-sm">
             <p className="font-medium">{summaryLabels[party.summary.stage]}</p>
+            {party.summary.stage === "DRAFT" && <p>Ориентир: {party.summary.estimate.knownMinimumByn === null
+              ? "цена уточняется" : `от ${party.summary.estimate.knownMinimumByn} BYN`}
+              {party.summary.estimate.unknownCount > 0 && party.summary.estimate.knownMinimumByn !== null && " + услуги без цены"}</p>}
+            {party.summary.proposed.knownAmountByn !== null && !cancelled &&
+              <p>По сметам, ожидающим подтверждения: {party.summary.proposed.knownAmountByn} BYN</p>}
             {party.summary.confirmedAmountByn !== null && <p>Согласовано: {party.summary.confirmedAmountByn} BYN</p>}
             {party.summary.confirmedPriceUnknownCount > 0 && <p>Цена части подтверждённых услуг уточняется</p>}
             {party.summary.awaitingCount > 0 && !cancelled && <p>Услуг без подтверждения: {party.summary.awaitingCount}</p>}

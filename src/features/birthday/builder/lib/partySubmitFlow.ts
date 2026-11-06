@@ -43,7 +43,7 @@ export function submittedPartyId(state: PartyFlowState): string | null {
 }
 
 export async function submitBirthdayParty(
-  state: PartyFlowState, input: PartySubmissionInput, request: PartyRequest = partyRequest,
+  state: PartyFlowState, input: PartySubmissionInput, request: PartyRequest = partyRequest, checkpoint: (state: PartyFlowState) => void = () => {},
 ): Promise<void> {
   if (state.submitted) return;
   const fingerprint = JSON.stringify(input);
@@ -62,6 +62,7 @@ export async function submitBirthdayParty(
   try {
     if (!state.draft) {
       state.draft = await request<PartyDraft>("/api/parent/parties", "POST", { citySlug, venueMode });
+      checkpoint(state);
     }
     const draft = state.draft;
     if (!state.pending) {
@@ -70,6 +71,7 @@ export async function submitBirthdayParty(
       state.draft = { id: draft.id, version: updated.version };
       state.pending = { id: draft.id, version: updated.version, fingerprint };
       state.key = crypto.randomUUID().replace(/-/g, "");
+      checkpoint(state);
     }
     await request("/api/parent/parties/" + state.pending.id + "/submit", "POST",
       { version: state.pending.version }, state.key!);
@@ -82,6 +84,7 @@ export async function submitBirthdayParty(
           "/api/parent/parties/" + state.draft.id, "GET");
         if (existing.status === "DRAFT") {
           state.draft = { id: state.draft.id, version: existing.version };
+          checkpoint(state);
         } else if (existing.status !== "CANCELLED") {
           state.submitted = true;
           return;

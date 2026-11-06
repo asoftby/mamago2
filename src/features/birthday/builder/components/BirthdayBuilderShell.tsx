@@ -283,6 +283,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             timeEnd={state.partyPlanning.timeEnd}
             venueMode={state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : state.quiz.placeType === "PACKAGE" ? "PACKAGE" : "VENUE"}
             childName={state.quiz.partyForChild?.name ?? null}
+            submissionOwnerId={builder.submissionOwnerId}
             authenticated={builder.isAuthenticated}
             authLoading={builder.isAuthLoading}
             requestLogin={builder.requestLoginToSubmit}

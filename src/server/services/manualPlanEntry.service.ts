@@ -123,6 +123,7 @@ const calendarItemSelect = {
   childId: true,
   locationText: true,
   notes: true,
+  partyOrder: { select: { id: true } },
   tags: true,
   category: true,
   reminderEnabled: true,
@@ -165,6 +166,7 @@ export type FamilyCalendarItemDto = {
   reminderLeadMinutes: number | null;
   locationText: string | null;
   notes: string | null;
+  partyOrderId?: string | null;
   tags: string[];
   category: string | null;
   reminderEnabled: boolean | null;
@@ -569,6 +571,7 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     reminderLeadMinutes: row.reminderLeadMinutes,
     locationText: row.locationText,
     notes: row.notes,
+    partyOrderId: row.partyOrder?.id ?? null,
     tags: row.tags,
     category: row.category,
     reminderEnabled: row.reminderEnabled,

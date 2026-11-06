@@ -1,3 +1,4 @@
+import { syncPartyPlan } from "./partyPlan.service";
 import "server-only";
 import { BookingKind, BookingStatus, PartyOrderStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -127,6 +128,7 @@ export async function resolveExpiredPartyQuote(input: {
           payload: { requestId, partyOrderId: order.id, userId: order.ownerUserId },
         },
       });
+      await syncPartyPlan(tx, order.id);
       return { requestId, closed: true, alreadyProcessed: false };
     }
 

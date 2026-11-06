@@ -30,7 +30,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
       items: {
         orderBy: { position: "asc" },
         include: {
-          offer: { select: { id: true, title: true } },
+          offer: { select: { id: true, title: true, priceMode: true, priceFrom: true, currency: true } },
           requests: {
             orderBy: { createdAt: "desc" },
             select: {

@@ -22,6 +22,7 @@ type Props = {
   childName: string | null;
   childBirthDateIso: string | null;
   selectedChildId?: string | null;
+  submissionOwnerId?: string | null;
   authenticated: boolean;
   authLoading: boolean;
   requestLogin: () => void;
@@ -34,7 +35,7 @@ type Props = {
 
 export function StepReview({
   offers, addonCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso, selectedChildId,
-  authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
+  submissionOwnerId, authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
   const budgetWarning = partyBudgetWarning(total, maxBudget);
@@ -137,6 +138,19 @@ export function StepReview({
     onBusyChange(true);
     setError(null);
     try {
+      const storageKey = submissionOwnerId ? `mamago:party-submit:${submissionOwnerId}:${citySlug}` : null;
+      if (storageKey && !flowStateRef.current.draft) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
+          if (saved?.draft && typeof saved.draft.id === "string" && Number.isInteger(saved.draft.version)) {
+            flowStateRef.current.draft = saved.draft;
+            if (typeof saved.key === "string") {
+              flowStateRef.current.pending = { ...saved.draft, fingerprint: "" };
+              flowStateRef.current.key = saved.key;
+            }
+          }
+        } catch { /* Storage is optional. */ }
+      }
       await submitBirthdayParty(flowStateRef.current, {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
@@ -144,7 +158,14 @@ export function StepReview({
         contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
         addonCategories,
+      }, undefined, state => {
+        if (!storageKey) return;
+        try { sessionStorage.setItem(storageKey, JSON.stringify({ draft: state.draft, key: state.key })); }
+        catch { /* A blocked storage API must not block sending. */ }
       });
+      if (storageKey) {
+        try { sessionStorage.removeItem(storageKey); } catch { /* Storage is optional. */ }
+      }
       onSent();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка отправки");

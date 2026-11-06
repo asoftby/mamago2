@@ -80,8 +80,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
           where: { dedupeKey }, select: { id: true },
         });
         if (previouslyConfirmed && quote?.version === expectedQuoteVersion) {
-          await syncPartyPlan(tx, order.id);
-      return { requestId, confirmed: true, alreadyConfirmed: true };
+          return { requestId, confirmed: true, alreadyConfirmed: true };
         }
         throw new PartyApiError(409, "Заявка уже подтверждена");
       }

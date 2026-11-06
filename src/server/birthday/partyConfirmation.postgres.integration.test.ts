@@ -149,6 +149,37 @@ function isPartyError(status: number) {
   return (error: unknown) => error instanceof PartyApiError && error.status === status;
 }
 
+test("forced 40P01 rolls back all effects and retries confirmation at most three times", async () => {
+  const ctx = await fixture();
+  const { order, request, quote } = await ctx.requestWithQuote();
+  await acceptPartyQuote({ userId: ctx.parent.id, orderId: order.id, requestId: request.id, quoteId: quote.id, expectedVersion: 1 });
+  await db.$executeRawUnsafe('CREATE SEQUENCE a5_confirm_attempts');
+  try {
+    await db.$executeRawUnsafe(`CREATE FUNCTION a5_force_confirmation_deadlock() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW."dedupeKey" LIKE '%:a5-forced-retry' AND nextval('a5_confirm_attempts') < 3 THEN
+          RAISE EXCEPTION 'synthetic conflict' USING ERRCODE = '40P01';
+        END IF;
+        RETURN NEW;
+      END;
+    $$`);
+    await db.$executeRawUnsafe(`CREATE TRIGGER a5_force_confirmation_deadlock BEFORE INSERT ON "PartyOutbox"
+      FOR EACH ROW EXECUTE FUNCTION a5_force_confirmation_deadlock()`);
+    const input = { requestId: request.id, businessId: ctx.business.id, actorUserId: ctx.owner.id,
+      expectedQuoteVersion: 1, bookingUnitId: ctx.unit.id, idempotencyKey: "a5-forced-retry" };
+    await confirmPartyRequest(input);
+    assert.equal((await confirmPartyRequest(input)).alreadyConfirmed, true);
+    const [sequence] = await db.$queryRaw<{ last_value: bigint }[]>`SELECT last_value FROM a5_confirm_attempts`;
+    assert.equal(sequence.last_value, BigInt(3));
+    assert.equal(await db.bookingAllocation.count({ where: { bookingRequestId: request.id } }), 1);
+    assert.equal(await db.partyOutbox.count({ where: { aggregateId: request.id, eventType: "PARTY_BOOKING_CONFIRMED" } }), 1);
+  } finally {
+    await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS a5_force_confirmation_deadlock ON "PartyOutbox"');
+    await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS a5_force_confirmation_deadlock()');
+    await db.$executeRawUnsafe('DROP SEQUENCE a5_confirm_attempts');
+  }
+});
+
 test("quote acceptance and concurrent room confirmation are exclusive and idempotent", async () => {
   const ctx = await fixture();
   const [first, second] = await Promise.all([ctx.requestWithQuote(), ctx.requestWithQuote()]);

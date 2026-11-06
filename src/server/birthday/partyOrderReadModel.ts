@@ -3,6 +3,7 @@ type Quote = { status: string; priceByn: Amount | null; validUntil: Date | null 
 type Request = { id: string; partyStage: string | null; partyQuotes: readonly Quote[] };
 type Item = {
   role: string; status: string; offerPriceSnapshot: Amount | null;
+  offer?: { priceMode: string; priceFrom: number | null; currency: string } | null;
   confirmedBookingRequestId: string | null; requests: readonly Request[];
 };
 
@@ -36,8 +37,23 @@ export function partyOrderReadModel(order: { status: string; items: readonly Ite
     : requests.some(request => request.partyStage === "QUOTED" && activeQuote(request)) ? "QUOTE_RECEIVED"
     : requests.some(request => request.partyStage === "SENT") ? "WAITING_BUSINESS"
     : requests.length ? "UNAVAILABLE" : "SUBMITTED";
+  const estimates = required.flatMap(item => {
+    if (item.offerPriceSnapshot !== null) return [item.offerPriceSnapshot];
+    const offer = item.offer;
+    return order.status === "DRAFT" && offer?.currency === "BYN" && offer.priceMode === "FROM" &&
+      offer.priceFrom !== null && Number.isFinite(offer.priceFrom) && offer.priceFrom >= 0 ? [offer.priceFrom] : [];
+  });
+  const proposed = remaining.flatMap(item => {
+    const request = item.requests.find(request => request.partyStage === "AWAITING_RECONFIRM" ||
+      (request.partyStage === "QUOTED" && activeQuote(request)));
+    const quote = request?.partyStage === "AWAITING_RECONFIRM"
+      ? request.partyQuotes.find(quote => quote.status === "ACCEPTED") : request && activeQuote(request);
+    return quote?.priceByn ? [quote.priceByn] : [];
+  });
   return {
     stage,
+    estimate: { knownMinimumByn: order.status === "DRAFT" ? money(estimates) : null, unknownCount: required.length - estimates.length },
+    proposed: { knownAmountByn: money(proposed), withoutPriceCount: remaining.length - proposed.length },
     confirmedAmountByn: money(final),
     confirmedPriceUnknownCount: confirmed.length - final.length,
     awaitingCount: remaining.length,
