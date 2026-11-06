@@ -49,6 +49,16 @@ export const defaultFilters: DiscoveryFilters = {
   adultOnly: false,
 };
 
+/** Transfer only an explicitly selected header audience into a catalog visit.
+ * Preserve the user's independent catalog filters; never serialize persona IDs.
+ */
+export function mergeCatalogPersonaAge(
+  stored: DiscoveryFilters | null,
+  age: readonly string[],
+): DiscoveryFilters {
+  return { ...(stored ?? defaultFilters), age: [...age], adultOnly: false, profile: null };
+}
+
 export function parseAppliedFromUrl(
   searchParams: Pick<URLSearchParams, "get">,
 ): DiscoveryFilters {
