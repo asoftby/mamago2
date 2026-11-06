@@ -1,3 +1,4 @@
+import { partyOrderReadModel } from "./partyOrderReadModel";
 import { isEligibleForConstructor } from "./constructorEligibility";
 import { constructorOfferSelect, constructorPartyDetails, toConstructorOffer } from "./constructorOffer";
 import { assessConstructorGeography } from "./constructorMatching";
@@ -48,7 +49,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
     },
   });
   if (!party) throw new PartyApiError(404, "Праздник не найден");
-  return party;
+  return { ...party, summary: partyOrderReadModel(party) };
 }
 
 /** Fetch all selected offers using the same public visibility and approved BIRTHDAY placement. */
