@@ -1,5 +1,6 @@
 "use client";
 
+import { PartyTariffConditions } from "../components/PartyTariffConditions";
 import { isUnchangedLegacyRange } from "../mappers";
 
 import { useMemo } from "react";
@@ -440,6 +441,9 @@ export function Step5Pricing({
                       rows={2}
                     />
                   </div>
+                  {isParty && <PartyTariffConditions value={option.partyConditions} disabled={!isEditable}
+                    components={data.productType === "PARTY_PACKAGE" ? data.packageComponents ?? [] : undefined}
+                    onChange={partyConditions => handleUpdatePricingOption(option.id, { partyConditions })} />}
                 </CardContent>
               </Card>
             ))}

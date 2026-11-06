@@ -1,3 +1,4 @@
+import { partyTariffConditions } from "@/lib/offers/partyTariff";
 // Offer Wizard Validation
 // Inherits Event Wizard architecture 1-to-1
 
@@ -280,6 +281,9 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
       pricingErrors.push("Добавьте хотя бы один вариант цены");
     } else {
       data.pricingOptions.forEach((option, index) => {
+        if (option.partyConditions && !partyTariffConditions.safeParse(option.partyConditions).success) {
+          pricingErrors.push(`Вариант ${index + 1}: проверьте условия цены`);
+        }
         if (!option.title || option.title.trim().length === 0) {
           pricingErrors.push(`Вариант ${index + 1}: укажите название`);
         }
