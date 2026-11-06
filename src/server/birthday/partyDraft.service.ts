@@ -1,3 +1,4 @@
+import { childScopeFor } from "@/server/family/familyAccess";
 import { partyOrderReadModel } from "./partyOrderReadModel";
 import { isEligibleForConstructor } from "./constructorEligibility";
 import { constructorOfferSelect, constructorPartyDetails, toConstructorOffer } from "./constructorOffer";
@@ -94,6 +95,10 @@ export async function updatePartyDraft(
   if (existing.status !== PartyOrderStatus.DRAFT || existing.version !== input.version) {
     throw new PartyApiError(409, "Черновик изменился. Обновите страницу");
   }
+
+  if (input.selectedChildId && !await prisma.child.findFirst({
+    where: { id: input.selectedChildId, ...(await childScopeFor(ownerUserId)) }, select: { id: true },
+  })) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
 
   const selectionChange = input.anchorOfferId !== undefined;
   const newMode = input.venueMode ?? existing.venueMode;

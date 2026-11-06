@@ -83,6 +83,7 @@ export type PlanItemWithActivity = {
   id: string;
   userId: string;
   activityId: string | null;
+  partyOrder?: { id: string } | null;
   offerId?: string | null;
   offer?: { id: string; title: string; slug: string | null; coverImage: string | null; priceFrom: number | null; priceText: string | null; place: { city: { slug: string } | null } | null } | null;
   /** Present on persisted rows; synthetic UI items may omit */
@@ -562,6 +563,7 @@ export async function removePlanItem(
   await prisma.planItem.deleteMany({
     where: {
       id: planItemId,
+      partyOrder: { is: null },
       ...(await planScopeFor(userId)), // Security: ownership by family scope (legacy: userId)
     },
   });
@@ -585,6 +587,7 @@ export async function listPlanItemsByWeek(
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
+      partyOrder: { select: { id: true } },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -600,6 +603,7 @@ export async function listAllPlanItems(userId: string): Promise<PlanItemWithActi
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
+      partyOrder: { select: { id: true } },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -624,6 +628,7 @@ export async function listUpcomingPlanItems(
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
+      partyOrder: { select: { id: true } },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -644,6 +649,7 @@ export async function listPlanItemsInRange(
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
+      partyOrder: { select: { id: true } },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -662,6 +668,7 @@ export async function listPlanItemsByDate(
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
+      partyOrder: { select: { id: true } },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanItemWithActivity[];
@@ -710,6 +717,7 @@ export async function listPlanItemsDueForReminder(args: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
+      partyOrder: { select: { id: true } },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanReminderCandidate[];
@@ -768,6 +776,7 @@ export async function listPlanItemsForTomorrowDigest(args: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
+      partyOrder: { select: { id: true } },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanTomorrowDigestCandidate[];

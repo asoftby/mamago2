@@ -51,9 +51,9 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
     ? publicActivityPath(item.activity.id, city, item.activity.slug)
     : null;
   const { title, poster, time } = planEntryDisplay(item);
-  const isManual = item.source === "MANUAL";
+  const isManual = item.source === "MANUAL" && !item.partyOrder;
   // Тап по карточке: событие mamaGo → его страница; свой пункт → страница плана на этот день.
-  const openHref = activityDetailHref ?? (isManual ? `/me/plan?date=${item.date}` : null);
+  const openHref = item.partyOrder ? `/me/birthdays/${encodeURIComponent(item.partyOrder.id)}` : activityDetailHref ?? (isManual ? `/me/plan?date=${item.date}` : null);
 
   const isCatalogEvent = planItemVisualKind(item) === "event";
   const [category, setCategory] = useState<PlanItemCategoryKey>(() =>
@@ -107,7 +107,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
         )}
 
         <div className="min-w-0 flex-1">
-          {onOpen && (item.activity || item.articleId || isManual) ? (
+          {!item.partyOrder && onOpen && (item.activity || item.articleId || isManual) ? (
             <button
               type="button"
               onClick={onOpen}
@@ -133,7 +133,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
           <div className="mp-font-meta mt-[3px] flex min-w-0 items-center gap-1.5 text-[11px] leading-4 tracking-[.02em] text-[var(--mp-tx2)]">
             <span className="shrink-0 tabular-nums">{time || "Весь день"}</span>
             <span aria-hidden>·</span>
-            <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
+            <span className="min-w-0 truncate">{participantLabel || (item.partyOrder ? "Участники не выбраны" : "Вся семья")}</span>
             {authorLabel ? (
               <span className="min-w-0 truncate">· Добавил(а) {authorLabel}</span>
             ) : null}
@@ -147,7 +147,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
           </div>
         </div>
 
-        <div className="relative z-10 flex shrink-0 items-center self-center">
+        {item.partyOrder ? <p className="text-xs text-muted-foreground">{item.notes}</p> : <div className="relative z-10 flex shrink-0 items-center self-center">
           {onMove ? (
             <button
               type="button"
@@ -168,7 +168,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
           >
             <Trash2 className="h-[18px] w-[18px]" aria-hidden />
           </button>
-        </div>
+        </div>}
       </div>
     </article>
   );

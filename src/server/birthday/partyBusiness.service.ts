@@ -1,3 +1,4 @@
+import { syncPartyPlan } from "./partyPlan.service";
 import { isConfirmationDeadlock } from "./partyConfirmationConflict";
 import { BookingKind, BookingStatus, PartyItemStatus, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -328,6 +329,7 @@ export async function replyToPartyRequest(params: {
           payload: { partyOrderId: order.id, requestId, quoteId: quote.id, userId: order.ownerUserId },
         },
       });
+      await syncPartyPlan(tx, order.id);
       return { requestId, quote, alreadyResponded: false };
     });
   } catch (error) {

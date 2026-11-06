@@ -277,6 +277,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             dateIso={state.partyPlanning.dateIso}
             quizDateKey={state.quiz.dateRangeFrom}
             maxBudget={maxBudget}
+            selectedChildId={state.quiz.partyForChild?.profileChildId ?? null}
             childBirthDateIso={state.quiz.partyForChild?.birthDateIso ?? null}
             timeStart={state.partyPlanning.timeStart}
             timeEnd={state.partyPlanning.timeEnd}

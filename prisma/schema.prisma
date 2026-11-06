@@ -668,6 +668,7 @@ model PlanItem {
   status            PlanDecisionStatus        @default(CONFIRMED)
   family            Family?                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   bookingRequests   BookingRequest[]
+  partyOrder        PartyOrder?
   activity          Activity?                 @relation(fields: [activityId], references: [id])
   offer             Offer?                    @relation(fields: [offerId], references: [id], onDelete: SetNull)
   route             Route?                    @relation(fields: [routeId], references: [id])
@@ -5961,7 +5962,9 @@ model PartyOrder {
   submitKey String? @unique
   submittedAt DateTime?
   cancelledAt DateTime?
-  planItemId String?
+  planItemId String? @unique
+  selectedChildId String?
+  planItem PlanItem? @relation(fields: [planItemId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

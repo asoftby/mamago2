@@ -23,6 +23,7 @@ export const updatePartyDraftSchema = z.object({
   childrenCount: z.number().int().min(0).max(500).nullable().optional(),
   adultsCount: z.number().int().min(0).max(500).nullable().optional(),
   childAge: z.number().int().min(0).max(20).nullable().optional(),
+  selectedChildId: z.string().min(1).max(100).nullable().optional(),
   childName: z.string().max(120).nullable().optional(),
   budgetByn: z.number().nonnegative().max(1_000_000).nullable().optional(),
   contactName: z.string().max(120).nullable().optional(),

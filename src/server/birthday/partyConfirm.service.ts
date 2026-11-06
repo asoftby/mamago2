@@ -1,3 +1,4 @@
+import { syncPartyPlan } from "./partyPlan.service";
 import { isConfirmationDeadlock } from "./partyConfirmationConflict";
 import "server-only";
 import {
@@ -79,7 +80,8 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
           where: { dedupeKey }, select: { id: true },
         });
         if (previouslyConfirmed && quote?.version === expectedQuoteVersion) {
-          return { requestId, confirmed: true, alreadyConfirmed: true };
+          await syncPartyPlan(tx, order.id);
+      return { requestId, confirmed: true, alreadyConfirmed: true };
         }
         throw new PartyApiError(409, "Заявка уже подтверждена");
       }
@@ -243,6 +245,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         order: { ...order, eventDate: order.eventDate, timeFrom: order.timeFrom },
         anchorRequestId: requestId, now,
       }) : 0;
+      await syncPartyPlan(tx, order.id);
       return { requestId, confirmed: true, alreadyConfirmed: false, addonRequests };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {

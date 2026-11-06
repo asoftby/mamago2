@@ -21,6 +21,7 @@ type Props = {
   venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   childName: string | null;
   childBirthDateIso: string | null;
+  selectedChildId?: string | null;
   authenticated: boolean;
   authLoading: boolean;
   requestLogin: () => void;
@@ -32,7 +33,7 @@ type Props = {
 };
 
 export function StepReview({
-  offers, addonCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
+  offers, addonCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso, selectedChildId,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
@@ -139,7 +140,7 @@ export function StepReview({
       await submitBirthdayParty(flowStateRef.current, {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
-        childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date),
+        selectedChildId, childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date),
         contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
         addonCategories,

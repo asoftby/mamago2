@@ -376,7 +376,7 @@ async function updateEditablePlanEntry(
   const expected = expectedVersion(expectedUpdatedAt);
   const current = await prisma.planItem.findFirst({
     where: {
-      id: planItemId,
+      id: planItemId, partyOrder: { is: null },
       ...(await activePlanScopeFor(owner.userId)),
       source,
       status: "CONFIRMED",
@@ -423,7 +423,7 @@ async function updateEditablePlanEntry(
   const reminderLeadMinutes = leadApplicable ? requestedLeadMinutes : null;
 
   const result = await prisma.planItem.updateMany({
-    where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source, status: "CONFIRMED", updatedAt: expected },
+    where: { id: current.id, partyOrder: { is: null }, ...(await activePlanScopeFor(owner.userId)), source, status: "CONFIRMED", updatedAt: expected },
     data: {
       updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)),
       ...(patch.entryType === undefined ? {} : { entryType: patch.entryType }),
@@ -491,13 +491,13 @@ export async function updateTelegramPlanEntry(
 export async function cancelManualPlanEntry(owner: PlanOwner, planItemId: string, expectedUpdatedAt: string): Promise<void> {
   const expected = expectedVersion(expectedUpdatedAt);
   const current = await prisma.planItem.findFirst({
-    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED" },
+    where: { id: planItemId, partyOrder: { is: null }, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED" },
     select: { updatedAt: true },
   });
   if (!current) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
   if (current.updatedAt.getTime() !== expected.getTime()) throw new ManualPlanEntryError("CONFLICT", "conflict");
   const result = await prisma.planItem.updateMany({
-    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
+    where: { id: planItemId, partyOrder: { is: null }, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
     data: { status: "CANCELLED", cancelledAt: new Date(), updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) },
   });
   if (result.count === 0) throw new ManualPlanEntryError("CONFLICT", "conflict");
