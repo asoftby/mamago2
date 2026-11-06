@@ -23,7 +23,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
 };
 
-const AGE_OPTIONS = Array.from({ length: 15 }, (_, i) => i);
+const AGE_OPTIONS = Array.from({ length: 21 }, (_, i) => i);
 /** Воронка заявки из подборки: открыл лист → отправить → вход → заявка создана. */
 function track(card: ResolvedOfferEmbedCard, step: "open" | "submit" | "created" | "resume") {
   void postAnalyticsEvent({
@@ -72,17 +72,31 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
 
   if (!party) return null;
   const set = <K extends keyof CollectionLeadForm>(key: K, value: CollectionLeadForm[K]) => {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      if (key === "eventDate") {
+        const birth = familyKids.find((k) => k.name === f.childName)?.birthDate;
+        if (birth) next.childAge = ageAtEvent(birth, value as string, f.childAge ?? 0);
+      }
+      return next;
+    });
     setErrors((e) => ({ ...e, [key]: undefined }));
   };
   const dateChips = suggestLeadDates();
   const familyKids = (persona?.personas ?? []).flatMap((x) => {
     if (x.kind !== "child") return [];
     const months = ageMonthsFromBirthDate(x.birthDate);
-    return months == null ? [] : [{ id: x.id, name: x.displayName, age: Math.min(ageYears(months), 14) }];
+    return months == null || !x.birthDate ? [] : [{ id: x.id, name: x.displayName, age: ageYears(months), birthDate: x.birthDate }];
   });
-  const pickKid = (kid: { id: string; name: string; age: number } | null) =>
-    setForm((f) => ({ ...f, childName: kid && f.childName !== kid.name ? kid.name : "", childAge: kid && f.childName !== kid.name ? kid.age : f.childAge }));
+  const ageAtEvent = (birthDate: string, eventDate: string | null | undefined, fallback: number) => {
+    const m = ageMonthsFromBirthDate(birthDate, eventDate ? new Date(`${eventDate}T12:00:00`) : new Date());
+    return m == null ? fallback : Math.min(ageYears(m), AGE_OPTIONS.length - 1);
+  };
+  const pickKid = (kid: { id: string; name: string; age: number; birthDate: string } | null) =>
+    setForm((f) => {
+      if (!kid || f.childName === kid.name) return { ...f, childName: "" };
+      return { ...f, childName: kid.name, childAge: ageAtEvent(kid.birthDate, f.eventDate, kid.age) };
+    });
   const addToPlan = async () => {
     if (!sent) return;
     setPlanState("saving");
