@@ -404,6 +404,30 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
       </div>
 
           <AdditionalPlacements data={data} onChange={onChange} isEditable={isEditable} />
+          <div className="space-y-2">
+            <Label htmlFor="venuePitch">Площадка о себе <span className="font-normal text-muted-foreground">— необязательно</span></Label>
+            <Input
+              id="venuePitch"
+              maxLength={140}
+              placeholder="Например: отдельный зал на 15 детей, свой торт можно"
+              value={data.venuePitch ?? ""}
+              onChange={(e) => onChange({ venuePitch: e.target.value })}
+              disabled={!isEditable}
+            />
+            <p className="text-xs text-muted-foreground">Одна фраза от вас. Показывается как цитата в подборках журнала. {140 - (data.venuePitch ?? "").length} симв.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="visitorNote">Учтите <span className="font-normal text-muted-foreground">— необязательно</span></Label>
+            <Input
+              id="visitorNote"
+              maxLength={160}
+              placeholder="Например: в выходные выезд только до 18:00"
+              value={data.visitorNote ?? ""}
+              onChange={(e) => onChange({ visitorNote: e.target.value })}
+              disabled={!isEditable}
+            />
+            <p className="text-xs text-muted-foreground">Ограничение или условие, о котором лучше знать заранее. {160 - (data.visitorNote ?? "").length} симв.</p>
+          </div>
           <FaqStep
             kind="offer"
             value={data.faqItems}

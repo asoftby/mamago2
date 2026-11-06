@@ -2605,6 +2605,10 @@ model Offer {
   coverImage               String?
   /// Видео URL (YouTube, YouTube Shorts, Instagram Reels)
   videoUrl                 String?
+  /// Короткая цитата площадки о себе (карточка в подборках журнала), до 140 символов
+  venuePitch               String?
+  /// Ограничения и условия «Учтите» (карточка в подборках журнала), до 160 символов
+  visitorNote              String?
   /// Rich-text подпись к цене: что входит, ограничения, условия участия
   priceCaption             String?
   priceFrom                Float?

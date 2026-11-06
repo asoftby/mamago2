@@ -6,6 +6,7 @@ import { MAIN_ARTICLE_GALLERY_BLOCK_ID } from "@/lib/article/articleMainGallery"
 import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
 import { resolveUniqueConcurrently } from "@/lib/article/resolveUniqueConcurrently";
 import { linkedItemsToCardBlocks } from "@/lib/journal/linkedItemBlocks";
+import { buildEventCardData, type ResolvedEventCardData } from "@/lib/article/collectionEventCard";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import {
@@ -95,7 +96,10 @@ export type ResolvedActivityCard = {
   meta?: string;
   imageUrl?: string | null;
   placeExtra?: PlaceCardExtra;
+  /** Данные карточки события афиши (только EVENT). */
+  event?: ResolvedEventCardData;
 };
+
 
 export type ArticleShiftPreview = {
   shiftId: string;
@@ -134,6 +138,11 @@ export type ResolvedOfferEmbedCard = {
   ctaMode: "camp-shift" | "phone" | "external" | "details";
   ctaPhone?: string | null;
   ctaHref?: string | null;
+  /** «Площадка о себе» (Offer.venuePitch). */
+  venuePitch?: string | null;
+  /** «Учтите» (Offer.visitorNote). */
+  visitorNote?: string | null;
+  galleryUrls?: string[];
 };
 
 export type ArticleMvpResolvedBlock =
@@ -203,14 +212,21 @@ async function resolveActivityCard(
         title: true,
         slug: true,
         type: true,
-        place: { select: { city: { select: { slug: true } } } },
+        nextOccurrenceAt: true,
+        ageMinMonths: true,
+        ageMaxMonths: true,
+        priceFrom: true,
+        priceTo: true,
+        currency: true,
+        coverImageUrl: true,
+        place: { select: { title: true, city: { select: { slug: true } } } },
       },
     });
     if (!a) return null;
     const citySlug = a.place?.city?.slug;
     const cs = citySlug ?? "minsk";
     const href = `/${cs}/events/${a.slug ?? b.entityId}`;
-    return { kind: "basic", href, title: a.title };
+    return { kind: "basic", href, title: a.title, event: buildEventCardData(a) };
   }
   if (b.entityType === "OFFER") {
     const o = await prisma.offer.findFirst({
@@ -221,6 +237,8 @@ async function resolveActivityCard(
         slug: true,
         kind: true,
         campProgramType: true,
+        venuePitch: true,
+        visitorNote: true,
         place: {
           select: {
             city: { select: { slug: true } },
@@ -321,6 +339,9 @@ async function resolveActivityCard(
       ctaMode,
       ctaPhone: offerData.cta.phone ?? null,
       ctaHref: offerData.cta.link ?? null,
+      venuePitch: o.venuePitch?.trim() || null,
+      visitorNote: o.visitorNote?.trim() || null,
+      galleryUrls: [offerData.media.posterUrl, ...offerData.media.gallery.map((image) => image.url)].filter((u): u is string => !!u).slice(0, 6),
     };
   }
   if (b.entityType === "ROUTE") {
@@ -379,7 +400,19 @@ async function loadBasicActivityCards(
     idsByType.EVENT.size
       ? prisma.activity.findMany({
           where: { id: { in: [...idsByType.EVENT] }, ...getPublicActivityDetailWhere() },
-          select: { id: true, title: true, slug: true, place: { select: { city: { select: { slug: true } } } } },
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            nextOccurrenceAt: true,
+            ageMinMonths: true,
+            ageMaxMonths: true,
+            priceFrom: true,
+            priceTo: true,
+            currency: true,
+            coverImageUrl: true,
+            place: { select: { title: true, city: { select: { slug: true } } } },
+          },
         })
       : [],
     idsByType.ROUTE.size
@@ -399,7 +432,7 @@ async function loadBasicActivityCards(
   const cards = new Map<string, ResolvedActivityCard>();
   for (const event of events) {
     const citySlug = event.place?.city?.slug ?? "minsk";
-    cards.set(`EVENT:${event.id}`, { kind: "basic", href: `/${citySlug}/events/${event.slug ?? event.id}`, title: event.title });
+    cards.set(`EVENT:${event.id}`, { kind: "basic", href: `/${citySlug}/events/${event.slug ?? event.id}`, title: event.title, event: buildEventCardData(event) });
   }
   for (const route of routes) {
     cards.set(`ROUTE:${route.id}`, { kind: "basic", href: `/routes/${route.slug}`, title: route.title });

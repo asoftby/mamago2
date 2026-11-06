@@ -131,6 +131,10 @@ export interface OfferFormData {
   title: string;
   shortDescription: string; // max 120 chars
   description: string; // Rich text HTML for full description
+  /** «Площадка о себе» — короткая цитата для карточки в подборках (≤140). */
+  venuePitch: string;
+  /** «Учтите» — ограничение/условие для карточки в подборках (≤160). */
+  visitorNote: string;
   ageGroups: string[];
   agePolicy: import("@prisma/client").AgePolicy;
   

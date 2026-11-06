@@ -92,6 +92,8 @@ const updateOfferSchema = z.object({
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
   description: z.string().optional(),
+  venuePitch: z.string().max(140).nullable().optional(),
+  visitorNote: z.string().max(160).nullable().optional(),
   agePolicy: z.nativeEnum(AgePolicy).optional(),
   ageMinMonths: z.number().nullable().optional(),
   ageMaxMonths: z.number().nullable().optional(),
@@ -406,6 +408,8 @@ export async function PATCH(
     }
     
     if (data.title !== undefined) updateData.title = data.title;
+    if (data.venuePitch !== undefined) updateData.venuePitch = data.venuePitch?.trim() || null;
+    if (data.visitorNote !== undefined) updateData.visitorNote = data.visitorNote?.trim() || null;
     // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
     if (data.description !== undefined && data.description.trim()) {
       updateData.description = data.description;

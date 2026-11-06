@@ -78,6 +78,8 @@ const createOfferSchema = z.object({
   title: z.string().min(1),
   shortDescription: z.string().min(1),
   description: z.string().optional(),
+  venuePitch: z.string().max(140).nullable().optional(),
+  visitorNote: z.string().max(160).nullable().optional(),
   agePolicy: z.nativeEnum(AgePolicy),
   ageMinMonths: z.number().nullable().optional(),
   ageMaxMonths: z.number().nullable().optional(),
@@ -375,6 +377,8 @@ export async function POST(request: NextRequest) {
             contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
             ...scheduleOfferColumns(data.schedule),
             title: data.title,
+            venuePitch: data.venuePitch?.trim() || null,
+            visitorNote: data.visitorNote?.trim() || null,
             // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
             description: data.description?.trim() ? data.description : data.shortDescription,
             ...(interestsCheck?.ok ? { interestSlugs: interestsCheck.slugs } : {}),
