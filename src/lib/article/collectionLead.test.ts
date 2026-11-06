@@ -3,7 +3,7 @@ import test from "node:test";
 import { CollectionLeadError, submitCollectionLead, type CollectionLeadProgress } from "./collectionLeadApi";
 import {
   clampChildren, DEFAULT_LEAD_FORM, earliestLeadDate, initialLeadForm, LEAD_DRAFT_TTL_MS, parseLeadDraft, serializeLeadDraft,
-  validateLeadForm, withLeadReturnParam, type CollectionLeadForm,
+  suggestLeadDates, validateLeadForm, withLeadReturnParam, type CollectionLeadForm,
 } from "./collectionLeadForm";
 
 const NOW = new Date("2026-11-06T09:00:00Z");
@@ -146,4 +146,33 @@ test("lead button only for party offers; other CTAs unchanged", () => {
   assert.equal(collectionPrimaryAction({ ...base, ctaMode: "external", ctaHref: "https://x.by" }), "external");
   assert.equal(collectionPrimaryAction({ ...base, ctaMode: "camp-shift", schedulePreview: [{ shiftId: "s" }] }), "camp-shift");
   assert.equal(collectionPrimaryAction({ ...base, ctaMode: "camp-shift" }), "details");
+});
+
+test("date chips are upcoming weekends, none inside the 24h window", () => {
+  // Пт 2026-11-06 12:00 по Минску → ближайшая допустимая суббота 2026-11-07 12:00 уже ближе 24 ч? Нет, ровно 24 ч — граница строгая.
+  const now = new Date("2026-11-06T09:00:00Z");
+  const chips = suggestLeadDates(now, 4);
+  assert.equal(chips.length, 4);
+  assert.ok(chips.every((c) => ["сб", "вс"].includes(c.weekday)));
+  assert.ok(chips.every((c) => validateLeadForm({ ...DEFAULT_LEAD_FORM, eventDate: c.iso, contactName: "А", contactPhone: "+375291234567", children: 5 }, { minChildren: null, maxChildren: null }, now).eventDate === undefined));
+  assert.deepEqual(chips.map((c) => c.iso), [...chips.map((c) => c.iso)].sort());
+  assert.equal(new Set(chips.map((c) => c.iso)).size, 4);
+});
+
+test("date chips skip a weekend day that is less than 24h away", () => {
+  const now = new Date("2026-11-07T10:00:00Z"); // сб 13:00 по Минску → сб уже нельзя, вс 12:00 меньше чем через 24 ч нельзя
+  const first = suggestLeadDates(now, 1)[0];
+  assert.equal(first?.iso, "2026-11-14");
+});
+
+test("child name travels to the party draft", async () => {
+  const { calls, impl } = fakeFetch([
+    { status: 201, body: { id: "p9", version: 0 } },
+    { status: 200, body: { version: 1 } },
+    { status: 201, body: { request: { id: "r9" } } },
+  ]);
+  await submitCollectionLead({ offerId: "o1", citySlug: "minsk", mode: "HOME", form: { ...ok, childName: " Степа ", childAge: 7 }, progress: { idempotencyKey: "k9" }, fetchImpl: impl });
+  const patch = JSON.parse(String(calls[1].init?.body));
+  assert.equal(patch.childName, "Степа");
+  assert.equal(patch.childAge, 7);
 });

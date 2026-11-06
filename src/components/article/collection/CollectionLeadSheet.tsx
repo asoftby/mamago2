@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Minus, Plus } from "lucide-react";
+import { Check, Minus, Plus, CalendarDays } from "lucide-react";
 import { PhoneInputByMask } from "@/components/phone/PhoneInputByMask";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
@@ -12,9 +12,10 @@ import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { cn } from "@/lib/utils";
 import { CollectionLeadError, submitCollectionLead, type CollectionLeadProgress } from "@/lib/article/collectionLeadApi";
 import {
-  clampChildren, clearLeadDraft, earliestLeadDate, initialLeadForm, loadLeadDraft, saveLeadDraft,
+  clampChildren, clearLeadDraft, earliestLeadDate, initialLeadForm, loadLeadDraft, saveLeadDraft, suggestLeadDates,
   validateLeadForm, withLeadReturnParam, type CollectionLeadErrors, type CollectionLeadForm,
 } from "@/lib/article/collectionLeadForm";
+import { ageMonthsFromBirthDate, ageYears } from "@/lib/article/collectionPersonalOrder";
 import type { ResolvedOfferEmbedCard } from "@/lib/article/articleMvpRenderData";
 
 type Props = {
@@ -73,7 +74,9 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
   const [errors, setErrors] = useState<CollectionLeadErrors>({});
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [sent, setSent] = useState<{ partyId: string } | null>(null);
+  const [sent, setSent] = useState<{ partyId: string; date: string } | null>(null);
+  const [anyDate, setAnyDate] = useState(false);
+  const [planState, setPlanState] = useState<"idle" | "saving" | "done" | "error">("idle");
   const progress = useRef<CollectionLeadProgress>({ idempotencyKey: "" });
   const wasOpen = useRef(false);
 
@@ -89,6 +92,8 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
     setErrors({});
     setServerError(null);
     setSent(null);
+    setPlanState("idle");
+    setAnyDate(false);
     progress.current = { idempotencyKey: `cl_${crypto.randomUUID().replace(/-/g, "")}` };
     track(card, restored ? "resume" : "open");
   }, [open, card, limits, adultName]);
@@ -97,6 +102,29 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
   const set = <K extends keyof CollectionLeadForm>(key: K, value: CollectionLeadForm[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => ({ ...e, [key]: undefined }));
+  };
+  const dateChips = suggestLeadDates();
+  const familyKids = (persona?.personas ?? []).flatMap((x) => {
+    if (x.kind !== "child") return [];
+    const months = ageMonthsFromBirthDate(x.birthDate);
+    return months == null ? [] : [{ id: x.id, name: x.displayName, age: Math.min(ageYears(months), 14) }];
+  });
+  const pickKid = (kid: { id: string; name: string; age: number } | null) =>
+    setForm((f) => ({ ...f, childName: kid && f.childName !== kid.name ? kid.name : "", childAge: kid && f.childName !== kid.name ? kid.age : f.childAge }));
+  const addToPlan = async () => {
+    if (!sent) return;
+    setPlanState("saving");
+    try {
+      const res = await fetch("/api/save/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ offerId: card.offerId, date: sent.date, title: card.title, coverImageUrl: card.imageUrl }),
+      });
+      setPlanState(res.ok ? "done" : "error");
+    } catch {
+      setPlanState("error");
+    }
   };
   const minChildren = Math.max(1, limits.minChildren ?? 1);
   const maxChildren = Math.max(minChildren, limits.maxChildren ?? 500);
@@ -123,7 +151,7 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
       const res = await submitCollectionLead({ offerId: card.offerId, citySlug: party.citySlug, mode: party.mode, form, progress: progress.current });
       clearLeadDraft(card.offerId);
       track(card, "created");
-      setSent({ partyId: res.partyId });
+      setSent({ partyId: res.partyId, date: form.eventDate });
     } catch (e) {
       if (e instanceof CollectionLeadError && e.status === 401) {
         goToLogin();
@@ -167,14 +195,55 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
           </span>
           <h3 className="mb-2 mt-4 font-serif text-[30px] font-normal leading-none">Заявка отправлена</h3>
           <p className="m-0 max-w-[320px] text-[15px] text-[#3A332B]">{`${card.placeName ?? "Площадка"} пришлёт предложение с ценой и условиями — оно появится в вашей заявке. Телефон площадка увидит только после того, как вы подтвердите праздник.`}</p>
-          <Link href={`/me/birthdays/${sent.partyId}`} className="mt-5 inline-flex min-h-12 items-center rounded-full bg-[#E86A3A] px-6 text-[15px] font-semibold text-white hover:bg-[#C24E22]">
+          <div className="mt-5 w-full rounded-[20px] bg-[#FFE8DC] p-4 text-left">
+            <b className="block text-base text-[#5E2A0E]">Добавить в «Мой план»?</b>
+            <span className="mt-1 block text-[13.5px] leading-snug text-[#6E3A1E]">Поставим праздник на выбранную дату, чтобы он не потерялся. Ответ площадки придёт в вашу заявку.</span>
+            {planState === "done" ? (
+              <Link href="/me/plan" className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[15px] font-semibold !text-white !no-underline">
+                <Check className="size-4" aria-hidden="true" /> В плане · открыть
+              </Link>
+            ) : (
+              <button type="button" onClick={addToPlan} disabled={planState === "saving"} className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[15px] font-semibold text-white hover:bg-[#C24E22] disabled:opacity-60">
+                <Plus className="size-4" aria-hidden="true" /> {planState === "saving" ? "Добавляем…" : "Добавить в план"}
+              </button>
+            )}
+            {planState === "error" ? <span role="alert" className="mt-2 block text-[13px] font-semibold text-[#8C2A20]">Не удалось добавить в план. Заявка при этом отправлена.</span> : null}
+          </div>
+          <Link href={`/me/birthdays/${sent.partyId}`} className="mt-3 inline-flex min-h-12 items-center rounded-full border border-[rgba(20,18,16,.18)] px-6 text-[15px] font-semibold !text-[#141210] !no-underline hover:border-[#141210]">
             Открыть мою заявку
           </Link>
         </div>
       ) : (
         <div className="overflow-y-auto px-4 pb-4 sm:px-5">
           <Row label="Дата праздника" error={errors.eventDate}>
-            <input type="date" className={field} value={form.eventDate} min={earliestLeadDate()} onChange={(e) => set("eventDate", e.target.value)} aria-invalid={!!errors.eventDate} />
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-5 sm:px-5 [&::-webkit-scrollbar]:hidden">
+              {dateChips.map((c) => (
+                <button
+                  key={c.iso}
+                  type="button"
+                  aria-pressed={form.eventDate === c.iso}
+                  aria-label={`${c.weekday}, ${c.day} ${c.month}`}
+                  onClick={() => { set("eventDate", c.iso); setAnyDate(false); }}
+                  className={cn("flex h-[88px] w-[68px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[18px] border", form.eventDate === c.iso ? "border-[#141210] bg-[#141210] text-white" : "border-[#ECE6DD] bg-white hover:border-[#DCD4C9]")}
+                >
+                  <span className={cn("font-mono text-[11px] uppercase tracking-[.14em]", form.eventDate === c.iso ? "text-white/70" : "text-[#6B6259]")}>{c.weekday}</span>
+                  <b className="font-serif text-[30px] font-normal leading-none">{c.day}</b>
+                  <span className={cn("font-mono text-[10px] uppercase tracking-[.12em]", form.eventDate === c.iso ? "text-white/70" : "text-[#6B6259]")}>{c.month}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                aria-pressed={anyDate}
+                onClick={() => setAnyDate((v) => !v)}
+                className={cn("flex h-[88px] w-[68px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[18px] border-[1.5px] border-dashed text-[#3A332B]", anyDate ? "border-[#141210]" : "border-[#DCD4C9]")}
+              >
+                <CalendarDays className="size-5" aria-hidden="true" />
+                <span className="font-mono text-[10px] uppercase tracking-[.12em] text-[#6B6259]">другая</span>
+              </button>
+            </div>
+            {anyDate || (form.eventDate && !dateChips.some((c) => c.iso === form.eventDate)) ? (
+              <input type="date" className={cn(field, "mt-2")} value={form.eventDate} min={earliestLeadDate()} onChange={(e) => set("eventDate", e.target.value)} aria-invalid={!!errors.eventDate} aria-label="Другая дата" />
+            ) : null}
           </Row>
           <Row label="Время" error={errors.timeFrom ?? errors.timeTo}>
             <div className="flex items-center gap-3">
@@ -198,11 +267,37 @@ export function CollectionLeadSheet({ card, open, onOpenChange }: Props) {
             <span className="text-sm font-bold">Сколько взрослых</span>
             <Stepper label="Взрослых" value={form.adults} min={0} max={50} onChange={(n) => set("adults", n)} />
           </div>
+          {familyKids.length ? (
+            <Row label="Чей праздник">
+              <div className="flex flex-wrap gap-2">
+                {familyKids.map((k) => (
+                  <button
+                    key={k.id}
+                    type="button"
+                    aria-pressed={form.childName === k.name}
+                    onClick={() => pickKid(k)}
+                    className={cn("inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold", form.childName === k.name ? "border-[#141210] bg-[#141210] text-white" : "border-[rgba(20,18,16,.18)] bg-white hover:border-[#141210]")}
+                  >
+                    {k.name}, {k.age}
+                  </button>
+                ))}
+              </div>
+            </Row>
+          ) : null}
           <Row label="Возраст именинника" hint="необязательно">
-            <select className={cn(field, "appearance-none")} value={form.childAge ?? ""} onChange={(e) => set("childAge", e.target.value === "" ? null : Number(e.target.value))}>
-              <option value="">Не указывать</option>
-              {AGE_OPTIONS.map((a) => <option key={a} value={a}>{a === 0 ? "до года" : `${a} ${a % 10 === 1 && a !== 11 ? "год" : a % 10 >= 2 && a % 10 <= 4 && (a < 12 || a > 14) ? "года" : "лет"}`}</option>)}
-            </select>
+            <div role="group" aria-label="Возраст именинника" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-5 sm:px-5 [&::-webkit-scrollbar]:hidden">
+              {AGE_OPTIONS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  aria-pressed={form.childAge === a}
+                  onClick={() => set("childAge", form.childAge === a ? null : a)}
+                  className={cn("min-h-11 min-w-11 shrink-0 rounded-xl border px-3 text-[15px] font-semibold", form.childAge === a ? "border-[#141210] bg-[#141210] text-white" : "border-[rgba(20,18,16,.18)] bg-white hover:border-[#141210]")}
+                >
+                  {a === 0 ? "<1" : a}
+                </button>
+              ))}
+            </div>
           </Row>
           <Row label="Как к вам обращаться" error={errors.contactName}>
             <input className={field} value={form.contactName} maxLength={120} autoComplete="name" onChange={(e) => set("contactName", e.target.value)} aria-invalid={!!errors.contactName} />
