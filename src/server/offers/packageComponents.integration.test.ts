@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PrismaClient } from "@prisma/client";
@@ -32,6 +33,15 @@ test("canonical composition transactions preserve pricing, reject stale/foreign 
       const snapshot = { id: component.id, title: saved.title, category: saved.category, priceSnapshot: "100.00" };
       const item = await db.partyOrderItem.create({ data: { partyOrderId: order.id, category: saved.category, role: "INCLUDED",
         packageComponentId: component.id, packageComponentSnapshot: snapshot } });
+      const legacy = await db.partyOrderItem.create({ data: { partyOrderId: order.id, category: saved.category, role: "INCLUDED",
+        packageComponentId: component.id, offerPriceSnapshot: 80 } });
+      const migration = readFileSync(new URL("../../../prisma/migrations/20261106030000_package_component_history/migration.sql", import.meta.url), "utf8");
+      const backfill = migration.slice(migration.indexOf('UPDATE "PartyOrderItem"'));
+      assert.equal(await db.$executeRawUnsafe(backfill), 1);
+      assert.equal(await db.$executeRawUnsafe(backfill), 0);
+      const migrated = await db.partyOrderItem.findUniqueOrThrow({ where: { id: legacy.id } });
+      assert.deepEqual(migrated.packageComponentSnapshot, { id: component.id, category: saved.category, provenance: "LEGACY_LINK_ONLY" });
+      assert.equal(migrated.offerPriceSnapshot?.toFixed(2), "80.00");
       await db.offer.update({ where: { id: offer.id }, data: { status: "DRAFT" } });
       await db.$transaction(tx => savePackageComponents(tx, offer.id, [], current));
       assert.ok((await db.packageComponent.findUniqueOrThrow({ where: { id: component.id } })).archivedAt);
