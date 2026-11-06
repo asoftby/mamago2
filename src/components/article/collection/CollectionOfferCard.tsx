@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Baby, ChevronLeft, ChevronRight, MapPin, Phone, Plus } from "lucide-react";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { CampShiftBookingOverlay } from "@/components/offers/CampShiftBookingOverlay";
 import { cn } from "@/lib/utils";
 import type { ResolvedOfferEmbedCard } from "@/lib/article/articleMvpRenderData";
+import { CollectionLeadSheet } from "./CollectionLeadSheet";
+import { collectionPrimaryAction } from "@/lib/article/collectionCardCta";
+import { LEAD_RETURN_PARAM } from "@/lib/article/collectionLeadForm";
 import { CollectionChip, CollectionNote, CollectionRating, CollectionVenueQuote } from "./CollectionCardParts";
 
 function Gallery({ card }: { card: ResolvedOfferEmbedCard }) {
@@ -69,12 +72,28 @@ function Gallery({ card }: { card: ResolvedOfferEmbedCard }) {
 export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) {
   const [open, setOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [leadOpen, setLeadOpen] = useState(false);
+  const rootRef = useRef<HTMLElement>(null);
+  const action = collectionPrimaryAction(card);
+  const hasLead = action === "lead";
+
+  // Возврат после входа: ?leadOffer=<id> открывает лист с сохранённой формой.
+  useEffect(() => {
+    if (!hasLead) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(LEAD_RETURN_PARAM) !== card.offerId) return;
+    url.searchParams.delete(LEAD_RETURN_PARAM);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    rootRef.current?.scrollIntoView({ block: "center" });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- одноразовое открытие по маркеру возврата
+    setLeadOpen(true);
+  }, [hasLead, card.offerId]);
   const phone = card.ctaPhone ?? null;
   const primaryClass = "inline-flex min-h-12 items-center justify-center rounded-full bg-[#E86A3A] px-5 text-[15px] font-semibold text-white hover:bg-[#C24E22]";
   const primaryLabel = card.ctaLabel || "Подробнее";
   const shift = card.ctaMode === "camp-shift" ? card.schedulePreview[0] ?? null : null;
   return (
-    <article aria-label={card.title} className="not-prose overflow-hidden rounded-3xl border border-[rgba(20,18,16,.1)] bg-[#FAF7F1] font-sans text-[#141210] shadow-[0_24px_50px_-38px_rgba(20,18,16,.3)]">
+    <article ref={rootRef} aria-label={card.title} className="not-prose overflow-hidden rounded-3xl border border-[rgba(20,18,16,.1)] bg-[#FAF7F1] font-sans text-[#141210] shadow-[0_24px_50px_-38px_rgba(20,18,16,.3)]">
       <Gallery card={card} />
       <div className="px-4 pb-3.5 pt-4 md:px-6 md:pb-4 md:pt-[22px]">
         <div className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6259]">
@@ -100,11 +119,13 @@ export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) 
           </div>
         ) : null}
         <div className="mt-4 grid grid-cols-[1fr_auto] gap-2 md:grid-cols-[auto_auto] md:justify-start">
-          {card.ctaMode === "camp-shift" && shift ? (
+          {action === "lead" ? (
+            <button type="button" onClick={() => setLeadOpen(true)} className={primaryClass}>Оставить заявку</button>
+          ) : action === "camp-shift" && shift ? (
             <button type="button" onClick={() => setBookingOpen(true)} className={primaryClass}>{primaryLabel}</button>
-          ) : card.ctaMode === "phone" && phone ? (
+          ) : action === "phone" && phone ? (
             <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} className={primaryClass}>{primaryLabel}</a>
-          ) : card.ctaMode === "external" && card.ctaHref ? (
+          ) : action === "external" && card.ctaHref ? (
             <a href={card.ctaHref} target="_blank" rel="noopener noreferrer" className={primaryClass}>{primaryLabel}</a>
           ) : (
             <Link href={card.href} className={primaryClass}>{primaryLabel}</Link>
@@ -125,6 +146,7 @@ export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) 
       {card.ctaMode === "camp-shift" && shift ? (
         <CampShiftBookingOverlay open={bookingOpen} onOpenChange={setBookingOpen} offerId={card.offerId} offerTitle={card.title} shift={shift} shifts={card.schedulePreview} />
       ) : null}
+      {hasLead ? <CollectionLeadSheet card={card} open={leadOpen} onOpenChange={setLeadOpen} /> : null}
     </article>
   );
 }

@@ -6,6 +6,7 @@ import { MAIN_ARTICLE_GALLERY_BLOCK_ID } from "@/lib/article/articleMainGallery"
 import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
 import { resolveUniqueConcurrently } from "@/lib/article/resolveUniqueConcurrently";
 import { linkedItemsToCardBlocks } from "@/lib/journal/linkedItemBlocks";
+import { deriveCollectionPartyMode, type CollectionPartyLead } from "@/lib/article/collectionPartyLead";
 import { buildEventCardData, type ResolvedEventCardData } from "@/lib/article/collectionEventCard";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
@@ -141,6 +142,8 @@ export type ResolvedOfferEmbedCard = {
   /** «Площадка о себе» (Offer.venuePitch). */
   ageMinMonths?: number | null;
   ageMaxMonths?: number | null;
+  /** Есть только у Party-офферов, которые принимают заявку на праздник (Party-поток). */
+  party?: CollectionPartyLead | null;
   venuePitch?: string | null;
   /** «Учтите» (Offer.visitorNote). */
   visitorNote?: string | null;
@@ -243,8 +246,15 @@ async function resolveActivityCard(
         ageMinMonths: true,
         ageMaxMonths: true,
         visitorNote: true,
+        productType: true,
+        category: true,
+        partyLocationType: true,
+        minChildren: true,
+        maxChildren: true,
+        placements: { where: { key: "BIRTHDAY", status: "APPROVED" }, select: { id: true }, take: 1 },
         place: {
           select: {
+            ownerBusinessId: true,
             city: { select: { slug: true } },
           },
         },
@@ -320,6 +330,18 @@ async function resolveActivityCard(
       ctaMode = "external";
     }
 
+    const partyMode = deriveCollectionPartyMode({
+      id: o.id,
+      productType: o.productType,
+      category: o.category,
+      partyLocationType: o.partyLocationType,
+      hasApprovedBirthdayPlacement: o.placements.length > 0,
+      ownerBusinessId: o.place?.ownerBusinessId ?? null,
+    });
+    const partyLead: CollectionPartyLead | null = partyMode
+      ? { mode: partyMode, citySlug, minChildren: o.minChildren, maxChildren: o.maxChildren }
+      : null;
+
     return {
       kind: "offer-embed",
       offerId: offerData.id,
@@ -345,6 +367,7 @@ async function resolveActivityCard(
       ctaHref: offerData.cta.link ?? null,
       ageMinMonths: o.ageMinMonths,
       ageMaxMonths: o.ageMaxMonths,
+      party: partyLead,
       venuePitch: o.venuePitch?.trim() || null,
       visitorNote: o.visitorNote?.trim() || null,
       galleryUrls: [offerData.media.posterUrl, ...offerData.media.gallery.map((image) => image.url)].filter((u): u is string => !!u).slice(0, 6),

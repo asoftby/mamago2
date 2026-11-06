@@ -28,6 +28,8 @@ export const updatePartyDraftSchema = z.object({
   contactName: z.string().max(120).nullable().optional(),
   contactPhone: z.string().max(40).nullable().optional(),
   anchorOfferId: z.string().min(1).nullable().optional(),
+  /** Комментарий родителя к основной услуге: уходит бизнесу как customerComment заявки. */
+  anchorNote: z.string().trim().max(500).nullable().optional(),
   addonOfferIds: z.array(z.string().min(1)).max(15).optional(),
   addonCategories: z.array(z.nativeEnum(PartyCategory)).max(15).refine(
     values => new Set(values).size === values.length,

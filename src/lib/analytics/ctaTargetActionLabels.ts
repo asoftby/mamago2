@@ -14,6 +14,10 @@ const CTA_TARGET_ACTION_LABELS: Record<string, string> = {
   plan: "Открыли добавление в план",
   primary: "Основное действие",
   book: "Записались",
+  collection_lead_open: "Открыли заявку из подборки",
+  collection_lead_resume: "Вернулись к заявке после входа",
+  collection_lead_submit: "Нажали «Отправить» в заявке из подборки",
+  collection_lead_created: "Заявка из подборки создана",
 };
 
 /** Raw `meta.targetAction` (or `null`/`undefined` when absent) -> Russian label. Never returns raw JSON. */
