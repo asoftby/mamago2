@@ -143,7 +143,7 @@ export interface EventFormData {
   ctaStepDraft: CtaStepFormValue | null;
   ticketLink: string;
   /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */
-  participationMode: "external-link" | "time-slots" | "walk-in" | "prebook";
+  participationMode: "external-link" | "time-slots" | "walk-in" | "request" | "prebook";
   prebookMethod: "phone" | "link" | null;
   prebookPhone: string;
   prebookUrl: string;

@@ -383,6 +383,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         "time-slots": "Запись по времени",
         "walk-in": "Без отдельного действия",
         "prebook": "Предварительная запись",
+        "request": "Заявка на участие",
       };
       const effectiveParticipation = data.participationMode;
       items.push({

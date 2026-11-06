@@ -74,6 +74,8 @@ export type EventSimpleBookingData = {
   time?: string;
   /** Для режима time-slots — список доступных слотов */
   slots?: EventBookingSlot[];
+  /** Подпись кнопки записи; по умолчанию «Записаться». */
+  label?: string;
 };
 
 export type EventPageCtaConfig = {

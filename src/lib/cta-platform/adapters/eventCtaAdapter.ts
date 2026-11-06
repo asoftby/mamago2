@@ -101,6 +101,25 @@ function fromParticipationMode(input: EventCtaLegacyInput): CanonicalCtaSeed | n
     };
   }
 
+  // «Оставить заявку»: заявка возможна только если серверная запись включена; у старых событий с
+  // этим режимом колонки не заполнены, и кнопка не должна обещать несуществующую запись.
+  if (mode === "request" && input.bookingEnabled) {
+    return {
+      actionKind: "REQUEST",
+      sourceEntityType: "EVENT",
+      sourceEntityId: input.id,
+      primaryLabel: "Оставить заявку",
+      requestConfig: {
+        runtime: "BOOKING",
+        selectionMode: "NONE",
+      },
+      instructions: input.bookingNote ?? undefined,
+      contactFallback: createPhoneFallback(input.bookingPhone ?? "")
+        ? [createPhoneFallback(input.bookingPhone ?? "")!]
+        : undefined,
+    };
+  }
+
   if (mode === "request" || mode === "info-only" || mode === "walk-in") {
       return {
       actionKind: "DISCOVER",

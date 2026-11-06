@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -201,6 +202,8 @@ export async function PATCH(
         cityId: true,
         nextOccurrenceAt: true,
         scheduleJson: true,
+        bookingEnabled: true,
+        bookingMode: true,
         eventCategoryId: true,
         organizerId: true,
         coverImageId: true,
@@ -538,6 +541,17 @@ export async function PATCH(
 
     if (scheduleJsonDirty) {
       updateData.scheduleJson = nextScheduleJson as Prisma.InputJsonValue;
+    }
+
+    // «Оставить заявку» включает серверную запись (bookingEnabled/REQUEST_ONLY); смена режима выключает её.
+    const requestBookingPatch = deriveEventRequestBookingColumns({
+      participationMode: nextScheduleJson.participationMode,
+      current: { bookingEnabled: existing.bookingEnabled, bookingMode: existing.bookingMode },
+      hasBusiness: Boolean(nextBusinessId !== undefined ? nextBusinessId : existing.businessId),
+    });
+    if (requestBookingPatch) {
+      updateData.bookingEnabled = requestBookingPatch.bookingEnabled;
+      updateData.bookingMode = requestBookingPatch.bookingMode;
     }
 
     if (

@@ -220,6 +220,8 @@ export async function loadPublicActivityForCityPage(
     priceItems: (activity.priceItems as unknown) ?? null,
     faqItems: (activity.faqItems as unknown) ?? null,
     scheduleJson: activity.scheduleJson,
+    bookingEnabled: activity.bookingEnabled,
+    bookingMode: activity.bookingMode,
     coverImageId: activity.coverImageId,
     coverImage: activity.coverImage,
     coverImageUrl: resolveActivityCoverUrl({

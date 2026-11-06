@@ -49,6 +49,7 @@ export function EventSessionSelector({
   onSelect,
   onPlan,
   onBook,
+  bookLabel,
   isPlanned = false,
   priceLabel,
   purchaseUrl,
@@ -61,6 +62,8 @@ export function EventSessionSelector({
   onPlan?: () => void;
   /** Открыть модалку записи для конкретного сеанса */
   onBook?: (sessionId: string) => void;
+  /** Подпись кнопки записи; по умолчанию «Записаться». */
+  bookLabel?: string;
   isPlanned?: boolean;
   priceLabel?: string;
   purchaseUrl?: string;
@@ -107,7 +110,7 @@ export function EventSessionSelector({
             title={getDateLabel(s.startsAt)}
             sessionTitle={s.title}
             subtitle={subtitle}
-            primaryLabel={hasAction ? (purchaseUrl ? buyLabel : "Записаться") : undefined}
+            primaryLabel={hasAction ? (purchaseUrl ? buyLabel : (bookLabel ?? "Записаться")) : undefined}
             primaryHref={purchaseUrl}
             onPrimary={() => { onSelect(s.id); if (onBook) onBook(s.id); }}
             onPlan={() => { onSelect(s.id); onPlan?.(); }}
