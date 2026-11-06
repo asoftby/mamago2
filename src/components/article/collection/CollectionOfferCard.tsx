@@ -100,7 +100,7 @@ export function CollectionOfferCard({ card }: { card: ResolvedOfferEmbedCard }) 
         <div className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6259]">
           {[card.placeName, card.typeLabel].filter(Boolean).join(" · ")}
         </div>
-        <h3 className="mb-2 mt-1.5 font-serif text-[28px] font-normal leading-[1.05] tracking-tight [text-wrap:balance] md:text-[32px]">{card.title}</h3>
+        <h3 className="!mb-2 !mt-1.5 font-serif !text-[28px] !font-normal !leading-[1.05] !tracking-tight [text-wrap:balance] md:!text-[32px]">{card.title}</h3>
         <CollectionRating value={card.ratingValue} count={card.ratingCount} />
         <div className="mt-3.5 flex flex-wrap gap-1.5">
           {card.ageLabel ? <CollectionChip icon={<Baby />}>{card.ageLabel}</CollectionChip> : null}

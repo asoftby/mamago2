@@ -201,6 +201,33 @@ function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPrev
   });
 }
 
+/** Поля события для карточки подборки: одна выборка и для одиночного, и для пакетного запроса (без N+1). */
+const EVENT_CARD_SELECT = {
+  nextOccurrenceAt: true,
+  ageMinMonths: true,
+  ageMaxMonths: true,
+  priceFrom: true,
+  priceTo: true,
+  currency: true,
+  coverImageUrl: true,
+  description: true,
+  eventCategory: { select: { nameRu: true } },
+  place: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      customAddress: true,
+      formattedAddr: true,
+      districtManual: { select: { name: true } },
+      districtAuto: { select: { name: true } },
+      metroManual: { select: { name: true } },
+      metroAuto: { select: { name: true } },
+      city: { select: { slug: true } },
+    },
+  },
+} satisfies Prisma.ActivitySelect;
+
 async function resolveActivityCard(
   b: Extract<ArticleBlockMvp, { type: "activityCard" }>,
   prefetched?: Map<string, ResolvedActivityCard>,
@@ -217,14 +244,7 @@ async function resolveActivityCard(
         title: true,
         slug: true,
         type: true,
-        nextOccurrenceAt: true,
-        ageMinMonths: true,
-        ageMaxMonths: true,
-        priceFrom: true,
-        priceTo: true,
-        currency: true,
-        coverImageUrl: true,
-        place: { select: { title: true, city: { select: { slug: true } } } },
+        ...EVENT_CARD_SELECT,
       },
     });
     if (!a) return null;
@@ -433,14 +453,7 @@ async function loadBasicActivityCards(
             id: true,
             title: true,
             slug: true,
-            nextOccurrenceAt: true,
-            ageMinMonths: true,
-            ageMaxMonths: true,
-            priceFrom: true,
-            priceTo: true,
-            currency: true,
-            coverImageUrl: true,
-            place: { select: { title: true, city: { select: { slug: true } } } },
+            ...EVENT_CARD_SELECT,
           },
         })
       : [],
