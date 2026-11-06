@@ -89,7 +89,11 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
       let planId: string | null = null;
       try {
         assert.equal(draft.planItemId, null);
-        const updated = await updatePartyDraft(parent.id, draft.id, { version: draft.version, anchorOfferId: scienceId });
+        const foreignChild = await db.child.create({ data: { parentId: host.user.id, birthDate: new Date("2018-01-01") } });
+        await assert.rejects(updatePartyDraft(parent.id, draft.id, { version: draft.version, selectedChildId: foreignChild.id }), /профиль ребёнка недоступен/);
+        const child = await db.child.create({ data: { parentId: parent.id, birthDate: new Date("2018-01-01") } });
+        const updated = await updatePartyDraft(parent.id, draft.id, { version: draft.version, anchorOfferId: scienceId,
+          selectedChildId: child.id, childrenCount: 1 });
         const first = await submitPartyAnchor(parent.id, draft.id, updated.version, 'a5-test-replay');
         const replay = await submitPartyAnchor(parent.id, draft.id, updated.version, 'a5-test-replay');
         assert.equal(first.request.id, replay.request.id);
@@ -99,7 +103,7 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
         const plan = await db.planItem.findUniqueOrThrow({ where: { id: planId } });
         assert.equal(plan.visibility, 'PRIVATE');
         assert.equal(plan.date, day);
-        assert.equal(plan.childId, null);
+        assert.equal(plan.childId, child.id);
         assert.equal(plan.assigneeUserId, null);
         assert.equal(await db.planItem.count({ where: { partyOrder: { is: { id: draft.id } } } }), 1);
         await assert.rejects(cancelPartyBeforeConfirmation(host.user.id, draft.id, sent.version));
