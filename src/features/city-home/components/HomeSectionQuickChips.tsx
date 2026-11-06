@@ -30,8 +30,8 @@ export function HomeSectionQuickChips({ chips, label }: { chips: HomeQuickChip[]
 
 export function HomeEventsQuickChips({ citySlug }: { citySlug: string }) {
   return <HomeSectionQuickChips label="Быстрый переход к событиям" chips={[
-    { label: "сегодня", href: `/${citySlug}/events?preset=today` },
-    { label: "завтра", href: `/${citySlug}/events?preset=tomorrow` },
-    { label: "на выходных", href: `/${citySlug}/events?preset=weekend` },
+    { label: "Сегодня", href: `/${citySlug}/events?preset=today` },
+    { label: "Завтра", href: `/${citySlug}/events?preset=tomorrow` },
+    { label: "На выходных", href: `/${citySlug}/events?preset=weekend` },
   ]} />;
 }

@@ -10,9 +10,9 @@ test("home event chips link to date-filtered catalog, not to local carousel togg
   assert.match(html, /\bh-11\b/);
   assert.match(html, /\bpx-5\b/);
   assert.doesNotMatch(html, /\bmin-h-10\b/);
-  assert.match(html, /сегодня/);
-  assert.match(html, /завтра/);
-  assert.match(html, /на выходных/);
+  assert.match(html, /Сегодня/);
+  assert.match(html, /Завтра/);
+  assert.match(html, /На выходных/);
   assert.match(html, /preset=today/);
   assert.match(html, /preset=tomorrow/);
   assert.match(html, /preset=weekend/);

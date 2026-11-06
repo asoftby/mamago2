@@ -9,9 +9,9 @@ import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
 import { useDiscoveryFilters, type WhenPreset } from "@/features/filters/discovery/filters.store";
 
 const PRESETS: Array<{ value: Exclude<WhenPreset, null>; label: string }> = [
-  { value: "TODAY", label: "сегодня" },
-  { value: "TOMORROW", label: "завтра" },
-  { value: "WEEKEND", label: "выходные" },
+  { value: "TODAY", label: "Сегодня" },
+  { value: "TOMORROW", label: "Завтра" },
+  { value: "WEEKEND", label: "Выходные" },
 ];
 
 export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabled?: boolean }) {
