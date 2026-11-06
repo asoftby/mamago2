@@ -133,7 +133,7 @@ export interface OfferFormData {
   priceKind?: "EXACT" | "FROM" | "ON_REQUEST" | "FREE" | "RANGE" | "NONE" | "UNKNOWN";
   packageComponentsEdited?: boolean;
   packageComponentsBaseline?: Array<{ id?: string; title: string; category: PartyCategory }>;
-  packageComponents?: Array<{ id?: string; title: string; category: PartyCategory }>;
+  packageComponents?: Array<{ id?: string; title: string; category: PartyCategory; isOptional?: boolean }>;
 
   // Legacy fields (for backward compatibility)
   offerKind: "course" | "birthday" | "service" | null;

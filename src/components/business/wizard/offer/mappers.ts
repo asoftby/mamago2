@@ -746,7 +746,7 @@ export function buildOfferCreatePayload(
     productType,
     requestedPlacements,
     details: buildTypeDetails(data, opts?.status === "DRAFT"),
-    ...(productType === "PARTY_PACKAGE" && data.packageComponentsEdited ? { packageComponents: data.packageComponents, packageComponentsBaseline: data.packageComponentsBaseline ?? [] } : {}),
+    ...(productType === "PARTY_PACKAGE" && data.packageComponentsEdited ? { packageComponents: data.packageComponents?.map(({ id, title, category }) => ({ id, title, category })), packageComponentsBaseline: data.packageComponentsBaseline ?? [] } : {}),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
@@ -989,7 +989,7 @@ export function buildOfferUpdatePayload(
     productType,
     requestedPlacements,
     details: buildTypeDetails(data, opts?.preserveClassPricingDraft === true),
-    ...(productType === "PARTY_PACKAGE" && data.packageComponentsEdited ? { packageComponents: data.packageComponents, packageComponentsBaseline: data.packageComponentsBaseline ?? [] } : {}),
+    ...(productType === "PARTY_PACKAGE" && data.packageComponentsEdited ? { packageComponents: data.packageComponents?.map(({ id, title, category }) => ({ id, title, category })), packageComponentsBaseline: data.packageComponentsBaseline ?? [] } : {}),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
@@ -1164,7 +1164,7 @@ export function mapOfferToFormData(offer: {
   promotionDetails?: string | null;
   promotionalOffer?: string | null;
   currency?: string;
-  components?: Array<{ id: string; title: string; category: PartyCategory }>;
+  components?: Array<{ id: string; title: string; category: PartyCategory; isOptional?: boolean }>;
   priceFrom: number | null;
   priceTo?: number | null;
   priceMode?: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" | "ON_REQUEST";
@@ -1339,7 +1339,7 @@ export function mapOfferToFormData(offer: {
     persistedAge: { policy: offer.agePolicy, min: offer.ageMinMonths, max: offer.ageMaxMonths, groups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths) },
     persistedDetails: offer.details && typeof offer.details === "object" && !Array.isArray(offer.details) ? offer.details as Record<string, unknown> : {},
     packageComponentsBaseline: offer.components?.map(c => ({ id: c.id, title: c.title, category: c.category })),
-    packageComponents: offer.components?.map(c => ({ id: c.id, title: c.title, category: c.category })),
+    packageComponents: offer.components?.map(c => ({ id: c.id, title: c.title, category: c.category, isOptional: c.isOptional })),
     agePolicy: offer.agePolicy,
     coverImage: offer.coverImage,
     gallery,
@@ -1433,6 +1433,6 @@ export function mapOfferToFormData(offer: {
 export function withSavedPackageComponents(data: OfferFormData, components: NonNullable<OfferFormData["packageComponents"]>): OfferFormData {
   const persistedDetails = { ...data.persistedDetails };
   if (data.packageComponentsEdited) delete persistedDetails.includedCategories;
-  return { ...data, packageComponents: components, packageComponentsBaseline: components, packageComponentsEdited: false,
+  return { ...data, packageComponents: components, packageComponentsBaseline: components.map(({ id, title, category }) => ({ id, title, category })), packageComponentsEdited: false,
     persistedDetails, birthdayDetails: data.packageComponentsEdited ? { ...data.birthdayDetails, includedCategories: [] } : data.birthdayDetails };
 }

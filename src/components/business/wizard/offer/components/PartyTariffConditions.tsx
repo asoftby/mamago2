@@ -16,7 +16,7 @@ export function PartyTariffConditions({ value, onChange, disabled, components }:
   const numberField = (label: string, key: "durationMinutes" | "minAgeMonths" | "maxAgeMonths" | "minGuests" | "maxGuests") => (
     <label className="space-y-1 text-sm">
       <span>{label}</span>
-      <Input type="number" min={key === "durationMinutes" ? 1 : 0} step={1} value={value?.[key] || ""}
+      <Input type="number" min={key === "durationMinutes" ? 1 : 0} step={1} value={value?.[key] ?? ""}
         onChange={event => update({ [key]: event.target.value === "" ? key === "durationMinutes" ? 0 : undefined : event.target.valueAsNumber })} />
     </label>
   );

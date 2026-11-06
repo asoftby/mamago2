@@ -1,3 +1,4 @@
+import { partyTariffConditions } from "@/lib/offers/partyTariff";
 /**
  * Offer Wizard Steps Configuration by Type
  * 
@@ -412,7 +413,7 @@ export function isStepComplete(
               (data.pricingMode === "single"
                 ? !!data.singlePrice.trim()
                 : data.pricingOptions.length > 0 &&
-                  data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim()));
+                  data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim() && (!opt.partyConditions || partyTariffConditions.safeParse(opt.partyConditions).success)));
 
         if (!hasValidPricing) return false;
 

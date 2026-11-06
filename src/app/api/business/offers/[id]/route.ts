@@ -924,7 +924,7 @@ export async function PATCH(
           updatedAt: true,
           productType: true,
           placements: true,
-          components: { where: { archivedAt: null }, orderBy: { position: "asc" }, select: { id: true, title: true, category: true } },
+          components: { where: { archivedAt: null }, orderBy: { position: "asc" }, select: { id: true, title: true, category: true, isOptional: true } },
           place: {
             select: {
               id: true,
