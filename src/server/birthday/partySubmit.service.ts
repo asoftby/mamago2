@@ -62,21 +62,6 @@ export async function submitPartyAnchor(
   }
   const anchorProblem = partyAnchorProblem(party.venueMode, published);
   if (anchorProblem) throw new PartyApiError(422, anchorProblem);
-  // The builder filters by age and guests on the client; the server must not rely on it.
-  const requirements = { childrenCount: party.childrenCount, childAge: party.childAge, recipientAudience: party.recipientAudience };
-  const anchorRequirement = partyRequirementsProblem(published, requirements);
-  if (anchorRequirement) throw new PartyApiError(422, anchorRequirement);
-  const addonOffers = await prisma.offer.findMany({
-    where: { partyOrderItems: { some: { partyOrderId: partyId, role: "STANDALONE" } } },
-    select: {
-      title: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
-    },
-  });
-  for (const addon of addonOffers) {
-    const problem = partyRequirementsProblem(addon, requirements);
-    if (problem) throw new PartyApiError(422, problem + ". Измените состав праздника");
-  }
-
   // Capture narrowed values before the async transaction callback: TypeScript
   // correctly regards nullable Prisma model fields as potentially mutable.
   const anchorOfferId = anchor.offerId;
@@ -122,12 +107,24 @@ export async function submitPartyAnchor(
       throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
     }
 
+    let ageMonthsRange: { min: number; max: number } | null = null;
     if (party.selectedChildId) {
       const profile = await tx.child.findFirst({
         where: { id: party.selectedChildId, ...childScope }, select: { birthDate: true, birthPrecision: true },
       });
       if (!profile) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
-      assertPartyRecipientProfile(profile, eventDate, party.recipientAudience, party.childAge);
+      ageMonthsRange = assertPartyRecipientProfile(profile, eventDate, party.recipientAudience, party.childAge);
+    }
+    const requirements = { childrenCount, childAge: party.childAge, recipientAudience: party.recipientAudience, ageMonthsRange };
+    const anchorRequirement = partyRequirementsProblem(currentOffer, requirements);
+    if (anchorRequirement) throw new PartyApiError(422, anchorRequirement);
+    const addonOffers = await tx.offer.findMany({
+      where: { partyOrderItems: { some: { partyOrderId: partyId, role: "STANDALONE" } } },
+      select: { title: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true },
+    });
+    for (const addon of addonOffers) {
+      const problem = partyRequirementsProblem(addon, requirements);
+      if (problem) throw new PartyApiError(422, problem + ". Измените состав праздника");
     }
     await createPartyPlan(tx, { id: partyId, ownerUserId, selectedChildId: party.selectedChildId,
       eventDate, timeFrom: partyTimeFrom, timeTo: partyTimeTo }, familyId);

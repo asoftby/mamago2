@@ -34,14 +34,14 @@ export type PartyRequirementOffer = Pick<
  * covers months 12Y..12Y+11 and only a range entirely outside the offer is rejected.
  */
 export function partyRequirementsProblem(
-  offer: PartyRequirementOffer, party: { childrenCount: number; childAge: number | null; recipientAudience?: string | null },
+  offer: PartyRequirementOffer, party: { childrenCount: number; childAge: number | null; recipientAudience?: string | null; ageMonthsRange?: { min: number; max: number } | null },
 ): string | null {
   const name = offer.title ? "«" + offer.title + "»" : "Выбранная услуга";
   if (birthdayParticipantsCompatibility({ minChildren: offer.minChildren ?? null, maxChildren: offer.maxChildren ?? null },
     { childrenMin: party.childrenCount, childrenMax: party.childrenCount }) === "MISMATCH") return name + (offer.minChildren != null && party.childrenCount < offer.minChildren ? " рассчитана минимум на " + offer.minChildren + " детей" : " рассчитана максимум на " + offer.maxChildren + " детей");
   const policy = offer.agePolicy ?? (offer.ageMinMonths != null || offer.ageMaxMonths != null ? "SPECIFIC" : "UNKNOWN");
   if (birthdayAgeCompatibility({ agePolicy: policy, ageMinMonths: offer.ageMinMonths ?? null, ageMaxMonths: offer.ageMaxMonths ?? null },
-    party.childAge === null ? undefined : { min: party.childAge * 12, max: party.childAge * 12 + 11 },
+    party.ageMonthsRange ?? (party.childAge === null ? undefined : { min: party.childAge * 12, max: party.childAge * 12 + 11 }),
     party.childAge !== null ? (party.childAge >= 18 ? "ADULT" : "CHILD") :
       party.recipientAudience === "ADULT" || party.recipientAudience === "CHILD" ? party.recipientAudience : "UNKNOWN") === "MISMATCH") return name + " не подходит по возрасту ребёнка";
 

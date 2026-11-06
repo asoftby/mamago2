@@ -8,14 +8,15 @@ export function assertPartyRecipientProfile(
   audience: string | null,
   statedYears: number | null,
 ) {
-  if (!eventDate) return;
+  if (!eventDate) return null;
   const age = ageMonthsIntervalAt(child, eventDate);
-  if (!age || age.min < 0) return;
+  if (!age || age.min < 0) return null;
   if ((audience === "ADULT" && age.max < 216) ||
       (audience === "CHILD" && age.min >= 216) ||
       (statedYears !== null && (age.max < statedYears * 12 || age.min > statedYears * 12 + 11))) {
     throw new PartyApiError(422, "Возраст не соответствует выбранному профилю на дату праздника");
   }
+  return age;
 }
 
 /** Business DTOs call this field childAge, so adult recipient ages stay in the order. */

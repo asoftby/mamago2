@@ -50,6 +50,7 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
   }
   async function save(b:Business,label:string,change:(d:ReturnType<typeof getDefaultFormData>)=>void=()=>{}) {
     const form=getDefaultFormData(b.p.id);form.productType='PARTY_SERVICE';form.offerWizardType='SINGLE';form.partyCategory='SHOW';form.requestedPlacements=['BIRTHDAY'];
+    form.venuePitch='Фраза площадки';form.visitorNote='Условия посещения';
     form.title='A3 '+label;form.description='Structured synthetic birthday offer';form.shortDescription='Structured synthetic offer';form.agePolicy='UNRESTRICTED';
     form.singleCurrency='BYN';form.singlePrice='150';form.priceKind='EXACT';form.birthdayDetails={...form.birthdayDetails,locationType:'BOTH',included:'Materials',durationMinutes:60};
     change(form);
@@ -58,6 +59,7 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
     const loaded=await request(b,'/api/business/offers/'+created.id);const reopened=mapOfferToFormData(loaded);if(label==='science')reopened.partyCategory='SHOW';
     await request(b,'/api/business/offers/'+created.id,'PATCH',buildOfferUpdatePayload(reopened));
     const again=await request(b,'/api/business/offers/'+created.id);
+    assert.equal(again.venuePitch,form.venuePitch);assert.equal(again.visitorNote,form.visitorNote);
     assert.equal(again.agePolicy,form.agePolicy);assert.deepEqual(again.interestSlugs,form.interestSlugs);assert.equal(again.currency,form.singleCurrency);assert.equal(again.priceMode,form.priceKind);
     if(again.productType==='PARTY_PACKAGE') assert.deepEqual(again.components.map((c:{id:string})=>c.id),loaded.components.map((c:{id:string})=>c.id));
     // Synthetic moderation fixture, not a production moderation bypass.
@@ -133,7 +135,11 @@ test("Wizard persistence → canonical A1 → common matching/availability on Po
           recipientAudience: 'CHILD', selectedChildId: child.id });
         await assert.rejects(updatePartyDraft(parent.id,draft.id,{version:previous.version,childAge:7,recipientAudience:'ADULT'}), /Возраст не соответствует/);
         await assert.rejects(updatePartyDraft(parent.id,draft.id,{version:previous.version,selectedChildId:child.id,recipientAudience:'ADULT'}), /Возраст не соответствует/);
-        const adult = await updatePartyDraft(parent.id, draft.id, { version: previous.version, recipientAudience: 'ADULT' });
+        const profileOnly = await updatePartyDraft(parent.id, draft.id, { version: previous.version, anchorOfferId: hostId,
+          recipientAudience: null, childAge: null, selectedChildId: child.id });
+        await assert.rejects(submitPartyAnchor(parent.id,draft.id,profileOnly.version,'integration-minor-on-adult-offer'), /по возрасту/);
+        const cleared = await updatePartyDraft(parent.id, draft.id, { version: profileOnly.version, anchorOfferId: null });
+        const adult = await updatePartyDraft(parent.id, draft.id, { version: cleared.version, recipientAudience: 'ADULT' });
         assert.equal(adult.childAge,null);
         assert.equal(adult.selectedChildId,null);
         const candidates = await findCandidatesForParty(parent.id, draft.id, 'ANIMATOR', [], {performerRole:'HOST'});
