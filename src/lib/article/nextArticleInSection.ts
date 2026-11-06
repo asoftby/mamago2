@@ -49,6 +49,8 @@ export type PublicContinuousArticleDto = {
   blocks: ArticleMvpResolvedBlock[];
   geoScope: GeoScope;
   cityId: string | null;
+  /** Только у первой статьи ленты (seed): подгружаемые статьи тип не несут. */
+  publicationType?: "ARTICLE" | "COLLECTION" | "BREAKING_NEWS";
 };
 
 export type FindNextArticleInSectionInput = {

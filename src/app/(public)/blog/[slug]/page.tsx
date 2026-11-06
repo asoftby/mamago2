@@ -476,6 +476,7 @@ export default async function ArticlePage({
         cityId: null,
         citySlug: null,
         documentTitle: schemaArticle?.seoTitle?.trim() || `${mvp.title} — mamaGo`,
+        publicationType: mvp.publicationType,
       });
       const { blocks: _blocks, ...seedWithoutBlocks } = seed;
       void _blocks;

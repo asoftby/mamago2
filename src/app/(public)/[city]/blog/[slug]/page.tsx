@@ -289,6 +289,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       cityId: city.id,
       citySlug: city.slug,
       documentTitle: articleRow.seoTitle?.trim() || `${mvp.title} — mamaGo`,
+      publicationType: mvp.publicationType,
     });
     const { blocks: _blocks, ...seedWithoutBlocks } = seed;
     void _blocks;
