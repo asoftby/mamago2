@@ -487,6 +487,9 @@ test("two businesses cannot confirm the same standalone party item concurrently"
   })));
   assert.equal(attempts.filter(x => x.status === "fulfilled").length, 1,
     "Exactly one performer must be confirmed for one party item");
+  const rejected = attempts.find(x => x.status === "rejected");
+  assert.ok(rejected?.reason instanceof PartyApiError && rejected.reason.status === 409);
+
   const winner = await db.partyOrderItem.findUniqueOrThrow({ where: { id: item.id } });
   assert.equal(winner.status, "CONFIRMED");
   assert.ok(entries.some(e => e.request.id === winner.confirmedBookingRequestId));

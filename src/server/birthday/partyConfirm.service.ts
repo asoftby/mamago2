@@ -32,10 +32,17 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
   // Covers the site and the Telegram confirmation, which both call this service.
   assertPartyConfirmationEnabled();
   const dedupeKey = `party:${requestId}:confirmed:${idempotencyKey}`;
-  try {
+  for (let attempt = 0; ; attempt++) try {
     return await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "BookingRequest"
-        WHERE "id" = ${requestId} FOR UPDATE`;
+      // Lock the requests that confirmation can close in a stable order.
+      // Locking only our own request first deadlocks on the common item.
+      await tx.$queryRaw`SELECT candidate."id" FROM "BookingRequest" AS candidate
+        WHERE candidate."id" = ${requestId}
+          OR candidate."partyOrderItemId" = (
+            SELECT "partyOrderItemId" FROM "BookingRequest"
+            WHERE "id" = ${requestId} AND "businessId" = ${businessId}
+          )
+        ORDER BY candidate."id" FOR UPDATE`;
       const now = new Date();
       const req = await tx.bookingRequest.findFirst({
         where: { id: requestId, businessId, kind: BookingKind.PARTY },
@@ -239,6 +246,19 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {
     if (isAllocationOverlapError(error)) throw new PartyApiError(409, "Этот ресурс только что заняли");
+    // Retry the whole rolled-back transaction. The outbox and allocations
+    // are transactional, and a committed replay still uses the same key.
+    if (isConfirmationDeadlock(error)) {
+      if (attempt < 2) continue;
+      throw new PartyApiError(409, "Подтверждение изменилось. Обновите заявку");
+    }
     throw error;
   }
+}
+
+function isConfirmationDeadlock(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const prismaError = error as Error & { code?: string; meta?: { code?: string } };
+  return prismaError.code === "P2034" || prismaError.code === "40P01" ||
+    prismaError.meta?.code === "40P01" || /\b40P01\b/.test(error.message);
 }
