@@ -29,32 +29,8 @@ function getAgeYears(birthDate: string | null | undefined): number | null {
   return age >= 0 ? age : null;
 }
 
-/**
- * Найти возрастную группу по возрасту в годах
- * Например: 2 года → "1-3", 5 лет → "3-5", 18 лет → "18+"
- */
-function findAgeGroupByYears(ageYears: number): string | null {
-  // Ищем группу, в которую попадает этот возраст
-  for (const group of AGE_GROUPS) {
-    // Парсим диапазон из label: "0–1 год", "1–3 года", "18+"
-    const label = group.label;
-
-    if (label === "18+") {
-      if (ageYears >= 18) return group.value;
-    } else {
-      // Парсим "X–Y" формат
-      const match = label.match(/(\d+)–(\d+)/);
-      if (match) {
-        const min = parseInt(match[1], 10);
-        const max = parseInt(match[2], 10);
-        if (ageYears >= min && ageYears <= max) {
-          return group.value;
-        }
-      }
-    }
-  }
-
-  return null;
+export function findAgeGroupsByYears(ageYears: number): string[] {
+  return AGE_GROUPS.filter(group => ageYears >= group.min && (group.max == null || ageYears <= group.max)).map(group => group.value);
 }
 
 /**
@@ -86,8 +62,7 @@ export function mapPlanParticipantsToAudience(
       // Ребёнок → его возрастная группа
       const ageYears = getAgeYears(persona.birthDate);
       if (ageYears !== null) {
-        const groupValue = findAgeGroupByYears(ageYears);
-        if (groupValue) {
+        for (const groupValue of findAgeGroupsByYears(ageYears)) {
           ageGroups.add(groupValue);
         }
       }

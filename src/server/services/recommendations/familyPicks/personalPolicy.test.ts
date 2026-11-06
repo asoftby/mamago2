@@ -125,6 +125,24 @@ test("multi-persona global selection ranks verified child/adult fits first but n
   assert.deepEqual(adultAndKid.slice(0, 2).map(item => item.candidate.id), ["adults", "for-six"]);
 });
 
+test("Nov 7 2026 cyberclass age 9–18 is ranked ahead of mismatches for a selected child", () => {
+  const taya = { id: "taya", birthDate: new Date("2016-06-15T00:00:00Z"), birthPrecision: "DAY" as const };
+  const saturday = new Date("2026-11-07T08:30:00Z");
+  const cyberclass = event("cyberclass-life", {
+    agePolicy: "SPECIFIC", ageMinMonths: 108, ageMaxMonths: 216,
+    occurrences: [saturday], sharedScore: 1,
+  });
+  const mismatch = event("not-for-taya", {
+    agePolicy: "SPECIFIC", ageMinMonths: 0, ageMaxMonths: 60,
+    occurrences: [saturday], sharedScore: 999,
+  });
+  const selection = { mode: "PERSONAS" as const, selectedChildIds: ["taya"], includeAdult: false };
+  const result = selectPersonalFamilyPicks([mismatch, cyberclass], [taya], selection);
+  assert.equal(result[0]?.candidate.id, "cyberclass-life");
+  assert.equal(result[0]?.targetFit, true);
+  assert.equal(result[0]?.startsAt.toISOString(), saturday.toISOString());
+});
+
 test("multiple sessions: card date and matching children are one consistent proof", () => {
   const child = { ...children[0]!, birthDate: new Date("2024-11-06Z") };
   const before = new Date("2030-11-04Z"), after = new Date("2030-11-07Z");
