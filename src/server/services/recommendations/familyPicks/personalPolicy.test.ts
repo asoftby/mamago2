@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { confirmedAgeMatchAt, selectPersonalFamilyPicks, type PersonalFamilyCandidate, type PersonalFamilyChild } from "./select";
 import { collectConfirmedOccurrences, resolvePersonalShowWindow } from "./window";
-import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError } from "./load";
+import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError, upcomingPlanBlocksFamilyPick, partitionPlannedFamilyPickExclusions, excludePlannedFamilyPickDates } from "./load";
 import { PLAN_SUGGESTION_ALGORITHM_VERSION, type RankedPlanSuggestion, type PlanSuggestionRankedBatch } from "@/server/services/planSuggestions.service";
 import { readFileSync } from "node:fs";
 
@@ -125,6 +125,24 @@ test("multi-persona global selection ranks verified child/adult fits first but n
   assert.deepEqual(adultAndKid.slice(0, 2).map(item => item.candidate.id), ["adults", "for-six"]);
 });
 
+test("Nov 7 2026 cyberclass age 9–18 is ranked ahead of mismatches for a selected child", () => {
+  const taya = { id: "taya", birthDate: new Date("2016-06-15T00:00:00Z"), birthPrecision: "DAY" as const };
+  const saturday = new Date("2026-11-07T08:30:00Z");
+  const cyberclass = event("cyberclass-life", {
+    agePolicy: "SPECIFIC", ageMinMonths: 108, ageMaxMonths: 216,
+    occurrences: [saturday], sharedScore: 1,
+  });
+  const mismatch = event("not-for-taya", {
+    agePolicy: "SPECIFIC", ageMinMonths: 0, ageMaxMonths: 60,
+    occurrences: [saturday], sharedScore: 999,
+  });
+  const selection = { mode: "PERSONAS" as const, selectedChildIds: ["taya"], includeAdult: false };
+  const result = selectPersonalFamilyPicks([mismatch, cyberclass], [taya], selection);
+  assert.equal(result[0]?.candidate.id, "cyberclass-life");
+  assert.equal(result[0]?.targetFit, true);
+  assert.equal(result[0]?.startsAt.toISOString(), saturday.toISOString());
+});
+
 test("multiple sessions: card date and matching children are one consistent proof", () => {
   const child = { ...children[0]!, birthDate: new Date("2024-11-06Z") };
   const before = new Date("2030-11-04Z"), after = new Date("2030-11-07Z");
@@ -159,7 +177,7 @@ function fixture(dates: Date[]) {
     children: children.map(child => ({ ...child, name: null, birthDate: child.birthDate as Date, systemInterests: [] })) };
   return { calls, profile, deps: {
     loadProfile: async () => profile,
-    loadExcluded: async () => [],
+    loadExcluded: async () => ({ excludedActivityIds: [], plannedDatesByActivity: {} }),
     loadAffinity: async () => ({ subjects: [], outcomeEventCount: 0, horizonDays: 365 }),
     rank: async (input: { dateFrom?: string; dateTo?: string }): Promise<PlanSuggestionRankedBatch> => {
       calls.push(input.dateTo!);
@@ -244,4 +262,48 @@ test("adult-only persona and manual 18+ retain open-ended 18+ and 21+ sessions",
   assert.deepEqual(adult.map(item => item.candidate.id), expected);
   assert.ok(manual.every(item => item.targetFit));
   assert.ok(adult.every(item => item.targetFit));
+});
+
+test("past family visits do not exclude future sessions; future bookings respect audience", () => {
+  const now = new Date("2026-11-06T10:00:00+03:00");
+  const base = { date: "2026-10-27", startsAt: null, childId: null, assigneeUserId: null };
+  const forTaya = { mode: "PERSONAS" as const, selectedChildIds: ["taya"], includeAdult: false };
+  assert.equal(upcomingPlanBlocksFamilyPick(base, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-06" }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", childId: "stepa" }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", childId: "taya" }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: null, startsAt: new Date("2026-10-27T10:00:00Z") }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: null }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, { ...forTaya, includeAdult: true }, "owner", now), true);
+});
+
+test("Cyberclass: planned Nov 9 session does not hide available Nov 7/8 sessions for Taya", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+  const selection = { mode: "CHILD" as const, selectedChildId: "taya" };
+  const plan = partitionPlannedFamilyPickExclusions([
+    { activityId: "cyberclass", date: "2026-10-14", startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "cyberclass", date: "2026-10-27", startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "cyberclass", date: "2026-11-09", startsAt: null, childId: null, assigneeUserId: null },
+  ], selection, "owner", now);
+  assert.deepEqual(plan.excludedActivityIds, []);
+  assert.deepEqual(plan.plannedDatesByActivity, { cyberclass: ["2026-11-09"] });
+  const sessions = [7, 8, 9].map(day => new Date(`2026-11-${String(day).padStart(2,"0")}T08:30:00Z`));
+  assert.deepEqual(excludePlannedFamilyPickDates("cyberclass", sessions, plan.plannedDatesByActivity), sessions.slice(0, 2));
+  const child = { id: "taya", birthDate: new Date("2015-01-01Z"), birthPrecision: "DAY" as const };
+  const picks = selectPersonalFamilyPicks([{ ...event("cyberclass", { ageMinMonths: 108, ageMaxMonths: 216 }), occurrences: sessions.slice(0, 2) }], [child], selection);
+  assert.equal(picks[0]?.candidate.id, "cyberclass");
+  assert.equal(picks[0]?.startsAt.toISOString(), sessions[0]!.toISOString());
+});
+
+test("undated plans still block entirely; sibling plans do not block Taya", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+  const selection = { mode: "CHILD" as const, selectedChildId: "taya" };
+  const plans = partitionPlannedFamilyPickExclusions([
+    { activityId: "undated", date: null, startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "sibling", date: "2026-11-07", startsAt: null, childId: "stepa", assigneeUserId: null },
+    { activityId: "taya-event", date: "2026-11-07", startsAt: null, childId: "taya", assigneeUserId: null },
+  ], selection, "owner", now);
+  assert.deepEqual(plans.excludedActivityIds, ["undated"]);
+  assert.deepEqual(plans.plannedDatesByActivity, { "taya-event": ["2026-11-07"] });
 });

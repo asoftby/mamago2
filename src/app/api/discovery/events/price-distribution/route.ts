@@ -1,3 +1,4 @@
+import { parseQuickFilterPreset } from "@/features/filters/discovery/quickFilterPresets";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
       categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],
       genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
       occasionSlug: p.get("occasion") === "halloween" ? "halloween" : null,
-      dateRange: resolveEventDateRange({ preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null, from: p.get("from"), to: p.get("to") }),
+      dateRange: resolveEventDateRange({ preset: parseQuickFilterPreset(preset), from: p.get("from"), to: p.get("to") }),
       free: p.get("free") === "true",
       priceMin: null,
       priceMax: null,

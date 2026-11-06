@@ -1,3 +1,4 @@
+import { parseQuickFilterPreset } from "@/features/filters/discovery/quickFilterPresets";
 import Link from "next/link";
 import { listAvailableTerritories } from "@/server/territory/listAvailableTerritories";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
@@ -18,7 +19,7 @@ export async function BelarusTripIdeas({ searchParams }: { searchParams: Params 
     genreSlugs: first("genre")?.split(",").filter(Boolean) ?? [],
     occasionSlug: first("occasion") === "halloween" ? "halloween" : null,
     dateRange: resolveEventDateRange({
-      preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null,
+      preset: parseQuickFilterPreset(preset),
       from: first("from") ?? first("dateFrom"),
       to: first("to") ?? first("dateTo"),
     }),

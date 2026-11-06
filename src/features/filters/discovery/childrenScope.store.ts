@@ -31,16 +31,11 @@ export function deriveAgeRangesFromChildren(
     let years = now.getFullYear() - b.getFullYear();
     const m = now.getMonth() - b.getMonth();
     if (m < 0 || (m === 0 && now.getDate() < b.getDate())) years -= 1;
-    const group = AGE_GROUPS.find(
-      (g) => years >= g.min && (g.max == null || years <= g.max),
-    );
-    if (!group) continue;
-    if (!byRange.has(group.value)) {
-      byRange.set(group.value, {
-        range: group.value,
-        source: "child",
-        childId: child.id,
-      });
+    for (const group of AGE_GROUPS) {
+      if (years < group.min || (group.max != null && years > group.max)) continue;
+      if (!byRange.has(group.value)) {
+        byRange.set(group.value, { range: group.value, source: "child", childId: child.id });
+      }
     }
   }
 
@@ -122,8 +117,9 @@ export function useChildrenScope(params: {
       );
     }
 
-    // Fallback: все дети (если контекст ещё не загружен)
-    return availableChildren.map((c) => c.id);
+    // Never paint all children selected during auth/persona hydration:
+    // that falsely shows a previous or free selection on route transitions.
+    return [];
   }, [availableChildren, allowedChildSet, familySync]);
 
   /**

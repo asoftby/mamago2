@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { SECTION_NAV_CHIP_HEIGHT, SECTION_NAV_CHIP_HORIZONTAL_PADDING } from "@/components/ui/sectionChipStyles";
 
 export type HomeQuickChip = { label: string; href: string };
 
@@ -18,7 +19,7 @@ export function HomeSectionQuickChips({ chips, label }: { chips: HomeQuickChip[]
         if (applied.age.length && !params.has("age")) params.set("age", applied.age.join(","));
         return (
           <Link key={chip.href} href={`${path}${params.size ? `?${params.toString()}` : ""}`}
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary">
+            className={`inline-flex ${SECTION_NAV_CHIP_HEIGHT} ${SECTION_NAV_CHIP_HORIZONTAL_PADDING} shrink-0 items-center justify-center rounded-full border border-border bg-background text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary`}>
             {chip.label}
           </Link>
         );
@@ -29,8 +30,8 @@ export function HomeSectionQuickChips({ chips, label }: { chips: HomeQuickChip[]
 
 export function HomeEventsQuickChips({ citySlug }: { citySlug: string }) {
   return <HomeSectionQuickChips label="Быстрый переход к событиям" chips={[
-    { label: "Сегодня", href: `/${citySlug}/events?preset=TODAY` },
-    { label: "Завтра", href: `/${citySlug}/events?preset=TOMORROW` },
-    { label: "На выходных", href: `/${citySlug}/events?preset=WEEKEND` },
+    { label: "сегодня", href: `/${citySlug}/events?preset=today` },
+    { label: "завтра", href: `/${citySlug}/events?preset=tomorrow` },
+    { label: "на выходных", href: `/${citySlug}/events?preset=weekend` },
   ]} />;
 }

@@ -136,7 +136,7 @@ export async function updatePartyDraft(
     throw new PartyApiError(422, "Для дополнительных услуг выберите основную");
   }
 
-  const { version, anchorOfferId, addonOfferIds, addonCategories, ...changes } = input;
+  const { version, anchorOfferId, anchorNote, addonOfferIds, addonCategories, ...changes } = input;
   void anchorOfferId;
   void addonOfferIds;
   void addonCategories;
@@ -172,6 +172,7 @@ export async function updatePartyDraft(
             partyOrderId: partyId, category: anchor.category ?? PartyCategory.OTHER,
             offerId: anchor.id, businessId, role: "ANCHOR",
             offerPriceSnapshot: snapshotDecimal(anchor),
+            note: anchorNote?.trim() || null,
             position: 0,
           },
         });

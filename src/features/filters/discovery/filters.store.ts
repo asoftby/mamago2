@@ -21,6 +21,7 @@ import {
 import { parseActivityFormatQuery, serializeActivityFormatQuery } from "@/domain/activities/activity-format";
 import {
   defaultFilters,
+  mergeCatalogPersonaAge,
   parseAppliedFromUrl,
   resetListingPage,
   type DiscoveryFilters,
@@ -295,7 +296,7 @@ export function serializeAppliedToSearchParams(
   params.delete("dateFrom");
   params.delete("dateTo");
 
-  if (next.whenPreset) params.set("preset", next.whenPreset);
+  if (next.whenPreset) params.set("preset", next.whenPreset.toLowerCase());
   else params.delete("preset");
 
   if (next.age.length > 0) params.set("age", next.age.join(","));
@@ -576,6 +577,16 @@ export function useDiscoveryFilters() {
     () => ({
       /** @deprecated Кнопки Go больше нет — оставлено для совместимости */
       apply: () => {},
+      /**
+       * An explicit family-chip change must survive immediate navigation from
+       * the city homepage to the events catalog. Home has no discovery intent,
+       * so its debounced URL update would otherwise never update kuda's saved
+       * filters. Persist only the age facet; preserve catalog-specific choices.
+       */
+      persistPersonaAudience: (age: string[]) => {
+        const previous = loadDiscoveryFiltersSession(cityForSession, "kuda") ?? defaultFilters;
+        saveDiscoveryFiltersSession(cityForSession, "kuda", mergeCatalogPersonaAge(previous, age));
+      },
       /** Немедленная запись в URL (реактивные фильтры), с дебаунсом 150мс */
       setDraft: patchFilters,
       resetAll: () => {

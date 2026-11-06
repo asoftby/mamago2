@@ -143,7 +143,10 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
   };
 
   let plaque: ReactNode;
-  if (isFamily) {
+  if (persona?.loading) {
+    // Профиль ещё грузится: резервируем место, чтобы гостевая плашка не мигала перед семейной.
+    plaque = <div aria-hidden="true" className="mb-5 min-h-[132px] rounded-[22px] border border-[rgba(20,18,16,.06)] bg-[#FAF7F1]/60" />;
+  } else if (isFamily) {
     const options = [{ id: "all", label: "Всем вместе" }, ...familyKids.map((k) => ({ id: k.id, label: k.name || "Ребёнок" }))];
     plaque = (
       <Plaque title="Порядок подобран под вашу семью" hint="Состав подборки у всех одинаковый">

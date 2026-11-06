@@ -206,6 +206,9 @@ assert.equal(renderToStaticMarkup(<ArticleGallery images={[]} />), "");
   assert.ok(source.includes("Promise.race"), "stalled image requests cannot lock navigation forever");
   assert.ok(source.includes("lightboxImageReadyCache.delete(url)"), "stalled readiness entries are retryable");
   assert.ok(source.includes("settling: true"), "incoming slide stays mounted while the committed frame paints underneath");
+  assert.ok(source.includes("(!transition || transition.settling) ? ("), "never render a stationary third photo behind a moving pair");
+  assert.ok(source.includes("onTransitionEnd={(event) => {"), "slide settles after the real CSS transform finishes");
+  assert.ok(source.includes("window.setTimeout(finishLightboxSlide, 380)"), "interrupted transitions still settle");
 }
 
 // Mobile in-article gallery must animate immediately and preload adjacent photos.
@@ -229,6 +232,9 @@ assert.equal(renderToStaticMarkup(<ArticleGallery images={[]} />), "");
   assert.ok(source.includes("tabIndex={interactive ? 0 : -1}"), "preloaded slides stay out of the tab order");
   assert.ok(source.includes("aria-hidden={index !== mobileIndex}"), "off-screen slides stay hidden from assistive technology");
   assert.ok(source.includes("setMobileTransition({ from: mobileIndex, to, direction, moving: false })"));
+  assert.ok(source.includes('mobileTransition?.moving && "transition-transform'), "after the swipe, track positions are rebased with animation disabled");
+  assert.ok(source.includes("index === mobileTransition?.to) finishMobileSlide()"), "mobile swipe commits on transform completion");
+  assert.ok(source.includes("window.setTimeout(finishMobileSlide, 380)"), "interrupted mobile swipes settle without stranding the gallery");
   assert.ok(!source.includes("waitForLightboxImageReady(targetUrl) : Promise.resolve(true)).then(\n        (ready) => {\n          if (navigationTokenRef.current !== token) return;\n          preparingNavigationRef.current = false;\n          if (!ready) return;\n          setMobileTransition"), "mobile carousel navigation must never wait for lightbox readiness");
   assert.ok(source.includes("didMobileSwipeRef"), "touch swipe must not open the lightbox via the synthetic click");
 }

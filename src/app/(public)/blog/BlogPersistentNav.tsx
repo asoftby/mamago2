@@ -144,7 +144,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
   ];
 
   return (
-    <section className="border-b border-border" aria-label="Разделы журнала">
+    <section className="pt-3 sm:pt-4" aria-label="Разделы журнала">
       <div className="site-wrap relative">
       <nav ref={scrollRef} className="no-scrollbar flex h-[56px] items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap px-6 sm:px-7" aria-label="Разделы журнала">
         {pills.map((pill) => {

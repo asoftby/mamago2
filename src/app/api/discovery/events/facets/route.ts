@@ -1,3 +1,4 @@
+import { parseQuickFilterPreset } from "@/features/filters/discovery/quickFilterPresets";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     eventFilters: {
       categorySlugs: [], genreSlugs: [], occasionSlug: null,
       dateRange: resolveEventDateRange({
-        preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null,
+        preset: parseQuickFilterPreset(preset),
         from: p.get("from"), to: p.get("to"),
       }),
       free: false, priceMin: null, priceMax: null,

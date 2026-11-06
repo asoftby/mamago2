@@ -233,6 +233,25 @@ export function confirmedPlanOccurrencesWhere(
 }
 
 /**
+ * HOME's personalized 30-day selector needs every eligible local candidate
+ * before its age/interest ranking. A silent first-120 SQL cut makes valid
+ * events invisible to the selector, regardless of how well they match.
+ * Keep normal interactive suggestions bounded; remote fallback is separately
+ * bounded to avoid a country-wide scan.
+ */
+export function planSuggestionCandidateTake(input: {
+  exhaustiveCandidatePool: boolean;
+  homeGeoFallback: boolean;
+  externalGeo: boolean;
+  take: number;
+}): number | undefined {
+  if (input.externalGeo) return 24;
+  if (input.exhaustiveCandidatePool) return undefined;
+  if (input.homeGeoFallback) return 120;
+  return Math.min(80, Math.max(input.take * 5, 24));
+}
+
+/**
  * Shared ranked EVENT batch. The function is surface-agnostic: My Plan,
  * Telegram and future consumers may pass different candidate windows, but
  * scoring/engagement interpretation remains one shared implementation.
@@ -313,6 +332,11 @@ export async function rankPlanSuggestionsForCity(
     format: string;
   };
 
+  const candidateTake = (externalGeoWhere?: Prisma.ActivityWhereInput) => planSuggestionCandidateTake({
+    exhaustiveCandidatePool, homeGeoFallback: input.homeGeoFallback === true,
+    externalGeo: Boolean(externalGeoWhere), take,
+  });
+
   async function fetchCandidateRows(
     withAgePreference: boolean,
     externalGeoWhere?: Prisma.ActivityWhereInput,
@@ -324,12 +348,10 @@ export async function rankPlanSuggestionsForCity(
         ...baseAnd.slice(2), ...agePart,
         ...(externalGeoWhere && scope ? [{ NOT: activityInExactTerritoryScopeWhere(scope.territoryIds) }] : [])],
     };
+    const limit = candidateTake(externalGeoWhere);
     return (await prisma.activity.findMany({
       where,
-      ...(externalGeoWhere ? { take: 24 }
-        : input.homeGeoFallback ? { take: 120 }
-        : exhaustiveCandidatePool ? {}
-        : { take: Math.min(80, Math.max(take * 5, 24)) }),
+      ...(limit === undefined ? {} : { take: limit }),
       orderBy: input.homeGeoFallback
         ? [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]
         : [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],

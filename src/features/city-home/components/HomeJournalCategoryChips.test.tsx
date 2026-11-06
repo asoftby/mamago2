@@ -9,6 +9,8 @@ test("home journal shows linked image-led pills from actual categories", () => {
     { id: "b", slug: "reviews", name: "Обзоры", thumbnailUrl: null, hasNewArticle: false },
   ]} />);
   assert.match(html, /Категории журнала/);
+  assert.match(html, /\bh-11\b/);
+  assert.match(html, /\bsize-9\b/);
   assert.match(html, /\/minsk\/blog\/category\/routes/);
   assert.match(html, /\/minsk\/blog\/category\/reviews/);
   assert.match(html, /\/routes.jpg/);
