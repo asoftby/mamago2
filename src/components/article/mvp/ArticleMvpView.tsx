@@ -7,6 +7,7 @@ import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventC
 import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferCardBlock";
 import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed";
 import { CollectionOfferCard } from "@/components/article/collection/CollectionOfferCard";
+import { CollectionPersonalList } from "@/components/article/collection/CollectionPersonalList";
 import { CollectionEventCard } from "@/components/article/collection/CollectionEventCard";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
@@ -140,6 +141,57 @@ export function ArticleMvpView({
   const showToc = shouldShowArticleToc(headingEntries);
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
   const firstBodyBlockIndex = blocks.findIndex((b) => b.type !== "intro");
+
+  const renderActivityCard = (block: Extract<ArticleMvpResolvedBlock, { type: "activityCard" }>): ReactNode => {
+          const c = block.card;
+          const cardTitle = c && "title" in c ? c.title : null;
+          const wrap = (node: ReactNode) => (
+            <ArticlePerformanceScope blocks={[activityDescriptor(block, cardTitle)]} mode="card">
+              {node}
+            </ArticlePerformanceScope>
+          );
+          if (block.entityType === "PLACE") {
+            if (!c || c.kind !== "place-live") return null;
+            return wrap(<ArticleLivePlaceBlock card={c} />);
+          }
+          if (!c) return <p className="text-sm text-muted-foreground my-6">Карточка: сущность не найдена</p>;
+          const isCollection = publicationType === "COLLECTION";
+          if (isCollection && block.entityType === "EVENT" && c.kind === "basic" && c.event) {
+            return wrap(<CollectionEventCard card={c} activityId={block.entityId} />);
+          }
+          if (isCollection && c.kind === "offer-embed") {
+            return wrap(<CollectionOfferCard card={c} />);
+          }
+          if (block.entityType === "EVENT" && c.kind === "basic") {
+            return wrap(
+              <ArticleEventCardBlock title={c.title} href={c.href} dateLabel={c.meta ?? ""} location="" ageLabel="" badge="" />,
+            );
+          }
+          if (c.kind === "offer-embed") return wrap(<ArticleOfferEmbed card={c} />);
+          if (c.kind === "place-embed" || c.kind === "place-live") return null;
+          return wrap(<ArticleOfferCardBlock title={c.title} href={c.href} image={c.imageUrl ?? undefined} />);
+  };
+
+  // Подборка: подряд идущие связанные карточки переупорядочиваются на клиенте под возраст детей.
+  // Серверная выдача одинакова для всех (общий кеш), персональный порядок строится только в браузере.
+  const collectionRun = publicationType === "COLLECTION"
+    ? blocks.filter(
+        (b): b is Extract<ArticleMvpResolvedBlock, { type: "activityCard" }> =>
+          b.type === "activityCard" && b.id.startsWith("linked-") && !!b.card,
+      )
+    : [];
+  const collectionRunIds = new Set(collectionRun.map((b) => b.id));
+  const collectionRunItems = collectionRun.map((b) => {
+    const c = b.card;
+    const age =
+      c && c.kind === "offer-embed"
+        ? { ageMinMonths: c.ageMinMonths ?? null, ageMaxMonths: c.ageMaxMonths ?? null }
+        : c && c.kind === "basic" && c.event
+          ? { ageMinMonths: c.event.ageMinMonths, ageMaxMonths: c.event.ageMaxMonths }
+          : { ageMinMonths: null, ageMaxMonths: null };
+    return { id: b.id, title: c && "title" in c ? c.title : "", ...age, node: renderActivityCard(b) };
+  });
+
   const subtitleTrim = (isBreakingNews ? "" : subtitle?.trim()) || "";
   const leadHtml = !isBreakingNews ? deriveArticleLeadHtml({ blocks: blocks as ArticleBlockMvp[] }) : null;
   const leadPlain = deriveArticleLeadPlainText({ blocks: blocks as ArticleBlockMvp[] }) || "";
@@ -245,6 +297,16 @@ export function ArticleMvpView({
               const block = group.block;
               if (block.type === "intro") return null;
 
+              if (collectionRunIds.has(block.id)) {
+                if (block.id !== collectionRun[0].id) return null;
+                return (
+                  <Fragment key={block.id}>
+                    {tocBeforeBody}
+                    <div className="my-6"><CollectionPersonalList items={collectionRunItems} /></div>
+                  </Fragment>
+                );
+              }
+
               const body = (() => {
                 if (block.type === "text") {
                   const legacyEmbed = parseArticleEmbed(block.text);
@@ -311,35 +373,7 @@ export function ArticleMvpView({
                   const descriptor = structuredBlockRenders(block) ? [structuredDescriptor(block)] : [];
                   return <ArticlePerformanceScope blocks={descriptor} mode="info"><ArticleInfoCard data={block.data} /></ArticlePerformanceScope>;
                 }
-                if (block.type === "activityCard") {
-                  const c = block.card;
-                  const cardTitle = c && "title" in c ? c.title : null;
-                  const wrap = (node: ReactNode) => (
-                    <ArticlePerformanceScope blocks={[activityDescriptor(block, cardTitle)]} mode="card">
-                      {node}
-                    </ArticlePerformanceScope>
-                  );
-                  if (block.entityType === "PLACE") {
-                    if (!c || c.kind !== "place-live") return null;
-                    return wrap(<ArticleLivePlaceBlock card={c} />);
-                  }
-                  if (!c) return <p className="text-sm text-muted-foreground my-6">Карточка: сущность не найдена</p>;
-                  const isCollection = publicationType === "COLLECTION";
-                  if (isCollection && block.entityType === "EVENT" && c.kind === "basic" && c.event) {
-                    return wrap(<div className="my-6"><CollectionEventCard card={c} activityId={block.entityId} /></div>);
-                  }
-                  if (isCollection && c.kind === "offer-embed") {
-                    return wrap(<div className="my-6"><CollectionOfferCard card={c} /></div>);
-                  }
-                  if (block.entityType === "EVENT" && c.kind === "basic") {
-                    return wrap(
-                      <ArticleEventCardBlock title={c.title} href={c.href} dateLabel={c.meta ?? ""} location="" ageLabel="" badge="" />,
-                    );
-                  }
-                  if (c.kind === "offer-embed") return wrap(<ArticleOfferEmbed card={c} />);
-                  if (c.kind === "place-embed" || c.kind === "place-live") return null;
-                  return wrap(<ArticleOfferCardBlock title={c.title} href={c.href} image={c.imageUrl ?? undefined} />);
-                }
+                if (block.type === "activityCard") return renderActivityCard(block);
                 return null;
               })();
 

@@ -139,6 +139,8 @@ export type ResolvedOfferEmbedCard = {
   ctaPhone?: string | null;
   ctaHref?: string | null;
   /** «Площадка о себе» (Offer.venuePitch). */
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
   venuePitch?: string | null;
   /** «Учтите» (Offer.visitorNote). */
   visitorNote?: string | null;
@@ -238,6 +240,8 @@ async function resolveActivityCard(
         kind: true,
         campProgramType: true,
         venuePitch: true,
+        ageMinMonths: true,
+        ageMaxMonths: true,
         visitorNote: true,
         place: {
           select: {
@@ -339,6 +343,8 @@ async function resolveActivityCard(
       ctaMode,
       ctaPhone: offerData.cta.phone ?? null,
       ctaHref: offerData.cta.link ?? null,
+      ageMinMonths: o.ageMinMonths,
+      ageMaxMonths: o.ageMaxMonths,
       venuePitch: o.venuePitch?.trim() || null,
       visitorNote: o.visitorNote?.trim() || null,
       galleryUrls: [offerData.media.posterUrl, ...offerData.media.gallery.map((image) => image.url)].filter((u): u is string => !!u).slice(0, 6),
