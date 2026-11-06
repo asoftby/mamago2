@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem, PartyCategoryKey } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
-import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
+import { submitBirthdayParty, submittedPartyId, type PartyFlowState, type PartySubmissionInput } from "../../lib/partySubmitFlow";
 import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Props = {
@@ -138,27 +138,34 @@ export function StepReview({
     onBusyChange(true);
     setError(null);
     try {
-      const storageKey = submissionOwnerId ? `mamago:party-submit:${submissionOwnerId}:${citySlug}` : null;
-      if (storageKey && !flowStateRef.current.draft) {
-        try {
-          const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
-          if (saved?.draft && typeof saved.draft.id === "string" && Number.isInteger(saved.draft.version)) {
-            flowStateRef.current.draft = saved.draft;
-            if (typeof saved.key === "string") {
-              flowStateRef.current.pending = { ...saved.draft, fingerprint: "" };
-              flowStateRef.current.key = saved.key;
-            }
-          }
-        } catch { /* Storage is optional. */ }
-      }
-      await submitBirthdayParty(flowStateRef.current, {
+      const intent: PartySubmissionInput = {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
         selectedChildId, childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date),
         contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
         addonCategories,
-      }, undefined, state => {
+      };
+      const fingerprint = JSON.stringify(intent);
+      let storageKey: string | null = null;
+      if (submissionOwnerId && globalThis.crypto?.subtle) {
+        try {
+          const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fingerprint));
+          const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+          storageKey = `mamago:party-submit:${submissionOwnerId}:${hash}`;
+          if (!flowStateRef.current.draft) {
+            const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
+            if (saved?.draft && typeof saved.draft.id === "string" && Number.isInteger(saved.draft.version)) {
+              flowStateRef.current.draft = saved.draft;
+              if (typeof saved.key === "string") {
+                flowStateRef.current.pending = { ...saved.draft, fingerprint };
+                flowStateRef.current.key = saved.key;
+              }
+            }
+          }
+        } catch { /* Storage and digest are optional. */ }
+      }
+      await submitBirthdayParty(flowStateRef.current, intent, undefined, state => {
         if (!storageKey) return;
         try { sessionStorage.setItem(storageKey, JSON.stringify({ draft: state.draft, key: state.key })); }
         catch { /* A blocked storage API must not block sending. */ }
