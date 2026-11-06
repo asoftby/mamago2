@@ -1,7 +1,12 @@
+import { childScopeFor } from "@/server/family/familyAccess";
+import { partyOrderReadModel } from "./partyOrderReadModel";
+import { isEligibleForConstructor } from "./constructorEligibility";
+import { constructorOfferSelect, constructorPartyDetails, toConstructorOffer } from "./constructorOffer";
+import { assessConstructorGeography } from "./constructorMatching";
+import { getPublicBirthdayOfferWhere } from "./birthdayOfferVisibility";
 import { PartyCategory, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
-import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { PartyApiError, type UpdatePartyDraft } from "./partyDraft.validation";
 import {
   assertCompatibleSelection, includedCategories, offerPriceSnapshot, type CatalogOffer,
@@ -25,7 +30,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
       items: {
         orderBy: { position: "asc" },
         include: {
-          offer: { select: { id: true, title: true } },
+          offer: { select: { id: true, title: true, priceMode: true, priceFrom: true, currency: true } },
           requests: {
             orderBy: { createdAt: "desc" },
             select: {
@@ -45,38 +50,33 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
     },
   });
   if (!party) throw new PartyApiError(404, "Праздник не найден");
-  return party;
+  return { ...party, summary: partyOrderReadModel(party) };
 }
 
 /** Fetch all selected offers using the same public visibility and approved BIRTHDAY placement. */
 export async function verifyPartyOffers(
-  citySlug: string, offerIds: string[], tx?: Prisma.TransactionClient,
+  citySlug: string, offerIds: string[], tx?: Prisma.TransactionClient, venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR" = "VENUE",
 ): Promise<Map<string, CatalogOffer>> {
   const city = await findCityBySlug(citySlug, { select: { id: true }, isActive: true });
   if (!city) throw new PartyApiError(422, "Город не найден");
   if (new Set(offerIds).size !== offerIds.length) {
     throw new PartyApiError(422, "Повторяющиеся услуги");
   }
-  const rows = await (tx ?? prisma).offer.findMany({
-    where: { AND: [
-      { id: { in: offerIds } },
-      getPublicPublishedOfferWhere(),
-      { productType: { in: ["PARTY_SERVICE", "PARTY_PACKAGE"] } },
-      { place: { cityId: city.id, ownerBusinessId: { not: null } } },
-      { placements: { some: { key: "BIRTHDAY", status: "APPROVED" } } },
-    ] },
-    select: {
-      id: true, productType: true, category: true, partyLocationType: true,
-      priceFrom: true, priceMode: true, currency: true, details: true,
-      ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
-      components: { select: { category: true, isOptional: true } },
-      place: { select: { ownerBusinessId: true } },
-    },
+  const db = tx ?? prisma;
+  const destination = await db.territoryLegacyMap.findUnique({ where: { legacyKind_legacyId: { legacyKind: "CITY", legacyId: city.id } }, select: { territoryId: true } });
+  const fetched = await db.offer.findMany({
+    where: { AND: [{ id: { in: offerIds } },getPublicBirthdayOfferWhere(null)] },
+    select: constructorOfferSelect,
+  });
+  const rows = fetched.filter(offer => {
+    if (!isEligibleForConstructor(offer.place?.ownerBusiness)) return false;
+    try { return assessConstructorGeography(toConstructorOffer(offer),destination ? { state: "KNOWN", value: { territoryId: destination.territoryId, placeId: null } } : { state: "UNKNOWN", reason: "NOT_PROVIDED" },venueMode) !== "MISMATCH"; }
+    catch { return false; }
   });
   if (rows.length !== offerIds.length) {
     throw new PartyApiError(422, "Одно из предложений больше не опубликовано");
   }
-  return new Map(rows.map((offer) => [offer.id, offer]));
+  return new Map(rows.map((offer) => [offer.id, { ...offer, details: constructorPartyDetails(offer), constructorPrice: toConstructorOffer(offer).price }]));
 }
 
 function snapshotDecimal(offer: CatalogOffer): Prisma.Decimal | null {
@@ -96,6 +96,10 @@ export async function updatePartyDraft(
     throw new PartyApiError(409, "Черновик изменился. Обновите страницу");
   }
 
+  if (input.selectedChildId && !await prisma.child.findFirst({
+    where: { id: input.selectedChildId, ...(await childScopeFor(ownerUserId)) }, select: { id: true },
+  })) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
+
   const selectionChange = input.anchorOfferId !== undefined;
   const newMode = input.venueMode ?? existing.venueMode;
   if (input.venueMode && input.venueMode !== existing.venueMode && !selectionChange) {
@@ -105,7 +109,7 @@ export async function updatePartyDraft(
   let addons: CatalogOffer[] = [];
   if (selectionChange && input.anchorOfferId) {
     const ids = [input.anchorOfferId, ...(input.addonOfferIds ?? [])];
-    const verified = await verifyPartyOffers(existing.citySlug, ids);
+    const verified = await verifyPartyOffers(existing.citySlug, ids, undefined, newMode);
     anchor = verified.get(input.anchorOfferId) ?? null;
     if (!anchor) throw new PartyApiError(422, "Основное предложение не найдено");
     addons = (input.addonOfferIds ?? []).map((id) => verified.get(id)!);
@@ -152,10 +156,17 @@ export async function updatePartyDraft(
           },
         });
         let position = 1;
-        for (const category of includedCategories(anchor)) {
+        for (const component of anchor.components.length ? anchor.components.filter(component => !component.isOptional) : includedCategories(anchor).map(category => ({ category, isOptional: false, id: undefined, title: undefined, refOfferId: null, priceSnapshot: null, priceDelta: null }))) {
           await tx.partyOrderItem.create({
             data: {
-              partyOrderId: partyId, category, businessId, parentItemId: anchorItem.id,
+              partyOrderId: partyId, category: component.category, businessId, parentItemId: anchorItem.id,
+              packageComponentId: component.id,
+              packageComponentSnapshot: component.id ? {
+                id: component.id, title: component.title ?? null, category: component.category,
+                refOfferId: component.refOfferId ?? null, isOptional: component.isOptional,
+                priceSnapshot: component.priceSnapshot?.toFixed(2) ?? null,
+                priceDelta: component.priceDelta?.toFixed(2) ?? null,
+              } : undefined,
               role: "INCLUDED", position: position++,
             },
           });

@@ -1,3 +1,5 @@
+import { syncPartyPlan } from "./partyPlan.service";
+import { isConfirmationDeadlock } from "./partyConfirmationConflict";
 import "server-only";
 import {
   BookingKind, BookingStatus, PartyItemRole, PartyItemStatus,
@@ -32,10 +34,17 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
   // Covers the site and the Telegram confirmation, which both call this service.
   assertPartyConfirmationEnabled();
   const dedupeKey = `party:${requestId}:confirmed:${idempotencyKey}`;
-  try {
+  for (let attempt = 0; ; attempt++) try {
     return await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "BookingRequest"
-        WHERE "id" = ${requestId} FOR UPDATE`;
+      // Lock the requests that confirmation can close in a stable order.
+      // Locking only our own request first deadlocks on the common item.
+      await tx.$queryRaw`SELECT candidate."id" FROM "BookingRequest" AS candidate
+        WHERE candidate."id" = ${requestId}
+          OR candidate."partyOrderItemId" = (
+            SELECT "partyOrderItemId" FROM "BookingRequest"
+            WHERE "id" = ${requestId} AND "businessId" = ${businessId}
+          )
+        ORDER BY candidate."id" FOR UPDATE`;
       const now = new Date();
       const req = await tx.bookingRequest.findFirst({
         where: { id: requestId, businessId, kind: BookingKind.PARTY },
@@ -93,7 +102,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
       }
 
       // A business cannot confirm a withdrawn or reassigned publication.
-      const verified = await verifyPartyOffers(order.citySlug, [req.offerId], tx);
+      const verified = await verifyPartyOffers(order.citySlug, [req.offerId], tx, order.venueMode);
       const offer = verified.get(req.offerId);
       if (!offer || offer.place?.ownerBusinessId !== businessId) {
         throw new PartyApiError(422, "Услуга больше не доступна у этого исполнителя");
@@ -235,10 +244,17 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         order: { ...order, eventDate: order.eventDate, timeFrom: order.timeFrom },
         anchorRequestId: requestId, now,
       }) : 0;
+      await syncPartyPlan(tx, order.id);
       return { requestId, confirmed: true, alreadyConfirmed: false, addonRequests };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {
     if (isAllocationOverlapError(error)) throw new PartyApiError(409, "Этот ресурс только что заняли");
+    // Retry the whole rolled-back transaction. The outbox and allocations
+    // are transactional, and a committed replay still uses the same key.
+    if (isConfirmationDeadlock(error)) {
+      if (attempt < 2) continue;
+      throw new PartyApiError(409, "Подтверждение изменилось. Обновите заявку");
+    }
     throw error;
   }
 }

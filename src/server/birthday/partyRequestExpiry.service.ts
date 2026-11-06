@@ -1,3 +1,4 @@
+import { syncPartyPlan } from "./partyPlan.service";
 import "server-only";
 
 import prisma from "@/lib/prisma";
@@ -67,6 +68,7 @@ export async function expirePartyRequests(limit = 50) {
           });
         }
       }
+      if (request.partyOrderItem) await syncPartyPlan(tx, request.partyOrderItem.partyOrderId);
       await tx.bookingActivity.create({
         data: {
           bookingId: request.id, type: "REQUEST_EXPIRED", actorType: "SYSTEM",
@@ -151,6 +153,7 @@ async function expirePartyQuotes(now: Date, limit: number) {
             });
           }
         }
+        if (request.partyOrderItem) await syncPartyPlan(tx, request.partyOrderItem.partyOrderId);
         await tx.bookingActivity.create({
           data: {
             bookingId: request.id, type: "REQUEST_EXPIRED", actorType: "SYSTEM",

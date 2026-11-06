@@ -26,6 +26,7 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
     id: party.id,
     childName: party.childName || "ребёнка",
     status: party.status,
+    summary: party.summary,
     version: party.version,
     cancelBlocker: partyCancelBlocker(party),
     date: party.eventDate?.toISOString().slice(0, 10) ?? null,
@@ -34,10 +35,13 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
       ? partyGiftsHref(party.childName || "ребёнка", party.eventDate?.toISOString().slice(0, 10) ?? null)
       : null,
     items: party.items.map((item) => {
-      const request = item.requests[0];
+      const request = item.requests.find(request => request.id === item.confirmedBookingRequestId) ?? item.requests[0];
       const quote = request?.partyQuotes[0];
+      const snapshot = item.packageComponentSnapshot;
+      const title = snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) &&
+        typeof snapshot.title === "string" ? snapshot.title : item.offer?.title ?? item.category;
       return {
-        id: item.id, title: item.offer?.title ?? item.category,
+        id: item.id, title,
         role: item.role, status: item.status,
         request: request ? {
           id: request.id, partyStage: request.partyStage,

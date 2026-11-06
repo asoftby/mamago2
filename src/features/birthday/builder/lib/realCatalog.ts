@@ -1,3 +1,5 @@
+import type { AgePolicy } from "@prisma/client";
+import { birthdayAgeCompatibility, birthdayParticipantsCompatibility } from "@/lib/birthday/compatibility";
 export type PartyCategoryKey = "VENUE" | "ANIMATOR" | "SHOW" | "MASTER_CLASS" | "CAKE" | "FOOD" | "DECOR" | "PHOTO" | "PROGRAM" | "OTHER";
 export type BirthdayCatalogItem = {
   id: string;
@@ -13,6 +15,13 @@ export type BirthdayCatalogItem = {
   priceFrom: number | null;
   priceMode: string;
   currency: string;
+  agePolicy?: AgePolicy;
+  interestSlugs?: string[];
+  performerRole?: "HOST" | "ANIMATOR" | null;
+  durationMinutes?: number | null;
+  components?: { id: string; title: string; category: PartyCategoryKey; isOptional: boolean }[];
+  priceResolution?: "RESOLVED" | "UNRESOLVED";
+  geographyCompatibility?: "MATCH" | "UNKNOWN";
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
   minChildren: number | null;
@@ -37,27 +46,22 @@ export function extractPartyDetails(details: unknown, components: readonly {
   const mandatory = components.filter((v) => !v.isOptional).map((v) => v.category);
   const stringOrNull = (v: unknown) => typeof v === "string" && v.trim() ? v.trim() : null;
   return {
-    includedCategories: Array.from(new Set([...selected, ...mandatory])),
+    includedCategories: Array.from(new Set((components.length ? mandatory : selected))),
     prepaymentTerms: stringOrNull(d.prepaymentTerms),
     cancellationTerms: stringOrNull(d.cancellationTerms),
   };
 }
 export function matchesBirthdayRequirements(item: BirthdayCatalogItem, q: {
-  ageMonths?: number | null; children?: number | null; maxBudget?: number | null;
+  ageMonths?: number | null; ageRangeMonths?: { min: number; max: number }; audience?: "ADULT" | "CHILD" | "UNKNOWN"; children?: number | null; maxBudget?: number | null;
   /** Guest group as a range; the offer is kept when its capacity overlaps it. */
   childrenMin?: number | null; childrenMax?: number | null;
 }): boolean {
-  if (q.ageMonths != null && (
-    (item.ageMinMonths != null && q.ageMonths < item.ageMinMonths) ||
-    (item.ageMaxMonths != null && q.ageMonths > item.ageMaxMonths)
-  )) return false;
-  if (q.children != null && (
-    (item.minChildren != null && q.children < item.minChildren) ||
-    (item.maxChildren != null && q.children > item.maxChildren)
-  )) return false;
-  if (q.childrenMin != null && item.maxChildren != null && item.maxChildren < q.childrenMin) return false;
-  if (q.childrenMax != null && item.minChildren != null && item.minChildren > q.childrenMax) return false;
-  if (q.maxBudget != null && item.priceFrom != null && item.priceFrom > q.maxBudget) return false;
+  const policy = item.agePolicy ?? (item.ageMinMonths !== null || item.ageMaxMonths !== null ? "SPECIFIC" : "UNKNOWN");
+  if (birthdayAgeCompatibility({ agePolicy: policy, ageMinMonths: item.ageMinMonths, ageMaxMonths: item.ageMaxMonths },
+    q.ageMonths != null ? { min: q.ageMonths, max: q.ageMonths } : q.ageRangeMonths, q.audience ?? "UNKNOWN") === "MISMATCH") return false;
+  if (birthdayParticipantsCompatibility(item, { childrenMin: q.children ?? q.childrenMin ?? null, childrenMax: q.children ?? q.childrenMax ?? null }) === "MISMATCH") return false;
+  // Budget is a soft ranking preference, not membership. Explicit UI price filters belong to their surface.
+
   return true;
 }
 

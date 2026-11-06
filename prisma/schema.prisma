@@ -668,6 +668,7 @@ model PlanItem {
   status            PlanDecisionStatus        @default(CONFIRMED)
   family            Family?                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   bookingRequests   BookingRequest[]
+  partyOrder        PartyOrder?
   activity          Activity?                 @relation(fields: [activityId], references: [id])
   offer             Offer?                    @relation(fields: [offerId], references: [id], onDelete: SetNull)
   route             Route?                    @relation(fields: [routeId], references: [id])
@@ -3004,6 +3005,7 @@ model PackageComponent {
   priceDelta    Decimal?      @db.Decimal(10, 2)
   position      Int
 
+  archivedAt DateTime?
   partyOrderItems PartyOrderItem[]
 
   @@index([packageId, position])
@@ -5964,7 +5966,10 @@ model PartyOrder {
   submitKey String? @unique
   submittedAt DateTime?
   cancelledAt DateTime?
-  planItemId String?
+  planItemId String? @unique
+  selectedChildId String?
+  recipientAudience String?
+  planItem PlanItem? @relation(fields: [planItemId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5984,6 +5989,7 @@ model PartyOrderItem {
   offerId String?
   businessId String?
   packageComponentId String?
+  packageComponentSnapshot Json?
   role PartyItemRole
   parentItemId String?
   offerPriceSnapshot Decimal? @db.Decimal(10, 2)

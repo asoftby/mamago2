@@ -1,3 +1,5 @@
+import { syncPartyPlan } from "./partyPlan.service";
+import { isConfirmationDeadlock } from "./partyConfirmationConflict";
 import { BookingKind, BookingStatus, PartyItemStatus, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
@@ -157,17 +159,22 @@ export async function replyToPartyRequest(params: {
   const autoConfirm = fixedPrice && performerUnitId !== null;
   const partyTimeTo = order.timeTo;
 
-  try {
+  for (let attempt = 0; ; attempt++) try {
     return await prisma.$transaction(async (tx) => {
       // Lock the request before any resource, in the same order as confirmPartyRequest,
       // quote acceptance and expiry: concurrent paths must conflict (409), not deadlock.
       await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE`;
+      const now = new Date();
+      const expiresAt = new Date(Math.min(now.getTime() + 24 * 3_600_000, startAt.getTime() - 3_600_000));
+      if (startAt <= now) throw new PartyApiError(410, "Дата праздника уже прошла");
+      if (!declined && expiresAt <= now) throw new PartyApiError(410, "До праздника осталось слишком мало времени");
+
       let performerWindow: PartyUnitWindow | null = null;
       // Automatic confirmation skips confirmPartyRequest, so repeat its live check:
       // a withdrawn or reassigned publication must not become a confirmed booking.
       if (autoConfirm) {
         const offerId = existing.offerId;
-        const verified = offerId ? await verifyPartyOffers(order.citySlug, [offerId], tx) : null;
+        const verified = offerId ? await verifyPartyOffers(order.citySlug, [offerId], tx, order.venueMode) : null;
         if (!offerId || verified?.get(offerId)?.place?.ownerBusinessId !== businessId) {
           throw new PartyApiError(422, "Услуга больше не доступна у этого исполнителя");
         }
@@ -322,11 +329,16 @@ export async function replyToPartyRequest(params: {
           payload: { partyOrderId: order.id, requestId, quoteId: quote.id, userId: order.ownerUserId },
         },
       });
+      await syncPartyPlan(tx, order.id);
       return { requestId, quote, alreadyResponded: false };
     });
   } catch (error) {
     // The DB exclusion constraint is the final guard against a concurrent booking.
     if (isAllocationOverlapError(error)) throw new PartyApiError(409, "Исполнитель уже занят в это время");
+    if (autoConfirm && isConfirmationDeadlock(error)) {
+      if (attempt < 2) continue;
+      throw new PartyApiError(409, "Подтверждение изменилось. Обновите заявку");
+    }
     throw error;
   }
 }

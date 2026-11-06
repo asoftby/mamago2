@@ -328,7 +328,7 @@ export async function setScenarioItemOverride(
   }
 
   const planItem = await prisma.planItem.findFirst({
-    where: { id: planItemId, ...(await planScopeFor(userId)), date },
+    where: { id: planItemId, ...(await planScopeFor(userId)), date, partyOrder: { is: null } },
     select: { id: true },
   });
   if (!planItem) {

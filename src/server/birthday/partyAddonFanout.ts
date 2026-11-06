@@ -11,6 +11,7 @@ export type AnchorConfirmedOrder = {
   id: string;
   ownerUserId: string;
   citySlug: string;
+  venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   eventDate: Date;
   timeFrom: string;
   childrenCount: number | null;
@@ -48,7 +49,7 @@ export async function requestPartyAddonsAfterAnchor(
   for (const addon of addons) {
     if (!addon.offerId) continue;
     try {
-      const checked = await verifyPartyOffers(order.citySlug, [addon.offerId], tx);
+      const checked = await verifyPartyOffers(order.citySlug, [addon.offerId], tx, order.venueMode);
       const candidate = checked.get(addon.offerId);
       if (candidate) live.set(addon.offerId, candidate);
     } catch (error) {

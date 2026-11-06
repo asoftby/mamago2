@@ -64,6 +64,8 @@ export type SerializedPlanItem = {
   childName: string | null;
   locationText: string | null;
   notes: string | null;
+  partyOrderId?: string | null;
+  partyPriceByn?: string | null;
   tags?: string[];
   reminderEnabled?: boolean | null;
   coverImageUrl: string | null;

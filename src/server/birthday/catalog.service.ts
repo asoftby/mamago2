@@ -1,62 +1,52 @@
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicBirthdayOfferWhere } from "./birthdayOfferVisibility";
-import { extractPartyDetails, publicPriceFrom, type BirthdayCatalogItem } from "@/features/birthday/builder/lib/realCatalog";
+import { extractPartyDetails, type BirthdayCatalogItem } from "@/features/birthday/builder/lib/realCatalog";
+import { constructorOfferSelect, constructorPartyDetails, toConstructorOffer } from "./constructorOffer";
+import { isEligibleForConstructor } from "./constructorEligibility";
+import { assessConstructorGeography } from "./constructorMatching";
 
-// Bounded first page only: UI-specific age, guest, budget and location filters
-// run later in the builder. A 100-row cap could hide relevant offers before that.
 const BIRTHDAY_CATALOG_CAP = 500;
-
-/** Real published offers with approved birthday placement only. No mock results. */
+/** Public projection only: no balance, private resource IDs, profile or complete server DTO. */
 export async function getPublicBirthdayCatalog(citySlug: string, limit = BIRTHDAY_CATALOG_CAP): Promise<BirthdayCatalogItem[] | null> {
-  const city = await findCityBySlug(citySlug, { select: { id: true }, isActive: true });
+  const city = await findCityBySlug(citySlug,{ select: { id: true }, isActive: true });
   if (!city) return null;
-  const offers = await prisma.offer.findMany({
-    where: getPublicBirthdayOfferWhere(city.id),
-    select: {
-      id: true, slug: true, title: true, productType: true, category: true,
-      placeId: true, coverImage: true, priceFrom: true, priceMode: true, currency: true,
-      ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
-      partyLocationType: true, details: true,
-      components: { select: { category: true, isOptional: true } },
-      place: { select: { title: true, ownerBusiness: { select: { id: true, name: true } } } },
-    },
-    orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
-    take: Math.min(BIRTHDAY_CATALOG_CAP, Math.max(1, limit)),
-  });
-  if (offers.length === BIRTHDAY_CATALOG_CAP) {
-    // A bounded result may have omitted later offers, even after stable DB filtering.
-    console.warn("[birthday/catalog] Offer cap reached; results may be truncated", {
-      citySlug, cap: BIRTHDAY_CATALOG_CAP,
-    });
+  const destination = await prisma.territoryLegacyMap.findUnique({ where: { legacyKind_legacyId: { legacyKind: "CITY", legacyId: city.id } }, select: { territoryId: true } });
+  const result: BirthdayCatalogItem[] = [];
+  const unknown: BirthdayCatalogItem[] = [];
+  let cursor: string | undefined;
+  const cap = Math.min(BIRTHDAY_CATALOG_CAP,Math.max(1,limit));
+  while (true) {
+    const rows = await prisma.offer.findMany({ where: getPublicBirthdayOfferWhere(null), select: constructorOfferSelect,
+      orderBy: { id: "asc" }, take: 200, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
+    if (!rows.length) break;
+    for (const row of rows) {
+      if (!isEligibleForConstructor(row.place?.ownerBusiness) || !row.placeId || !row.place?.ownerBusiness) continue;
+      let contract;
+      try { contract = toConstructorOffer(row); } catch { continue; }
+      // Mobile geography remains unknown without structured zones, not the business's city.
+      const geography = assessConstructorGeography(contract,destination ? { state: "KNOWN", value: { territoryId: destination.territoryId, placeId: null } } : { state: "UNKNOWN", reason: "NOT_PROVIDED" },"VENUE");
+      if (geography === "MISMATCH") continue;
+      const details = extractPartyDetails(constructorPartyDetails(row),row.productType === "PARTY_PACKAGE" ? row.components : []);
+      const price = contract.price;
+      const target = geography === "MATCH" ? result : unknown;
+      if (target.length >= cap) continue;
+      target.push({
+        id: row.id, slug: row.slug, title: row.title, productType: contract.productType, category: row.category,
+        placeId: row.placeId, placeTitle: row.place.title, businessId: row.place.ownerBusiness.id, businessName: row.place.ownerBusiness.name,
+        coverImage: row.coverImage, priceMode: row.priceMode, currency: row.currency,
+        geographyCompatibility: geography,
+        priceResolution: price.state, priceFrom: price.state === "RESOLVED" && price.price.kind !== "ON_REQUEST" ? Number(price.price.kind === "EXACT" ? price.price.amountByn : price.price.minimumByn) : null,
+        agePolicy: row.agePolicy, ageMinMonths: row.ageMinMonths, ageMaxMonths: row.ageMaxMonths,
+        interestSlugs: row.interestSlugs, performerRole: contract.performerRole?.state === "KNOWN" ? contract.performerRole.value : null,
+        durationMinutes: contract.durationMinutes.state === "KNOWN" ? contract.durationMinutes.value : null,
+        components: row.components.map(c => ({ id: c.id, title: c.title, category: c.category, isOptional: c.isOptional })), minChildren: row.minChildren, maxChildren: row.maxChildren, locationType: row.partyLocationType,
+        ...details,
+      });
+
+    }
+    cursor = rows[rows.length-1].id;
+    if (rows.length < 200) break;
   }
-  return offers.flatMap((offer): BirthdayCatalogItem[] => {
-    if ((offer.productType !== "PARTY_SERVICE" && offer.productType !== "PARTY_PACKAGE") ||
-        !offer.placeId || !offer.place?.ownerBusiness) return [];
-    if (offer.productType === "PARTY_SERVICE" && !offer.category) return [];
-    const details = offer.productType === "PARTY_PACKAGE"
-      ? extractPartyDetails(offer.details, offer.components)
-      : { includedCategories: [], prepaymentTerms: null, cancellationTerms: null };
-    const commonDetails = extractPartyDetails(offer.details, []);
-    return [{
-      id: offer.id,
-      slug: offer.slug,
-      title: offer.title,
-      productType: offer.productType,
-      category: offer.category,
-      placeId: offer.placeId,
-      placeTitle: offer.place.title,
-      businessId: offer.place.ownerBusiness.id,
-      businessName: offer.place.ownerBusiness.name,
-      coverImage: offer.coverImage,
-      priceFrom: publicPriceFrom(offer.priceMode, offer.priceFrom),
-      priceMode: offer.priceMode, currency: offer.currency,
-      ageMinMonths: offer.ageMinMonths, ageMaxMonths: offer.ageMaxMonths,
-      minChildren: offer.minChildren, maxChildren: offer.maxChildren,
-      locationType: offer.partyLocationType,
-      includedCategories: details.includedCategories,
-      prepaymentTerms: commonDetails.prepaymentTerms,
-      cancellationTerms: commonDetails.cancellationTerms,
-    }];
-  });
+  return [...result,...unknown].slice(0,cap);
 }

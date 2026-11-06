@@ -1,3 +1,4 @@
+import { partyTariffConditions } from "@/lib/offers/partyTariff";
 /**
  * Offer Wizard Steps Configuration by Type
  * 
@@ -406,13 +407,13 @@ export function isStepComplete(
         const hasValidPricing =
           data.productType === "REGULAR_ACTIVITY"
             ? data.schedule.classSchedule.groups.some((g) => (g.tariffs ?? []).some((t) => t.title.trim() && t.price.trim()))
-            : data.offerWizardType === "CAMP"
+            : data.offerWizardType === "CAMP" || ((data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") && data.priceKind === "ON_REQUEST")
             ? true
             : !!data.pricingMode &&
               (data.pricingMode === "single"
                 ? !!data.singlePrice.trim()
                 : data.pricingOptions.length > 0 &&
-                  data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim()));
+                  data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim() && (!opt.partyConditions || partyTariffConditions.safeParse(opt.partyConditions).success)));
 
         if (!hasValidPricing) return false;
 
@@ -624,7 +625,7 @@ export function getMissingFieldsForStep(
     case "price":
       if (data.productType === "REGULAR_ACTIVITY") {
         if (!data.schedule.classSchedule.groups.some((g) => (g.tariffs ?? []).some((t) => t.title.trim() && t.price.trim()))) missing.push("Тариф группы");
-      } else if (data.offerWizardType !== "CAMP") {
+      } else if (data.offerWizardType !== "CAMP" && !((data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") && data.priceKind === "ON_REQUEST")) {
         if (!data.pricingMode) {
           missing.push("Режим ценообразования");
         } else if (data.pricingMode === "single" && !data.singlePrice.trim()) {

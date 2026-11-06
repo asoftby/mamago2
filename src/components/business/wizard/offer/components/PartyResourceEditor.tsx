@@ -24,7 +24,10 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
   const [unit, setUnit] = useState<Resource | null>(null);
   const [name, setName] = useState("");
   const [status, setStatus] = useState<Resource["status"]>("ACTIVE");
-  const [capacity, setCapacity] = useState("1");
+  const [capacity, setCapacity] = useState("");
+  const [step, setStep] = useState(30);
+  const [prep, setPrep] = useState(0);
+  const [cleanup, setCleanup] = useState(0);
   const [duration, setDuration] = useState("60");
   const [rules, setRules] = useState<Rule[]>([]);
   const [exceptions, setExceptions] = useState<Exception[]>([]);
@@ -39,16 +42,17 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
     const value = json.unit;
     if (!value.offers.some(link => link.offerId === offerId)) throw new Error("Ресурс не привязан к предложению");
     setUnit(value);setName(value.name);setStatus(value.status);
-    setCapacity(String(value.capacity ?? 1));setDuration(String(value.minDurationMinutes ?? 60));
+    setCapacity(value.capacity === null ? "" : String(value.capacity));setDuration(value.minDurationMinutes === null ? "" : String(value.minDurationMinutes));
+    setStep(value.stepMinutes);setPrep(value.prepMinutes);setCleanup(value.cleanupMinutes);
     setRules(value.rules);setExceptions(value.exceptions.map(e => ({...e,date:e.date.slice(0,10)})));
   };
   useEffect(() => {void load().catch(e=>setError(String(e)));}, [unitId, offerId]);
   const save = async () => {
     if (!unit || busy) return;
     setError("");setMessage("");
-    const cap = Number(capacity), min = Number(duration);
-    if (!name.trim() || !Number.isInteger(cap) || cap < 1 || cap > 1000 ||
-        !Number.isInteger(min) || min < 15 || min > 1440 || rules.length === 0) {
+    const cap = capacity === "" ? null : Number(capacity), min = duration === "" ? null : Number(duration);
+    if (!name.trim() || (cap !== null && (!Number.isInteger(cap) || cap < 1 || cap > 1000)) ||
+        (min !== null && (!Number.isInteger(min) || min < 15 || min > 1440)) || rules.length === 0) {
       setError("Проверьте название, вместимость, длительность и интервалы.");return;
     }
     setBusy(true);
@@ -57,8 +61,8 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
         method:"PUT",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           expectedUpdatedAt:unit.updatedAt, status, name:name.trim(), capacity:cap,
-          prepMinutes:unit.prepMinutes, cleanupMinutes:unit.cleanupMinutes,
-          minDurationMinutes:min, stepMinutes:unit.stepMinutes,
+          prepMinutes:prep, cleanupMinutes:cleanup,
+          minDurationMinutes:min, stepMinutes:step,
           offerIds:unit.offers.map(link=>link.offerId),rules,exceptions,
         }),
       });
@@ -70,7 +74,7 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
   };
   return (
     <section className="space-y-3 rounded-xl border p-3" aria-label="Редактирование праздничного ресурса">
-      <h4 className="font-medium">Изменить ресурс</h4>
+      <h4 className="font-medium">Изменить свободное время</h4>
       {!unit ? <p className="text-sm">{error || "Загрузка…"}</p> : <>
         <div className="grid gap-3 sm:grid-cols-3">
           <div><Label htmlFor={`unit-name-${unitId}`}>Название</Label>
@@ -81,7 +85,16 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
             <Input id={`unit-duration-${unitId}`} type="number" min={15} max={1440} value={duration} onChange={e=>setDuration(e.target.value)}/></div>
         </div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={status==="ACTIVE"}
-          onChange={e=>setStatus(e.target.checked?"ACTIVE":"INACTIVE")}/> Ресурс активен</label>
+          onChange={e=>setStatus(e.target.checked?"ACTIVE":"INACTIVE")}/> Доступен для записи</label>
+        <details className="rounded-xl border p-3">
+          <summary className="cursor-pointer min-h-11 text-sm font-medium">Настроить начало, подготовку и уборку</summary>
+          <p className="my-2 text-xs text-muted-foreground">Например, начало каждые 30 минут: 10:00, 10:30, 11:00. Время подготовки и уборки тоже будет занято, но не добавляется к цене автоматически.</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="text-sm">Начало каждые, мин<input className="mt-1 w-full min-h-11 rounded-lg border px-2" type="number" min={5} max={240} value={step} onChange={e=>setStep(Number(e.target.value))}/></label>
+            <label className="text-sm">До начала, мин<input className="mt-1 w-full min-h-11 rounded-lg border px-2" type="number" min={0} max={240} value={prep} onChange={e=>setPrep(Number(e.target.value))}/></label>
+            <label className="text-sm">После окончания, мин<input className="mt-1 w-full min-h-11 rounded-lg border px-2" type="number" min={0} max={240} value={cleanup} onChange={e=>setCleanup(Number(e.target.value))}/></label>
+          </div>
+        </details>
         <p className="text-sm font-medium">Еженедельные интервалы</p>
         {rules.map((rule,i)=><div className="flex flex-wrap items-center gap-2" key={i}>
           <select aria-label="День недели" value={rule.weekday} onChange={e=>setRules(list=>list.map((r,j)=>j===i?{...r,weekday:Number(e.target.value)}:r))}>
@@ -98,14 +111,14 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
         {exceptions.filter(e=>e.kind==="CLOSED"&&e.startMinutes===null).map(e=><div key={e.date} className="flex items-center gap-2 text-sm">
           <span>{e.date}</span><Button type="button" size="sm" variant="ghost" onClick={()=>setExceptions(list=>list.filter(x=>x!==e))}>Удалить</Button>
         </div>)}
-        <div className="flex items-center gap-2"><Input aria-label="Закрытая дата" className="max-w-44" type="date" value={date} onChange={e=>setDate(e.target.value)}/>
+        <div className="flex flex-wrap items-center gap-2"><Input aria-label="Закрытая дата" className="max-w-44" type="date" value={date} onChange={e=>setDate(e.target.value)}/>
           <Button type="button" size="sm" variant="outline" onClick={()=>{if(date&&!exceptions.some(e=>e.date===date)){setExceptions(list=>[...list,{date,kind:"CLOSED",startMinutes:null,endMinutes:null}]);setDate("");}}}>+ Закрыть день</Button>
         </div>
         {exceptions.some(e=>e.kind!=="CLOSED"||e.startMinutes!==null)&&<p className="text-xs text-muted-foreground">Особые интервалы сохранены без изменений.</p>}
         {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
         {message&&<p role="status" className="text-sm">{message}</p>}
-        <Button type="button" disabled={busy} onClick={()=>void save()}>{busy?"Сохранение…":"Сохранить расписание"}</Button>
-        <p className="text-xs text-muted-foreground">При будущих бронированиях изменение ресурса запрещено сервером. Конфликт вернёт ошибку.</p>
+        <Button type="button" className="h-auto min-h-11 max-w-full whitespace-normal" disabled={busy} onClick={()=>void save()}>{busy?"Сохранение…":"Сохранить расписание"}</Button>
+        <p className="text-xs text-muted-foreground">Если есть будущие бронирования, изменение расписания может быть недоступно. Сначала проверьте существующие записи.</p>
       </>}
     </section>
   );

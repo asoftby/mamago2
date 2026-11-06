@@ -1,3 +1,4 @@
+import { syncPartyPlan } from "./partyPlan.service";
 import "server-only";
 import { BookingKind, BookingStatus, PartyItemStatus, PartyOrderStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -85,6 +86,7 @@ export async function cancelPartyBeforeConfirmation(
       data: { status: PartyOrderStatus.CANCELLED, cancelledAt: now, version: { increment: 1 } },
     });
     if (claimed.count !== 1) throw new PartyApiError(409, "Праздник изменился. Обновите страницу");
+    await syncPartyPlan(tx, partyId);
     return { partyId, cancelled: true, alreadyCancelled: false, closedRequests: open.length,
       closedRequestIds: open.map((request) => request.id) };
   });

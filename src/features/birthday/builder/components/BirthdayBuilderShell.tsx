@@ -100,23 +100,23 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   // Soft budget: compared with the whole party in review, never used to hide single offers.
   const maxBudget = budgetMaxByn(state.quiz.budgetGroup);
 
-  const ageMonths = useMemo(() => {
-    const person = state.quiz.partyForChild;
-    if (person?.recipientType === "adult") return null;
-    if (person?.recipientType === "guest" && person.statedAgeYears != null) {
-      return person.statedAgeYears >= 18 ? null : person.statedAgeYears * 12;
-    }
-    return ageMonthsOnDate(person?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom));
-  }, [state.quiz.partyForChild, state.quiz.dateRangeFrom]);
+  const person = state.quiz.partyForChild;
+  const ageMonths = ageMonthsOnDate(person?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom));
+  const statedAge = person?.recipientType === "guest" ? person.statedAgeYears ?? null : null;
+  const recipientAge = ageMonths ?? (statedAge === null ? null : statedAge * 12);
+  const audience = person?.recipientType === "adult" || (recipientAge !== null && recipientAge >= 216)
+    ? "ADULT" : recipientAge !== null || person?.recipientType === "child" ? "CHILD" : null;
+  const selectedChildId = person?.recipientType === "adult" || person?.recipientType === "guest"
+    ? null : person?.profileChildId ?? null;
 
   const guests = GUESTS_RANGE[state.quiz.guestsGroup ?? ""] ?? null;
 
   const visibleOffers = useMemo(() => catalog.offers.filter((offer) =>
     isLocationCompatible(offer, state.quiz.placeType) &&
     matchesBirthdayRequirements(offer, {
-      ageMonths, childrenMin: guests?.min, childrenMax: guests?.max,
+      ageMonths, ageRangeMonths: statedAge === null ? undefined : { min: statedAge * 12, max: statedAge * 12 + 11 }, audience: audience ?? "UNKNOWN", childrenMin: guests?.min, childrenMax: guests?.max,
     })),
-    [catalog.offers, state.quiz.placeType, ageMonths, guests?.min, guests?.max]);
+    [catalog.offers, state.quiz.placeType, ageMonths, statedAge, audience, guests?.min, guests?.max]);
 
   const validBase = hasValidCatalogAnchor(
     visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,
@@ -282,12 +282,15 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             dateIso={state.partyPlanning.dateIso}
             quizDateKey={state.quiz.dateRangeFrom}
             maxBudget={maxBudget}
+            selectedChildId={selectedChildId}
+            recipientAudience={audience}
             childBirthDateIso={state.quiz.partyForChild?.birthDateIso ?? null}
-            statedAgeYears={state.quiz.partyForChild?.statedAgeYears ?? null}
+            statedAgeYears={statedAge}
             timeStart={state.partyPlanning.timeStart}
             timeEnd={state.partyPlanning.timeEnd}
             venueMode={state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : state.quiz.placeType === "PACKAGE" ? "PACKAGE" : "VENUE"}
             childName={state.quiz.partyForChild?.name ?? null}
+            submissionOwnerId={builder.submissionOwnerId}
             authenticated={builder.isAuthenticated}
             authLoading={builder.isAuthLoading}
             requestLogin={builder.requestLoginToSubmit}

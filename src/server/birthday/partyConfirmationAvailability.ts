@@ -44,3 +44,16 @@ export function isWithinSchedule(
   return rules.some((r) => r.weekday === window.weekday &&
     contains(r.startMinutes, r.endMinutes));
 }
+
+/** Read-only preview grid: an anchor belongs to the SAME interval containing the service. */
+export function isPartyStartOnStep(
+  window: { startMinutes: number; endMinutes: number; weekday: number },
+  rules: Array<{ weekday: number; startMinutes: number; endMinutes: number }>,
+  exceptions: Array<{ kind: "CLOSED" | "OPEN_OVERRIDE"; startMinutes: number | null; endMinutes: number | null }>,
+  step: number,
+): boolean {
+  if (!Number.isInteger(step) || step < 5 || step > 240) return false;
+  const overrides = exceptions.filter(e => e.kind === "OPEN_OVERRIDE");
+  const intervals = overrides.length ? overrides.map(e => ({ startMinutes: e.startMinutes ?? 0, endMinutes: e.endMinutes ?? 1440 })) : rules.filter(r => r.weekday === window.weekday);
+  return intervals.some(r => r.startMinutes <= window.startMinutes && r.endMinutes >= window.endMinutes && (window.startMinutes-r.startMinutes)%step === 0);
+}

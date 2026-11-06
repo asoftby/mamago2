@@ -11,6 +11,7 @@ export type PartyOrderScreenData = {
   childName: string;
   status: string;
   version: number;
+  summary?: { stage: string; confirmedAmountByn: string | null; confirmedPriceUnknownCount: number; awaitingCount: number; estimate: { knownMinimumByn: string | null; unknownCount: number }; proposed: { knownAmountByn: string | null; withoutPriceCount: number } };
   /** Why the parent cannot cancel at once (confirmed services); null when cancellation is allowed. */
   cancelBlocker: string | null;
   date: string | null;
@@ -49,6 +50,13 @@ const stageLabels: Record<string, string> = {
   EXPIRED: "Срок ответа истёк",
   NOT_ACCEPTED: "Предложение закрыто",
   CANCELLED: "Отменено",
+};
+
+const summaryLabels: Record<string, string> = {
+  DRAFT: "Черновик", SUBMITTED: "Заявка отправлена", WAITING_BUSINESS: "Ожидаем ответа исполнителя",
+  QUOTE_RECEIVED: "Получена смета", AWAITING_CONFIRMATION: "Смета принята, ждём подтверждения",
+  ANCHOR_CONFIRMED: "Основная услуга подтверждена", PARTIAL: "Часть услуг подтверждена",
+  READY: "Все услуги подтверждены", CANCELLED: "Праздник отменён", UNAVAILABLE: "Предложение недоступно",
 };
 
 const orderNotices: Record<string, string> = {
@@ -130,6 +138,17 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             Вы можете принимать предложения исполнителей. Бронирование считается завершённым
             только после подтверждения исполнителем.
           </p>
+          {party.summary && <div className="space-y-1 text-sm">
+            <p className="font-medium">{summaryLabels[party.summary.stage]}</p>
+            {party.summary.stage === "DRAFT" && <p>Ориентир: {party.summary.estimate.knownMinimumByn === null
+              ? "цена уточняется" : `от ${party.summary.estimate.knownMinimumByn} BYN`}
+              {party.summary.estimate.unknownCount > 0 && party.summary.estimate.knownMinimumByn !== null && " + услуги без цены"}</p>}
+            {party.summary.proposed.knownAmountByn !== null && !cancelled &&
+              <p>По сметам, ожидающим подтверждения: {party.summary.proposed.knownAmountByn} BYN</p>}
+            {party.summary.confirmedAmountByn !== null && <p>Согласовано: {party.summary.confirmedAmountByn} BYN</p>}
+            {party.summary.confirmedPriceUnknownCount > 0 && <p>Цена части подтверждённых услуг уточняется</p>}
+            {party.summary.awaitingCount > 0 && !cancelled && <p>Услуг без подтверждения: {party.summary.awaitingCount}</p>}
+          </div>}
         </header>
 
         {orderNotices[party.status] ? (
@@ -193,6 +212,12 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             );
           })}
         </div>
+        {party.items.some(item => item.role === "INCLUDED") && <section className="space-y-2 rounded-2xl border border-border bg-card p-4">
+          <h2 className="font-semibold">Входит в пакет</h2>
+          <ul className="list-inside list-disc text-sm">
+            {party.items.filter(item => item.role === "INCLUDED").map(item => <li key={item.id}>{item.title}</li>)}
+          </ul>
+        </section>}
         {!cancelled && party.giftsHref ? (
           <section className="space-y-2 border-t border-border pt-5">
             <h2 className="text-lg font-semibold text-foreground">Подарки</h2>
