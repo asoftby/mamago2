@@ -46,7 +46,7 @@ export function RequestSheetFrame({
 }) {
   return (
     <SaveFlowContainer open={open} onOpenChange={onOpenChange} title="Оставить заявку">
-      <div className="min-w-0 w-full max-w-full overflow-x-clip px-4 pb-0 pt-0 sm:px-6 sm:pt-4">
+      <div className="min-w-0 w-full max-w-full overflow-x-clip px-4 pb-0 pt-0 sm:max-h-[85vh] sm:overflow-y-auto sm:px-6 sm:pt-4">
         <SaveActivityHeader kicker={kicker} heading={heading} ticket={ticket} />
         {children}
       </div>
