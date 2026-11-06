@@ -32,6 +32,7 @@ type EventDecisionPanelProps = {
     | "factChips"
     | "priceLabel"
     | "venue"
+    | "media"
     | "cta"
     | "ownerEditHref"
   >;
@@ -298,6 +299,8 @@ export function EventDecisionPanel({
             open={bookingOpen}
             onOpenChange={setBookingOpen}
             eventTitle={data.title}
+            eventImageUrl={data.media?.posterUrl}
+            eventVenue={data.venue?.name}
             eventCategory={data.categoryLabel}
             priceLabel={data.priceLabel}
             booking={data.cta.simpleBooking}
