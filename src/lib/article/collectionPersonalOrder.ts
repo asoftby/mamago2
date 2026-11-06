@@ -3,20 +3,24 @@
  * для всех, меняется только порядок по возрасту детей. Работает в браузере поверх общей
  * (кешируемой) серверной выдачи и не форкает ranking-движок рекомендаций.
  */
-export type OrderKid = { id: string; name: string | null; ageMonths: number };
+/** `ageMonthsMax` задан, когда точный возраст неизвестен (гость выбрал год): тогда это интервал. */
+export type OrderKid = { id: string; name: string | null; ageMonths: number; ageMonthsMax?: number };
 export type OrderItem = { id: string; ageMinMonths: number | null; ageMaxMonths: number | null };
 export type AgeFit = "MATCH" | "UNKNOWN" | "MISMATCH";
 
-export function ageFit(item: OrderItem, ageMonths: number): AgeFit {
+export function ageFit(item: OrderItem, kid: number | Pick<OrderKid, "ageMonths" | "ageMonthsMax">): AgeFit {
+  const lo = typeof kid === "number" ? kid : kid.ageMonths;
+  const hi = typeof kid === "number" ? kid : kid.ageMonthsMax ?? kid.ageMonths;
   if (item.ageMinMonths == null && item.ageMaxMonths == null) return "UNKNOWN";
-  if (item.ageMinMonths != null && ageMonths < item.ageMinMonths) return "MISMATCH";
-  if (item.ageMaxMonths != null && ageMonths > item.ageMaxMonths) return "MISMATCH";
-  return "MATCH";
+  if ((item.ageMinMonths != null && item.ageMinMonths > hi) || (item.ageMaxMonths != null && item.ageMaxMonths < lo)) return "MISMATCH";
+  const covers = (item.ageMinMonths == null || item.ageMinMonths <= lo) && (item.ageMaxMonths == null || item.ageMaxMonths >= hi);
+  // Частичное пересечение с интервалом возраста — не подтверждённое совпадение.
+  return covers ? "MATCH" : "UNKNOWN";
 }
 
 function score(item: OrderItem, kids: readonly OrderKid[]): number {
   if (!kids.length) return 0;
-  const fits = kids.map((k) => ageFit(item, k.ageMonths));
+  const fits = kids.map((k) => ageFit(item, k));
   const matches = fits.filter((f) => f === "MATCH").length;
   if (matches > 0) return matches * 10;
   return fits.every((f) => f === "MISMATCH") ? -1 : 0;
@@ -43,7 +47,7 @@ function yearsWord(n: number): string {
 
 /** Причина показывается только при реальном совпадении возраста. */
 export function reasonFor(item: OrderItem, kids: readonly OrderKid[]): { kidIds: string[]; text: string } | null {
-  const fit = kids.filter((k) => ageFit(item, k.ageMonths) === "MATCH");
+  const fit = kids.filter((k) => ageFit(item, k) === "MATCH");
   if (!fit.length) return null;
   const named = fit.every((k) => !!k.name?.trim());
   if (named) {
@@ -68,7 +72,7 @@ export function ageMonthsFromBirthDate(iso: string | null | undefined, now: Date
   return months >= 0 ? months : null;
 }
 
-/** Возраст гостя выбирается в годах: берём середину года, «<1» = 6 месяцев. */
+/** Гость выбирает возраст в годах: это интервал [y·12, y·12+11] месяцев, а не выдуманная точка. */
 export function kidsFromGuestYears(years: readonly number[]): OrderKid[] {
-  return years.map((y) => ({ id: `guest-${y}`, name: null, ageMonths: y * 12 + 6 }));
+  return years.map((y) => ({ id: `guest-${y}`, name: null, ageMonths: y * 12, ageMonthsMax: y * 12 + 11 }));
 }

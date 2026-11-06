@@ -85,7 +85,10 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
   const [sel, setSel] = useState<string>("all");
   // Выбор гостя хранится только на устройстве; на сервере и при гидратации — пусто.
   const guestAgesRaw = useSyncExternalStore(subscribeGuestAges, readGuestAgesRaw, () => "");
-  const guestAges = useMemo(() => parseGuestAges(guestAgesRaw), [guestAgesRaw]);
+  // Запасной вариант в памяти: если запись в хранилище не удалась, порядок всё равно применяется на этой странице.
+  const [memoryAges, setMemoryAges] = useState<number[] | null>(null);
+  const storedAges = useMemo(() => parseGuestAges(guestAgesRaw), [guestAgesRaw]);
+  const guestAges = memoryAges ?? storedAges;
   const [pick, setPick] = useState<number[]>([]);
   const [askOpen, setAskOpen] = useState(false);
 
@@ -134,6 +137,7 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
   };
   const applyGuest = (ages: number[]) => {
     snapshot();
+    setMemoryAges(ages);
     writeGuestAges(ages);
     setAskOpen(false);
   };

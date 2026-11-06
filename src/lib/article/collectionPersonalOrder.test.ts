@@ -13,6 +13,7 @@ const taisia: OrderKid = { id: "t", name: "Таисия", ageMonths: 4 * 12 };
 
 test("fit: bounds, unknown and mismatch", () => {
   assert.equal(ageFit(items[3], stepa.ageMonths), "MATCH");
+  assert.equal(ageFit(items[3], stepa), "MATCH");
   assert.equal(ageFit(items[0], stepa.ageMonths), "MISMATCH");
   assert.equal(ageFit(items[1], stepa.ageMonths), "UNKNOWN");
 });
@@ -50,4 +51,12 @@ test("birth date to months", () => {
   assert.equal(ageMonthsFromBirthDate("2020-01-15", new Date("2026-03-14")), 73);
   assert.equal(ageMonthsFromBirthDate("2020-01-15", new Date("2026-03-15")), 74);
   assert.equal(ageMonthsFromBirthDate(null), null);
+});
+
+test("guest year interval: partial overlap is not a confirmed match", () => {
+  const underOne = kidsFromGuestYears([0]);
+  assert.equal(reasonFor({ id: "a", ageMinMonths: 6, ageMaxMonths: 12 }, underOne), null);
+  assert.equal(ageFit({ id: "a", ageMinMonths: 6, ageMaxMonths: 12 }, underOne[0]), "UNKNOWN");
+  assert.equal(ageFit({ id: "b", ageMinMonths: 18, ageMaxMonths: 36 }, kidsFromGuestYears([1])[0]), "UNKNOWN");
+  assert.equal(ageFit({ id: "c", ageMinMonths: 24, ageMaxMonths: 60 }, underOne[0]), "MISMATCH");
 });
