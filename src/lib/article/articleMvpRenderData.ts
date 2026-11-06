@@ -1,3 +1,6 @@
+import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import { buildCollectionEventMedia } from "@/lib/article/collectionEventMedia";
+import { buildCollectionOfferSections, collectionOfferTypeLabel, type CollectionCardSection } from "@/lib/article/collectionCardSections";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
@@ -131,8 +134,6 @@ export type ResolvedOfferEmbedCard = {
   discountBadge?: string | null;
   ratingValue?: number | null;
   ratingCount?: number | null;
-  galleryThumbs: string[];
-  galleryExtraCount: number;
   metaItems: Array<{ id: string; label: string; value: string }>;
   schedulePreview: ArticleShiftPreview[];
   ctaLabel: string;
@@ -147,7 +148,8 @@ export type ResolvedOfferEmbedCard = {
   venuePitch?: string | null;
   /** «Учтите» (Offer.visitorNote). */
   visitorNote?: string | null;
-  galleryUrls?: string[];
+  mediaItems?: MediaGalleryItem[];
+  sections?: CollectionCardSection[];
 };
 
 export type ArticleMvpResolvedBlock =
@@ -201,6 +203,38 @@ function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPrev
   });
 }
 
+/** Поля события для карточки подборки: одна выборка и для одиночного, и для пакетного запроса (без N+1). */
+const EVENT_CARD_SELECT = {
+  nextOccurrenceAt: true,
+  ageMinMonths: true,
+  ageMaxMonths: true,
+  ageTags: true,
+  agePolicy: true,
+  priceFrom: true,
+  priceTo: true,
+  currency: true,
+  coverImageUrl: true,
+  coverImageId: true,
+  scheduleJson: true,
+  images: { orderBy: { sortOrder: "asc" }, select: { id: true, url: true, mediaAssetId: true } },
+  description: true,
+  eventCategory: { select: { nameRu: true } },
+  place: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      customAddress: true,
+      formattedAddr: true,
+      districtManual: { select: { name: true } },
+      districtAuto: { select: { name: true } },
+      metroManual: { select: { name: true } },
+      metroAuto: { select: { name: true } },
+      city: { select: { slug: true } },
+    },
+  },
+} satisfies Prisma.ActivitySelect;
+
 async function resolveActivityCard(
   b: Extract<ArticleBlockMvp, { type: "activityCard" }>,
   prefetched?: Map<string, ResolvedActivityCard>,
@@ -217,14 +251,7 @@ async function resolveActivityCard(
         title: true,
         slug: true,
         type: true,
-        nextOccurrenceAt: true,
-        ageMinMonths: true,
-        ageMaxMonths: true,
-        priceFrom: true,
-        priceTo: true,
-        currency: true,
-        coverImageUrl: true,
-        place: { select: { title: true, city: { select: { slug: true } } } },
+        ...EVENT_CARD_SELECT,
       },
     });
     if (!a) return null;
@@ -243,6 +270,7 @@ async function resolveActivityCard(
         kind: true,
         campProgramType: true,
         venuePitch: true,
+        videoUrl: true,
         ageMinMonths: true,
         ageMaxMonths: true,
         visitorNote: true,
@@ -252,6 +280,7 @@ async function resolveActivityCard(
         minChildren: true,
         maxChildren: true,
         placements: { where: { key: "BIRTHDAY", status: "APPROVED" }, select: { id: true }, take: 1 },
+        components: { orderBy: { position: "asc" }, select: { title: true, isOptional: true } },
         place: {
           select: {
             ownerBusinessId: true,
@@ -303,12 +332,7 @@ async function resolveActivityCard(
       })),
     );
 
-    const typeLabel =
-      offerData.offerType === "CAMP"
-        ? "Лагерь"
-        : offerData.offerType === "REGULAR"
-          ? "Программа"
-          : "Предложение";
+    const typeLabel = collectionOfferTypeLabel(o.productType, offerData.offerType);
 
     const firstDiscount = offerData.pricing.discounts?.[0];
     const discountBadge = firstDiscount
@@ -357,9 +381,8 @@ async function resolveActivityCard(
       discountBadge,
       ratingValue: offerData.averageRating ?? offerData.place?.rating ?? null,
       ratingCount: offerData.reviewsCount ?? offerData.place?.ratingsCount ?? null,
-      galleryThumbs: offerData.media.gallery.slice(0, 3).map((image) => image.url),
-      galleryExtraCount: Math.max(offerData.media.gallery.length - 3, 0),
       metaItems,
+      sections: buildCollectionOfferSections(offerData, o.productType, o.components),
       schedulePreview,
       ctaLabel: offerData.cta.primaryLabel || "Записаться",
       ctaMode,
@@ -370,7 +393,12 @@ async function resolveActivityCard(
       party: partyLead,
       venuePitch: o.venuePitch?.trim() || null,
       visitorNote: o.visitorNote?.trim() || null,
-      galleryUrls: [offerData.media.posterUrl, ...offerData.media.gallery.map((image) => image.url)].filter((u): u is string => !!u).slice(0, 6),
+      mediaItems: buildCollectionEventMedia({
+        title: offerData.title,
+        coverImageUrl: offerData.media.posterUrl ?? null,
+        images: offerData.media.gallery.map((image, index) => ({ id: `offer-photo-${index}`, url: image.url })),
+        scheduleJson: { reelsUrl: o.videoUrl },
+      }),
     };
   }
   if (b.entityType === "ROUTE") {
@@ -433,14 +461,7 @@ async function loadBasicActivityCards(
             id: true,
             title: true,
             slug: true,
-            nextOccurrenceAt: true,
-            ageMinMonths: true,
-            ageMaxMonths: true,
-            priceFrom: true,
-            priceTo: true,
-            currency: true,
-            coverImageUrl: true,
-            place: { select: { title: true, city: { select: { slug: true } } } },
+            ...EVENT_CARD_SELECT,
           },
         })
       : [],
@@ -570,6 +591,21 @@ export async function buildArticleMvpResolvedBlocks(
   return out;
 }
 
+/** Shared block resolution for standalone and continuous-reading articles. */
+export async function resolvePublicArticleBlocks(articleId: string, contentBlocks: ArticleBlockMvp[]): Promise<ArticleMvpResolvedBlock[]> {
+  const linkedRows = await prisma.articleLinkedItem.findMany({
+    where: { articleId },
+    orderBy: { position: "asc" },
+    select: { id: true, kind: true, position: true, activityId: true, offerId: true, linkedArticleId: true },
+  });
+  const linkedBlocks = linkedItemsToCardBlocks(linkedRows);
+  const resolvedBlocks = await buildArticleMvpResolvedBlocks([...contentBlocks, ...linkedBlocks]);
+  // Hidden or unpublished linked entities must not produce broken cards.
+  return resolvedBlocks.filter(
+    (block) => !(block.type === "activityCard" && block.id.startsWith("linked-") && !block.card),
+  );
+}
+
 export async function loadArticleMvpBySlugPublic(
   slug: string,
   cityId: string | null,
@@ -586,19 +622,8 @@ export async function loadArticleMvpBySlugPublic(
   if (!article) return null;
   const cover = await resolveCoverMedia(await fetchArticleCoverImageId(article.id));
   const content = parseArticleContentJson(article.contentJson);
-  const linkedRows = await prisma.articleLinkedItem.findMany({
-    where: { articleId: article.id },
-    orderBy: { position: "asc" },
-    select: { id: true, kind: true, position: true, activityId: true, offerId: true, linkedArticleId: true },
-  });
-  const linkedBlocks = linkedItemsToCardBlocks(linkedRows);
-  if (content.blocks.length === 0 && linkedBlocks.length === 0) return null;
-  // Подборка: текст статьи, затем связанные объекты в сохранённом порядке.
-  const resolvedBlocks = await buildArticleMvpResolvedBlocks([...content.blocks, ...linkedBlocks]);
-  // Скрытые/снятые с публикации связанные объекты не показываем (без «не найдено»).
-  const blocks = resolvedBlocks.filter(
-    (block) => !(block.type === "activityCard" && block.id.startsWith("linked-") && !block.card),
-  );
+  const blocks = await resolvePublicArticleBlocks(article.id, content.blocks);
+  if (blocks.length === 0) return null;
   const heroUrl = cover?.publicUrl ?? article.heroImage ?? article.seoOgImage ?? null;
   return {
     id: article.id,
