@@ -30,7 +30,7 @@ import {
  * Конструктор: без логина — черновик в localStorage; gate на добавление услуг,
  * переход к подтверждению и отправку заявок.
  */
-export function useBirthdayBuilderWithGate() {
+export function useBirthdayBuilderWithGate(citySlug: string) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -59,6 +59,36 @@ export function useBirthdayBuilderWithGate() {
     () => setPostLoginRefinementChild(null),
     [],
   );
+
+  const sessionDraftKey = user?.id ? `mamago.birthdayBuilder.session:${user.id}:${citySlug}` : null;
+  const [restoredSessionKey, setRestoredSessionKey] = useState<string | null>(null);
+  const completedSessionKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isLoading || !sessionDraftKey || restoredSessionKey === sessionDraftKey) return;
+    const task = window.setTimeout(() => {
+      if (searchParams.get("bbAuth") !== "1") {
+        try {
+          const draft = JSON.parse(sessionStorage.getItem(sessionDraftKey) ?? "null");
+          if (draft?.quiz && draft?.selection && draft?.ui && draft?.partyPlanning) replaceState(draft);
+        } catch { /* Storage is optional. */ }
+      }
+      setRestoredSessionKey(sessionDraftKey);
+    }, 0);
+    return () => window.clearTimeout(task);
+  }, [isLoading, sessionDraftKey, restoredSessionKey, searchParams, replaceState]);
+
+  useEffect(() => {
+    if (!sessionDraftKey || restoredSessionKey !== sessionDraftKey || completedSessionKey.current === sessionDraftKey) return;
+    try { sessionStorage.setItem(sessionDraftKey, JSON.stringify(builder.state)); }
+    catch { /* Storage is optional. */ }
+  }, [builder.state, restoredSessionKey, sessionDraftKey]);
+
+  const clearSessionDraft = useCallback(() => {
+    if (!sessionDraftKey) return;
+    completedSessionKey.current = sessionDraftKey;
+    try { sessionStorage.removeItem(sessionDraftKey); } catch { /* Storage is optional. */ }
+  }, [sessionDraftKey]);
 
   /** Гость: восстановить черновик один раз */
   useEffect(() => {
@@ -264,6 +294,7 @@ export function useBirthdayBuilderWithGate() {
     nextStep,
     resetBuilder,
     isAuthenticated,
+    clearSessionDraft,
     submissionOwnerId: user?.id ?? null,
     isEmailVerified,
     isAuthLoading: isLoading,

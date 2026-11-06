@@ -56,6 +56,28 @@ export function StepReview({
   const [slotsKey, setSlotsKey] = useState("");
 
   const anchorOfferId = offers[0]?.id;
+  const formKey = submissionOwnerId && anchorOfferId
+    ? `mamago:party-review:${submissionOwnerId}:${citySlug}:${anchorOfferId}` : null;
+  const [restoredFormKey, setRestoredFormKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!formKey || restoredFormKey === formKey) return;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(formKey) ?? "null");
+      if (draft && ["date", "timeFrom", "timeTo", "children", "adults", "name", "phone"].every(key => typeof draft[key] === "string")) {
+        setDate(draft.date); setTimeFrom(draft.timeFrom); setTimeTo(draft.timeTo);
+        setChildren(draft.children); setAdults(draft.adults); setName(draft.name); setPhone(draft.phone);
+      }
+    } catch { /* Storage is optional. */ }
+    setRestoredFormKey(formKey);
+  }, [formKey, restoredFormKey]);
+
+  useEffect(() => {
+    if (!formKey || restoredFormKey !== formKey || sent) return;
+    try { sessionStorage.setItem(formKey, JSON.stringify({ date, timeFrom, timeTo, children, adults, name, phone })); }
+    catch { /* Storage is optional. */ }
+  }, [formKey, restoredFormKey, sent, date, timeFrom, timeTo, children, adults, name, phone]);
+
   const checkVenue = venueMode === "VENUE" || venueMode === "PACKAGE";
   const partySize = Number(children) + Number(adults);
 
@@ -176,6 +198,9 @@ export function StepReview({
       });
       if (storageKey) {
         try { sessionStorage.removeItem(storageKey); } catch { /* Storage is optional. */ }
+      }
+      if (formKey) {
+        try { sessionStorage.removeItem(formKey); } catch { /* Storage is optional. */ }
       }
       onSent();
     } catch (cause) {

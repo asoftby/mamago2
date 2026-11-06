@@ -70,7 +70,7 @@ interface Props {
 
 function BirthdayBuilderShellInner({ citySlug }: Props) {
   const router = useRouter();
-  const builder = useBirthdayBuilderWithGate();
+  const builder = useBirthdayBuilderWithGate(citySlug);
   const ageSignals = useBirthdayAgeSignals();
   // Keep the draft ID and idempotency key alive across review-step unmount/remount.
   const submissionFlowRef = useRef<PartyFlowState>({
@@ -298,7 +298,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             busy={submissionBusy}
             onBusyChange={setSubmissionBusy}
             sent={submissionSent}
-            onSent={() => setSubmissionSent(true)}
+            onSent={() => { builder.clearSessionDraft(); setSubmissionSent(true); }}
           />}
         </main>
 
