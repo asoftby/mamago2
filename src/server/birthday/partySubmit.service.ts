@@ -46,7 +46,7 @@ export async function submitPartyAnchor(
       !party.contactName?.trim() || !party.contactPhone?.trim()) {
     throw new PartyApiError(422, "Укажите дату, время, гостей и контакты");
   }
-  if (party.timeTo <= party.timeFrom || party.childrenCount < 1 || party.adultsCount < 0) {
+  if (party.timeTo <= party.timeFrom || party.childrenCount < 0 || party.adultsCount < 0 || party.childrenCount + party.adultsCount < 1) {
     throw new PartyApiError(422, "Проверьте длительность и количество гостей");
   }
   if (!/^\+?[0-9()\-\s]{7,24}$/.test(party.contactPhone.trim())) {
