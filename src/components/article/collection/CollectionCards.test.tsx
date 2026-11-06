@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { buildEventCardData, eventCardDescription } from "@/lib/article/collectionEventCard";
+import { buildEventCardData, eventCardDescription, resolveEventCardVenue } from "@/lib/article/collectionEventCard";
 import { CollectionNote, CollectionRating, CollectionVenueQuote } from "./CollectionCardParts";
 
 const base = { nextOccurrenceAt: null, ageMinMonths: null, ageMaxMonths: null, priceFrom: null, currency: "BYN", coverImageUrl: null, place: null };
@@ -73,4 +73,35 @@ test("rating: no votes shows «Новое на mamaGo», votes show value", () =
 test("venue voice is labelled and note is marked «Учтите»", () => {
   assert.match(renderToStaticMarkup(<CollectionVenueQuote text="Свой торт можно" />), /Площадка о себе[\s\S]*«Свой торт можно»/);
   assert.match(renderToStaticMarkup(<CollectionNote text="Только до 18:00" />), /Учтите[\s\S]*Только до 18:00/);
+});
+
+test("description keeps separators between paragraphs, list items and line breaks", () => {
+  assert.equal(eventCardDescription("<p>Возраст: 6+</p><p>Стоимость: 20 BYN</p>"), "Возраст: 6+ Стоимость: 20 BYN");
+  assert.equal(eventCardDescription("<ul><li>Игры</li><li>Мастер-класс</li></ul>"), "Игры Мастер-класс");
+  assert.equal(eventCardDescription("Строка один<br>строка два"), "Строка один строка два");
+});
+
+const linked = { id: "p1", slug: "linked", title: "Связанная площадка", customAddress: "Минск, ул. Связанная, 1", city: { slug: "minsk" } };
+const own = { id: "p2", slug: "own", title: "Площадка события", customAddress: "Минск, ул. Своя, 2", city: { slug: "minsk" } };
+
+test("venue: event venue place wins over the linked place", () => {
+  const v = resolveEventCardVenue({ place: linked, venue: { kind: "PLACE", title: null, addressLine: null, place: own } });
+  assert.equal(v?.name, "Площадка события");
+  assert.match(v?.address ?? "", /Своя/);
+  assert.equal(v?.href, "/minsk/places/own");
+});
+
+test("venue: custom address line replaces the linked place address, keeps its district and link", () => {
+  const v = resolveEventCardVenue({ title: "Событие", place: { ...linked, districtAuto: { name: "Центральный р-н" } }, venue: { kind: "CUSTOM", title: "Двор школы", addressLine: "Минск, ул. Школьная, 5", place: null } });
+  assert.equal(v?.name, "Двор школы");
+  assert.match(v?.address ?? "", /Школьная/);
+  assert.equal(v?.district, "Центральный р-н");
+  assert.equal(v?.href, "/minsk/places/linked");
+});
+
+test("venue: custom venue without a linked place, online events and empty data", () => {
+  assert.equal(resolveEventCardVenue({ place: null, venue: { kind: "CUSTOM", title: "Парк", addressLine: null, place: null } })?.name, "Парк");
+  assert.equal(resolveEventCardVenue({ format: "ONLINE", place: linked }), null);
+  assert.equal(resolveEventCardVenue({ place: null }), null);
+  assert.equal(resolveEventCardVenue({ place: linked })?.name, "Связанная площадка");
 });

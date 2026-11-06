@@ -202,7 +202,21 @@ function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPrev
 }
 
 /** Поля события для карточки подборки: одна выборка и для одиночного, и для пакетного запроса (без N+1). */
+const EVENT_CARD_PLACE_SELECT = {
+  id: true,
+  slug: true,
+  title: true,
+  customAddress: true,
+  formattedAddr: true,
+  districtManual: { select: { name: true } },
+  districtAuto: { select: { name: true } },
+  metroManual: { select: { name: true } },
+  metroAuto: { select: { name: true } },
+  city: { select: { slug: true } },
+} satisfies Prisma.PlaceSelect;
+
 const EVENT_CARD_SELECT = {
+  format: true,
   nextOccurrenceAt: true,
   ageMinMonths: true,
   ageMaxMonths: true,
@@ -212,18 +226,14 @@ const EVENT_CARD_SELECT = {
   coverImageUrl: true,
   description: true,
   eventCategory: { select: { nameRu: true } },
-  place: {
+  place: { select: EVENT_CARD_PLACE_SELECT },
+  // Своё место проведения события приоритетнее связанной площадки (как venueFromActivity на странице события).
+  venue: {
     select: {
-      id: true,
-      slug: true,
+      kind: true,
       title: true,
-      customAddress: true,
-      formattedAddr: true,
-      districtManual: { select: { name: true } },
-      districtAuto: { select: { name: true } },
-      metroManual: { select: { name: true } },
-      metroAuto: { select: { name: true } },
-      city: { select: { slug: true } },
+      addressLine: true,
+      place: { select: EVENT_CARD_PLACE_SELECT },
     },
   },
 } satisfies Prisma.ActivitySelect;
@@ -251,7 +261,7 @@ async function resolveActivityCard(
     const citySlug = a.place?.city?.slug;
     const cs = citySlug ?? "minsk";
     const href = `/${cs}/events/${a.slug ?? b.entityId}`;
-    return { kind: "basic", href, title: a.title, event: buildEventCardData(a) };
+    return { kind: "basic", href, title: a.title, event: buildEventCardData({ ...a }) };
   }
   if (b.entityType === "OFFER") {
     const o = await prisma.offer.findFirst({
