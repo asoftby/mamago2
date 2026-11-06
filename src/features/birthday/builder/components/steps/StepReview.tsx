@@ -15,6 +15,7 @@ type Props = {
   selectedBaseId: string | null;
   onCompositionSaved: (saved: boolean) => void;
   ownerId: string | null;
+  restoredRecipient?: { name: boolean; age: boolean } | null;
   addonCategories?: PartyCategoryKey[];
   citySlug: string;
   dateIso: string | null;
@@ -43,7 +44,7 @@ function forgetReviewDraft(scope: string | null) {
 }
 
 export function StepReview({
-  offers: initialOffers, candidates, ownerId, selectedBaseId, onCompositionSaved, addonCategories: initialCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso, statedAgeYears,
+  offers: initialOffers, candidates, ownerId, restoredRecipient, selectedBaseId, onCompositionSaved, addonCategories: initialCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso, statedAgeYears,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const anchor = initialOffers[0];
@@ -54,6 +55,7 @@ export function StepReview({
   const [replacementId, setReplacementId] = useState<string | null>(null);
   const [candidateId, setCandidateId] = useState("");
   const [updatedAge, setUpdatedAge] = useState("");
+  const [updatedName, setUpdatedName] = useState("");
   const savedIds = review?.items.filter(item => item.role === "STANDALONE").map(item => item.offerId);
   const offers = anchor && savedIds ? [anchor, ...savedIds.flatMap(id => {
     const offer = candidates.find(candidate => candidate.id === id) ?? initialOffers.find(candidate => candidate.id === id);
@@ -151,8 +153,8 @@ export function StepReview({
       const updated = await saveBirthdayComposition(flowStateRef.current, {
         citySlug, venueMode, anchorOfferId: anchor.id, addonOfferIds: ids,
         addonCategories: addonCategories.filter(category => !selectedCategories.has(category)),
-      }, partyRequest, date && (!needsAgeInput || enteredAge != null)
-        ? { eventDate: date, childName: childName ?? review?.childName ?? null, childAge: recipientAge }
+      }, partyRequest, date && (!needsAgeInput || enteredAge != null) && (!needsNameInput || recipientName)
+        ? { eventDate: date, childName: recipientName, childAge: recipientAge }
         : undefined);
       setReview(updated);
       onCompositionSaved(true);
@@ -170,9 +172,11 @@ export function StepReview({
   const age = childAgeYearsOnDate(childBirthDateIso, date) ??
     (statedAgeYears != null && statedAgeYears <= 20 ? statedAgeYears : null);
   const savedAgeDate = review?.eventDate?.slice(0, 10);
-  const needsAgeInput = age == null && review?.childAge != null && savedAgeDate !== date;
+  const needsAgeInput = age == null && (review?.childAge != null ? savedAgeDate !== date : restoredRecipient?.age);
+  const needsNameInput = !childName && !review?.childName && restoredRecipient?.name;
+  const recipientName = childName || review?.childName || updatedName.trim() || null;
   const enteredAge = /^(0|[1-9]|1[0-9]|20)$/.test(updatedAge) ? Number(updatedAge) : null;
-  const recipientAge = age ?? (savedAgeDate === date ? review?.childAge ?? null : enteredAge);
+  const recipientAge = age ?? (savedAgeDate === date ? review?.childAge ?? enteredAge : enteredAge);
 
   const anchorOfferId = offers[0]?.id;
   const checkVenue = venueMode === "VENUE" || venueMode === "PACKAGE";
@@ -256,8 +260,12 @@ export function StepReview({
     event.preventDefault();
     if (busy || !offers.length || hasUnavailableSelection || (scope && restoreState !== "ready")) return;
     if (!authenticated) { requestLogin(); return; }
+    if (needsNameInput && !recipientName) {
+      setError("Укажите имя ребёнка");
+      return;
+    }
     if (needsAgeInput && enteredAge == null) {
-      setError("Укажите возраст ребёнка на новую дату");
+      setError("Укажите возраст ребёнка на дату праздника");
       return;
     }
     if (timeTo <= timeFrom) { setError("Окончание должно быть позже начала"); return; }
@@ -267,7 +275,7 @@ export function StepReview({
       await submitBirthdayParty(flowStateRef.current, {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
-        childName: childName ?? review?.childName ?? null, childAge: recipientAge,
+        childName: recipientName, childAge: recipientAge,
         contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
         addonCategories,
@@ -403,8 +411,13 @@ export function StepReview({
         <h3 className="font-semibold">Данные для заявки</h3>
         <fieldset disabled={busy || Boolean(scope && restoreState !== "ready")} className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm">Дата праздника<input required type="date" value={date} onChange={e => { setDate(e.target.value); setUpdatedAge(""); }} className="block w-full rounded-lg border p-3" /></label>
+          {needsNameInput && <label className="text-sm">
+            Имя ребёнка
+            <input required maxLength={120} value={updatedName}
+              onChange={event => setUpdatedName(event.target.value)} className="block w-full rounded-lg border p-3 text-base" />
+          </label>}
           {needsAgeInput && <label className="text-sm">
-            Возраст ребёнка на новую дату
+            Возраст ребёнка на дату праздника
             <input required type="number" min="0" max="20" value={updatedAge}
               onChange={event => setUpdatedAge(event.target.value)} className="block w-full rounded-lg border p-3 text-base" />
           </label>}
