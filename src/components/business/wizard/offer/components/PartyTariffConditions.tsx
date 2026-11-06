@@ -50,15 +50,15 @@ export function PartyTariffConditions({ value, onChange, disabled, components }:
         </label>)}
       </div>
       {components && <div className="space-y-1" role="group" aria-label="Состав пакета">
-        <p className="text-sm">Услуги, включённые в эту цену</p>
-        {components.map((component, index) => <label key={component.id ?? index} className="flex gap-2 text-sm">
-          <input type="checkbox" disabled={!component.id} checked={!!component.id && value.componentIds?.includes(component.id)} onChange={e => {
-            if (!component.id) return;
-            const next = (value.componentIds ?? []).filter(id => id !== component.id);
-            if (e.target.checked) next.push(component.id);
-            update({ componentIds: next });
-          }} />{component.title}{!component.id && " (сначала сохраните пакет)"}
-        </label>)}
+        <p className="text-sm">Цена действует на весь обязательный состав пакета.</p>
+        <ul className="list-inside list-disc text-sm">
+          {components.filter(component => !component.isOptional).map((component, index) =>
+            <li key={component.id ?? index}>{component.title}{!component.id && " (сначала сохраните пакет)"}</li>)}
+        </ul>
+        <button type="button" className="text-sm underline" onClick={() =>
+          update({ componentIds: components.flatMap(component => component.id && !component.isOptional ? [component.id] : []) })}>
+          Привязать к текущему составу
+        </button>
       </div>}
       {!partyTariffConditions.safeParse(value).success && <p role="alert" className="text-sm text-destructive">Укажите длительность и проверьте границы условий.</p>}
     </>}
