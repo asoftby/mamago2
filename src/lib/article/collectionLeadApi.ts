@@ -68,6 +68,7 @@ export async function submitCollectionLead(input: {
         childrenCount: form.children,
         adultsCount: form.adults,
         childAge: form.childAge,
+        childName: form.childName.trim() || null,
         contactName: form.contactName.trim(),
         contactPhone: form.contactPhone.trim(),
       }),

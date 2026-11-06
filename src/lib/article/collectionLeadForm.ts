@@ -9,6 +9,8 @@ export type CollectionLeadForm = {
   children: number;
   adults: number;
   childAge: number | null;
+  /** Имя именинника (из профиля семьи); необязательно. */
+  childName: string;
   contactName: string;
   contactPhone: string;
   comment: string;
@@ -24,6 +26,7 @@ export const DEFAULT_LEAD_FORM: CollectionLeadForm = {
   children: 8,
   adults: 2,
   childAge: null,
+  childName: "",
   contactName: "",
   contactPhone: "+375",
   comment: "",
@@ -105,6 +108,7 @@ export function parseLeadDraft(raw: string | null, now: number = Date.now()): Co
       children: typeof f.children === "number" ? f.children : DEFAULT_LEAD_FORM.children,
       adults: typeof f.adults === "number" ? f.adults : DEFAULT_LEAD_FORM.adults,
       childAge: typeof f.childAge === "number" ? f.childAge : null,
+      childName: typeof f.childName === "string" ? f.childName : "",
       contactName: typeof f.contactName === "string" ? f.contactName : "",
       contactPhone: f.contactPhone,
       comment: typeof f.comment === "string" ? f.comment : "",
@@ -150,4 +154,31 @@ export function withLeadReturnParam(pathWithSearch: string, offerId: string): st
   const url = new URL(path, "https://x.invalid");
   url.searchParams.set(LEAD_RETURN_PARAM, offerId);
   return `${url.pathname}${url.search}${hash ? `#${hash}` : ""}`;
+}
+
+export type LeadDateChip = { iso: string; weekday: string; day: number; month: string };
+
+const CHIP_WEEKDAYS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+const CHIP_MONTHS = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+/**
+ * Ближайшие субботы и воскресенья, на которые ещё можно подать заявку (позже чем через 24 часа, по Минску).
+ * Чипы быстрее календаря для самого частого случая — праздник в выходные; остальные даты — «другая».
+ */
+export function suggestLeadDates(now: Date = new Date(), count: number = 8): LeadDateChip[] {
+  const first = earliestLeadDate(now);
+  const chips: LeadDateChip[] = [];
+  const cursor = new Date(`${first}T12:00:00Z`);
+  for (let i = 0; i < 60 && chips.length < count; i++) {
+    const dow = cursor.getUTCDay();
+    if (dow === 0 || dow === 6) {
+      const iso = cursor.toISOString().slice(0, 10);
+      // Чип допустим, только если старт в 12:00 по Минску позже границы в 24 часа.
+      if (leadStartsAt({ eventDate: iso, timeFrom: "12:00" }).getTime() > now.getTime() + 24 * 3600_000) {
+        chips.push({ iso, weekday: CHIP_WEEKDAYS[dow]!, day: cursor.getUTCDate(), month: CHIP_MONTHS[cursor.getUTCMonth()]! });
+      }
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return chips;
 }
