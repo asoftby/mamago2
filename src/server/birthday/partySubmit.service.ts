@@ -1,3 +1,6 @@
+import { assertPartyRecipientProfile, childAgeForBusiness } from "./partyRecipientProfile";
+import { childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
+import { createPartyPlan } from "./partyPlan.service";
 import { PartyOrderStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt, validateSubmissionWindow } from "./partyDraft.validation";
@@ -44,7 +47,7 @@ export async function submitPartyAnchor(
       !party.contactName?.trim() || !party.contactPhone?.trim()) {
     throw new PartyApiError(422, "Укажите дату, время, гостей и контакты");
   }
-  if (party.timeTo <= party.timeFrom || party.childrenCount < 1 || party.adultsCount < 0) {
+  if (party.timeTo <= party.timeFrom || party.childrenCount < 0 || party.adultsCount < 0 || party.childrenCount + party.adultsCount < 1) {
     throw new PartyApiError(422, "Проверьте длительность и количество гостей");
   }
   if (!/^\+?[0-9()\-\s]{7,24}$/.test(party.contactPhone.trim())) {
@@ -52,28 +55,13 @@ export async function submitPartyAnchor(
   }
   const eventStart = partyStartAt(party.eventDate, party.timeFrom);
   const responseDueAt = validateSubmissionWindow(eventStart, now);
-  const verified = await verifyPartyOffers(party.citySlug, [anchor.offerId]);
+  const verified = await verifyPartyOffers(party.citySlug, [anchor.offerId], undefined, party.venueMode);
   const published = verified.get(anchor.offerId);
   if (!published || published.place?.ownerBusinessId !== anchor.businessId) {
     throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
   }
   const anchorProblem = partyAnchorProblem(party.venueMode, published);
   if (anchorProblem) throw new PartyApiError(422, anchorProblem);
-  // The builder filters by age and guests on the client; the server must not rely on it.
-  const requirements = { childrenCount: party.childrenCount, childAge: party.childAge };
-  const anchorRequirement = partyRequirementsProblem(published, requirements);
-  if (anchorRequirement) throw new PartyApiError(422, anchorRequirement);
-  const addonOffers = await prisma.offer.findMany({
-    where: { partyOrderItems: { some: { partyOrderId: partyId, role: "STANDALONE" } } },
-    select: {
-      title: true, ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
-    },
-  });
-  for (const addon of addonOffers) {
-    const problem = partyRequirementsProblem(addon, requirements);
-    if (problem) throw new PartyApiError(422, problem + ". Измените состав праздника");
-  }
-
   // Capture narrowed values before the async transaction callback: TypeScript
   // correctly regards nullable Prisma model fields as potentially mutable.
   const anchorOfferId = anchor.offerId;
@@ -84,6 +72,8 @@ export async function submitPartyAnchor(
   const childrenCount = party.childrenCount;
   const adultsCount = party.adultsCount;
 
+  const childScope = party.selectedChildId ? await childScopeFor(ownerUserId) : null;
+  const familyId = await familyIdForWrite(ownerUserId);
   return prisma.$transaction(async (tx) => {
     // Claim the transition before any side effects. A second submit cannot
     // create another BookingRequest even if it arrives concurrently.
@@ -110,12 +100,34 @@ export async function submitPartyAnchor(
 
     // Re-check publication under the submitting transaction: client snapshots
     // and the preflight query cannot authorize a currently withdrawn offer.
-    const checked = await verifyPartyOffers(party.citySlug, [anchorOfferId], tx);
+    const checked = await verifyPartyOffers(party.citySlug, [anchorOfferId], tx, party.venueMode);
     const currentOffer = checked.get(anchorOfferId);
     if (!currentOffer || currentOffer.place?.ownerBusinessId !== anchorBusinessId ||
         partyAnchorProblem(party.venueMode, currentOffer)) {
       throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
     }
+
+    let ageMonthsRange: { min: number; max: number } | null = null;
+    if (party.selectedChildId) {
+      const profile = await tx.child.findFirst({
+        where: { id: party.selectedChildId, ...childScope }, select: { birthDate: true, birthPrecision: true },
+      });
+      if (!profile) throw new PartyApiError(422, "Выбранный профиль ребёнка недоступен");
+      ageMonthsRange = assertPartyRecipientProfile(profile, eventDate, party.recipientAudience, party.childAge);
+    }
+    const requirements = { childrenCount, childAge: party.childAge, recipientAudience: party.recipientAudience, ageMonthsRange };
+    const anchorRequirement = partyRequirementsProblem(currentOffer, requirements);
+    if (anchorRequirement) throw new PartyApiError(422, anchorRequirement);
+    const addonOffers = await tx.offer.findMany({
+      where: { partyOrderItems: { some: { partyOrderId: partyId, role: "STANDALONE" } } },
+      select: { title: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true },
+    });
+    for (const addon of addonOffers) {
+      const problem = partyRequirementsProblem(addon, requirements);
+      if (problem) throw new PartyApiError(422, problem + ". Измените состав праздника");
+    }
+    await createPartyPlan(tx, { id: partyId, ownerUserId, selectedChildId: party.selectedChildId,
+      eventDate, timeFrom: partyTimeFrom, timeTo: partyTimeTo }, familyId);
 
     const request = await tx.bookingRequest.create({
       data: {
@@ -133,7 +145,7 @@ export async function submitPartyAnchor(
         customerPhone: null,
         adultsCount: adultsCount,
         childrenCount: childrenCount,
-        childAge: party.childAge,
+        childAge: childAgeForBusiness(party),
         customerComment: anchor.note,
         responseDueAt,
       },

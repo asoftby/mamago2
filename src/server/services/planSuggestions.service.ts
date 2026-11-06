@@ -8,7 +8,7 @@ import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, reso
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
-import { INTEREST_MATCH_WEIGHT, MAX_INTEREST_MATCHES } from "@/server/services/recommendations/rankingSignals";
+import { profileInterestScoreFromSlugs } from "@/server/services/recommendations/rankingSignals";
 import {
   CANONICAL_EVENT_INTEREST_SLUGS,
   eventSystemInterestSlugs,
@@ -32,10 +32,7 @@ export function profileInterestScore(
   profileInterestSlugs: readonly string[],
   scheduleJson: unknown,
 ): { interestMatchCount: number; interestBoost: number } {
-  const selected = new Set(profileInterestSlugs.filter((slug) => CANONICAL_EVENT_INTEREST_SLUGS.has(slug)));
-  const matchCount = eventSystemInterestSlugs(scheduleJson).filter((slug) => selected.has(slug)).length;
-  const interestMatchCount = Math.min(matchCount, MAX_INTEREST_MATCHES);
-  return { interestMatchCount, interestBoost: interestMatchCount * INTEREST_MATCH_WEIGHT };
+  return profileInterestScoreFromSlugs(profileInterestSlugs, eventSystemInterestSlugs(scheduleJson));
 }
 
 export function planSuggestionScore(input: {

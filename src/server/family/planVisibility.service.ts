@@ -23,7 +23,7 @@ type ChangeInput = {
 async function loadItem(userId: string, planItemId: string) {
   if (!familyReadsEnabled()) throw new PlanVisibilityError("disabled");
   const item = await prisma.planItem.findFirst({
-    where: { id: planItemId, ...(await planScopeFor(userId)) },
+    where: { id: planItemId, partyOrder: { is: null }, ...(await planScopeFor(userId)) },
     select: { id: true, userId: true, familyId: true, visibility: true, status: true, createdAt: true, updatedAt: true },
   });
   if (!item) throw new PlanVisibilityError("not_found");
@@ -82,7 +82,7 @@ async function setVisibility(
 
   // Conditional write: a concurrent edit (updatedAt moved) or visibility flip loses.
   const res = await prisma.planItem.updateMany({
-    where: { id: item.id, visibility: from, status: "CONFIRMED", updatedAt: item.updatedAt },
+    where: { id: item.id, partyOrder: { is: null }, visibility: from, status: "CONFIRMED", updatedAt: item.updatedAt },
     data: { visibility: to },
   });
   if (res.count === 0) throw new PlanVisibilityError("conflict");

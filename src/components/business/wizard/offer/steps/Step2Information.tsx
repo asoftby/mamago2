@@ -295,10 +295,10 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
       {/* Child interests (new wizard) */}
       {v2 && (
         <div className="space-y-2">
-          <Label>Интересы ребёнка</Label>
+          <Label>Интересы клиентов (необязательно)</Label>
           <ChipsRow
             layout="wrap"
-            aria-label="Интересы ребёнка"
+            aria-label="Интересы клиентов"
             items={SYSTEM_INTERESTS.map((interest): ChipItem => {
               const active = data.interestSlugs.includes(interest.slug);
               return {
@@ -322,6 +322,7 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
       )}
 
       {/* Age Groups */}
+      {(!["CAKE", "FOOD", "DECOR"].includes(data.partyCategory ?? "") || data.agePolicy === AgePolicy.SPECIFIC || data.agePolicy === AgePolicy.ADULT_ONLY) && <>
       <div className="space-y-2">
         <Label>Возрастные группы</Label>
         <ChipsRow
@@ -338,7 +339,7 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
             disabled: !isEditable,
             onClick: () => isEditable && handleAgeGroupsChange(ageOption.key),
             })),
-            { id: "adult-only", label: "#nokids", active: data.agePolicy === AgePolicy.ADULT_ONLY, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.ADULT_ONLY, ageGroups: [] }) },
+            { id: "adult-only", label: v2 ? "Только взрослые" : "#nokids", active: data.agePolicy === AgePolicy.ADULT_ONLY, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.ADULT_ONLY, ageGroups: [] }) },
           ]}
         />
         <p className="text-xs text-muted-foreground">
@@ -346,6 +347,7 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
         </p>
       </div>
 
+      </>}
       <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
         <CollapsibleTrigger asChild>
           <button type="button" className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-left text-sm font-medium">

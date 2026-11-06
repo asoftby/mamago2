@@ -1,70 +1,60 @@
+import { getPublicBirthdayOfferWhere } from "./birthdayOfferVisibility";
+import { constructorBusinessSelect, isEligibleForConstructor } from "./constructorEligibility";
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { minskBookingWindow, isWithinSchedule } from "./partyConfirmationAvailability";
-import { overlapsBookingWindow } from "./partyAvailabilityPreview.logic";
+import type { AvailabilityEvidence, ServiceInterval } from "@/lib/birthday/constructorContract";
+import { assessPartyAvailability, type ConstructorUnit } from "./partyAvailabilityPreview.logic";
+import { minskBookingWindow } from "./partyConfirmationAvailability";
 
-/** Informational only. Final booking always locks and rechecks in lockAvailablePartyUnit. */
-export async function previewPartyOfferAvailability(input: {
-  offerId: string; date: string; timeFrom: string; timeTo: string;
-  childrenCount: number; adultsCount: number;
-}) {
-  const date = new Date(input.date + "T00:00:00.000Z");
-  const offer = await prisma.offer.findFirst({
-    where: { id: input.offerId, status: "PUBLISHED" },
-    select: { id: true, place: { select: { ownerBusinessId: true } } },
-  });
-  const businessId = offer?.place?.ownerBusinessId;
-  if (!businessId) return { availability: "UNKNOWN" as const };
-  const mapped = await prisma.bookingUnitOffer.findMany({
-    where: { offerId: input.offerId, bookingUnit: { businessId } },
-    select: { bookingUnit: { select: {
-      id: true, status: true, timezone: true, capacity: true,
-      prepMinutes: true, cleanupMinutes: true, minDurationMinutes: true,
+/** Batch the relations once per candidate page; no per-offer DB fan-out. */
+export async function loadPartyAvailability(db: Prisma.TransactionClient, offers: readonly { id: string; businessId: string }[], requested: ServiceInterval | null, guestCount: number, now: Date) {
+  const result = new Map<string, { availability: AvailabilityEvidence; units: ConstructorUnit[] }>();
+  if (!requested || !offers.length) {
+    for (const offer of offers) result.set(offer.id, { availability: { state: "UNKNOWN", reason: "NO_EXACT_TIME" }, units: [] });
+    return result;
+  }
+  const start = new Date(requested.startAt), end = new Date(requested.endAt);
+  const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Minsk", dateStyle: "short" }).format(start);
+  const date = new Date(day + "T00:00:00.000Z");
+  const localStart = new Date(day + "T00:00:00+03:00");
+  const rangeStart = new Date(Math.min(start.getTime(), localStart.getTime()) - 240 * 60_000);
+  const rangeEnd = new Date(Math.max(end.getTime(), localStart.getTime() + 24*60*60_000) + 240 * 60_000);
+  const ids = offers.map(o => o.id), businesses = [...new Set(offers.map(o => o.businessId))];
+  const rows = await db.bookingUnit.findMany({
+    where: { businessId: { in: businesses }, offers: { some: { offerId: { in: ids } } } },
+    select: {
+      id: true, updatedAt: true, businessId: true, status: true, timezone: true, capacity: true,
+      prepMinutes: true, cleanupMinutes: true, minDurationMinutes: true, stepMinutes: true,
+      offers: { where: { offerId: { in: ids } }, select: { offerId: true } },
       rules: { select: { weekday: true, startMinutes: true, endMinutes: true } },
-    } } },
+      exceptions: { where: { date }, select: { kind: true, startMinutes: true, endMinutes: true } },
+      blocks: { where: { blockStart: { lt: rangeEnd }, blockEnd: { gt: rangeStart } }, select: { blockStart: true, blockEnd: true } },
+      allocations: { where: { blockStart: { lt: rangeEnd }, blockEnd: { gt: rangeStart }, OR: [
+        { status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: now } },
+      ] }, select: { blockStart: true, blockEnd: true } },
+    },
   });
-  if (mapped.length === 0) return { availability: "UNKNOWN" as const };
-  const now = new Date();
-  const eligible = [];
-  for (const { bookingUnit: unit } of mapped) {
-    if (unit.status !== "ACTIVE" || unit.timezone !== "Europe/Minsk" ||
-      (unit.capacity !== null && input.childrenCount + input.adultsCount > unit.capacity)) continue;
-    const window = minskBookingWindow(date, input.timeFrom, input.timeTo, unit.prepMinutes, unit.cleanupMinutes);
-    if (window.serviceStart <= now ||
-      (unit.minDurationMinutes !== null &&
-        (window.serviceEnd.getTime() - window.serviceStart.getTime()) / 60000 < unit.minDurationMinutes)) continue;
-    eligible.push({ unit, window });
+  const ownership = new Map(offers.map(o => [o.id, o.businessId]));
+  const byOffer = new Map<string, ConstructorUnit[]>();
+  for (const row of rows) for (const link of row.offers) {
+    if (ownership.get(link.offerId) !== row.businessId) continue;
+    const list = byOffer.get(link.offerId) ?? []; list.push(row); byOffer.set(link.offerId,list);
   }
-  if (eligible.length === 0) return { availability: "UNAVAILABLE" as const };
+  for (const offer of offers) {
+    const units = byOffer.get(offer.id) ?? [];
+    result.set(offer.id, { availability: assessPartyAvailability(units, requested, guestCount, now), units });
+  }
+  return result;
+}
 
-  // One bounded batch per relation, instead of three queries per booking unit.
-  // Apply the exact per-unit overlap in memory after the broad DB range filter.
-  const ids = [...new Set(eligible.map(({ unit }) => unit.id))];
-  const blockStart = new Date(Math.min(...eligible.map(({ window }) => window.blockStart.getTime())));
-  const blockEnd = new Date(Math.max(...eligible.map(({ window }) => window.blockEnd.getTime())));
-  const [exceptions, blocks, allocations] = await Promise.all([
-    prisma.availabilityException.findMany({
-      where: { bookingUnitId: { in: ids }, date },
-      select: { bookingUnitId: true, kind: true, startMinutes: true, endMinutes: true },
-    }),
-    prisma.calendarBlock.findMany({
-      where: { bookingUnitId: { in: ids }, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart } },
-      select: { bookingUnitId: true, blockStart: true, blockEnd: true },
-    }),
-    prisma.bookingAllocation.findMany({
-      where: {
-        bookingUnitId: { in: ids }, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart },
-        OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: now } }],
-      },
-      select: { bookingUnitId: true, blockStart: true, blockEnd: true },
-    }),
-  ]);
-  for (const { unit, window } of eligible) {
-    const blocked = blocks.some((item) => item.bookingUnitId === unit.id && overlapsBookingWindow(item, window));
-    const reserved = allocations.some((item) => item.bookingUnitId === unit.id && overlapsBookingWindow(item, window));
-    if (!blocked && !reserved && isWithinSchedule(
-      window, unit.rules, exceptions.filter((item) => item.bookingUnitId === unit.id),
-    )) return { availability: "AVAILABLE" as const };
-  }
-  return { availability: "UNAVAILABLE" as const };
+/** Backwards-compatible one-offer wrapper; final confirmation still locks/rechecks independently. */
+export async function previewPartyOfferAvailability(input: { offerId: string; date: string; timeFrom: string; timeTo: string; childrenCount: number; adultsCount: number }) {
+  const offer = await prisma.offer.findFirst({ where: { AND: [getPublicBirthdayOfferWhere(null), { id: input.offerId }] }, select: { id: true, place: { select: { ownerBusinessId: true, ownerBusiness: { select: constructorBusinessSelect } } } } });
+  if (!offer?.place?.ownerBusinessId || !isEligibleForConstructor(offer.place.ownerBusiness)) return { availability: "UNKNOWN" as const };
+  const w = minskBookingWindow(new Date(input.date + "T00:00:00.000Z"), input.timeFrom, input.timeTo,0,0);
+  const evidence = (await loadPartyAvailability(prisma, [{ id: offer.id, businessId: offer.place.ownerBusinessId }],
+    { startAt: w.serviceStart.toISOString(), endAt: w.serviceEnd.toISOString() }, input.childrenCount + input.adultsCount, new Date())).get(offer.id)!;
+  // No resource IDs/allocations in this legacy/public response.
+  return { availability: evidence.availability.state };
 }

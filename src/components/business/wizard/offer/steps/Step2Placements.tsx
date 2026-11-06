@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,7 +31,7 @@ const LOCATION_OPTIONS: Array<{ value: BirthdayLocationType; label: string }> = 
 
 const SERVICE_OPTIONS: Array<{ value: PartyCategory; label: string }> = [
   { value: "VENUE", label: "Площадка / зал" },
-  { value: "ANIMATOR", label: "Аниматор / ведущий" },
+  { value: "ANIMATOR", label: "Аниматор" },
   { value: "SHOW", label: "Шоу" },
   { value: "MASTER_CLASS", label: "Мастер-класс" },
   { value: "CAKE", label: "Торт / сладкий стол" },
@@ -73,6 +73,23 @@ export function Step2Placements({
     : photoService
       ? [{ value: "ON_SITE" as const, label: "В студии" }, { value: "OFF_SITE" as const, label: "С выездом" }, { value: "BOTH" as const, label: "И там, и там" }]
       : LOCATION_OPTIONS;
+  const zonePurpose = isService && ["CAKE", "FOOD", "DECOR"].includes(data.partyCategory ?? "") ? "delivery" : "travel";
+  const showZones = (isService || isPackage) && (birthday.locationType === "OFF_SITE" || birthday.locationType === "BOTH");
+  const [territories, setTerritories] = useState<{ id: string; name: string; parent: { name: string } | null }[]>([]);
+  const [territoryError, setTerritoryError] = useState(false);
+  useEffect(() => {
+    if (!showZones) return;
+    const controller = new AbortController();
+    void fetch("/api/business/offers/service-territories", { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error("territories");
+        return response.json();
+      })
+      .then(setTerritories)
+      .catch(() => { if (!controller.signal.aborted) setTerritoryError(true); });
+    return () => controller.abort();
+  }, [showZones]);
+  const selectedZones = birthday.serviceAreas?.[zonePurpose] ?? [];
   const [showMore, setShowMore] = useState(false);
   const hasAdditionalData = Boolean(
     birthday.program.trim() || birthday.note.trim() || birthday.includedCategories.length ||
@@ -118,6 +135,25 @@ export function Step2Placements({
         </div>
       )}
 
+      {isService && data.partyCategory === "ANIMATOR" && <div className="space-y-2">
+        <Label>Кто проводит программу?</Label>
+        <select aria-label="Кто проводит программу?" className="w-full min-h-11 rounded-xl border px-3 bg-background" disabled={!isEditable}
+          value={birthday.performerRole ?? "ANIMATOR"} onChange={e => updateBirthdayDetails({ performerRole: e.target.value as "ANIMATOR" | "HOST" })}>
+          <option value="ANIMATOR">Аниматор — игры и развлечения</option><option value="HOST">Ведущий — проведение мероприятия</option>
+        </select>
+      </div>}
+      {(data.partyCategory === "CAKE" || data.partyCategory === "DECOR") && <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Индивидуальные заказы</legend>
+        {([{ key: "acceptsCustomOrders", label: "Принимаете заказы по пожеланиям клиента?" }, { key: "acceptsReferences", label: "Можно прислать фотографии желаемого результата?" }] as const).map(question => (
+          <label key={question.key} className="block text-sm">{question.label}
+            <select className="mt-1 w-full min-h-11 rounded-xl border bg-background px-3" disabled={!isEditable} value={birthday[question.key] == null ? "" : String(birthday[question.key])}
+              onChange={e => updateBirthdayDetails({ [question.key]: e.target.value === "" ? null : e.target.value === "true" })}>
+              <option value="">Пока не указано</option><option value="true">Да</option><option value="false">Нет</option>
+            </select>
+          </label>
+        ))}
+        <p className="text-xs text-muted-foreground">Фотографии клиент прикрепит к своему заказу. Здесь загружать их не нужно.</p>
+      </fieldset>}
       <div className="space-y-2">
         <p className="text-sm font-medium">{locationQuestion} <span className="text-destructive">*</span></p>
         <div role="group" aria-label={locationQuestion.replace("?", "")} className="grid grid-cols-3 gap-2">
@@ -142,6 +178,26 @@ export function Step2Placements({
           ))}
         </div>
       </div>
+
+      {showZones && <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">{zonePurpose === "delivery" ? "Города доставки" : "Города выезда"}</legend>
+        <p className="text-xs text-muted-foreground">Если список пуст, возможность обслуживания нужно уточнить.</p>
+        {territoryError && <p role="alert">Не удалось загрузить города.</p>}
+        <select aria-label="Добавить город обслуживания" disabled={!isEditable || selectedZones.length >= 50} value=""
+          className="min-h-11 w-full rounded-md border bg-card px-2"
+          onChange={event => {
+            if (!event.target.value) return;
+            updateBirthdayDetails({ serviceAreas: { travel: [], delivery: [], ...birthday.serviceAreas, [zonePurpose]: [...selectedZones, event.target.value] } });
+          }}>
+          <option value="">Добавить город</option>
+          {territories.filter(city => !selectedZones.includes(city.id)).map(city => <option key={city.id} value={city.id}>{city.name}{city.parent ? " · " + city.parent.name : ""}</option>)}
+        </select>
+        <ul>{selectedZones.map(id => <li key={id} className="flex items-center justify-between">
+          <span>{territories.find(city => city.id === id)?.name ?? "Сохранённый город"}</span>
+          <button type="button" className="min-h-11 px-2 underline" disabled={!isEditable}
+            onClick={() => updateBirthdayDetails({ serviceAreas: { travel: [], delivery: [], ...birthday.serviceAreas, [zonePurpose]: selectedZones.filter(zone => zone !== id) } })}>Убрать</button>
+        </li>)}</ul>
+      </fieldset>}
 
       {((advancedDuration && existingDuration) || (advancedChildren && existingChildren)) && (
         <p className="text-sm text-muted-foreground">
@@ -187,29 +243,23 @@ export function Step2Placements({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="space-y-5 pt-4">
-          {isPackage && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Состав готового пакета</p>
-              <p className="text-xs text-muted-foreground">Отметьте услуги, которые входят в цену.</p>
-              <div className="grid grid-cols-2 gap-3">
-                {SERVICE_OPTIONS.filter((option) => option.value !== "PROGRAM" && option.value !== "OTHER").map((option) => (
-                  <label key={option.value} className="flex cursor-pointer items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={birthday.includedCategories.includes(option.value)}
-                      disabled={!isEditable}
-                      onCheckedChange={(checked) => {
-                        const list = checked === true
-                          ? Array.from(new Set([...birthday.includedCategories, option.value]))
-                          : birthday.includedCategories.filter((value) => value !== option.value);
-                        updateBirthdayDetails({ includedCategories: list });
-                      }}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
+          {isPackage && <div className="space-y-3">
+            <p className="text-sm font-medium">Состав готового пакета</p>
+            <p className="text-xs text-muted-foreground">Укажите, что входит в пакет. Изменение состава не пересчитывает цену автоматически: стоимость задаётся в разделе «Услуги и цены».</p>
+            {!data.packageComponents?.length && birthday.includedCategories.length > 0 && <p className="text-sm">Прежний состав: {birthday.includedCategories.map(c => SERVICE_OPTIONS.find(o => o.value === c)?.label ?? c).join(", ")}. Он сохранён, пока вы не зададите позиции ниже.</p>}
+            {data.persistedOfferStatus === "PUBLISHED" && <p className="text-sm">Изменение состава опубликованного пакета требует согласования. Текущие позиции сохранены.</p>}
+            {(data.packageComponents ?? []).map((component, index) => <div key={component.id ?? index} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_1fr_auto]">
+              <label className="text-sm">Услуга<select className="mt-1 min-h-11 w-full rounded-lg border bg-background px-2" disabled={!isEditable || data.persistedOfferStatus === "PUBLISHED"} value={component.category}
+                onChange={e => onChange({ packageComponentsEdited: true, packageComponents: data.packageComponents!.map((c, i) => i === index ? { ...c, category: e.target.value as PartyCategory } : c) })}>
+                {SERVICE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select></label>
+              <label className="text-sm">Что входит<input className="mt-1 min-h-11 w-full rounded-lg border bg-background px-2" value={component.title} disabled={!isEditable || data.persistedOfferStatus === "PUBLISHED"} maxLength={200}
+                onChange={e => onChange({ packageComponentsEdited: true, packageComponents: data.packageComponents!.map((c, i) => i === index ? { ...c, title: e.target.value } : c) })} /></label>
+              <button type="button" className="min-h-11 text-sm underline" disabled={!isEditable || data.persistedOfferStatus === "PUBLISHED"} onClick={() => onChange({ packageComponentsEdited: true, packageComponents: data.packageComponents!.filter((_, i) => i !== index) })}>Убрать из состава</button>
+            </div>)}
+            <button type="button" className="min-h-11 text-sm underline" disabled={!isEditable || data.persistedOfferStatus === "PUBLISHED" || (data.packageComponents?.length ?? 0) >= 30}
+              onClick={() => onChange({ packageComponentsEdited: true, packageComponents: [...(data.packageComponents ?? []), { title: "", category: "OTHER" }] })}>Добавить позицию пакета</button>
+          </div>}
           <div className="space-y-2">
             <Label htmlFor="party-program">Программа праздника</Label>
             <Textarea id="party-program" rows={3} value={birthday.program}

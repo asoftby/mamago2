@@ -1,3 +1,7 @@
+import { partyTariffConditions } from "@/lib/offers/partyTariff";
+import { validatePartyServiceAreas } from "@/server/offers/partyServiceAreas";
+import { explicitWizardPrice, wizardPriceModeSchema, packageComponentInputSchema, validatePartyWizardInput, PartyWizardInputError } from "@/lib/offers/partyWizardInput";
+import { savePackageComponents } from "@/server/offers/packageComponents";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -108,11 +112,16 @@ const updateOfferSchema = z.object({
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]).optional(),
   singlePrice: z.number().finite().nonnegative().optional(),
   singlePriceLabel: z.string().optional(),
+  priceMode: wizardPriceModeSchema.optional(),
+  currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  packageComponents: packageComponentInputSchema.optional(),
+  packageComponentsBaseline: packageComponentInputSchema.optional(),
   pricingOptions: z.array(z.object({
     title: z.string(),
     price: z.number().finite().nonnegative(),
     oldPrice: z.number().optional(),
     description: z.string().optional(),
+    partyConditions: partyTariffConditions.optional(),
   })).optional(),
   ctaType: z.enum(["BOOK", "RESERVE", "BUY_TICKET", "SEND_REQUEST", "VISIT_WEBSITE"]).optional(),
   phone: z.string().optional(),
@@ -212,6 +221,7 @@ export async function GET(
           },
         },
         placements: true,
+        components: { where: { archivedAt: null }, orderBy: { position: "asc" } },
       },
     });
 
@@ -303,6 +313,10 @@ export async function PATCH(
         priceFrom: true,
         priceTo: true,
         priceMode: true,
+        currency: true,
+        details: true,
+        minChildren: true,
+        maxChildren: true,
         priceItems: true,
         priceText: true,
         agePolicy: true,
@@ -549,12 +563,16 @@ export async function PATCH(
       }
     }
 
+    validatePartyWizardInput({ productType: data.productType ?? existingOffer.productType, details: data.details === undefined ? existingOffer.details : data.details, minChildren: data.minChildren === undefined ? existingOffer.minChildren : data.minChildren, maxChildren: data.maxChildren === undefined ? existingOffer.maxChildren : data.maxChildren });
+    if (["PARTY_SERVICE", "PARTY_PACKAGE"].includes(data.productType ?? existingOffer.productType ?? "")) await validatePartyServiceAreas(prisma, data.details);
+    const explicitPrice = explicitWizardPrice(data.priceMode, data.singlePrice);
+    if (explicitPrice && ["PARTY_SERVICE", "PARTY_PACKAGE"].includes(data.productType ?? existingOffer.productType ?? "")) { priceMode = explicitPrice.mode; priceFrom = explicitPrice.min; priceTo = explicitPrice.max; priceItems = Prisma.DbNull; }
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
     if (priceTo !== existingOffer.priceTo) updateData.priceTo = priceTo;
     if (priceMode !== existingOffer.priceMode) updateData.priceMode = priceMode;
-    if (data.pricingMode !== undefined || isCampOffer) updateData.priceItems = priceItems;
-    updateData.currency = "BYN";
+    if (data.pricingMode !== undefined || isCampOffer || data.priceMode !== undefined) updateData.priceItems = priceItems;
+    if (data.currency !== undefined) updateData.currency = data.currency;
     if (priceText !== existingOffer.priceText) updateData.priceText = priceText;
     const productType =
       data.productType !== undefined
@@ -827,6 +845,8 @@ export async function PATCH(
           ? await snapshotOfferSchedule(tx, id)
           : null;
 
+      if (data.packageComponents !== undefined) await savePackageComponents(tx, id, data.packageComponents, data.packageComponentsBaseline, false, data.productType);
+
       await tx.offer.update({
         where: { id },
         data: updateData,
@@ -908,6 +928,7 @@ export async function PATCH(
           updatedAt: true,
           productType: true,
           placements: true,
+          components: { where: { archivedAt: null }, orderBy: { position: "asc" }, select: { id: true, title: true, category: true, isOptional: true } },
           place: {
             select: {
               id: true,
@@ -1004,6 +1025,7 @@ export async function PATCH(
     timer.log({ error: 1 });
     console.error("Update offer error:", error);
 
+    if (error instanceof PartyWizardInputError) return NextResponse.json({ error: error.message }, { status: 422 });
     if (error instanceof OfferCategoriesError) {
       return NextResponse.json(
         {

@@ -1,3 +1,5 @@
+import { createPartyPlan } from "./partyPlan.service";
+import { familyIdForWrite } from "@/server/family/familyAccess";
 /**
  * Real PostgreSQL booking confirmation integration.
  *
@@ -34,7 +36,7 @@ if (
 }
 if (
   !["localhost", "127.0.0.1"].includes(url.hostname) ||
-  url.port !== "5434" ||
+  !["5434", "55444"].includes(url.port) ||
   url.pathname !== "/mamago_birthday_it"
 ) {
   throw new Error("Party integration only permits localhost:5434/mamago_birthday_it");
@@ -72,7 +74,8 @@ async function fixture() {
   const parent = await db.user.create({ data: { email: `party-parent-${run}@example.test` } });
   const outsider = await db.user.create({ data: { email: `party-outsider-${run}@example.test` } });
   const business = await db.business.create({
-    data: { name: `Party business ${run}`, ownerUserId: owner.id, operationalStatus: "ACTIVE" },
+    data: { name: `Party business ${run}`, ownerUserId: owner.id, operationalStatus: "ACTIVE", verificationStatus: "APPROVED",
+      billingAccount: { create: { status: "ACTIVE", depositBalance: 1 } } },
   });
   await db.businessMember.create({
     data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true },
@@ -148,9 +151,63 @@ function isPartyError(status: number) {
   return (error: unknown) => error instanceof PartyApiError && error.status === status;
 }
 
+test("forced 40P01 rolls back all effects and retries confirmation at most three times", async () => {
+  const ctx = await fixture();
+  const { order, request, quote } = await ctx.requestWithQuote();
+  await acceptPartyQuote({ userId: ctx.parent.id, orderId: order.id, requestId: request.id, quoteId: quote.id, expectedVersion: 1 });
+  await db.$executeRawUnsafe('CREATE SEQUENCE a5_confirm_attempts');
+  try {
+    await db.$executeRawUnsafe(`CREATE FUNCTION a5_force_confirmation_deadlock() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW."dedupeKey" LIKE '%:a5-forced-retry' AND nextval('a5_confirm_attempts') < 3 THEN
+          RAISE EXCEPTION 'synthetic conflict' USING ERRCODE = '40P01';
+        END IF;
+        IF NEW."dedupeKey" LIKE '%:a5-sla-retry' THEN
+          PERFORM nextval('a5_confirm_attempts');
+          PERFORM pg_sleep(3.1);
+          RAISE EXCEPTION 'synthetic conflict after SLA' USING ERRCODE = '40P01';
+        END IF;
+        RETURN NEW;
+      END;
+    $$`);
+    await db.$executeRawUnsafe(`CREATE TRIGGER a5_force_confirmation_deadlock BEFORE INSERT ON "PartyOutbox"
+      FOR EACH ROW EXECUTE FUNCTION a5_force_confirmation_deadlock()`);
+    const input = { requestId: request.id, businessId: ctx.business.id, actorUserId: ctx.owner.id,
+      expectedQuoteVersion: 1, bookingUnitId: ctx.unit.id, idempotencyKey: "a5-forced-retry" };
+    await confirmPartyRequest(input);
+    assert.equal((await confirmPartyRequest(input)).alreadyConfirmed, true);
+    const [sequence] = await db.$queryRaw<{ last_value: bigint }[]>`SELECT last_value FROM a5_confirm_attempts`;
+    assert.equal(sequence.last_value, BigInt(3));
+    assert.equal(await db.bookingAllocation.count({ where: { bookingRequestId: request.id } }), 1);
+    assert.equal(await db.partyOutbox.count({ where: { aggregateId: request.id, eventType: "PARTY_BOOKING_CONFIRMED" } }), 1);
+    const expiringCtx = await fixture();
+    const expiring = await expiringCtx.requestWithQuote();
+    await acceptPartyQuote({ userId: expiringCtx.parent.id, orderId: expiring.order.id, requestId: expiring.request.id, quoteId: expiring.quote.id, expectedVersion: 1 });
+    await db.bookingRequest.update({ where: { id: expiring.request.id }, data: { responseDueAt: new Date(Date.now() + 3000) } });
+    await assert.rejects(confirmPartyRequest({
+      requestId: expiring.request.id, businessId: expiringCtx.business.id, actorUserId: expiringCtx.owner.id,
+      expectedQuoteVersion: 1, bookingUnitId: expiringCtx.unit.id, idempotencyKey: "a5-sla-retry",
+    }), isPartyError(409));
+    const [afterExpiry] = await db.$queryRaw<{ last_value: bigint }[]>`SELECT last_value FROM a5_confirm_attempts`;
+    assert.equal(afterExpiry.last_value, BigInt(4), "retry must stop before the outbox when SLA expired");
+    assert.equal(await db.bookingAllocation.count({ where: { bookingRequestId: expiring.request.id } }), 0);
+    assert.equal(await db.partyOutbox.count({ where: { aggregateId: expiring.request.id, eventType: "PARTY_BOOKING_CONFIRMED" } }), 0);
+
+  } finally {
+    await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS a5_force_confirmation_deadlock ON "PartyOutbox"');
+    await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS a5_force_confirmation_deadlock()');
+    await db.$executeRawUnsafe('DROP SEQUENCE a5_confirm_attempts');
+  }
+});
+
 test("quote acceptance and concurrent room confirmation are exclusive and idempotent", async () => {
   const ctx = await fixture();
   const [first, second] = await Promise.all([ctx.requestWithQuote(), ctx.requestWithQuote()]);
+  const familyId = await familyIdForWrite(ctx.parent.id);
+  const plans = await Promise.all([first, second].map(entry => db.$transaction(tx => createPartyPlan(tx, {
+    id: entry.order.id, ownerUserId: ctx.parent.id, selectedChildId: null,
+    eventDate, timeFrom: "10:00", timeTo: "11:00",
+  }, familyId))));
 
   await assert.rejects(
     acceptPartyQuote({
@@ -211,8 +268,15 @@ test("quote acceptance and concurrent room confirmation are exclusive and idempo
   assert.equal((await db.partyOrder.findUniqueOrThrow({
     where: { id: winner.entry.order.id },
   })).status, "ANCHOR_CONFIRMED");
+  const winnerPlanId = plans[winner.entry === first ? 0 : 1];
+  const confirmedPlan = await db.planItem.findUniqueOrThrow({ where: { id: winnerPlanId } });
+  assert.equal(confirmedPlan.notes, "Праздник подготовлен");
+  assert.equal(confirmedPlan.priceAmount?.toFixed(2), "450.00");
   assert.equal((await confirm(winner.entry.request.id,
     winner.entry === first ? "first-confirm" : "second-confirm")).alreadyConfirmed, true);
+  const replayedPlan = await db.planItem.findUniqueOrThrow({ where: { id: winnerPlanId } });
+  assert.equal(replayedPlan.updatedAt.getTime(), confirmedPlan.updatedAt.getTime());
+
   assert.equal(await db.bookingAllocation.count({
     where: { bookingUnitId: ctx.unit.id, status: "CONFIRMED" },
   }), 1);
@@ -332,6 +396,19 @@ test("fixed-price auto-confirmation at home requests each add-on exactly once", 
   assert.equal((await addonRequests()).length, 1);
 });
 
+test("confirmations for independent resources both succeed concurrently", async () => {
+  const ctx = await fixture();
+  const [first, second] = await Promise.all([homeSetup(ctx), homeSetup(ctx)]);
+  const [a, b] = await Promise.all([
+    homeOrder(ctx, first, "10:00", "11:00"),
+    homeOrder(ctx, second, "10:00", "11:00"),
+  ]);
+  await Promise.all([fixedPriceReply(ctx, a.request.id, 60), fixedPriceReply(ctx, b.request.id, 60)]);
+  assert.equal(await db.bookingAllocation.count({
+    where: { bookingUnitId: { in: [first.performer!.id, second.performer!.id] }, status: "CONFIRMED" },
+  }), 2);
+});
+
 test("one performer cannot be auto-confirmed for two overlapping parties", async () => {
   const ctx = await fixture();
   const setup = await homeSetup(ctx, { cleanupMinutes: 30 });
@@ -439,7 +516,8 @@ test("two businesses cannot confirm the same standalone party item concurrently"
   const photoA = (await homeSetup(ctx, { withUnit: false })).photo;
   const otherOwner = await db.user.create({ data: { email: `party-other-${randomUUID()}@example.test` } });
   const otherBusiness = await db.business.create({
-    data: { name: "Second party provider", ownerUserId: otherOwner.id, operationalStatus: "ACTIVE" },
+    data: { name: "Second party provider", ownerUserId: otherOwner.id, operationalStatus: "ACTIVE", verificationStatus: "APPROVED",
+      billingAccount: { create: { status: "ACTIVE", depositBalance: 1 } } },
   });
   const otherPlace = await db.place.create({ data: {
     title: "Second provider", shortDesc: "Isolated confirmation race fixture",
@@ -485,6 +563,9 @@ test("two businesses cannot confirm the same standalone party item concurrently"
   })));
   assert.equal(attempts.filter(x => x.status === "fulfilled").length, 1,
     "Exactly one performer must be confirmed for one party item");
+  const rejected = attempts.find(x => x.status === "rejected");
+  assert.ok(rejected?.reason instanceof PartyApiError && rejected.reason.status === 409);
+
   const winner = await db.partyOrderItem.findUniqueOrThrow({ where: { id: item.id } });
   assert.equal(winner.status, "CONFIRMED");
   assert.ok(entries.some(e => e.request.id === winner.confirmedBookingRequestId));

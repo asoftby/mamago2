@@ -1,3 +1,4 @@
+import type { PartyTariffConditions } from "@/lib/offers/partyTariff";
 // Offer Wizard Types
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
@@ -106,6 +107,10 @@ export interface OfferFormData {
   placementStatuses: Partial<Record<OfferPlacementKey, OfferPlacementStatus>>;
   birthdayDetails: {
     locationType: BirthdayLocationType | null;
+    serviceAreas?: { travel: string[]; delivery: string[] };
+    performerRole?: "ANIMATOR" | "HOST";
+    acceptsCustomOrders?: boolean | null;
+    acceptsReferences?: boolean | null;
     durationMinutes: number | null;
     minChildren: number | null;
     maxChildren: number | null;
@@ -120,6 +125,16 @@ export interface OfferFormData {
     cancellationTerms: string;
   };
   
+  /** Existing persisted values retained until the corresponding controls change. */
+  persistedOfferStatus?: string;
+  persistedPriceRange?: { from: number | null; to: number | null; productType: OfferProductType | null };
+  persistedAge?: { policy: import("@prisma/client").AgePolicy; min: number | null; max: number | null; groups: string[] };
+  persistedDetails?: Record<string, unknown>;
+  priceKind?: "EXACT" | "FROM" | "ON_REQUEST" | "FREE" | "RANGE" | "NONE" | "UNKNOWN";
+  packageComponentsEdited?: boolean;
+  packageComponentsBaseline?: Array<{ id?: string; title: string; category: PartyCategory }>;
+  packageComponents?: Array<{ id?: string; title: string; category: PartyCategory; isOptional?: boolean }>;
+
   // Legacy fields (for backward compatibility)
   offerKind: "course" | "birthday" | "service" | null;
   durationType: "single" | "recurring" | "camp" | null;
@@ -185,7 +200,7 @@ export interface OfferFormData {
   // Step 5/6: Pricing
   pricingMode: "single" | "multiple";
   singlePrice: string;
-  singleCurrency: "BYN" | "USD" | "EUR";
+  singleCurrency: string;
   priceCaption: string;
   pricingOptions: PricingOption[];
   promotionDetails: string;
@@ -247,6 +262,7 @@ export interface OfferFormData {
 }
 
 export interface PricingOption {
+  partyConditions?: PartyTariffConditions;
   id: string;
   title: string;
   price: string;

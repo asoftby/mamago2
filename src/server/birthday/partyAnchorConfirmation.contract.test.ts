@@ -80,7 +80,7 @@ assert.ok(service.indexOf("bookingRequestId_idempotencyKey") < service.indexOf("
 // Auto-confirm repeats confirmPartyRequest's live check inside the transaction, before the claim:
 // a withdrawn publication or a place reassigned to another business must not confirm (422).
 const txStart = service.indexOf("prisma.$transaction");
-const liveCheck = service.indexOf("verifyPartyOffers(order.citySlug, [offerId], tx)");
+const liveCheck = service.indexOf("verifyPartyOffers(order.citySlug, [offerId], tx, order.venueMode)");
 assert.ok(txStart !== -1 && liveCheck > txStart, "Offer check must run inside the transaction");
 assert.ok(liveCheck < service.indexOf("tx.bookingRequest.updateMany"), "Offer check must precede the claim");
 assert.match(service.slice(txStart, liveCheck), /if \(autoConfirm\) \{\s*const offerId = existing\.offerId;\s*const verified = offerId \? await $/,

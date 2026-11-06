@@ -1,3 +1,4 @@
+import { hasPartyTariffConditions, partyTariffConditions } from "@/lib/offers/partyTariff";
 import type { OfferKind, OfferStatus, PartyCategory, PartyOccasion } from "@prisma/client";
 import type {
   OfferFormData,
@@ -76,6 +77,7 @@ function parsePlaceVisitDetailsFromDb(
 }
 
 function parseServiceDetailsFromDb(details: unknown): {
+  serviceAreas?: OfferFormData["birthdayDetails"]["serviceAreas"];
   program: string;
   included: string;
   note: string;
@@ -94,6 +96,7 @@ function parseServiceDetailsFromDb(details: unknown): {
     "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
   ]);
   return {
+    serviceAreas: d?.serviceAreas,
     program: d?.program ?? "",
     included: d?.included ?? "",
     note: d?.note ?? "",
@@ -485,8 +488,10 @@ function mapCtaToApi(
 }
 
 function parsePrice(value: string): number | undefined {
-  const n = parseFloat(String(value).replace(",", ".").trim());
-  return Number.isFinite(n) ? n : undefined;
+  const text = String(value).replace(",", ".").trim();
+  if (!text) return undefined;
+  if (!/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/.test(text)) throw new Error("Укажите корректную цену, например 150 или 150,50");
+  return Number(text);
 }
 
 function richTextToLegacyPriceText(html: string): string | undefined {
@@ -654,7 +659,9 @@ export function buildOfferCreatePayload(
     : [];
   const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
   const pricingMode = regularLowestPrice !== null ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
-  const ages = ageGroupsToMonths(data.ageGroups);
+  const unchangedAge = data.persistedAge && data.persistedAge.policy === data.agePolicy &&
+    JSON.stringify([...data.persistedAge.groups].sort()) === JSON.stringify([...data.ageGroups].sort());
+  const ages = unchangedAge ? { ageMinMonths: data.persistedAge!.min, ageMaxMonths: data.persistedAge!.max } : ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
     data,
@@ -690,20 +697,23 @@ export function buildOfferCreatePayload(
         ? undefined
         : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
+    currency: data.singleCurrency,
+    ...((productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") && data.priceKind ? { priceMode: data.priceKind } : {}),
     singlePrice:
-      data.offerWizardType === "CAMP" ? undefined : (regularLowestPrice ?? parsePrice(data.singlePrice)),
+      data.offerWizardType === "CAMP" ? undefined : (data.pricingMode === "multiple" || ((productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") && data.priceKind === "ON_REQUEST") ? undefined : regularLowestPrice ?? parsePrice(data.singlePrice)),
     singlePriceLabel:
       data.offerWizardType === "CAMP"
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP" || regularLowestPrice !== null
+      data.offerWizardType === "CAMP" || regularLowestPrice !== null || data.pricingMode !== "multiple" || ((productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") && data.priceKind === "ON_REQUEST")
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
-            price: parsePrice(o.price) ?? 0,
+            price: (() => { const price = parsePrice(o.price); if (price === undefined) throw new Error("Укажите цену варианта"); return price; })(),
             oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
             description: o.description?.trim() || undefined,
+            partyConditions: o.partyConditions,
           })),
     ctaType: accessFields.ctaType,
     phone: accessFields.phone,
@@ -738,6 +748,7 @@ export function buildOfferCreatePayload(
     productType,
     requestedPlacements,
     details: buildTypeDetails(data, opts?.status === "DRAFT"),
+    ...(productType === "PARTY_PACKAGE" && data.packageComponentsEdited ? { packageComponents: data.packageComponents?.map(({ id, title, category }) => ({ id, title, category })), packageComponentsBaseline: data.packageComponentsBaseline ?? [] } : {}),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
@@ -775,15 +786,21 @@ function buildTypeDetails(
   if (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") {
     const bd = data.birthdayDetails;
     const result: Record<string, unknown> = {};
-    if (bd.durationMinutes != null) result.durationMinutes = bd.durationMinutes;
-    if (bd.program.trim()) result.program = bd.program.trim();
-    if (bd.included.trim()) result.included = bd.included.trim();
-    if (bd.note.trim()) result.note = bd.note.trim();
-    if (bd.prepaymentTerms?.trim()) result.prepaymentTerms = bd.prepaymentTerms.trim();
-    if (bd.cancellationTerms?.trim()) result.cancellationTerms = bd.cancellationTerms.trim();
+    Object.assign(result, data.persistedDetails ?? {});
+    if (bd.serviceAreas !== undefined) result.serviceAreas = bd.serviceAreas;
+    if (bd.performerRole !== undefined) result.performerRole = bd.performerRole;
+    if (bd.acceptsCustomOrders !== undefined) result.acceptsCustomOrders = bd.acceptsCustomOrders;
+    if (bd.acceptsReferences !== undefined) result.acceptsReferences = bd.acceptsReferences;
+    result.durationMinutes = bd.durationMinutes;
+    result.program = bd.program.trim();
+    result.included = bd.included.trim();
+    result.note = bd.note.trim();
+    result.prepaymentTerms = bd.prepaymentTerms?.trim() ?? "";
+    result.cancellationTerms = bd.cancellationTerms?.trim() ?? "";
     if (data.productType === "PARTY_PACKAGE" && (bd.includedCategories?.length ?? 0) > 0) {
       result.includedCategories = bd.includedCategories;
     }
+    if (data.productType === "PARTY_PACKAGE" && data.packageComponentsEdited) delete result.includedCategories;
     return Object.keys(result).length > 0 ? result : undefined;
   }
   return undefined;
@@ -795,8 +812,8 @@ function buildPartyFilterColumns(data: OfferFormData): Record<string, unknown> |
     return {
       category: data.partyCategory ?? undefined,
       partyLocationType: data.birthdayDetails.locationType ?? undefined,
-      minChildren: data.birthdayDetails.minChildren ?? undefined,
-      maxChildren: data.birthdayDetails.maxChildren ?? undefined,
+      minChildren: data.birthdayDetails.minChildren,
+      maxChildren: data.birthdayDetails.maxChildren,
       occasions: data.occasions,
     };
   }
@@ -804,8 +821,8 @@ function buildPartyFilterColumns(data: OfferFormData): Record<string, unknown> |
     return {
       category: null,
       partyLocationType: data.birthdayDetails.locationType ?? undefined,
-      minChildren: data.birthdayDetails.minChildren ?? undefined,
-      maxChildren: data.birthdayDetails.maxChildren ?? undefined,
+      minChildren: data.birthdayDetails.minChildren,
+      maxChildren: data.birthdayDetails.maxChildren,
       occasions: data.occasions,
     };
   }
@@ -889,7 +906,9 @@ export function buildOfferUpdatePayload(
     : [];
   const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
   const pricingMode = regularLowestPrice !== null ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
-  const ages = ageGroupsToMonths(data.ageGroups);
+  const unchangedAge = data.persistedAge && data.persistedAge.policy === data.agePolicy &&
+    JSON.stringify([...data.persistedAge.groups].sort()) === JSON.stringify([...data.ageGroups].sort());
+  const ages = unchangedAge ? { ageMinMonths: data.persistedAge!.min, ageMaxMonths: data.persistedAge!.max } : ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
     data,
@@ -922,20 +941,23 @@ export function buildOfferUpdatePayload(
         ? undefined
         : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
+    currency: data.singleCurrency,
+    ...((productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") && data.priceKind ? { priceMode: data.priceKind } : {}),
     singlePrice:
-      data.offerWizardType === "CAMP" ? undefined : (regularLowestPrice ?? parsePrice(data.singlePrice)),
+      data.offerWizardType === "CAMP" ? undefined : (data.pricingMode === "multiple" || ((productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") && data.priceKind === "ON_REQUEST") ? undefined : regularLowestPrice ?? parsePrice(data.singlePrice)),
     singlePriceLabel:
       data.offerWizardType === "CAMP"
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP" || regularLowestPrice !== null
+      data.offerWizardType === "CAMP" || regularLowestPrice !== null || data.pricingMode !== "multiple" || ((productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") && data.priceKind === "ON_REQUEST")
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
-            price: parsePrice(o.price) ?? 0,
+            price: (() => { const price = parsePrice(o.price); if (price === undefined) throw new Error("Укажите цену варианта"); return price; })(),
             oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
             description: o.description?.trim() || undefined,
+            partyConditions: o.partyConditions,
           })),
     ctaType: accessFields.ctaType,
     phone: accessFields.phone,
@@ -971,6 +993,7 @@ export function buildOfferUpdatePayload(
     productType,
     requestedPlacements,
     details: buildTypeDetails(data, opts?.preserveClassPricingDraft === true),
+    ...(productType === "PARTY_PACKAGE" && data.packageComponentsEdited ? { packageComponents: data.packageComponents?.map(({ id, title, category }) => ({ id, title, category })), packageComponentsBaseline: data.packageComponentsBaseline ?? [] } : {}),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
@@ -987,7 +1010,17 @@ export function buildOfferUpdatePayload(
     payload.wizardCompletedSteps = opts.wizardCompletedSteps;
   }
 
+  if (isUnchangedLegacyRange(data)) {
+    // Existing numeric ranges have no variant rows. Preserve both DB bounds until explicitly replaced.
+    for (const key of ["pricingMode", "singlePrice", "pricingOptions", "priceMode"]) delete payload[key];
+  }
   return payload;
+}
+
+export function isUnchangedLegacyRange(data: OfferFormData): boolean {
+  return Boolean(data.persistedPriceRange && data.priceKind === "RANGE" && data.pricingMode === "single" &&
+    data.productType === data.persistedPriceRange.productType &&
+    data.singlePrice === (data.persistedPriceRange.from == null ? "" : String(data.persistedPriceRange.from)));
 }
 
 type OfferOpeningHoursRow = {
@@ -1136,7 +1169,10 @@ export function mapOfferToFormData(offer: {
   priceCaption?: string | null;
   promotionDetails?: string | null;
   promotionalOffer?: string | null;
+  currency?: string;
+  components?: Array<{ id: string; title: string; category: PartyCategory; isOptional?: boolean }>;
   priceFrom: number | null;
+  priceTo?: number | null;
   priceMode?: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" | "ON_REQUEST";
   priceItems?: unknown;
   priceText: string | null;
@@ -1259,6 +1295,7 @@ export function mapOfferToFormData(offer: {
 
   return {
     ...defaults,
+    persistedOfferStatus: offer.status,
     offerWizardType: inferredWizardType,
     productType,
     requestedPlacements: ensurePrimaryPlacements(requestedPlacements, productType),
@@ -1266,7 +1303,11 @@ export function mapOfferToFormData(offer: {
     // birthdayDetails: PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON;
     // the plain BIRTHDAY-checkbox case (non-party types) has no extra fields to persist.
     birthdayDetails: {
+      serviceAreas: usesPartyColumns ? serviceDetails?.serviceAreas : undefined,
       locationType: usesPartyColumns ? (offer.partyLocationType ?? null) : null,
+      performerRole: (offer.details as Record<string, unknown> | null)?.performerRole === "HOST" ? "HOST" : undefined,
+      acceptsCustomOrders: typeof (offer.details as Record<string, unknown> | null)?.acceptsCustomOrders === "boolean" ? (offer.details as Record<string, boolean>).acceptsCustomOrders : undefined,
+      acceptsReferences: typeof (offer.details as Record<string, unknown> | null)?.acceptsReferences === "boolean" ? (offer.details as Record<string, boolean>).acceptsReferences : undefined,
       durationMinutes: usesPartyColumns ? (serviceDetails?.durationMinutes ?? null) : null,
       minChildren: usesPartyColumns ? (offer.minChildren ?? null) : null,
       maxChildren: usesPartyColumns ? (offer.maxChildren ?? null) : null,
@@ -1303,6 +1344,10 @@ export function mapOfferToFormData(offer: {
     venuePitch: offer.venuePitch ?? "",
     visitorNote: offer.visitorNote ?? "",
     ageGroups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths),
+    persistedAge: { policy: offer.agePolicy, min: offer.ageMinMonths, max: offer.ageMaxMonths, groups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths) },
+    persistedDetails: offer.details && typeof offer.details === "object" && !Array.isArray(offer.details) ? offer.details as Record<string, unknown> : {},
+    packageComponentsBaseline: offer.components?.map(c => ({ id: c.id, title: c.title, category: c.category })),
+    packageComponents: offer.components?.map(c => ({ id: c.id, title: c.title, category: c.category, isOptional: c.isOptional })),
     agePolicy: offer.agePolicy,
     coverImage: offer.coverImage,
     gallery,
@@ -1321,9 +1366,12 @@ export function mapOfferToFormData(offer: {
         : offer.promotionalOffer
           ? plainTextToRichTextHtml(normalizeRichTextCurrency(offer.promotionalOffer))
           : "",
-    pricingMode: offer.priceMode === "RANGE" && Array.isArray(offer.priceItems) ? "multiple" : "single",
+    pricingMode: (offer.priceMode === "RANGE" && Array.isArray(offer.priceItems)) || hasPartyTariffConditions(offer.priceItems) ? "multiple" : "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
-    singleCurrency: "BYN",
+    singleCurrency: offer.currency ?? "BYN",
+    priceKind: hasPartyTariffConditions(offer.priceItems) ? "RANGE" : offer.priceMode ?? "UNKNOWN",
+    persistedPriceRange: offer.priceMode === "RANGE" && (!Array.isArray(offer.priceItems) || offer.priceItems.length === 0)
+      ? { from: offer.priceFrom, to: offer.priceTo ?? null, productType } : undefined,
     pricingOptions: Array.isArray(offer.priceItems)
       ? offer.priceItems.flatMap((item, index) => {
           if (!item || typeof item !== "object") return [];
@@ -1335,6 +1383,7 @@ export function mapOfferToFormData(offer: {
             price: String(row.price),
             oldPrice: typeof row.oldPrice === "number" ? String(row.oldPrice) : undefined,
             description: typeof row.description === "string" ? row.description : "",
+            partyConditions: partyTariffConditions.safeParse(row.partyConditions).data,
           }];
         })
       : [],
@@ -1386,4 +1435,12 @@ export function mapOfferToFormData(offer: {
     campSafetyInfo: normalizeRichTextEditorValue(offer.campSafetyInfo),
     campMedicalInfo: normalizeRichTextEditorValue(offer.campMedicalInfo),
   };
+}
+
+/** Synchronize only server-assigned component identities after an offer save. */
+export function withSavedPackageComponents(data: OfferFormData, components: NonNullable<OfferFormData["packageComponents"]>): OfferFormData {
+  const persistedDetails = { ...data.persistedDetails };
+  if (data.packageComponentsEdited) delete persistedDetails.includedCategories;
+  return { ...data, packageComponents: components, packageComponentsBaseline: components.map(({ id, title, category }) => ({ id, title, category })), packageComponentsEdited: false,
+    persistedDetails, birthdayDetails: data.packageComponentsEdited ? { ...data.birthdayDetails, includedCategories: [] } : data.birthdayDetails };
 }

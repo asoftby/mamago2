@@ -1,3 +1,4 @@
+import { childAgeForBusiness } from "./partyRecipientProfile";
 import "server-only";
 import { BookingKind, BookingStatus, PartyItemRole, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -43,9 +44,9 @@ export async function dispatchPartyCandidateWave(input: {
         confirmedBookingRequestId: true,
         providerInvites: { select: { id: true }, take: 1 },
         partyOrder: { select: {
-          id: true, status: true, version: true, ownerUserId: true, citySlug: true,
+          id: true, status: true, version: true, ownerUserId: true, citySlug: true, venueMode: true,
           eventDate: true, timeFrom: true, timeTo: true,
-          childrenCount: true, adultsCount: true, childAge: true,
+          childrenCount: true, adultsCount: true, childAge: true, recipientAudience: true,
         } },
         requests: { select: { businessId: true, status: true, partyStage: true } },
       },
@@ -85,12 +86,12 @@ export async function dispatchPartyCandidateWave(input: {
     let sent = 0;
     for (const candidate of wave.selected) {
       // Recheck current publication and business ownership inside transaction.
-      const published = await verifyPartyOffers(order.citySlug, [candidate.offerId], tx);
+      const published = await verifyPartyOffers(order.citySlug, [candidate.offerId], tx, order.venueMode);
       const offer = published.get(candidate.offerId);
       if (!offer || offer.category !== current.category ||
           offer.place?.ownerBusinessId !== candidate.businessId ||
           partyRequirementsProblem(offer, { childrenCount: order.childrenCount,
-            childAge: order.childAge })) continue;
+            childAge: order.childAge, recipientAudience: order.recipientAudience })) continue;
       const request = await tx.bookingRequest.create({
         data: {
           kind: BookingKind.PARTY, publicationType: "OFFER",
@@ -99,7 +100,7 @@ export async function dispatchPartyCandidateWave(input: {
           partyStage: "SENT", status: BookingStatus.NEW,
           requestedDate: order.eventDate, requestedTime: order.timeFrom,
           adultsCount: order.adultsCount, childrenCount: order.childrenCount,
-          childAge: order.childAge, customerName: null,
+          childAge: childAgeForBusiness(order), customerName: null,
           customerPhone: null, customerComment: null, responseDueAt: due,
         },
         select: { id: true },

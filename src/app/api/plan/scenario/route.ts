@@ -89,7 +89,7 @@ async function loadCanonical(
   const [items, overrideRows] = await Promise.all([
     tx.planItem.findMany({
       where: { ...scope, date },
-      include: { activity: { select: activitySelect } },
+      include: { activity: { select: activitySelect }, partyOrder: { select: { id: true } } },
       orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     }),
     tx.dayScenarioItemOverride.findMany({ where: { scenarioId }, select: { planItemId: true, startTimeOverride: true } }),
@@ -171,7 +171,7 @@ export async function saveScenarioDraftForUser(
       throw new ScenarioSaveError(409, "PLAN_CHANGED");
     }
     const targets = new Map(current.items.map((item) => [item.id, item]));
-    if ([...intent.replacements.map((x) => x.planItemId), ...intent.removals].some((id) => !targets.has(id))) {
+    if ([...intent.replacements.map((x) => x.planItemId), ...intent.removals].some((id) => !targets.has(id) || targets.get(id)?.partyOrder)) {
       throw new ScenarioSaveError(422, "INVALID_PLAN_ITEM");
     }
 
@@ -194,7 +194,7 @@ export async function saveScenarioDraftForUser(
       }
 
       await tx.planItem.update({
-        where: { id: replacement.planItemId },
+        where: { id: replacement.planItemId, partyOrder: { is: null } },
         data: { activityId: activity.id, startsAt, title: activity.title, coverImageUrl: activity.coverImageUrl },
       });
       await tx.dayScenarioItemOverride.deleteMany({ where: { scenarioId: scenario.id, planItemId: replacement.planItemId } });
@@ -202,7 +202,7 @@ export async function saveScenarioDraftForUser(
 
     if (intent.removals.length > 0) {
       await tx.dayScenarioItemOverride.deleteMany({ where: { scenarioId: scenario.id, planItemId: { in: intent.removals } } });
-      await tx.planItem.deleteMany({ where: { ...aclScope, date: intent.date, id: { in: intent.removals } } });
+      await tx.planItem.deleteMany({ where: { ...aclScope, date: intent.date, id: { in: intent.removals }, partyOrder: { is: null } } });
     }
 
     const finalLoaded = await loadCanonical(tx as Tx, activeScope, intent.date, scenario.id);

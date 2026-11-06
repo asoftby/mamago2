@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem, PartyCategoryKey } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
-import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
+import { submitBirthdayParty, submittedPartyId, type PartyFlowState, type PartySubmissionInput } from "../../lib/partySubmitFlow";
 import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Props = {
@@ -22,6 +22,9 @@ type Props = {
   childName: string | null;
   childBirthDateIso: string | null;
   statedAgeYears?: number | null;
+  selectedChildId?: string | null;
+  submissionOwnerId?: string | null;
+  recipientAudience?: "ADULT" | "CHILD" | null;
   authenticated: boolean;
   authLoading: boolean;
   requestLogin: () => void;
@@ -33,8 +36,9 @@ type Props = {
 };
 
 export function StepReview({
-  offers, addonCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso, statedAgeYears,
-  authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
+  offers, addonCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName,
+  childBirthDateIso, statedAgeYears, selectedChildId, recipientAudience,
+  submissionOwnerId, authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
   const budgetWarning = partyBudgetWarning(total, maxBudget);
@@ -52,6 +56,28 @@ export function StepReview({
   const [slotsKey, setSlotsKey] = useState("");
 
   const anchorOfferId = offers[0]?.id;
+  const formKey = submissionOwnerId && anchorOfferId
+    ? `mamago:party-review:${submissionOwnerId}:${citySlug}:${anchorOfferId}` : null;
+  const [restoredFormKey, setRestoredFormKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!formKey || restoredFormKey === formKey) return;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(formKey) ?? "null");
+      if (draft && ["date", "timeFrom", "timeTo", "children", "adults", "name", "phone"].every(key => typeof draft[key] === "string")) {
+        setDate(draft.date); setTimeFrom(draft.timeFrom); setTimeTo(draft.timeTo);
+        setChildren(draft.children); setAdults(draft.adults); setName(draft.name); setPhone(draft.phone);
+      }
+    } catch { /* Storage is optional. */ }
+    setRestoredFormKey(formKey);
+  }, [formKey, restoredFormKey]);
+
+  useEffect(() => {
+    if (!formKey || restoredFormKey !== formKey || sent) return;
+    try { sessionStorage.setItem(formKey, JSON.stringify({ date, timeFrom, timeTo, children, adults, name, phone })); }
+    catch { /* Storage is optional. */ }
+  }, [formKey, restoredFormKey, sent, date, timeFrom, timeTo, children, adults, name, phone]);
+
   const checkVenue = venueMode === "VENUE" || venueMode === "PACKAGE";
   const partySize = Number(children) + Number(adults);
 
@@ -137,14 +163,45 @@ export function StepReview({
     onBusyChange(true);
     setError(null);
     try {
-      await submitBirthdayParty(flowStateRef.current, {
+      const intent: PartySubmissionInput = {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
-        childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date) ?? (statedAgeYears != null && statedAgeYears <= 20 ? statedAgeYears : null),
+        selectedChildId, recipientAudience, childName: childName || null,
+        childAge: childAgeYearsOnDate(childBirthDateIso, date) ?? statedAgeYears ?? null,
         contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
         addonCategories,
+      };
+      const fingerprint = JSON.stringify(intent);
+      let storageKey: string | null = null;
+      if (submissionOwnerId && globalThis.crypto?.subtle) {
+        try {
+          const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fingerprint));
+          const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+          storageKey = `mamago:party-submit:${submissionOwnerId}:${hash}`;
+          if (!flowStateRef.current.draft) {
+            const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
+            if (saved?.draft && typeof saved.draft.id === "string" && Number.isInteger(saved.draft.version)) {
+              flowStateRef.current.draft = saved.draft;
+              if (typeof saved.key === "string") {
+                flowStateRef.current.pending = { ...saved.draft, fingerprint };
+                flowStateRef.current.key = saved.key;
+              }
+            }
+          }
+        } catch { /* Storage and digest are optional. */ }
+      }
+      await submitBirthdayParty(flowStateRef.current, intent, undefined, state => {
+        if (!storageKey) return;
+        try { sessionStorage.setItem(storageKey, JSON.stringify({ draft: state.draft, key: state.key })); }
+        catch { /* A blocked storage API must not block sending. */ }
       });
+      if (storageKey) {
+        try { sessionStorage.removeItem(storageKey); } catch { /* Storage is optional. */ }
+      }
+      if (formKey) {
+        try { sessionStorage.removeItem(formKey); } catch { /* Storage is optional. */ }
+      }
       onSent();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка отправки");
@@ -212,7 +269,7 @@ export function StepReview({
         <h3 className="font-semibold">Данные для заявки</h3>
         <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">Дата праздника<input required type="date" value={date} onChange={e => setDate(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
-          <label className="text-sm">Количество детей<input required type="number" min="1" max="500" value={children} onChange={e => setChildren(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
+          <label className="text-sm">Количество детей<input required type="number" min="0" max="500" value={children} onChange={e => setChildren(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Начало<input required type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Окончание<input required type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Количество взрослых<input required type="number" min="0" max="500" value={adults} onChange={e => setAdults(e.target.value)} className="block w-full rounded-lg border p-3" /></label>

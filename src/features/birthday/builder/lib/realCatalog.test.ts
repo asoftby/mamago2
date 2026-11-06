@@ -9,7 +9,7 @@ assert.deepEqual(extractPartyDetails({
   includedCategories: ["VENUE", "CAKE", "INJECTED", "CAKE"],
   prepaymentTerms: "30% после подтверждения",
 }, [{ category: "DECOR", isOptional: false }, { category: "FOOD", isOptional: true }]), {
-  includedCategories: ["VENUE", "CAKE", "DECOR"],
+  includedCategories: ["DECOR"],
   prepaymentTerms: "30% после подтверждения",
   cancellationTerms: null,
 });
@@ -24,7 +24,7 @@ const offer: BirthdayCatalogItem = {
 assert.equal(matchesBirthdayRequirements(offer, { ageMonths: 72, children: 8, maxBudget: 200 }), true);
 assert.equal(matchesBirthdayRequirements(offer, { ageMonths: 24 }), false);
 assert.equal(matchesBirthdayRequirements(offer, { children: 20 }), false);
-assert.equal(matchesBirthdayRequirements(offer, { maxBudget: 100 }), false);
+assert.equal(matchesBirthdayRequirements(offer, { maxBudget: 100 }), true);
 assert.equal(matchesBirthdayRequirements({ ...offer, priceFrom: null }, { maxBudget: 100 }), true);
 // Unknown price is retained as unknown (not zero), and is never claimed affordable.
 // Guest group is a range: capacity must overlap it.
@@ -72,7 +72,7 @@ for (const category of ["CAKE", "FOOD"] as const) {
 }
 assert.equal(isLocationCompatible({ ...onsite, category: "SHOW" }, "HOME"), false);
 assert.equal(isLocationCompatible(offsite, "HOME"), true);
-assert.equal(isLocationCompatible({ ...offsite, category: "SHOW" }, "VENUE"), false);
+assert.equal(isLocationCompatible({ ...offsite, category: "SHOW" }, "VENUE"), true);
 assert.equal(isLocationCompatible(both, "OUTDOOR"), true);
 assert.equal(isLocationCompatible(both, "PACKAGE"), true);
 assert.equal(isLocationCompatible(legacy, "HOME"), true);
@@ -99,3 +99,5 @@ assert.deepEqual(
   { selectedBaseId: null, selectedAddonIds: [] },
 );
 console.log("realCatalog.test.ts: OK");
+
+assert.equal(catalogPriceLabel({priceFrom:null,priceMode:"EXACT",currency:"BYN",priceResolution:"UNRESOLVED"}),"Стоимость уточняется");

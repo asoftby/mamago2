@@ -1,3 +1,4 @@
+import { childAgeForBusiness } from "./partyRecipientProfile";
 import "server-only";
 
 import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
@@ -21,9 +22,9 @@ export async function dispatchQueuedPartyInvites(itemId: string) {
       select: {
         id: true, role: true, status: true, category: true, confirmedBookingRequestId: true,
         partyOrder: { select: {
-          id: true, ownerUserId: true, status: true, citySlug: true,
+          id: true, ownerUserId: true, status: true, citySlug: true, venueMode: true,
           eventDate: true, timeFrom: true, timeTo: true,
-          childrenCount: true, adultsCount: true, childAge: true,
+          childrenCount: true, adultsCount: true, childAge: true, recipientAudience: true,
         } },
         requests: { select: { id: true, businessId: true, partyStage: true, status: true } },
         providerInvites: { orderBy: { position: "asc" }, select: {
@@ -64,7 +65,7 @@ export async function dispatchQueuedPartyInvites(itemId: string) {
     if (decision.expireIds.length) return { sent: 0, alreadyQueued: true };
     const selected = item.providerInvites.filter(invite => decision.dispatchIds.includes(invite.id));
     const published = selected.length
-      ? await verifyPartyOffers(order.citySlug, selected.map(x => x.offerId), tx)
+      ? await verifyPartyOffers(order.citySlug, selected.map(x => x.offerId), tx, order.venueMode)
       : new Map();
     let sent = 0;
     for (const invite of selected) {
@@ -74,7 +75,7 @@ export async function dispatchQueuedPartyInvites(itemId: string) {
       const offer = published.get(invite.offerId);
       if (!offer || offer.productType !== "PARTY_SERVICE" ||
         offer.category !== item.category || offer.place?.ownerBusinessId !== invite.businessId ||
-        partyRequirementsProblem(offer, { childrenCount: order.childrenCount, childAge: order.childAge })) {
+        partyRequirementsProblem(offer, { childrenCount: order.childrenCount, childAge: order.childAge, recipientAudience: order.recipientAudience })) {
         throw new PartyApiError(409, "Предложение исполнителя изменилось");
       }
       const claim = await tx.partyProviderInvite.updateMany({
@@ -90,7 +91,7 @@ export async function dispatchQueuedPartyInvites(itemId: string) {
           partyStage: "SENT", status: BookingStatus.NEW,
           requestedDate: order.eventDate, requestedTime: order.timeFrom,
           adultsCount: order.adultsCount, childrenCount: order.childrenCount,
-          childAge: order.childAge, customerName: null,
+          childAge: childAgeForBusiness(order), customerName: null,
           customerPhone: null, customerComment: null, responseDueAt: due,
         },
         select: { id: true },

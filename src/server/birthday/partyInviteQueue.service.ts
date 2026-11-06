@@ -32,7 +32,7 @@ export async function queuePartyProviderCandidates(
     where: { id: partyOrderItemId },
     select: {
       role: true, status: true, category: true,
-      partyOrder: { select: { citySlug: true, status: true } },
+      partyOrder: { select: { citySlug: true, status: true, venueMode: true } },
       requests: { select: { id: true }, take: 1 },
     },
   });
@@ -58,7 +58,7 @@ export async function queuePartyProviderCandidates(
 
   // Re-validate all candidates against the public offer pool at write time.
   const published = await verifyPartyOffers(
-    item.partyOrder.citySlug, candidates.map(c => c.offerId), tx,
+    item.partyOrder.citySlug, candidates.map(c => c.offerId), tx, item.partyOrder.venueMode,
   );
   if (candidates.some(candidate => {
     const offer = published.get(candidate.offerId);

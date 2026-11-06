@@ -1,3 +1,7 @@
+import type { OfferForConstructor } from "@/lib/birthday/constructorContract";
+import type { AgePolicy } from "@prisma/client";
+import { birthdayAgeCompatibility, birthdayParticipantsCompatibility, birthdayLocationCompatibility } from "@/lib/birthday/compatibility";
+import { extractPartyDetails } from "@/features/birthday/builder/lib/realCatalog";
 import { PartyCategory, type OfferProductType, type PartyLocationType, type Prisma } from "@prisma/client";
 import { PartyApiError } from "./partyDraft.validation";
 
@@ -6,12 +10,14 @@ export type CatalogOffer = {
   productType: OfferProductType | null;
   category: PartyCategory | null;
   partyLocationType: PartyLocationType | null;
+  constructorPrice?: OfferForConstructor["price"];
   priceFrom: number | null;
   priceMode: string;
   currency: string;
   details: Prisma.JsonValue | null;
-  components: { category: PartyCategory; isOptional: boolean }[];
+  components: { category: PartyCategory; isOptional: boolean; id?: string; title?: string; refOfferId?: string | null; priceSnapshot?: Prisma.Decimal | null; priceDelta?: Prisma.Decimal | null }[];
   place: { ownerBusinessId: string | null } | null;
+  agePolicy?: AgePolicy;
   ageMinMonths?: number | null;
   ageMaxMonths?: number | null;
   minChildren?: number | null;
@@ -19,7 +25,7 @@ export type CatalogOffer = {
 };
 
 export type PartyRequirementOffer = Pick<
-  CatalogOffer, "ageMinMonths" | "ageMaxMonths" | "minChildren" | "maxChildren"
+  CatalogOffer, "agePolicy" | "ageMinMonths" | "ageMaxMonths" | "minChildren" | "maxChildren"
 > & { title?: string | null };
 
 /**
@@ -28,23 +34,17 @@ export type PartyRequirementOffer = Pick<
  * covers months 12Y..12Y+11 and only a range entirely outside the offer is rejected.
  */
 export function partyRequirementsProblem(
-  offer: PartyRequirementOffer, party: { childrenCount: number; childAge: number | null },
+  offer: PartyRequirementOffer, party: { childrenCount: number; childAge: number | null; recipientAudience?: string | null; ageMonthsRange?: { min: number; max: number } | null },
 ): string | null {
   const name = offer.title ? "«" + offer.title + "»" : "Выбранная услуга";
-  if (offer.minChildren != null && party.childrenCount < offer.minChildren) {
-    return name + " рассчитана минимум на " + offer.minChildren + " детей";
-  }
-  if (offer.maxChildren != null && party.childrenCount > offer.maxChildren) {
-    return name + " рассчитана максимум на " + offer.maxChildren + " детей";
-  }
-  if (party.childAge != null) {
-    const fromMonths = party.childAge * 12;
-    const toMonths = fromMonths + 11;
-    if ((offer.ageMinMonths != null && toMonths < offer.ageMinMonths) ||
-        (offer.ageMaxMonths != null && fromMonths > offer.ageMaxMonths)) {
-      return name + " не подходит по возрасту ребёнка";
-    }
-  }
+  if (birthdayParticipantsCompatibility({ minChildren: offer.minChildren ?? null, maxChildren: offer.maxChildren ?? null },
+    { childrenMin: party.childrenCount, childrenMax: party.childrenCount }) === "MISMATCH") return name + (offer.minChildren != null && party.childrenCount < offer.minChildren ? " рассчитана минимум на " + offer.minChildren + " детей" : " рассчитана максимум на " + offer.maxChildren + " детей");
+  const policy = offer.agePolicy ?? (offer.ageMinMonths != null || offer.ageMaxMonths != null ? "SPECIFIC" : "UNKNOWN");
+  if (birthdayAgeCompatibility({ agePolicy: policy, ageMinMonths: offer.ageMinMonths ?? null, ageMaxMonths: offer.ageMaxMonths ?? null },
+    party.ageMonthsRange ?? (party.childAge === null ? undefined : { min: party.childAge * 12, max: party.childAge * 12 + 11 }),
+    party.childAge !== null ? (party.childAge >= 18 ? "ADULT" : "CHILD") :
+      party.recipientAudience === "ADULT" || party.recipientAudience === "CHILD" ? party.recipientAudience : "UNKNOWN") === "MISMATCH") return name + " не подходит по возрасту ребёнка";
+
   return null;
 }
 
@@ -55,14 +55,7 @@ export function isVenueOffer(offer: CatalogOffer): boolean {
 type PartyMode = "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
 
 export function isCompatiblePartyLocation(mode: PartyMode, offer: CatalogOffer): boolean {
-  // For cakes and catering this field represents pickup/delivery, not where the
-  // birthday takes place. Keep selection parity with the public builder.
-  if (offer.productType === "PARTY_SERVICE" &&
-    (offer.category === "CAKE" || offer.category === "FOOD")) return true;
-  const location = offer.partyLocationType;
-  if (!location || location === "BOTH") return true;
-  const onsite = mode === "VENUE" || mode === "PACKAGE";
-  return location === (onsite ? "ON_SITE" : "OFF_SITE");
+  return birthdayLocationCompatibility({ ...offer, locationType: offer.partyLocationType },mode) !== "MISMATCH";
 }
 
 /** R1: at home/outdoors the anchor is the main entertainment service, not a venue. */
@@ -79,6 +72,7 @@ export function partyAnchorProblem(mode: PartyMode, offer: CatalogOffer): string
     return "Основная услуга не подходит по месту проведения";
   }
   if (mode === "VENUE" || mode === "PACKAGE") {
+    if (offer.partyLocationType === "OFF_SITE") return "Основная услуга не подходит по месту проведения";
     return isVenueOffer(offer) ? null : "Для праздника на площадке выберите площадку или пакет";
   }
   if (offer.productType === "PARTY_PACKAGE") {
@@ -98,22 +92,16 @@ export function isAutoConfirmMode(mode: PartyMode): boolean {
 
 export function includedCategories(offer: CatalogOffer): PartyCategory[] {
   if (offer.productType !== "PARTY_PACKAGE") return [];
-  const details = offer.details && typeof offer.details === "object" &&
-    !Array.isArray(offer.details) ? offer.details as Record<string, unknown> : {};
-  const included = Array.isArray(details.includedCategories) ? details.includedCategories : [];
-  const validCategories = new Set(Object.values(PartyCategory));
-  return [...new Set([
-    ...included.filter((v): v is PartyCategory => typeof v === "string" &&
-      validCategories.has(v as PartyCategory)),
-    ...offer.components.filter((v) => !v.isOptional).map((v) => v.category),
-  ])];
+  return extractPartyDetails(offer.details, offer.components).includedCategories;
 }
 
 /** Offers declared "on request" may carry a stale number; only a real price is snapshotted. */
-export function offerPriceSnapshot(offer: Pick<CatalogOffer, "priceFrom" | "priceMode" | "currency">): number | null {
+export function offerPriceSnapshot(offer: Pick<CatalogOffer, "priceFrom" | "priceMode" | "currency" | "constructorPrice">): number | null {
+  const canonical = "constructorPrice" in offer ? offer.constructorPrice : undefined;
+  if (canonical) return canonical.state === "RESOLVED" && canonical.price.kind === "EXACT" ? Number(canonical.price.amountByn) : null;
   if (offer.currency !== "BYN") return null;
   if (offer.priceMode === "FREE") return 0;
-  if (offer.priceMode === "ON_REQUEST" || offer.priceMode === "NONE" || offer.priceMode === "UNKNOWN") return null;
+  if (offer.priceMode === "ON_REQUEST" || offer.priceMode === "NONE" || offer.priceMode === "UNKNOWN" || offer.priceMode === "FROM" || offer.priceMode === "RANGE") return null;
   return offer.priceFrom != null && Number.isFinite(offer.priceFrom) && offer.priceFrom >= 0 ? offer.priceFrom : null;
 }
 

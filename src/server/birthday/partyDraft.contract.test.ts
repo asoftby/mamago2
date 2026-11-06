@@ -31,8 +31,8 @@ for (const needle of [
 assert.ok(!submit.includes("dispatchDelivery("), "Submission must never send notifications inline.");
 const read = readFileSync("src/server/birthday/partyDraft.service.ts", "utf8");
 assert.match(read, /ownerUserId, status: "DRAFT", version/);
-assert.match(read, /getPublicPublishedOfferWhere/);
-assert.match(read, /key: "BIRTHDAY", status: "APPROVED"/);
+assert.match(read, /getPublicBirthdayOfferWhere/);
+assert.match(readFileSync("src/server/birthday/birthdayOfferVisibility.ts", "utf8"), /key: "BIRTHDAY", status: "APPROVED"/);
 console.log("partyDraft.contract.test.ts: OK");
 
 import {
@@ -67,11 +67,11 @@ for (const category of ["CAKE", "FOOD"] as const) {
     assert.doesNotThrow(() => assertCompatibleSelection("VENUE", base, [addon]));
   }
 }
-// Venue-only entertainment still cannot go to a home party, and vice versa.
+// Venue-only entertainment cannot go to a home party. Mobile performers can visit the selected venue.
 assert.throws(() => assertCompatibleSelection("HOME", mobilePackage,
   [{ ...show, partyLocationType: "ON_SITE" }]), PartyApiError);
-assert.throws(() => assertCompatibleSelection("VENUE", base,
-  [{ ...show, partyLocationType: "OFF_SITE" }]), PartyApiError);
+assert.doesNotThrow(() => assertCompatibleSelection("VENUE", base,
+  [{ ...show, partyLocationType: "OFF_SITE" }]));
 // Price snapshot honours priceMode: a stale number behind ON_REQUEST is never frozen as a price.
 assert.equal(offerPriceSnapshot({ priceFrom: 500, priceMode: "ON_REQUEST", currency: "BYN" }), null);
 assert.equal(offerPriceSnapshot({ priceFrom: null, priceMode: "FREE", currency: "BYN" }), 0);
@@ -88,6 +88,13 @@ assert.match(partyRequirementsProblem(hall, { childrenCount: 8, childAge: 3 }) ?
 assert.equal(partyRequirementsProblem(hall, { childrenCount: 8, childAge: 8 }), null);
 assert.match(partyRequirementsProblem(hall, { childrenCount: 8, childAge: 9 }) ?? "", /по возрасту/);
 assert.equal(partyRequirementsProblem({}, { childrenCount: 200, childAge: 0 }), null);
-assert.match(submit, /partyRequirementsProblem\(published, requirements\)/);
+assert.match(submit, /partyRequirementsProblem\(currentOffer, requirements\)/);
 assert.match(submit, /role: "STANDALONE"/);
 console.log("partySelection checks: OK");
+
+
+const adultsOnly = { agePolicy: "ADULT_ONLY" as const };
+assert.equal(partyRequirementsProblem(adultsOnly, { childrenCount: 0, childAge: null, recipientAudience: "ADULT" }), null);
+assert.match(partyRequirementsProblem(adultsOnly, { childrenCount: 1, childAge: null, recipientAudience: "CHILD" }) ?? "", /по возрасту/);
+assert.equal(partyRequirementsProblem(adultsOnly, { childrenCount: 0, childAge: 42, recipientAudience: "ADULT" }), null);
+assert.match(partyRequirementsProblem(adultsOnly, { childrenCount: 1, childAge: null, ageMonthsRange: { min: 95, max: 95 } }) ?? "", /по возрасту/);

@@ -23,6 +23,7 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
           },
         },
       },
+      components: { where: { archivedAt: null }, orderBy: { position: "asc" }, select: { id: true, title: true, category: true, isOptional: true } },
       classGroups: { orderBy: { position: "asc" }, include: { tariffs: { orderBy: { position: "asc" } } } },
       placements: {
         orderBy: { createdAt: "asc" },

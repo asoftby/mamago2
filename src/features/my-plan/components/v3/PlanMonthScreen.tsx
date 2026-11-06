@@ -247,7 +247,7 @@ export function PlanMonthScreen({
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => onOpenDay(block.day)}
+                        onClick={() => item.partyOrderId ? window.location.assign(`/me/birthdays/${encodeURIComponent(item.partyOrderId)}`) : onOpenDay(block.day)}
                         className={cn(
                           "mb-2 flex w-full items-center gap-2.5 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] py-2.5 pl-2.5 pr-3 text-left transition-colors hover:border-[var(--mp-tx2)]",
                           PLAN_FOCUS,
@@ -256,7 +256,7 @@ export function PlanMonthScreen({
                         <span className="mp-font-meta w-11 shrink-0 text-center text-[12.5px] font-semibold tabular-nums text-[var(--mp-tx)]">{itemTime(item) ?? "день"}</span>
                         <span className="min-w-0 flex-1">
                           <span className="line-clamp-2 block text-[15px] font-semibold leading-[1.3] text-[var(--mp-tx)] [overflow-wrap:anywhere]">{itemTitle(item)}</span>
-                          <span className="mp-font-meta mt-0.5 block text-[12px] text-[var(--mp-tx2)]">{item.childName ?? "все"}</span>
+                          <span className="mp-font-meta mt-0.5 block text-[12px] text-[var(--mp-tx2)]">{item.childName ?? (item.partyOrderId ? "Участники не выбраны" : "все")}{item.partyOrderId && item.notes ? ` · ${item.notes}` : ""}</span>
                         </span>
                       </button>
                     ))}

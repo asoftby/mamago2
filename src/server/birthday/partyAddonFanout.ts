@@ -1,3 +1,4 @@
+import { childAgeForBusiness } from "./partyRecipientProfile";
 import "server-only";
 import {
   BookingKind, BookingStatus, PartyItemRole, PartyItemStatus, type Prisma,
@@ -11,11 +12,13 @@ export type AnchorConfirmedOrder = {
   id: string;
   ownerUserId: string;
   citySlug: string;
+  venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   eventDate: Date;
   timeFrom: string;
   childrenCount: number | null;
   adultsCount: number | null;
   childAge: number | null;
+  recipientAudience?: string | null;
 };
 
 /**
@@ -48,7 +51,7 @@ export async function requestPartyAddonsAfterAnchor(
   for (const addon of addons) {
     if (!addon.offerId) continue;
     try {
-      const checked = await verifyPartyOffers(order.citySlug, [addon.offerId], tx);
+      const checked = await verifyPartyOffers(order.citySlug, [addon.offerId], tx, order.venueMode);
       const candidate = checked.get(addon.offerId);
       if (candidate) live.set(addon.offerId, candidate);
     } catch (error) {
@@ -80,7 +83,7 @@ export async function requestPartyAddonsAfterAnchor(
         partyStage: "SENT", status: BookingStatus.NEW,
         requestedDate: order.eventDate, requestedTime: order.timeFrom,
         adultsCount: order.adultsCount ?? 0, childrenCount: order.childrenCount ?? 0,
-        childAge: order.childAge,
+        childAge: childAgeForBusiness(order),
         customerName: null, customerPhone: null, customerComment: null,
         responseDueAt: due,
       },
