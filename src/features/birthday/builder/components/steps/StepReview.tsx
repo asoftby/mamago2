@@ -107,6 +107,14 @@ export function StepReview({
         if (active) setRestoreState("ready");
         return;
       }
+      function clearUnavailableDraft() {
+        forgetReviewDraft(scope);
+        Object.assign(flow, { draft: null, pending: null, key: null, submitted: false });
+        setReview(null);
+        onCompositionSaved(false);
+        setRestoreState("ready");
+        setError("Прежний черновик недоступен. Сохраните состав, чтобы создать новый.");
+      }
       try {
         const draft = await partyRequest<PartyReviewDraft>("/api/parent/parties/" + encodeURIComponent(id), "GET");
         if (!active) return;
@@ -116,7 +124,7 @@ export function StepReview({
           forgetReviewDraft(scope);
           onSent();
         } else if (draft.status === "CANCELLED") {
-          setRestoreState("error");
+          clearUnavailableDraft();
         } else {
           const hasAnchor = draft.items.some(item => item.role === "ANCHOR");
           setReview(hasAnchor ? draft : null);
@@ -124,8 +132,10 @@ export function StepReview({
           if (hasAnchor && draft.eventDate) setDate(draft.eventDate.slice(0, 10));
           setRestoreState("ready");
         }
-      } catch {
-        if (active) setRestoreState("error");
+      } catch (cause) {
+        if (!active) return;
+        if (cause instanceof PartyRequestError && cause.status === 404) clearUnavailableDraft();
+        else setRestoreState("error");
       }
     }
     void restore();
