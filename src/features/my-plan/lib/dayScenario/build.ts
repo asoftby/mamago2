@@ -1,5 +1,6 @@
 import { haversineMeters } from "@/lib/geo/haversineMeters";
 import { geoCellWithNeighbors } from "@/lib/geo/geoCell";
+import { EVENT_UTILITY_FLOOR, FILLER_CONFIG } from "./fillers";
 import { MODE_RULES, TravelEstimator } from "./travel";
 import type {
   BuildInput,
@@ -107,6 +108,32 @@ function evaluateChain(
   return { ok: true, penalty, legs };
 }
 
+/**
+ * Candidate start times. Events: their confirmed sessions. Filler places: a grid of
+ * starts inside the day window and the place's opening hours (always-open and
+ * unknown-hours places use the whole window).
+ */
+function candidateStarts(event: PoolEvent, input: BuildInput): number[] {
+  if (event.kind !== "place") return event.sessionStartsMs;
+  const step = FILLER_CONFIG.slotStepMin * MIN_MS;
+  const duration = event.durationMin * MIN_MS;
+  const ranges =
+    event.availability?.kind === "windows"
+      ? event.availability.windows
+      : [{ startMs: input.windowStartMs, endMs: input.windowEndMs }];
+  const out: number[] = [];
+  for (const range of ranges) {
+    const lo = Math.max(range.startMs, input.windowStartMs);
+    const hi = Math.min(range.endMs, input.windowEndMs) - duration;
+    for (let t = Math.ceil(lo / step) * step; t <= hi && out.length < FILLER_CONFIG.maxSlotsPerPlace; t += step) out.push(t);
+  }
+  return out;
+}
+
+function isUnconfirmedHours(event: PoolEvent): boolean {
+  return event.kind === "place" && event.availability?.kind === "unknown";
+}
+
 function modeAllows(event: PoolEvent, mode: TravelMode): boolean {
   if (!event.geo) return false;
   if (mode === "walk") return !event.geo.approximate;
@@ -140,17 +167,24 @@ export function buildDayScenario(events: PoolEvent[], input: BuildInput, deps: B
       modeAllows(event, mode),
   );
 
-  const raw = eligible.map((event) => deps.scoreOf(event));
-  // Ratio-to-best on a zero-based scale: small score differences stay small (no
-  // min-max stretching of noise); negative scores sit below the zero line.
+  // Events: ratio-to-best on a zero-based scale (small score differences stay small,
+  // negative scores sit below the zero line), mapped into [EVENT_UTILITY_FLOOR, 100].
+  // Filler places sit below events: a base utility, lower still without an hours record.
+  const eventRows = eligible.filter((event) => event.kind !== "place");
+  const raw = eventRows.map((event) => deps.scoreOf(event));
   const floor = raw.length ? Math.min(0, ...raw) : 0;
   const hi = raw.length ? Math.max(...raw) : 0;
   const utility = new Map<string, number>();
-  eligible.forEach((event, i) => {
+  const jitterOf = (event: PoolEvent) => (input.variant > 0 ? hash01(input.variant, event.activityId) * VARIANT_JITTER : 0);
+  eventRows.forEach((event, i) => {
     const norm = hi > floor ? ((raw[i]! - floor) / (hi - floor)) * 100 : 50;
-    const jitter = input.variant > 0 ? hash01(input.variant, event.activityId) * VARIANT_JITTER : 0;
-    utility.set(event.activityId, norm + jitter);
+    utility.set(event.activityId, EVENT_UTILITY_FLOOR + ((100 - EVENT_UTILITY_FLOOR) / 100) * norm + jitterOf(event));
   });
+  for (const event of eligible) {
+    if (event.kind !== "place") continue;
+    const base = FILLER_CONFIG.baseUtility - (isUnconfirmedHours(event) ? FILLER_CONFIG.unknownHoursPenalty : 0);
+    utility.set(event.activityId, base + jitterOf(event));
+  }
 
   // Pool indexed by cell: how many other eligible events share the walking ring
   // (walk) or the coarse cell (car/transit). Used only to choose the anchor.
@@ -176,11 +210,16 @@ export function buildDayScenario(events: PoolEvent[], input: BuildInput, deps: B
   const sortChain = (chain: Placed[]) => [...chain].sort((a, b) => a.startMs - b.startMs);
   let current = evaluateChain(sortChain(placed), mode, audience.hasToddler, deps.estimator);
 
+  const uncategorizedPlaced = () =>
+    placed.filter((p) => p.event.kind === "place" && p.event.uncategorized).length;
+
   while (placed.length < input.targetCount) {
     let best: { placed: Placed; gain: number; chain: ChainEval } | null = null;
+    const uncategorizedFull = uncategorizedPlaced() >= FILLER_CONFIG.maxUncategorizedPerScenario;
     for (const event of eligible) {
       if (placedIds.has(event.activityId)) continue;
-      for (const startMs of event.sessionStartsMs) {
+      if (uncategorizedFull && event.kind === "place" && event.uncategorized) continue;
+      for (const startMs of candidateStarts(event, input)) {
         const endMs = startMs + event.durationMin * MIN_MS;
         if (startMs < input.windowStartMs || endMs > input.windowEndMs) continue;
         if (overlapsBusy(startMs, endMs)) continue;
@@ -206,6 +245,8 @@ export function buildDayScenario(events: PoolEvent[], input: BuildInput, deps: B
   const evaluated = evaluateChain(chain, mode, audience.hasToddler, deps.estimator);
   const farLimit = mode === "walk" ? Infinity : MODE_RULES[mode].farLegMin;
   const items: ScenarioItem[] = chain.map((p, i) => ({
+    kind: p.event.kind,
+    hoursUnconfirmed: isUnconfirmedHours(p.event),
     activityId: p.event.activityId,
     card: p.event.card,
     startsAtMs: p.startMs,

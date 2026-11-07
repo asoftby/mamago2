@@ -104,8 +104,20 @@ export function geoCellsFor(lat: unknown, lng: unknown): GeoCells | null {
   return { geoCell6, geoCell5: geoCell6.slice(0, GEO_CELL_COARSE_PRECISION) };
 }
 
-/** The cell itself plus its (up to) 8 neighbours; computed, never queried. */
+const neighborMemo = new Map<string, string[]>();
+const NEIGHBOR_MEMO_MAX = 20_000;
+
+/** The cell itself plus its (up to) 8 neighbours; computed, never queried. Memoised. */
 export function geoCellWithNeighbors(cell: string): string[] {
+  const memo = neighborMemo.get(cell);
+  if (memo) return memo;
+  const ring = computeNeighbors(cell);
+  if (neighborMemo.size >= NEIGHBOR_MEMO_MAX) neighborMemo.clear();
+  neighborMemo.set(cell, ring);
+  return ring;
+}
+
+function computeNeighbors(cell: string): string[] {
   const b = decodeGeohashBounds(cell);
   const dLat = b.latMax - b.latMin;
   const dLng = b.lngMax - b.lngMin;

@@ -11,6 +11,7 @@ const at = (hour: number) => DAY_START + (hour - 9) * 3_600_000;
 function ev(id: string, lat: number | null, lng: number | null, hours: number[], score = 10, over: Partial<PoolEvent> = {}): PoolEvent {
   const cells = lat != null && lng != null ? geoCellsFor(lat, lng) : null;
   return {
+    kind: "event",
     activityId: id,
     card: { id, slug: id, title: id, coverImageUrl: null, ageLabel: null, categoryName: null, priceFrom: null, priceTo: null, priceText: null, currency: null, address: null },
     sessionStartsMs: hours.map(at),
@@ -169,6 +170,84 @@ const FAR2 = { lat: 54.0300, lng: 27.7000 }; // ~17 km north-east
 {
   const leg = travelLeg(ev("a", 53.9, 27.55, [10]).geo!, ev("b", 53.9108, 27.55, [10]).geo!, "walk");
   assert.ok(leg.minutes >= 14 && leg.minutes <= 16, `walk 1.2 km -> ${leg.minutes} min`);
+}
+
+// ---------- filler places ----------
+function place(id: string, lat: number, lng: number, availability: PoolEvent["availability"], over: Partial<PoolEvent> = {}): PoolEvent {
+  return {
+    ...ev(id, lat, lng, [], 0),
+    kind: "place",
+    availability,
+    uncategorized: false,
+    sessionStartsMs: [],
+    durationMin: 90,
+    ...over,
+  };
+}
+const ALWAYS = { kind: "always" } as const;
+const UNKNOWN = { kind: "unknown" } as const;
+
+// F1. an event stays the anchor; fillers complete the day; ordered, non-overlapping
+{
+  const events = [ev("e", A.lat, A.lng, [12]), place("p1", B.lat, B.lng, ALWAYS), place("p2", C.lat, C.lng, ALWAYS)];
+  const r = buildDayScenario(events, baseInput(), deps());
+  assert.equal(r.items.length, 3);
+  assert.ok(r.items.some((i) => i.activityId === "e" && i.kind === "event"));
+  assert.equal(r.items.filter((i) => i.kind === "place").length, 2);
+  assert.ok(r.items.every((i, k) => k === 0 || i.startsAtMs >= r.items[k - 1]!.endsAtMs));
+  assert.ok(r.items.filter((i) => i.kind === "place").every((i) => i.startsAtMs % (30 * 60_000) === 0), "filler starts sit on the 30-minute grid");
+}
+
+// F2. opening windows are respected (open 10:00-12:00 with a 90 minute visit -> starts 10:00..10:30)
+{
+  const w: PoolEvent["availability"] = { kind: "windows", windows: [{ startMs: at(10), endMs: at(12) }] };
+  const r = buildDayScenario([place("p", A.lat, A.lng, w)], baseInput({ targetCount: 1 }), deps());
+  assert.equal(r.items.length, 1);
+  assert.ok(r.items[0]!.startsAtMs >= at(10) && r.items[0]!.endsAtMs <= at(12), "inside the opening window");
+  const outside: PoolEvent["availability"] = { kind: "windows", windows: [{ startMs: at(5), endMs: at(8) }] };
+  assert.equal(buildDayScenario([place("p", A.lat, A.lng, outside)], baseInput({ targetCount: 1 }), deps()).items.length, 0, "open only before the planning window -> not offered");
+  const tooShort: PoolEvent["availability"] = { kind: "windows", windows: [{ startMs: at(10), endMs: at(11) }] };
+  assert.equal(buildDayScenario([place("p", A.lat, A.lng, tooShort)], baseInput({ targetCount: 1 }), deps()).items.length, 0, "window shorter than the visit -> not offered");
+  const shortVisit = buildDayScenario([place("p", A.lat, A.lng, tooShort, { durationMin: 60 })], baseInput({ targetCount: 1 }), deps());
+  assert.equal(shortVisit.items.length, 1, "a 60 minute cafe visit fits a one hour window");
+}
+
+// F3. unknown hours: allowed, flagged, and ranked below a place with confirmed hours
+{
+  const lone = buildDayScenario([place("u", A.lat, A.lng, UNKNOWN)], baseInput({ targetCount: 1 }), deps());
+  assert.equal(lone.items.length, 1, "without a hours record the place is still offered (otherwise the pool is empty)");
+  assert.equal(lone.items[0]!.hoursUnconfirmed, true);
+  const both = buildDayScenario([place("u", A.lat, A.lng, UNKNOWN), place("k", A.lat + 0.0001, A.lng, ALWAYS)], baseInput({ targetCount: 1 }), deps());
+  assert.equal(both.items[0]!.activityId, "k", "confirmed hours win over unknown hours");
+  assert.equal(both.items[0]!.hoursUnconfirmed, false);
+}
+
+// F4. uncategorized places: allowed, but at most one per scenario
+{
+  const three = [0, 1, 2].map((i) => place(`n${i}`, A.lat + i * 0.001, A.lng, ALWAYS, { uncategorized: true }));
+  assert.equal(buildDayScenario(three, baseInput(), deps()).items.length, 1, "only uncategorized places -> exactly one");
+  const mixed = [...three, place("c1", C.lat, C.lng, ALWAYS), place("c2", C.lat + 0.001, C.lng, ALWAYS)];
+  const r = buildDayScenario(mixed, baseInput(), deps());
+  assert.equal(r.items.filter((i) => mixed.find((m) => m.activityId === i.activityId)!.uncategorized).length <= 1, true);
+  assert.equal(r.items.length, 3);
+  // a pinned uncategorized place counts against the limit
+  const pinned = buildDayScenario(three, baseInput({ pinned: [{ activityId: "n0", startsAtMs: at(11) }], targetCount: 3 }), deps());
+  assert.deepEqual(pinned.items.map((i) => i.activityId), ["n0"], "pinned uncategorized place uses the single slot");
+}
+
+// F5. walk mode works with fillers inside the walking ring, and respects the ring
+{
+  const near = [place("w1", A.lat, A.lng, ALWAYS), place("w2", B.lat, B.lng, ALWAYS), place("wfar", FAR.lat, FAR.lng, ALWAYS)];
+  const r = buildDayScenario(near, baseInput({ mode: "walk", targetCount: 3 }), deps());
+  assert.ok(!r.items.some((i) => i.activityId === "wfar"));
+  assert.equal(r.items.length, 2);
+  assert.ok(r.items.every((i) => (i.travelFromPrev?.minutes ?? 0) <= 15));
+}
+
+// F6. an event always beats a filler of equal proximity, even with zero engagement
+{
+  const r = buildDayScenario([place("p", A.lat, A.lng, ALWAYS), ev("zero", A.lat + 0.0001, A.lng, [12], 0)], baseInput({ targetCount: 1 }), deps());
+  assert.equal(r.items[0]!.activityId, "zero");
 }
 
 console.log("dayScenario build tests passed");

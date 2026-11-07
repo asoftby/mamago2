@@ -1,26 +1,38 @@
 import { ActivityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
-import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
+import { getPublicListingActivityWhere, getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
-import { activityInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { activityInTerritoryScopeWhere, placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import { zonedDayRange } from "@/server/services/planSuggestions.service";
 import { TravelEstimator } from "@/features/my-plan/lib/dayScenario/travel";
 import type { PoolEvent } from "@/features/my-plan/lib/dayScenario/types";
-import { hasStaleStoredCells, toPoolEvent, type PoolActivityRow } from "./poolMapping";
+import {
+  hasStaleStoredCells,
+  hasStaleStoredPlaceCells,
+  toPoolEvent,
+  toPoolPlace,
+  type PoolActivityRow,
+  type PoolPlaceRow,
+} from "./poolMapping";
 import { createTtlCache } from "./ttlCache";
 
 export const POOL_TTL_MS = 10 * 60_000;
 export const POOL_MAX_ENTRIES = 64;
 /** One city-day: published EVENTs with a confirmed session. Bounded to protect memory. */
 export const POOL_MAX_EVENTS = 200;
+/** Published filler places with coordinates for a city-day. Bounded to protect memory. */
+export const POOL_MAX_PLACES = 400;
 
 export type DayScenarioPool = {
   citySlug: string;
   date: string;
+  /** Dated events and filler places (`kind`). */
   events: PoolEvent[];
+  /** Number of filler places among `events`. */
+  placeCount: number;
   /** Shared by every build on this pool, so pair legs are computed once. */
   estimator: TravelEstimator;
   loadedAtMs: number;
@@ -40,7 +52,7 @@ const placeGeoSelect = {
 
 /** The only database read of a build: audience-agnostic public catalog facts. */
 export async function loadDayScenarioPool(citySlug: string, date: string, nowMs = Date.now()): Promise<DayScenarioPool> {
-  const empty: DayScenarioPool = { citySlug, date, events: [], estimator: new TravelEstimator(), loadedAtMs: nowMs, staleGeoCells: 0 };
+  const empty: DayScenarioPool = { citySlug, date, events: [], placeCount: 0, estimator: new TravelEstimator(), loadedAtMs: nowMs, staleGeoCells: 0 };
   const city = await findCityBySlug(citySlug.toLowerCase());
   if (!city) return empty;
   const scope = await resolveTerritoryScope(citySlug);
@@ -87,11 +99,63 @@ export async function loadDayScenarioPool(citySlug: string, date: string, nowMs 
     },
   })) as unknown as PoolActivityRow[];
 
+  const placeRows = (await prisma.place.findMany({
+    where: {
+      AND: [
+        getPublicPublishedPlaceWhere(new Date(nowMs)),
+        scope ? placeInTerritoryScopeWhere(scope.territoryIds) : { cityId: city.id },
+        { lat: { not: null }, lng: { not: null } },
+      ],
+    },
+    take: POOL_MAX_PLACES,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      lat: true,
+      lng: true,
+      geoCell6: true,
+      geoCell5: true,
+      shortAddress: true,
+      formattedAddr: true,
+      customAddress: true,
+      primaryCategory: { select: { id: true, slug: true, nameRu: true } },
+      images: { select: { url: true, kind: true }, orderBy: { sortOrder: "asc" }, take: 3 },
+      openingHours: {
+        select: {
+          mode: true,
+          timezone: true,
+          rules: {
+            select: {
+              dayOfWeek: true,
+              isOpen: true,
+              allDay: true,
+              intervals: { select: { startTime: true, endTime: true }, orderBy: { sortOrder: "asc" } },
+            },
+          },
+          exceptions: {
+            where: { date },
+            select: {
+              date: true,
+              isClosed: true,
+              allDay: true,
+              intervals: { select: { startTime: true, endTime: true }, orderBy: { sortOrder: "asc" } },
+            },
+          },
+        },
+      },
+    },
+  })) as unknown as PoolPlaceRow[];
+
   const scores = await getEventEngagementScores(rows.map((row) => row.id));
-  const events = rows
+  const dated = rows
     .map((row) => toPoolEvent(row, scores.get(row.id) ?? 0))
     .filter((event): event is PoolEvent => event !== null);
-  const staleGeoCells = rows.filter((row) => hasStaleStoredCells(row)).length;
+  const fillers = placeRows.map((row) => toPoolPlace(row, date)).filter((event): event is PoolEvent => event !== null);
+  const events = [...dated, ...fillers];
+  const staleGeoCells =
+    rows.filter((row) => hasStaleStoredCells(row)).length + placeRows.filter((row) => hasStaleStoredPlaceCells(row)).length;
   if (staleGeoCells > 0) {
     console.warn("[day-scenario-pool] stored Place.geoCell disagrees with lat/lng; recomputed in memory", {
       citySlug,
@@ -100,7 +164,7 @@ export async function loadDayScenarioPool(citySlug: string, date: string, nowMs 
       hint: "run backfill:place-geo-cells -- --apply",
     });
   }
-  return { citySlug, date, events, estimator: new TravelEstimator(), loadedAtMs: nowMs, staleGeoCells };
+  return { citySlug, date, events, placeCount: fillers.length, estimator: new TravelEstimator(), loadedAtMs: nowMs, staleGeoCells };
 }
 
 const poolCache = createTtlCache<DayScenarioPool>({ ttlMs: POOL_TTL_MS, maxEntries: POOL_MAX_ENTRIES });

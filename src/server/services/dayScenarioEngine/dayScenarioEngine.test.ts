@@ -3,7 +3,15 @@ import { isDayScenarioEngineEnabled } from "./flag";
 import type { PrismaClient } from "@prisma/client";
 import { geoCellsFor } from "@/lib/geo/geoCell";
 import { extendPrismaWithPlaceGeoCells } from "@/lib/place/placeGeoCellExtension";
-import { hasStaleStoredCells, resolveEventGeo, toPoolEvent, type PoolActivityRow } from "./poolMapping";
+import {
+  hasStaleStoredCells,
+  hasStaleStoredPlaceCells,
+  resolveEventGeo,
+  toPoolEvent,
+  toPoolPlace,
+  type PoolActivityRow,
+  type PoolPlaceRow,
+} from "./poolMapping";
 import { createTtlCache } from "./ttlCache";
 import { draftRequestSchema } from "./draft.service";
 
@@ -104,6 +112,48 @@ async function main() {
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", mode: "bike" }).success, false);
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", targetCount: 9 }).success, false);
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", ageRanges: ["3-5"] }).success, true);
+
+  // --- filler places ---
+  const DAY = "2026-11-14"; // Saturday
+  const placeRow = (over: Partial<PoolPlaceRow> = {}): PoolPlaceRow => ({
+    id: "pl1", slug: "pl1", title: "Парк", lat: 53.9006, lng: 27.559, geoCell6: null, geoCell5: null,
+    shortAddress: "ул. Парковая 1", formattedAddr: null, customAddress: null,
+    primaryCategory: { id: "c1", slug: "parks", nameRu: "Парки" },
+    images: [{ url: "https://x/logo.png", kind: "LOGO" }, { url: "https://x/cover.jpg", kind: "GALLERY" }],
+    openingHours: null, ...over,
+  });
+  const weeklyHours = (rules: NonNullable<PoolPlaceRow["openingHours"]>["rules"], extra: Partial<NonNullable<PoolPlaceRow["openingHours"]>> = {}): PoolPlaceRow["openingHours"] =>
+    ({ mode: "WEEKLY", timezone: "Europe/Minsk", rules, exceptions: [], ...extra });
+
+  const unknown = toPoolPlace(placeRow(), DAY)!;
+  assert.deepEqual([unknown.kind, unknown.availability?.kind, unknown.uncategorized, unknown.durationMin], ["place", "unknown", false, 90], "no hours record -> kept as unknown");
+  assert.equal(unknown.card.coverImageUrl, "https://x/cover.jpg", "cover prefers a non-logo image");
+  assert.equal(unknown.activityId, "pl1");
+  assert.equal(toPoolPlace(placeRow({ lat: null, lng: null }), DAY), null, "no coordinates -> not a filler");
+  assert.equal(toPoolPlace(placeRow({ lat: 0, lng: 0 }), DAY), null);
+
+  assert.equal(toPoolPlace(placeRow({ openingHours: { mode: "BY_APPOINTMENT", timezone: "Europe/Minsk", rules: [], exceptions: [] } }), DAY), null, "by appointment is excluded");
+  assert.equal(toPoolPlace(placeRow({ openingHours: { mode: "TEMPORARILY_CLOSED", timezone: "Europe/Minsk", rules: [], exceptions: [] } }), DAY), null, "temporarily closed is excluded");
+  assert.equal(toPoolPlace(placeRow({ openingHours: weeklyHours([{ dayOfWeek: "SUN", isOpen: true, allDay: true, intervals: [] }]) }), DAY), null, "closed on that weekday -> excluded");
+  assert.equal(toPoolPlace(placeRow({ openingHours: weeklyHours([{ dayOfWeek: "SAT", isOpen: true, allDay: true, intervals: [] }], { exceptions: [{ date: DAY, isClosed: true, allDay: false, intervals: [] }] }) }), DAY), null, "closed by an exception on the date");
+
+  const always = toPoolPlace(placeRow({ openingHours: { mode: "ALWAYS_OPEN", timezone: "Europe/Minsk", rules: [], exceptions: [] } }), DAY)!;
+  assert.equal(always.availability?.kind, "always");
+
+  const windowed = toPoolPlace(placeRow({ openingHours: weeklyHours([{ dayOfWeek: "SAT", isOpen: true, allDay: false, intervals: [{ startTime: "10:00", endTime: "18:30" }] }]) }), DAY)!;
+  assert.deepEqual(windowed.availability, { kind: "windows", windows: [{ startMs: Date.parse("2026-11-14T07:00:00Z"), endMs: Date.parse("2026-11-14T15:30:00Z") }] }, "10:00-18:30 Minsk time -> UTC ms");
+
+  // durations: 90 by default, 60 for the cafe category (by slug or by name), uncategorized still gets 90
+  assert.equal(toPoolPlace(placeRow({ primaryCategory: { id: "c2", slug: "food", nameRu: "Кафе и еда" } }), DAY)!.durationMin, 60);
+  assert.equal(toPoolPlace(placeRow({ primaryCategory: { id: "c2", slug: "other-slug", nameRu: "Кафе и еда" } }), DAY)!.durationMin, 60, "matched by name too");
+  const nocat = toPoolPlace(placeRow({ primaryCategory: null }), DAY)!;
+  assert.deepEqual([nocat.uncategorized, nocat.durationMin, nocat.card.categoryName], [true, 90, null]);
+
+  // stored cells on places are compared with lat/lng
+  const truthP = geoCellsFor(53.9006, 27.559)!;
+  assert.equal(hasStaleStoredPlaceCells({ lat: 53.9006, lng: 27.559, geoCell6: truthP.geoCell6, geoCell5: truthP.geoCell5 }), false);
+  assert.equal(hasStaleStoredPlaceCells({ lat: 53.93, lng: 27.62, geoCell6: truthP.geoCell6, geoCell5: truthP.geoCell5 }), true);
+  assert.equal(hasStaleStoredPlaceCells({ lat: 53.93, lng: 27.62, geoCell6: null, geoCell5: null }), false);
 
   console.log("dayScenarioEngine tests passed");
 }
