@@ -1,5 +1,6 @@
 "use client";
 
+import { PackageComponentsEditor } from "../components/PackageComponentsEditor";
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,8 @@ export function Step2Placements({
         <p className="text-sm text-muted-foreground">Укажите основные условия. Остальное — по желанию.</p>
       </div>
 
+      {isPackage && <PackageComponentsEditor rows={data.packageComponents ?? []} disabled={!isEditable}
+        onChange={packageComponents => onChange({ packageComponents })} />}
       {isService && (!v2 || !data.partyCategory) && (
         <div className="space-y-2">
           <p className="text-sm font-medium">Какая услуга? <span className="text-destructive">*</span></p>
@@ -187,7 +190,7 @@ export function Step2Placements({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="space-y-5 pt-4">
-          {isPackage && (
+          {isPackage && data.packageComponents === undefined && (
             <div className="space-y-2">
               <p className="text-sm font-medium">Состав готового пакета</p>
               <p className="text-xs text-muted-foreground">Отметьте услуги, которые входят в цену.</p>

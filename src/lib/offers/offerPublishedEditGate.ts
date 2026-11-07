@@ -160,6 +160,7 @@ export const CONTENT_COLUMN_LABELS: Record<string, string> = {
   contactPhone3Label: "подписи к телефонам",
   contactSocialLinks: "ссылки",
   requestedPlacements: "разделы каталога",
+  packageComponents: "состав и правила пакета",
   campSessionTexts: "тексты смен",
   categoryIds: "категории",
   interestSlugs: "интересы",

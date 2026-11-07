@@ -1,3 +1,4 @@
+import { packageComponentInputSchema, PackageComponentsError, componentRows, savePackageComponents, validatePackageCredits } from "@/server/offers/packageComponents";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -149,6 +150,9 @@ const updateOfferSchema = z.object({
   requestedPlacements: z.array(offerPlacementKeySchema).optional(),
   // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
   /** Type-specific display details (Offer.details JSONB). Null clears the field. */
+  partyPriceMode: z.enum(["EXACT", "FROM", "ON_REQUEST", "FREE", "RANGE", "NONE", "UNKNOWN"]).optional(),
+  packageComponents: packageComponentInputSchema.optional(),
+  packageComponentsBaseline: packageComponentInputSchema.optional(),
   details: z.record(z.string(), z.unknown()).nullable().optional(),
   // PARTY_SERVICE filterable columns (Phase 3b-2)
   category: partyCategorySchema.nullable().optional(),
@@ -391,7 +395,7 @@ export async function PATCH(
       priceMode = normalized.mode;
       priceItems = values.map((price) => ({ price })) as Prisma.InputJsonValue;
       priceText = priceFrom != null ? formatPriceFrom(priceFrom) : null;
-    } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
+    } else if (data.pricingMode === "SINGLE" && (data.singlePrice !== undefined || ((data.productType ?? existingOffer.productType) === "PARTY_PACKAGE" && data.partyPriceMode))) {
       const normalized = normalizePublicationPrice({ mode: "EXACT", min: data.singlePrice });
       priceFrom = normalized.min;
       priceTo = normalized.max;
@@ -550,6 +554,11 @@ export async function PATCH(
     }
 
     // Update price fields if they were recalculated
+    if ((data.productType ?? existingOffer.productType) === "PARTY_PACKAGE" && data.pricingMode !== "MULTIPLE" &&
+        (data.pricingMode === "SINGLE" || !Array.isArray(priceItems)) && data.partyPriceMode && data.partyPriceMode !== "RANGE") {
+      const normalized = normalizePublicationPrice({ mode: data.partyPriceMode, min: data.singlePrice });
+      priceFrom = normalized.min; priceTo = normalized.max; priceMode = normalized.mode;
+    }
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
     if (priceTo !== existingOffer.priceTo) updateData.priceTo = priceTo;
     if (priceMode !== existingOffer.priceMode) updateData.priceMode = priceMode;
@@ -623,11 +632,45 @@ export async function PATCH(
     const gateApplies = !canPublishContentDirectly(user.role);
 
     const offer = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Offer" WHERE "id" = ${id} FOR UPDATE`;
+      const packageLive = await tx.offer.findUniqueOrThrow({ where: { id } });
+      const readPackageRows = data.packageComponents !== undefined ||
+        (packageLive.productType === "PARTY_PACKAGE" && (updateData.priceMode !== undefined || updateData.priceFrom !== undefined));
+      const packageRows = readPackageRows ? await tx.packageComponent.findMany({
+        where: { packageId: id, archivedAt: null }, orderBy: [{ position: "asc" }, { id: "asc" }],
+      }) : [];
+      const packageBaseline = componentRows(packageRows);
+      const changesLivePrice = updateData.priceMode !== undefined || updateData.priceFrom !== undefined;
+      if (changesLivePrice && (packageLive.status === "PUBLISHED" || data.packageComponents === undefined)) {
+        validatePackageCredits(packageBaseline, String(updateData.priceMode ?? packageLive.priceMode),
+          typeof updateData.priceFrom === "number" ? updateData.priceFrom : packageLive.priceFrom);
+      }
+      if (data.packageComponents !== undefined) {
+        if ((data.productType ?? packageLive.productType) !== "PARTY_PACKAGE" ||
+            data.packageComponents.some(row => row.id && !packageBaseline.some(saved => saved.id === row.id))) {
+          throw new PackageComponentsError("Компонент не принадлежит этому пакету");
+        }
+        if (JSON.stringify(data.packageComponentsBaseline) !== JSON.stringify(packageBaseline)) {
+          throw new PackageComponentsError("Состав изменился. Откройте предложение заново");
+        }
+        validatePackageCredits(data.packageComponents, String(updateData.priceMode ?? packageLive.priceMode),
+          typeof updateData.priceFrom === "number" ? updateData.priceFrom : packageLive.priceFrom);
+      }
+      if (data.packageComponents !== undefined) {
+        const details = data.details ?? packageLive.details;
+        if (details && typeof details === "object" && !Array.isArray(details)) {
+          const nextDetails = { ...details } as Record<string, unknown>;
+          delete nextDetails.includedCategories;
+          updateData.details = nextDetails as Prisma.InputJsonValue;
+        }
+      }
+      const packageChanged = data.packageComponents !== undefined &&
+        JSON.stringify(data.packageComponents) !== JSON.stringify(packageBaseline);
+
       if (gateApplies) {
         // Сравнение с живой строкой и запись — один снимок: блокируем строку, чтобы правка админа
         // между чтением и записью не была перезаписана устаревшим контентом из payload мастера.
-        await tx.$queryRaw`SELECT "id" FROM "Offer" WHERE "id" = ${id} FOR UPDATE`;
-        const live = await tx.offer.findUniqueOrThrow({ where: { id } });
+        const live = packageLive;
         const liveRecord = live as unknown as Record<string, unknown>;
         const updateRecord = updateData as Record<string, unknown>;
 
@@ -648,6 +691,7 @@ export async function PATCH(
         if (data.categoryIds !== undefined) presentColumns.push("categoryIds");
         if (data.selectedPlace?.id) presentColumns.push("placeId");
 
+        if (data.packageComponents !== undefined) presentColumns.push("packageComponents");
         let campTextsChanged = false;
         if (live.status === "PUBLISHED" && "campSessions" in updateRecord) {
           const campResult = mergeCampSessionsForPublished(live.campSessions, updateRecord.campSessions);
@@ -717,6 +761,7 @@ export async function PATCH(
           "priceTextDerived",
           "campSessions",
         ];
+        if (packageChanged) changedColumns.push("packageComponents");
         const typeSwitched = TYPE_SWITCH_COLUMNS.some((column) => changedColumns.includes(column));
         const typeDerivedColumns = typeSwitched
           ? TYPE_DERIVED_COLUMNS.filter((column) => changedColumns.includes(column))
@@ -759,7 +804,8 @@ export async function PATCH(
 
           const proposalValues: Record<string, unknown> = {};
           for (const column of visibleContent) {
-            if (column === "requestedPlacements") proposalValues[column] = data.requestedPlacements;
+            if (column === "packageComponents") proposalValues[column] = { rows: data.packageComponents, baseline: packageBaseline };
+            else if (column === "requestedPlacements") proposalValues[column] = data.requestedPlacements;
             else if (column === "categoryIds") proposalValues[column] = data.categoryIds;
             else if (column === "placeId") proposalValues[column] = data.selectedPlace?.id;
             else if (column === "campSessionTexts" || column === "campSessions") proposalValues[column] = proposedCampSessions;
@@ -832,6 +878,9 @@ export async function PATCH(
         data: updateData,
       });
 
+      if (data.packageComponents !== undefined && !(gateApplies && packageLive.status === "PUBLISHED")) {
+        await savePackageComponents(tx, id, data.packageComponents, packageBaseline, true);
+      }
       await applyOfferSchedule({
         db: tx,
         offerId: id,
@@ -906,6 +955,7 @@ export async function PATCH(
           slug: true,
           publishedAt: true,
           updatedAt: true,
+          components: { where: { archivedAt: null }, orderBy: [{ position: "asc" }, { id: "asc" }] },
           productType: true,
           placements: true,
           place: {
@@ -997,12 +1047,20 @@ export async function PATCH(
     return NextResponse.json({
       ...offer,
       operationalVersion,
+      ...(data.packageComponents !== undefined ? {
+        packageComponentsState: {
+          rows: gateApplies && existingOffer.status === "PUBLISHED" ? data.packageComponents : componentRows(offer.components),
+          baseline: componentRows(offer.components),
+        },
+      } : {}),
       ...(gate.moderationNotice ? { moderationNotice: gate.moderationNotice } : {}),
     });
 
   } catch (error) {
     timer.log({ error: 1 });
     console.error("Update offer error:", error);
+
+    if (error instanceof PackageComponentsError) return NextResponse.json({ error: error.message }, { status: 409 });
 
     if (error instanceof OfferCategoriesError) {
       return NextResponse.json(
