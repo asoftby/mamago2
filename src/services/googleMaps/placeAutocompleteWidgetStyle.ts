@@ -22,8 +22,9 @@ export function placeAutocompleteWidgetStyles(className: string): string {
       height: 40px;
     }
 
+    /* iOS Safari zooms focused editable fields smaller than 16px. */
     .${className}::part(input) {
-      font-size: 14px;
+      font-size: 16px;
       color: #1f1f1f;
     }
 

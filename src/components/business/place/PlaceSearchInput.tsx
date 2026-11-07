@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
+import { MobilePlaceAutocomplete } from "./MobilePlaceAutocomplete";
 import { GoogleMapsService } from "@/services/googleMaps";
 import { toLegacyAddressComponents, type NewAddressComponent } from "@/services/googleMaps/toLegacyAddressComponents";
 import { placeAutocompleteWidgetStyles } from "@/services/googleMaps/placeAutocompleteWidgetStyle";
@@ -78,6 +79,16 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
   const onPlaceSelectRef = useRef(onPlaceSelect);
   const onInputChangeRef = useRef(onInputChange);
   const [isWidgetReady, setIsWidgetReady] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileValue, setMobileValue] = useState(initialValue ?? "");
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => { if (initialValue !== undefined) setMobileValue(initialValue); }, [initialValue]);
 
   useEffect(() => {
     onPlaceSelectRef.current = onPlaceSelect;
@@ -194,11 +205,11 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
   }, []);
 
   useEffect(() => {
-    initAutocomplete();
+    if (!isMobile) void initAutocomplete();
     return () => {
       cleanupRef.current?.();
     };
-  }, [initAutocomplete]);
+  }, [initAutocomplete, isMobile]);
 
   // Keep the widget's disabled attribute and value in sync with props after it mounts
   useEffect(() => {
@@ -219,7 +230,29 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
     }
   }, [initialValue]);
 
-  return (
+  return isMobile ? (
+    <MobilePlaceAutocomplete
+      value={mobileValue}
+      onChange={(value) => { setMobileValue(value); onInputChangeRef.current?.(value); }}
+      onSelect={(place) => {
+        const lat = readCoordinate(place.location?.lat);
+        const lng = readCoordinate(place.location?.lng);
+        if (!place.id || lat === null || lng === null) return;
+        const formattedAddr = place.formattedAddress ?? "";
+        setMobileValue(formattedAddr);
+        onPlaceSelectRef.current({
+          googlePlaceId: place.id,
+          placeName: place.displayName || formattedAddr,
+          lat,
+          lng,
+          formattedAddr,
+          addressJson: toLegacyAddressComponents(place.addressComponents),
+        });
+      }}
+      placeholder="Адрес или название места"
+      disabled={disabled}
+    />
+  ) : (
     <div id="place-location-search" className="relative">
       <style>{placeAutocompleteWidgetStyles(PLACE_SEARCH_WIDGET_CLASS)}</style>
 
