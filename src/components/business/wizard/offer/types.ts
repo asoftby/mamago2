@@ -98,7 +98,18 @@ export type OfferWizardVariant = "v1" | "v2";
  * Follows Event Wizard structure with offer-specific fields
  * Now supports SINGLE, REGULAR, and CAMP types
  */
+export type PackageComponentFormRow = {
+  id?: string;
+  title: string;
+  category: PartyCategory;
+  removalPolicy: "REQUIRED" | "REMOVABLE_NO_REFUND" | "REMOVABLE_FIXED_CREDIT" | "REMOVABLE_QUOTE_REQUIRED" | null;
+  removalCreditByn: string | null;
+};
+
 export interface OfferFormData {
+  partyPriceMode?: "EXACT" | "FROM" | "ON_REQUEST" | "FREE" | "RANGE" | "NONE" | "UNKNOWN";
+  packageComponents?: PackageComponentFormRow[];
+  packageComponentsBaseline?: PackageComponentFormRow[];
   // Step 1: Offer Type
   offerWizardType: OfferWizardType | null; // SINGLE, REGULAR, or CAMP
   productType: OfferProductType | null;

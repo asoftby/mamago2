@@ -12,7 +12,7 @@ import {
  */
 export type OfferRevisionPayload = Record<string, unknown>;
 
-export const REVISION_PSEUDO_COLUMNS = ["requestedPlacements", "categoryIds", "campSessionTexts"] as const;
+export const REVISION_PSEUDO_COLUMNS = ["requestedPlacements", "categoryIds", "campSessionTexts", "packageComponents"] as const;
 
 /** Колонки, которые ревизия не переносит никогда (служебные и статус публикации). */
 const REVISION_NEVER_COLUMNS: ReadonlySet<string> = new Set(["status", "publishedAt", "updatedAt", "currency"]);
@@ -162,6 +162,9 @@ export function applyRevisionToOffer<T extends Record<string, unknown>>(
     if (!isRevisionPseudoColumn(column)) next[column] = value;
   }
 
+  if ("packageComponents" in payload && payload.packageComponents && typeof payload.packageComponents === "object") {
+    next.components = (payload.packageComponents as { rows?: unknown }).rows;
+  }
   if ("requestedPlacements" in payload && Array.isArray(payload.requestedPlacements)) {
     const live = Array.isArray(offer.placements)
       ? (offer.placements as Array<{ key: string; status?: string | null }>)

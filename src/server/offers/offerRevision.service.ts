@@ -1,3 +1,4 @@
+import { packageComponentInputSchema, savePackageComponents } from "./packageComponents";
 import { Prisma } from "@prisma/client";
 import type { OfferRevision, Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -112,6 +113,8 @@ async function lockPendingRevision(tx: Tx, revisionId: string) {
 /** Применить ревизию к живому офферу и закрыть её как одобренную. */
 export async function approveOfferRevision(revisionId: string, reviewerId: string, reviewerRole: Role) {
   const result = await prisma.$transaction(async (tx) => {
+    const reference = await tx.offerRevision.findUniqueOrThrow({ where: { id: revisionId }, select: { offerId: true } });
+    await tx.$queryRaw`SELECT "id" FROM "Offer" WHERE "id" = ${reference.offerId} FOR UPDATE`;
     const revision = await lockPendingRevision(tx, revisionId);
     const payload = revision.payload as OfferRevisionPayload;
     const live = await tx.offer.findUniqueOrThrow({ where: { id: revision.offerId } });
@@ -139,6 +142,11 @@ export async function approveOfferRevision(revisionId: string, reviewerId: strin
       await tx.offer.update({ where: { id: live.id }, data: data as Prisma.OfferUpdateInput });
     }
 
+    if ("packageComponents" in payload) {
+      const proposal = payload.packageComponents as { rows: unknown; baseline: unknown };
+      await savePackageComponents(tx, live.id, packageComponentInputSchema.parse(proposal.rows),
+        packageComponentInputSchema.parse(proposal.baseline), true);
+    }
     if ("categoryIds" in payload) {
       await syncOfferCategories({
         db: tx,
@@ -272,6 +280,7 @@ function jsonSafe(value: unknown): unknown {
 
 /** Псевдоколонки, которые умеет применять эта реализация. Новая псевдоколонка = новый обработчик в `approveOfferRevision`. */
 const SUPPORTED_PSEUDO_COLUMNS: ReadonlySet<string> = new Set([
+  "packageComponents",
   "requestedPlacements",
   "campSessionTexts",
   "categoryIds",
