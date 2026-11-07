@@ -242,13 +242,16 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         widget.addEventListener("gmp-select", handlePlaceSelect);
         widget.addEventListener("gmp-placeselect", handlePlaceSelect);
 
+        // Поле-заглушка вот-вот будет заменено виджетом: если пользователь уже печатает
+        // в нём (eager-режим не ставит shouldFocusWidgetRef), передаём фокус виджету.
+        // Если фокус ушёл в другое место — фокус не перехватываем.
+        if (document.activeElement === fallbackInputRef.current) {
+          shouldFocusWidgetRef.current = true;
+        }
+
         host.innerHTML = "";
         host.appendChild(widget);
         setIsWidgetReady(true);
-        if (shouldFocusWidgetRef.current) {
-          shouldFocusWidgetRef.current = false;
-          widget.focus?.();
-        }
 
         cleanupRef.current = () => {
           console.debug("[EventLocationSearchInput] cleanup");
@@ -292,6 +295,15 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
 
       syncWidgetValue(widget, inputValue);
     }, [inputValue, syncWidgetValue]);
+
+    // Фокус переносим после рендера: до снятия `hidden` с контейнера виджет не фокусируем.
+    useEffect(() => {
+      if (!isWidgetReady || !shouldFocusWidgetRef.current) {
+        return;
+      }
+      shouldFocusWidgetRef.current = false;
+      widgetRef.current?.focus?.();
+    }, [isWidgetReady]);
 
     const requestAutocomplete = useCallback(() => {
       if (disabled || autocompleteRequested) {

@@ -19,6 +19,11 @@ assert.match(quick, /<EventLocationSearchInput[\s\S]*?\beagerInit\b/, "widget mo
 assert.match(input, /eagerInit = false/);
 assert.match(input, /useState\(eagerInit && !disabled\)/);
 
+// Focus survives the fallback -> widget swap when the user is already typing (slow Maps load),
+// and is handed over only after render, once the host is no longer hidden.
+assert.match(input, /document\.activeElement === fallbackInputRef\.current[\s\S]*?shouldFocusWidgetRef\.current = true/);
+assert.match(input, /if \(!isWidgetReady \|\| !shouldFocusWidgetRef\.current\)[\s\S]*?widgetRef\.current\?\.focus\?\.\(\)/);
+
 // Typing/selecting never navigates: Enter in the fallback field is swallowed, no router usage.
 assert.match(input, /event\.key === "Enter"\) event\.preventDefault\(\)/);
 assert.doesNotMatch(input, /useRouter|router\.(push|replace)|window\.location/);
