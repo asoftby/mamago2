@@ -4,8 +4,14 @@ export type PartyReviewDraft = PartyDraft & {
   eventDate: string | null;
   childAge: number | null;
   childName: string | null;
-  items: Array<{ role: string; offerId: string | null; category: string }>;
+  items: Array<{
+    id: string; role: string; offerId: string | null; category: string;
+    packageComponentSnapshot?: { title?: string; removalPolicy?: string | null; removalCreditByn?: string | null } | null;
+    packageComponentChange?: { requiresQuote: boolean; replacementOfferId?: string | null } | null;
+    offerPriceSnapshot?: string | null;
+  }>;
   estimate?: {
+    minimumByn: number;
     exactByn: number;
     fromByn: number;
     unknownCount: number;

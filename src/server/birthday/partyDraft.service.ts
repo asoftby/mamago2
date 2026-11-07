@@ -5,12 +5,13 @@ import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisib
 import { withDraftEstimate } from "./partyDraftEstimate";
 import { PartyApiError, type UpdatePartyDraft } from "./partyDraft.validation";
 import {
-  assertCompatibleSelection, includedCategories, offerPriceSnapshot, type CatalogOffer,
+  assertCompatibleSelection, includedCategories, isCompatiblePartyLocation, isVenueOffer, offerPriceSnapshot, type CatalogOffer,
 } from "./partySelection";
 
 const draftComponentSelect = {
   id: true, title: true, category: true, refOfferId: true,
   isOptional: true, priceSnapshot: true, priceDelta: true,
+  removalPolicy: true, removalCreditByn: true,
 } satisfies Prisma.PackageComponentSelect;
 
 type DraftCatalogOffer = Omit<CatalogOffer, "components"> & {
@@ -102,6 +103,82 @@ function snapshotDecimal(offer: CatalogOffer): Prisma.Decimal | null {
   return price == null ? null : new Prisma.Decimal(price);
 }
 
+function changeObject(value: Prisma.JsonValue) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+async function changePackageItem(
+  tx: Prisma.TransactionClient, partyId: string, mode: UpdatePartyDraft["venueMode"],
+  items: { id: string; role: string; category: PartyCategory; offerId: string | null; businessId: string | null;
+    position: number; offerPriceSnapshot: Prisma.Decimal | null; draftPriceModeSnapshot: string | null;
+    packageComponentSnapshot: Prisma.JsonValue; packageComponentChange: Prisma.JsonValue;
+    packageComponentChangeHistory: Prisma.JsonValue }[],
+  change: NonNullable<UpdatePartyDraft["packageChange"]>, replacement: DraftCatalogOffer | undefined,
+) {
+  const item = items.find(row => row.id === change.itemId && row.role === "INCLUDED");
+  const anchor = items.find(row => row.role === "ANCHOR");
+  if (!item || !anchor) throw new PartyApiError(422, "Компонент не входит в этот пакет");
+  const previous = changeObject(item.packageComponentChange);
+  if (change.undo) {
+    if (!previous) return;
+    if (typeof previous.replacementItemId === "string") {
+      await tx.partyOrderItem.deleteMany({ where: { partyOrderId: partyId, id: previous.replacementItemId, role: "STANDALONE" } });
+    }
+    const history = Array.isArray(item.packageComponentChangeHistory) ? item.packageComponentChangeHistory : [];
+    await tx.partyOrderItem.update({ where: { id: item.id }, data: {
+      packageComponentChange: Prisma.DbNull,
+      packageComponentChangeHistory: [...history, { ...previous, undoneAt: new Date().toISOString() }] as Prisma.InputJsonArray,
+    } });
+    return;
+  }
+
+  if (previous) {
+    if ((previous.replacementOfferId ?? undefined) === change.replacementOfferId) return;
+    throw new PartyApiError(409, "Сначала отмените предыдущее изменение компонента");
+  }
+  const snapshot = changeObject(item.packageComponentSnapshot);
+  const policy = snapshot?.removalPolicy;
+  if (policy === "REQUIRED") throw new PartyApiError(422, "Обязательный компонент нельзя убрать");
+  const fixedCreditAvailable = policy === "REMOVABLE_FIXED_CREDIT" &&
+    typeof snapshot?.removalCreditByn === "string" && anchor.offerPriceSnapshot !== null &&
+    Boolean(anchor.draftPriceModeSnapshot);
+  const requiresQuote = policy !== "REMOVABLE_NO_REFUND" && !fixedCreditAvailable;
+  let credit = new Prisma.Decimal(0);
+  if (fixedCreditAvailable && typeof snapshot?.removalCreditByn === "string" && anchor.offerPriceSnapshot !== null) {
+    credit = new Prisma.Decimal(snapshot.removalCreditByn);
+    const applied = items.reduce((total, row) => {
+      const saved = changeObject(row.packageComponentChange);
+      return typeof saved?.creditByn === "string" ? total.plus(saved.creditByn) : total;
+    }, credit);
+    if (credit.lte(0) || applied.gt(anchor.offerPriceSnapshot)) {
+      throw new PartyApiError(422, "Уменьшение превышает исходную стоимость пакета");
+    }
+  }
+
+  let replacementItemId: string | null = null;
+  if (change.replacementOfferId) {
+    if (!replacement || !mode || replacement.category !== item.category || isVenueOffer(replacement) ||
+        !isCompatiblePartyLocation(mode, replacement) || replacement.place?.ownerBusinessId === item.businessId ||
+        items.some(row => row.offerId === replacement.id || (row.id !== item.id && row.category === item.category &&
+          (row.role === "ADDON" || row.role === "STANDALONE" || (row.role === "INCLUDED" && !row.packageComponentChange))))) {
+      throw new PartyApiError(422, "Выберите совместимую услугу другой компании");
+    }
+    const added = await tx.partyOrderItem.create({ data: {
+      partyOrderId: partyId, role: "STANDALONE", category: item.category,
+      offerId: replacement.id, businessId: replacement.place?.ownerBusinessId,
+      offerPriceSnapshot: snapshotDecimal(replacement), draftPriceModeSnapshot: replacement.priceMode,
+      position: Math.max(...items.map(row => row.position)) + 1,
+    }, select: { id: true } });
+    replacementItemId = added.id;
+  }
+  await tx.partyOrderItem.update({ where: { id: item.id }, data: {
+    packageComponentChange: {
+      requiresQuote, creditByn: credit.toFixed(2), replacementItemId,
+      replacementOfferId: replacement?.id ?? null, requestedAt: new Date().toISOString(),
+    },
+  } });
+}
+
 export async function updatePartyDraft(
   ownerUserId: string, partyId: string, input: UpdatePartyDraft,
 ) {
@@ -127,12 +204,16 @@ export async function updatePartyDraft(
     anchor = verified.get(input.anchorOfferId) ?? null;
     if (!anchor) throw new PartyApiError(422, "Основное предложение не найдено");
     addons = (input.addonOfferIds ?? []).map((id) => verified.get(id)!);
-    assertCompatibleSelection(newMode, anchor, addons);
   } else if (selectionChange && input.addonOfferIds?.length) {
     throw new PartyApiError(422, "Для дополнительных услуг выберите основную");
   }
 
-  const { version, anchorOfferId, anchorNote, addonOfferIds, addonCategories, ...changes } = input;
+  const packageChange = input.packageChange;
+  const replacement = packageChange?.replacementOfferId
+    ? (await verifyPartyOffers(existing.citySlug, [packageChange.replacementOfferId])).get(packageChange.replacementOfferId)
+    : undefined;
+  const { version, anchorOfferId, anchorNote, addonOfferIds, addonCategories, packageChange: _packageChange, ...changes } = input;
+  void _packageChange;
   void anchorOfferId;
   void addonOfferIds;
   void addonCategories;
@@ -155,24 +236,50 @@ export async function updatePartyDraft(
     });
     if (result.count !== 1) throw new PartyApiError(409, "Черновик изменился. Обновите страницу");
 
-    if (selectionChange) {
-      // Only DRAFT items exist; any sent request would prevent reaching here.
-      await tx.partyOrderItem.deleteMany({ where: { partyOrderId: partyId } });
+    const items = packageChange || selectionChange ? await tx.partyOrderItem.findMany({ where: { partyOrderId: partyId }, select: {
+        id: true, role: true, category: true, offerId: true, businessId: true, position: true,
+        offerPriceSnapshot: true, draftPriceModeSnapshot: true, packageComponentSnapshot: true,
+        packageComponentChange: true, packageComponentChangeHistory: true,
+    } }) : [];
+    if (packageChange) {
+      await changePackageItem(tx, partyId, newMode, items, packageChange, replacement);
+    } else if (selectionChange) {
+      if (items.some(item => item.packageComponentChange !== null)) {
+        throw new PartyApiError(422, "Сначала отмените изменения компонентов пакета");
+      }
+      const savedAnchor = anchor?.productType === "PARTY_PACKAGE"
+        ? items.find(item => item.role === "ANCHOR" && item.offerId === anchor?.id) : undefined;
+      if (!savedAnchor && items.some(item => item.packageComponentChangeHistory !== null)) {
+        throw new PartyApiError(422, "Для другого пакета создайте новый черновик");
+      }
+      const savedComponents = savedAnchor ? items.filter(item => item.role === "INCLUDED") : [];
+      if (anchor) assertCompatibleSelection(newMode, savedAnchor ? {
+        ...anchor, components: [], details: { includedCategories: savedComponents.map(item => item.category) },
+      } : anchor, addons);
+      const savedAddons = new Map(items.filter(item => item.role === "STANDALONE").map(item => [item.offerId, item]));
+      // Preserve package snapshots and component IDs when saving the same anchor.
+      await tx.partyOrderItem.deleteMany({ where: {
+        partyOrderId: partyId, ...(savedAnchor ? { role: { in: ["STANDALONE", "ADDON"] } } : {}),
+      } });
       if (anchor) {
         const businessId = anchor.place?.ownerBusinessId ?? null;
         if (!businessId) throw new PartyApiError(422, "Исполнитель недоступен");
-        const anchorItem = await tx.partyOrderItem.create({
+        const anchorItem = savedAnchor ?? await tx.partyOrderItem.create({
           data: {
             partyOrderId: partyId, category: anchor.category ?? PartyCategory.OTHER,
             offerId: anchor.id, businessId, role: "ANCHOR",
             offerPriceSnapshot: snapshotDecimal(anchor),
+            draftPriceModeSnapshot: anchor.priceMode,
             note: anchorNote?.trim() || null,
             position: 0,
           },
         });
-        let position = 1;
-        const included = includedCategories(anchor);
-        const components = anchor.productType === "PARTY_PACKAGE"
+        if (savedAnchor && anchorNote !== undefined) {
+          await tx.partyOrderItem.update({ where: { id: savedAnchor.id }, data: { note: anchorNote?.trim() || null } });
+        }
+        let position = Math.max(0, ...savedComponents.map(item => item.position)) + 1;
+        const included = savedAnchor ? savedComponents.map(item => item.category) : includedCategories(anchor);
+        const components = !savedAnchor && anchor.productType === "PARTY_PACKAGE"
           ? anchor.components.filter(component => !component.isOptional) : [];
         const componentCategories = new Set(components.map(component => component.category));
         const selectedCategories = new Set(addons.map(addon => addon.category));
@@ -189,21 +296,29 @@ export async function updatePartyDraft(
               refOfferId: component.refOfferId, isOptional: component.isOptional,
               priceSnapshot: component.priceSnapshot?.toFixed(2) ?? null,
               priceDelta: component.priceDelta?.toFixed(2) ?? null,
+              removalPolicy: component.removalPolicy,
+              removalCreditByn: component.removalCreditByn?.toFixed(2) ?? null,
             },
             role: "INCLUDED" as const, position: position++,
           })),
-          ...included.filter(category => !componentCategories.has(category)).map(category => ({
+          ...included.filter(category => !savedAnchor && !componentCategories.has(category)).map(category => ({
             partyOrderId: partyId, category, businessId, parentItemId: anchorItem.id,
             role: "INCLUDED" as const, position: position++,
           })),
           ...requestedCategories.map(category => ({
             partyOrderId: partyId, category, role: "ADDON" as const, position: position++,
           })),
-          ...addons.map(addon => ({
-            partyOrderId: partyId, category: addon.category ?? PartyCategory.OTHER,
-            offerId: addon.id, businessId: addon.place?.ownerBusinessId,
-            role: "STANDALONE" as const, offerPriceSnapshot: snapshotDecimal(addon), position: position++,
-          })),
+          ...addons.map(addon => {
+            const saved = savedAnchor ? savedAddons.get(addon.id) : undefined;
+            return {
+              partyOrderId: partyId, category: addon.category ?? PartyCategory.OTHER,
+              offerId: addon.id, businessId: addon.place?.ownerBusinessId,
+              role: "STANDALONE" as const,
+              offerPriceSnapshot: saved?.draftPriceModeSnapshot ? saved.offerPriceSnapshot : snapshotDecimal(addon),
+              draftPriceModeSnapshot: saved?.draftPriceModeSnapshot ?? addon.priceMode,
+              position: position++,
+            };
+          }),
         ];
         if (remainingItems.length > 0) await tx.partyOrderItem.createMany({ data: remainingItems });
       }

@@ -39,8 +39,15 @@ async function main() {
     data: {
       id: "it-component-" + key, packageId: "it-offer-pkg", category: "ANIMATOR",
       title: "IT package animator", priceSnapshot: 90, position: 0,
+      removalPolicy: "REMOVABLE_FIXED_CREDIT", removalCreditByn: 25,
     },
   });
+  await prisma.packageComponent.createMany({ data: [
+    { packageId: "it-offer-pkg", category: "DECOR", title: "Required", position: 1, removalPolicy: "REQUIRED" },
+    { packageId: "it-offer-pkg", category: "FOOD", title: "No refund", position: 2, removalPolicy: "REMOVABLE_NO_REFUND" },
+    { packageId: "it-offer-pkg", category: "SHOW", title: "Quote required", position: 3, removalPolicy: "REMOVABLE_QUOTE_REQUIRED" },
+    { packageId: "it-offer-pkg", category: "CAKE", title: "Legacy", position: 4 },
+  ] });
   const packageDraft = await createPartyDraft(parent.id, { citySlug: "minsk", venueMode: "PACKAGE" });
   const withPackage = await updatePartyDraft(parent.id, packageDraft.id, {
     version: packageDraft.version, anchorOfferId: "it-offer-pkg", addonOfferIds: ["it-offer-photo"],
@@ -50,11 +57,12 @@ async function main() {
   assert.deepEqual(included.packageComponentSnapshot, {
     id: component.id, title: component.title, category: "ANIMATOR", refOfferId: null,
     isOptional: false, priceSnapshot: "90.00", priceDelta: null,
+    removalPolicy: "REMOVABLE_FIXED_CREDIT", removalCreditByn: "25.00",
   });
   assert.ok(withPackage.items.some(item => item.role === "INCLUDED" && item.category === "VENUE" && !item.packageComponentId));
   assert.ok("estimate" in withPackage);
   assert.deepEqual(withPackage.estimate, {
-    exactByn: 120, fromByn: 650, unknownCount: 0,
+    minimumByn: 770, exactByn: 120, fromByn: 650, unknownCount: 0,
     lines: [
       { offerId: "it-offer-pkg", mode: "FROM", amount: 650 },
       { offerId: "it-offer-photo", mode: "EXACT", amount: 120 },
@@ -64,6 +72,41 @@ async function main() {
   const reloaded = await readPartyOrder(parent.id, packageDraft.id);
   assert.deepEqual(reloaded.items.find(item => item.id === included.id)?.packageComponentSnapshot, included.packageComponentSnapshot);
   console.log("PASS package snapshot preserves original component and excludes its amount from the estimate");
+
+  const itemId = (category: string) => withPackage.items.find(item => item.role === "INCLUDED" && item.category === category)!.id;
+  const packageEdit = (version: number, category: string, replacementOfferId?: string, undo?: true) =>
+    updatePartyDraft(parent.id, packageDraft.id, { version, packageChange: { itemId: itemId(category), replacementOfferId, undo } });
+  await expectPartyError(422, () => packageEdit(withPackage.version, "DECOR"), "mandatory component cannot be removed");
+  await expectPartyError(404, () => updatePartyDraft(ownerA.id, packageDraft.id, {
+    version: withPackage.version, packageChange: { itemId: included.id },
+  }), "foreign account cannot edit package components");
+  const noRefund = await packageEdit(withPackage.version, "FOOD");
+  assert.deepEqual("estimate" in noRefund && noRefund.estimate, withPackage.estimate);
+  const replaced = await packageEdit(noRefund.version, "ANIMATOR", "it-offer-anim");
+  assert.deepEqual("estimate" in replaced && replaced.estimate, {
+    minimumByn: 925, exactByn: 120, fromByn: 805, unknownCount: 0,
+    lines: [
+      { offerId: "it-offer-pkg", mode: "FROM", amount: 625 },
+      { offerId: "it-offer-photo", mode: "EXACT", amount: 120 },
+      { offerId: "it-offer-anim", mode: "FROM", amount: 180 },
+    ],
+  });
+  const repeated = await packageEdit(replaced.version, "ANIMATOR", "it-offer-anim");
+  assert.deepEqual("estimate" in repeated && repeated.estimate, "estimate" in replaced && replaced.estimate);
+  await expectPartyError(409, () => packageEdit(replaced.version, "SHOW"), "stale version cannot overwrite saved edit");
+  const quote = await packageEdit(repeated.version, "SHOW");
+  const legacy = await packageEdit(quote.version, "CAKE");
+  for (const category of ["SHOW", "CAKE"]) {
+    assert.equal(legacy.items.find(item => item.id === itemId(category))?.packageComponentChange &&
+      (legacy.items.find(item => item.id === itemId(category))?.packageComponentChange as { requiresQuote: boolean }).requiresQuote, true);
+  }
+  const restored = await readPartyOrder(parent.id, packageDraft.id);
+  assert.deepEqual(restored.items.map(item => item.packageComponentChange), legacy.items.map(item => item.packageComponentChange));
+  await expectPartyError(422, () => submitPartyAnchor(parent.id, packageDraft.id, legacy.version, "modified_" + key), "modified package cannot send original scope");
+  const undone = await packageEdit(legacy.version, "ANIMATOR", undefined, true);
+  assert.ok(!undone.items.some(item => item.offerId === "it-offer-anim"));
+  assert.ok(Array.isArray(undone.items.find(item => item.id === included.id)?.packageComponentChangeHistory));
+  console.log("PASS package edit policies, replacement, replay, reload, quote guard and undo history");
 
   const seedOffer = await prisma.offer.findUniqueOrThrow({ where: { id: "it-offer-venue" } });
   // An isolated per-run offer keeps old test allocations/disabled resources

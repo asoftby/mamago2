@@ -107,11 +107,27 @@ const estimate = withDraftEstimate({
 });
 assert.ok("estimate" in estimate);
 assert.deepEqual(estimate.estimate, {
-  exactByn: 100, fromByn: 100, unknownCount: 2,
+  minimumByn: 200, exactByn: 100, fromByn: 100, unknownCount: 2,
   lines: [
     { offerId: "pk", mode: "EXACT", amount: 100 },
     { offerId: "show", mode: "FROM", amount: 100 },
     { offerId: "unknown", mode: "ON_REQUEST", amount: null },
     { offerId: null, mode: "ON_REQUEST", amount: null },
+  ],
+});
+
+const fractionalEstimate = withDraftEstimate({
+  status: "DRAFT",
+  items: [0.1, 0.2].map((priceFrom, index) => ({
+    role: "STANDALONE", offerId: String(index),
+    offer: { priceFrom, priceMode: "EXACT", currency: "BYN" },
+  })),
+});
+assert.ok("estimate" in fractionalEstimate);
+assert.deepEqual(fractionalEstimate.estimate, {
+  minimumByn: 0.3, exactByn: 0.3, fromByn: 0, unknownCount: 0,
+  lines: [
+    { offerId: "0", mode: "EXACT", amount: 0.1 },
+    { offerId: "1", mode: "EXACT", amount: 0.2 },
   ],
 });
