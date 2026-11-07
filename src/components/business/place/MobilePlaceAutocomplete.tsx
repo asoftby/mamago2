@@ -10,7 +10,7 @@ type Prediction = {
   toPlace: () => google.maps.places.Place;
 };
 
-type Suggestion = { placePrediction?: Prediction };
+
 
 interface Props {
   value: string;
@@ -22,7 +22,7 @@ interface Props {
 
 /** Mobile-only, controlled Google Places suggestions; avoids the widget's viewport-sized popover on iOS. */
 export function MobilePlaceAutocomplete({ value, onChange, onSelect, placeholder, disabled }: Props) {
-  const [suggestions, setSuggestions] = useState<Prediction[]>([]);
+  const [suggestions, setSuggestions] = useState<google.maps.places.PlacePrediction[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState(false);
@@ -53,8 +53,8 @@ export function MobilePlaceAutocomplete({ value, onChange, onSelect, placeholder
         });
         if (request === requestRef.current) {
           setSuggestions(response.suggestions
-            .map((suggestion: Suggestion) => suggestion.placePrediction)
-            .filter((prediction): prediction is Prediction => Boolean(prediction)));
+            .map((suggestion) => suggestion.placePrediction)
+            .filter((prediction): prediction is google.maps.places.PlacePrediction => prediction !== null));
         }
       } catch (cause) {
         console.error("[MobilePlaceAutocomplete] Search error:", cause);
@@ -72,7 +72,7 @@ export function MobilePlaceAutocomplete({ value, onChange, onSelect, placeholder
     };
   }, [value, open, disabled]);
 
-  const choose = async (prediction: Prediction) => {
+  const choose = async (prediction: google.maps.places.PlacePrediction) => {
     selectingRef.current = true;
     requestRef.current++;
     setOpen(false);
