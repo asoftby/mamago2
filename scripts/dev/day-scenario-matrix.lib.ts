@@ -5,10 +5,36 @@
  */
 import { geoCellsFor } from "../../src/lib/geo/geoCell";
 import { haversineMeters } from "../../src/lib/geo/haversineMeters";
+import { ageRangeAt } from "../../src/lib/child/birth";
 import { CLUSTER_LABEL, MOCK_PLACES, type MockPlaceSpec } from "../ops/day-scenario-mocks/places.data";
 import { MOCK_EVENTS } from "../ops/day-scenario-mocks/events.data";
 import { hoursPlanFor, sessionInstant, type HoursPlan } from "../ops/seed-day-scenario-mocks";
 import type { DaySlot } from "../ops/day-scenario-mocks/events.data";
+
+/** Child fields the oracle needs, as returned by GET /api/children. */
+export type OracleChild = { birthDate?: string | null; birthPrecision?: "DAY" | "MONTH" | null };
+
+/**
+ * Age ranges the audience has on `date`, derived from the children's birth data with the same
+ * canonical function the server uses. Independent of the engine response, so age violations
+ * are judged for authenticated audiences too. Throws when nothing can be derived: an empty
+ * oracle would silently skip every age check.
+ */
+export function oracleAgeRanges(children: readonly OracleChild[], date: string): string[] {
+  const target = new Date(`${date}T12:00:00.000Z`);
+  const ranges = new Set<string>();
+  for (const child of children) {
+    if (!child.birthDate) continue;
+    const range = ageRangeAt({ birthDate: new Date(child.birthDate), birthPrecision: child.birthPrecision ?? null }, target);
+    if (range) ranges.add(range);
+  }
+  if (ranges.size === 0) throw new Error(`cannot derive age ranges for ${date}: children have no usable birth data`);
+  return [...ranges];
+}
+
+export const TODDLER_RANGES = new Set(["0-1", "1-3"]);
+
+export const PLAN_FIXTURE_TITLE = "[MOCK] Запись плана 12:00";
 
 export type ApiItem = {
   kind?: "event" | "place";

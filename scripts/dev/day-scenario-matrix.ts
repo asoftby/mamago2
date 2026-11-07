@@ -14,7 +14,11 @@ import { writeFileSync } from "node:fs";
 import { minskDateOf, resolveSlotDates, sessionInstant } from "../ops/seed-day-scenario-mocks";
 import {
   checkResult,
+  oracleAgeRanges,
+  PLAN_FIXTURE_TITLE,
   renderReport,
+  TODDLER_RANGES,
+  type OracleChild,
   type ApiResult,
   type RunParams,
   type RunRecord,
@@ -51,6 +55,37 @@ async function post(path: string, body: unknown, authed: boolean): Promise<{ sta
   });
   const json = await res.json().catch(() => null);
   return { status: res.status, json, ms: performance.now() - t0 };
+}
+
+/** Non-draft calls (plan fixtures). Counted against the same call budget. */
+async function api(method: "GET" | "DELETE", path: string, body?: unknown): Promise<{ status: number; json: unknown }> {
+  budget();
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { "content-type": "application/json", "user-agent": UA, cookie },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const json = await res.json().catch(() => null);
+  await sleep(500);
+  return { status: res.status, json };
+}
+
+type CalendarItem = { id: string; title: string | null; status: string; updatedAt: string; startsAt: string | null };
+
+async function listPlan(from: string, to: string): Promise<CalendarItem[]> {
+  const r = await api("GET", `/api/plan/calendar?from=${from}&to=${to}`);
+  if (r.status !== 200) throw new Error(`plan calendar read failed (HTTP ${r.status})`);
+  return ((r.json as { items?: CalendarItem[] }).items ?? []).filter((i) => i.status !== "CANCELLED");
+}
+
+/** Cancels every runner-owned fixture in the range; returns how many were cancelled. */
+async function cancelFixtures(from: string, to: string): Promise<number> {
+  let cancelled = 0;
+  for (const item of (await listPlan(from, to)).filter((i) => i.title === PLAN_FIXTURE_TITLE)) {
+    const r = await api("DELETE", `/api/plan/manual/${item.id}`, { expectedUpdatedAt: item.updatedAt });
+    if (r.status === 200) cancelled += 1;
+  }
+  return cancelled;
 }
 
 async function draft(body: object, authed: boolean): Promise<{ step: Omit<StepRecord, "name" | "violations">; result: ApiResult | null }> {
@@ -91,7 +126,7 @@ async function main(): Promise<void> {
   if (!login.ok || !cookie) throw new Error(`login failed (${login.status})`);
   budget();
   const kidsRes = await fetch(`${BASE}/api/children`, { headers: { cookie, "user-agent": UA } });
-  const kids = ((await kidsRes.json()) as { children?: { id: string }[] }).children ?? [];
+  const kids = ((await kidsRes.json()) as { children?: (OracleChild & { id: string })[] }).children ?? [];
   if (kids.length < 2) throw new Error("the test user needs two children (7 and 12)");
   const personaIds = kids.slice(0, 2).map((k) => k.id);
 
@@ -100,6 +135,11 @@ async function main(): Promise<void> {
     { key: "sun", date: dates.sun1, label: `воскресенье ${dates.sun1}`, window: { start: "09:00", end: "20:00" } },
     { key: "wed", date: dates.wed1, label: `будний (среда) ${dates.wed1}`, window: { start: "16:00", end: "20:00" } },
   ];
+  // Authenticated audiences: the oracle ages come from the children's birth data per day
+  // (personaIds are still what the API receives, so server-side profile resolution is tested).
+  const authedAges = Object.fromEntries(days.map((d) => [d.key, oracleAgeRanges(kids.slice(0, 2), d.date)]));
+  const rangeFrom = days.map((d) => d.date).sort()[0]!;
+  const rangeTo = days.map((d) => d.date).sort().slice(-1)[0]!;
   const audiences = [
     { key: "G03", label: "гость, 0–3 года", ageRanges: ["0-1", "1-3"], toddler: true, authed: false, plan: false },
     { key: "G57", label: "гость, 5–7 лет", ageRanges: ["5-7"], toddler: false, authed: false, plan: false },
@@ -109,28 +149,51 @@ async function main(): Promise<void> {
 
   const runs: RunRecord[] = [];
   const notes: string[] = [
-    `Запись плана 12:00–13:30 создаётся через POST /api/plan/manual («[MOCK] Запись плана 12:00»); у аудитории «+ запись плана» она уже есть, у остальных — нет.`,
-    `Нарушения оцениваются по эталону из сида (координаты, часы работы, возраст мок-точек), а не по ответам движка.`,
+    `Запись плана 12:00–13:30 создаётся через POST /api/plan/manual («${PLAN_FIXTURE_TITLE}») только для аудитории «+ запись плана»; у остальных её нет. После прогона такие записи отменяются (статус CANCELLED).`,
+    `Нарушения оцениваются по эталону из сида (координаты, часы работы, возраст мок-точек), а не по ответам движка. Возраст аудитории «пользователь» считается из дат рождения детей на каждую дату.`,
   ];
 
+  // Baseline: remove fixtures left by an earlier execution, then make sure the plan-free audiences
+  // really run without plan entries.
+  const leftovers = await cancelFixtures(rangeFrom, rangeTo);
+  if (leftovers > 0) notes.push(`Перед прогоном отменено записей-остатков от прошлых запусков: ${leftovers}.`);
+  const remaining = await listPlan(rangeFrom, rangeTo);
+  if (remaining.some((i) => i.title === PLAN_FIXTURE_TITLE)) throw new Error("fixtures from a previous execution could not be cancelled; aborting before collecting results");
+  const foreign = remaining.filter((i) => i.startsAt);
+  if (foreign.length > 0) notes.push(`ВНИМАНИЕ: в плане пользователя на даты прогона уже есть записей со временем: ${foreign.length}. Они влияют на ВСЕ аудитории, включая «без записи плана».`);
+
+  let tornDown = false;
+  const teardown = async () => {
+    if (tornDown) return;
+    tornDown = true;
+    try {
+      const n = await cancelFixtures(rangeFrom, rangeTo);
+      notes.push(`После прогона отменено созданных записей плана: ${n}.`);
+    } catch (error) {
+      notes.push(`ВНИМАНИЕ: не удалось отменить записи плана «${PLAN_FIXTURE_TITLE}»: ${error instanceof Error ? error.message : String(error)}.`);
+    }
+  };
+
+  try {
   for (const aud of audiences) {
     if (aud.plan && !SKIP_PLAN_ITEMS) {
       for (const d of days) {
-        const created = await post("/api/plan/manual", { title: "[MOCK] Запись плана 12:00", date: d.date, startsAt: sessionInstant(d.date, "12:00").toISOString(), endsAt: sessionInstant(d.date, "13:30").toISOString() }, true);
+        const created = await post("/api/plan/manual", { title: PLAN_FIXTURE_TITLE, date: d.date, startsAt: sessionInstant(d.date, "12:00").toISOString(), endsAt: sessionInstant(d.date, "13:30").toISOString() }, true);
         await sleep(500);
         if (created.status !== 201) notes.push(`Запись плана на ${d.date}: HTTP ${created.status} — прогоны с записью могут быть невалидны.`);
       }
     }
     for (const d of days) {
       for (const mode of ["walk", "car"] as const) {
+        const ages = aud.authed ? authedAges[d.key]! : aud.ageRanges;
         const params: RunParams = {
           id: `${aud.key}-${d.key}-${mode}`,
           date: d.date,
           dateLabel: d.label,
           mode,
           audience: aud.label,
-          ageRanges: aud.ageRanges,
-          toddler: aud.toddler,
+          ageRanges: ages,
+          toddler: aud.authed ? ages.some((a) => TODDLER_RANGES.has(a)) : aud.toddler,
           window: d.window,
           planItem: aud.plan,
         };
@@ -170,6 +233,9 @@ async function main(): Promise<void> {
         console.log(`${params.id}: ${built.result?.status ?? "HTTP " + built.step.httpStatus}, calls=${calls}`);
       }
     }
+  }
+  } finally {
+    await teardown();
   }
 
   const html = renderReport({ generatedAt: new Date().toISOString(), base: BASE, build, dates: dates as Record<string, string>, runs, calls, notes });

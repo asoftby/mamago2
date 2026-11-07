@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { MOCK_EVENTS } from "../ops/day-scenario-mocks/events.data";
 import { MOCK_PLACES } from "../ops/day-scenario-mocks/places.data";
 import { resolveSlotDates, sessionInstant } from "../ops/seed-day-scenario-mocks";
-import { checkResult, renderReport, seededAvailability, specFor, totalsOf, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
+import { checkResult, oracleAgeRanges, PLAN_FIXTURE_TITLE, renderReport, seededAvailability, specFor, totalsOf, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
 import { hoursPlanFor } from "../ops/seed-day-scenario-mocks";
 
 const dates = resolveSlotDates("2026-11-07");
@@ -11,6 +11,19 @@ const item = (title: string, start: string, end: string, travel: ApiItem["travel
   ({ activityId: title, card: { title }, startsAt: sessionInstant(dates.sat1, start).toISOString(), endsAt: sessionInstant(dates.sat1, end).toISOString(), travel, approximatePlace: false, far: false, ...over });
 const result = (items: ApiItem[], status = "ok"): ApiResult => ({ status, mode: "car", suggestMode: null, items });
 const rules = (r: RunParams, items: ApiItem[], prior: string[] = []) => checkResult(r, "step", result(items), { dates, priorSignatures: prior }).map((v) => v.rule);
+
+// ---- oracle ages for authenticated audiences come from birth data, never empty
+const kids = [{ birthDate: "2019-03-10T00:00:00.000Z", birthPrecision: "DAY" as const }, { birthDate: "2014-06-01T00:00:00.000Z", birthPrecision: "DAY" as const }];
+const kidRanges = oracleAgeRanges(kids, dates.sat1);
+assert.equal(kidRanges.length, 2, `two children, two ranges: ${kidRanges.join(",")}`);
+assert.throws(() => oracleAgeRanges([{ birthDate: null }], dates.sat1), /cannot derive age ranges/);
+assert.throws(() => oracleAgeRanges([], dates.sat1), /cannot derive age ranges/);
+{
+  const adultsPlace = MOCK_PLACES.find((x) => x.adultOnly)!;
+  const authedRun = run({ audience: "user 7+12", ageRanges: kidRanges });
+  assert.ok(rules(authedRun, [item(adultsPlace.title, "10:00", "11:30")]).includes("Возраст: место 18+ в детском сценарии"), "age checks apply to authenticated audiences once ranges are derived");
+}
+assert.equal(PLAN_FIXTURE_TITLE, "[MOCK] Запись плана 12:00");
 
 // ---- spec lookup: places and events resolve to coordinates and a geoCell5
 const p = MOCK_PLACES.find((x) => x.key === "center-park-1")!;
