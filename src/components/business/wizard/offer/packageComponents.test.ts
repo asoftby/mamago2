@@ -34,7 +34,7 @@ for (const partyPriceMode of ["ON_REQUEST", "FREE"] as const) {
   for (const variant of ["v1", "v2"] as const) assert.equal(validateForSubmit(data, variant).errors.includes("Укажите цену"), false);
 }
 const multiple = { ...base, pricingMode: "multiple" as const, partyPriceMode: "EXACT" as const,
-  singlePrice: "999", pricingOptions: [{ id: "first", title: "First", price: "100", currency: "BYN" as const }, { id: "second", title: "Second", price: "200", currency: "BYN" as const }] };
+  singlePrice: "999", pricingOptions: [{ id: "first", title: "First", price: "100", description: "", currency: "BYN" as const }, { id: "second", title: "Second", price: "200", description: "", currency: "BYN" as const }] };
 assert.equal(buildOfferCreatePayload(multiple).partyPriceMode, undefined);
 assert.equal(buildOfferUpdatePayload(multiple).partyPriceMode, undefined);
 for (const file of ["src/app/api/business/offers/route.ts", "src/app/api/business/offers/[id]/route.ts"]) {
