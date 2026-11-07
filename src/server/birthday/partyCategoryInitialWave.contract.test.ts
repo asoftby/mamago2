@@ -5,7 +5,7 @@ const draft = readFileSync("src/server/birthday/partyDraft.service.ts", "utf8");
 const replenish = readFileSync("src/server/birthday/partyCandidateReplenishment.service.ts", "utf8");
 const dispatch = readFileSync("src/server/birthday/partyCandidateDispatch.service.ts", "utf8");
 assert.ok(validation.includes("addonCategories: z.array(z.nativeEnum(PartyCategory))"));
-assert.ok(draft.includes("role: \"ADDON\", position: position++"));
+assert.match(draft, /role:\s*"ADDON"(?:\s+as const)?,\s*position:\s*position\+\+/);
 assert.ok(draft.includes("category,") && draft.includes("input.addonCategories ?? []"));
 assert.ok(replenish.includes('offerId: null, businessId: null'));
 assert.ok(replenish.includes('requests: { none: {} }'));

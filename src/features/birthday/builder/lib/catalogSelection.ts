@@ -122,7 +122,7 @@ export function partyBudgetWarning(
 /** Price text that respects how the business declared the price. Unknown never reads as zero. */
 export function catalogPriceLabel(offer: Pick<BirthdayCatalogItem, "priceFrom" | "priceMode" | "currency">): string {
   if (offer.priceMode === "FREE") return "Бесплатно";
-  if (offer.priceFrom == null) return "Цена по запросу";
+  if (offer.priceFrom == null || offer.priceMode === "ON_REQUEST") return "Цена по запросу";
   const amount = offer.priceFrom.toLocaleString("ru-RU") + " " + offer.currency;
   return offer.priceMode === "EXACT" ? amount : "От " + amount;
 }

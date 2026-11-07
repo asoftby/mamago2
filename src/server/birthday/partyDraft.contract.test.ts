@@ -91,3 +91,27 @@ assert.equal(partyRequirementsProblem({}, { childrenCount: 200, childAge: 0 }), 
 assert.match(submit, /partyRequirementsProblem\(published, requirements\)/);
 assert.match(submit, /role: "STANDALONE"/);
 console.log("partySelection checks: OK");
+
+
+import { withDraftEstimate } from "./partyDraftEstimate";
+
+const estimate = withDraftEstimate({
+  status: "DRAFT",
+  items: [
+    { role: "ANCHOR", offerId: "pk", offer: { ...pkg, priceMode: "EXACT" } },
+    { role: "INCLUDED", offerId: "included", offer: cake },
+    { role: "STANDALONE", offerId: "show", offer: show },
+    { role: "STANDALONE", offerId: "unknown", offer: { ...cake, priceMode: "ON_REQUEST" } },
+    { role: "ADDON", offerId: null, offer: null },
+  ],
+});
+assert.ok("estimate" in estimate);
+assert.deepEqual(estimate.estimate, {
+  exactByn: 100, fromByn: 100, unknownCount: 2,
+  lines: [
+    { offerId: "pk", mode: "EXACT", amount: 100 },
+    { offerId: "show", mode: "FROM", amount: 100 },
+    { offerId: "unknown", mode: "ON_REQUEST", amount: null },
+    { offerId: null, mode: "ON_REQUEST", amount: null },
+  ],
+});

@@ -2,6 +2,7 @@ import { PartyCategory, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { withDraftEstimate } from "./partyDraftEstimate";
 import { PartyApiError, type UpdatePartyDraft } from "./partyDraft.validation";
 import {
   assertCompatibleSelection, includedCategories, offerPriceSnapshot, type CatalogOffer,
@@ -18,6 +19,10 @@ export async function createPartyDraft(ownerUserId: string, input: {
   });
 }
 
+const draftOfferSelect = {
+  id: true, title: true, priceFrom: true, priceMode: true, currency: true,
+} satisfies Prisma.OfferSelect;
+
 export async function readPartyOrder(ownerUserId: string, partyId: string) {
   const party = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
@@ -25,7 +30,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
       items: {
         orderBy: { position: "asc" },
         include: {
-          offer: { select: { id: true, title: true } },
+          offer: { select: draftOfferSelect },
           requests: {
             orderBy: { createdAt: "desc" },
             select: {
@@ -45,7 +50,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
     },
   });
   if (!party) throw new PartyApiError(404, "Праздник не найден");
-  return party;
+  return withDraftEstimate(party);
 }
 
 /** Fetch all selected offers using the same public visibility and approved BIRTHDAY placement. */
@@ -153,40 +158,33 @@ export async function updatePartyDraft(
           },
         });
         let position = 1;
-        for (const category of includedCategories(anchor)) {
-          await tx.partyOrderItem.create({
-            data: {
-              partyOrderId: partyId, category, businessId, parentItemId: anchorItem.id,
-              role: "INCLUDED", position: position++,
-            },
-          });
-        }
+        const included = includedCategories(anchor);
         const selectedCategories = new Set(addons.map(addon => addon.category));
-        for (const category of input.addonCategories ?? []) {
-          if (selectedCategories.has(category) || includedCategories(anchor).includes(category)) {
-            throw new PartyApiError(422, "Услуга этой категории уже выбрана");
-          }
-          await tx.partyOrderItem.create({
-            data: { partyOrderId: partyId, category,
-              role: "ADDON", position: position++ },
-          });
+        const requestedCategories = input.addonCategories ?? [];
+        if (requestedCategories.some(category => selectedCategories.has(category) || included.includes(category))) {
+          throw new PartyApiError(422, "Услуга этой категории уже выбрана");
         }
-        for (const addon of addons) {
-          await tx.partyOrderItem.create({
-            data: {
-              partyOrderId: partyId, category: addon.category ?? PartyCategory.OTHER,
-              offerId: addon.id, businessId: addon.place?.ownerBusinessId,
-              role: "STANDALONE",
-              offerPriceSnapshot: snapshotDecimal(addon),
-              position: position++,
-            },
-          });
-        }
+        const remainingItems: Prisma.PartyOrderItemCreateManyInput[] = [
+          ...included.map(category => ({
+            partyOrderId: partyId, category, businessId, parentItemId: anchorItem.id,
+            role: "INCLUDED" as const, position: position++,
+          })),
+          ...requestedCategories.map(category => ({
+            partyOrderId: partyId, category, role: "ADDON" as const, position: position++,
+          })),
+          ...addons.map(addon => ({
+            partyOrderId: partyId, category: addon.category ?? PartyCategory.OTHER,
+            offerId: addon.id, businessId: addon.place?.ownerBusinessId,
+            role: "STANDALONE" as const, offerPriceSnapshot: snapshotDecimal(addon), position: position++,
+          })),
+        ];
+        if (remainingItems.length > 0) await tx.partyOrderItem.createMany({ data: remainingItems });
       }
     }
-    return tx.partyOrder.findUniqueOrThrow({
+    const updated = await tx.partyOrder.findUniqueOrThrow({
       where: { id: partyId },
-      include: { items: { orderBy: { position: "asc" } } },
+      include: { items: { orderBy: { position: "asc" }, include: { offer: { select: draftOfferSelect } } } },
     });
+    return withDraftEstimate(updated);
   });
 }
