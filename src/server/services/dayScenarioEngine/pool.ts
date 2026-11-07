@@ -121,6 +121,8 @@ export async function loadDayScenarioPool(citySlug: string, date: string, nowMs 
       formattedAddr: true,
       customAddress: true,
       primaryCategory: { select: { id: true, slug: true, nameRu: true } },
+      agePolicy: true,
+      ageTags: true,
       images: { select: { url: true, kind: true }, orderBy: { sortOrder: "asc" }, take: 3 },
       openingHours: {
         select: {

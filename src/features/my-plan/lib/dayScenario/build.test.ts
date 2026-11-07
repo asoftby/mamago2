@@ -250,4 +250,19 @@ const UNKNOWN = { kind: "unknown" } as const;
   assert.equal(r.items[0]!.activityId, "zero");
 }
 
+// F7. place age restrictions are enforced like event ones (review finding)
+{
+  const child = { ageRanges: ["3-5"], profileInterestSlugs: [], hasToddler: false };
+  const places = [
+    place("adults", A.lat, A.lng, ALWAYS, { adultOnly: true }),
+    place("teens", B.lat, B.lng, ALWAYS, { ageTags: ["12-14"] }),
+    place("kids", C.lat, C.lng, ALWAYS, { ageTags: ["3-5"] }),
+    place("any", A.lat + 0.0005, A.lng, ALWAYS),
+  ];
+  const r = buildDayScenario(places, baseInput({ audience: child }), deps());
+  assert.deepEqual(r.items.map((i) => i.activityId).sort(), ["any", "kids"], "adults-only and non-matching age places never reach a child scenario");
+  const adultsOk = buildDayScenario(places, baseInput({ audience: { ageRanges: ["18+"], profileInterestSlugs: [], hasToddler: false } }), deps());
+  assert.ok(adultsOk.items.some((i) => i.activityId === "adults"), "an adult audience may get the adults-only place");
+}
+
 console.log("dayScenario build tests passed");

@@ -119,6 +119,7 @@ async function main() {
     id: "pl1", slug: "pl1", title: "Парк", lat: 53.9006, lng: 27.559, geoCell6: null, geoCell5: null,
     shortAddress: "ул. Парковая 1", formattedAddr: null, customAddress: null,
     primaryCategory: { id: "c1", slug: "parks", nameRu: "Парки" },
+    agePolicy: "UNKNOWN", ageTags: [],
     images: [{ url: "https://x/logo.png", kind: "LOGO" }, { url: "https://x/cover.jpg", kind: "GALLERY" }],
     openingHours: null, ...over,
   });
@@ -154,6 +155,13 @@ async function main() {
   assert.equal(hasStaleStoredPlaceCells({ lat: 53.9006, lng: 27.559, geoCell6: truthP.geoCell6, geoCell5: truthP.geoCell5 }), false);
   assert.equal(hasStaleStoredPlaceCells({ lat: 53.93, lng: 27.62, geoCell6: truthP.geoCell6, geoCell5: truthP.geoCell5 }), true);
   assert.equal(hasStaleStoredPlaceCells({ lat: 53.93, lng: 27.62, geoCell6: null, geoCell5: null }), false);
+
+  // age restrictions of places are carried into the pool (so the builder can enforce them)
+  const adults = toPoolPlace(placeRow({ agePolicy: "ADULT_ONLY" }), DAY)!;
+  assert.deepEqual([adults.adultOnly, adults.ageTags], [true, []]);
+  const kids = toPoolPlace(placeRow({ agePolicy: "SPECIFIC", ageTags: ["3-5", "5-7"] }), DAY)!;
+  assert.deepEqual([kids.adultOnly, kids.ageTags], [false, ["3-5", "5-7"]]);
+  assert.deepEqual([unknown.adultOnly, unknown.ageTags], [false, []], "no restriction stored -> suitable for everyone");
 
   console.log("dayScenarioEngine tests passed");
 }

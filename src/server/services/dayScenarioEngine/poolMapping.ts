@@ -132,6 +132,9 @@ export type PoolPlaceRow = {
   formattedAddr: string | null;
   customAddress: string | null;
   primaryCategory: { id: string; slug: string; nameRu: string } | null;
+  /** Stored age restrictions; enforced exactly like for events. */
+  agePolicy: string;
+  ageTags: string[];
   images: { url: string; kind: string }[];
   openingHours: {
     mode: HoursMode;
@@ -192,8 +195,8 @@ export function toPoolPlace(row: PoolPlaceRow, dateIso: string): PoolEvent | nul
     card,
     sessionStartsMs: [],
     durationMin: fillerDurationMin(row.primaryCategory),
-    ageTags: [],
-    adultOnly: false,
+    ageTags: row.ageTags,
+    adultOnly: row.agePolicy === "ADULT_ONLY",
     engagementScore: 0,
     scheduleJson: null,
     categoryId: row.primaryCategory?.id ?? null,
