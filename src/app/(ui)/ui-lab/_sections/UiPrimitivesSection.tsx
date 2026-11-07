@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { PackageComponentsEditor } from "@/components/business/wizard/offer/components/PackageComponentsEditor";
+import type { PackageComponentFormRow } from "@/components/business/wizard/offer/types";
 import { DemoSection } from "../_components/DemoSection";
 import { InventoryGrid } from "../_components/InventoryGrid";
 import { RenderSafe } from "../_components/RenderSafe";
@@ -85,6 +87,21 @@ function ChipsRowLabDemo() {
   );
 }
 
+function PackageRulesPreview() {
+  const [rows, setRows] = React.useState<PackageComponentFormRow[]>([
+    { title: "Площадка", category: "VENUE", removalPolicy: "REQUIRED", removalCreditByn: null },
+    { title: "Торт", category: "CAKE", removalPolicy: "REMOVABLE_NO_REFUND", removalCreditByn: null },
+    { title: "Декор", category: "DECOR", removalPolicy: "REMOVABLE_FIXED_CREDIT", removalCreditByn: "50.00" },
+    { title: "Шоу", category: "SHOW", removalPolicy: "REMOVABLE_QUOTE_REQUIRED", removalCreditByn: null },
+    { title: "Старое условие", category: "OTHER", removalPolicy: null, removalCreditByn: null },
+  ]);
+  const [disabled, setDisabled] = React.useState(false);
+  return <div className="space-y-3">
+    <Button variant="outline" onClick={() => setDisabled(value => !value)}>Режим {disabled ? "просмотра" : "редактирования"}</Button>
+    <PackageComponentsEditor rows={rows} disabled={disabled} onChange={setRows} />
+  </div>;
+}
+
 export function UiPrimitivesSection() {
   return (
     <DemoSection
@@ -93,6 +110,9 @@ export function UiPrimitivesSection() {
       description="Core building blocks from src/components/ui"
     >
       <InventoryGrid>
+        <RenderSafe title="Правила компонентов пакета" file="src/components/business/wizard/offer/components/PackageComponentsEditor.tsx">
+          <PackageRulesPreview />
+        </RenderSafe>
         <RenderSafe title="Button" file="src/components/ui/button.tsx">
           <div className="flex gap-2 flex-wrap">
             <Button>Default</Button>

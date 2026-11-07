@@ -737,6 +737,11 @@ export function buildOfferCreatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
+    ...(productType === "PARTY_PACKAGE" ? { partyPriceMode: data.partyPriceMode ?? "EXACT" } : {}),
+    ...(productType === "PARTY_PACKAGE" && data.packageComponents !== undefined ? {
+      packageComponents: data.packageComponents,
+      packageComponentsBaseline: data.packageComponentsBaseline ?? [],
+    } : {}),
     details: buildTypeDetails(data, opts?.status === "DRAFT"),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
@@ -781,7 +786,7 @@ function buildTypeDetails(
     if (bd.note.trim()) result.note = bd.note.trim();
     if (bd.prepaymentTerms?.trim()) result.prepaymentTerms = bd.prepaymentTerms.trim();
     if (bd.cancellationTerms?.trim()) result.cancellationTerms = bd.cancellationTerms.trim();
-    if (data.productType === "PARTY_PACKAGE" && (bd.includedCategories?.length ?? 0) > 0) {
+    if (data.productType === "PARTY_PACKAGE" && data.packageComponents === undefined && (bd.includedCategories?.length ?? 0) > 0) {
       result.includedCategories = bd.includedCategories;
     }
     return Object.keys(result).length > 0 ? result : undefined;
@@ -970,6 +975,11 @@ export function buildOfferUpdatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
+    ...(productType === "PARTY_PACKAGE" ? { partyPriceMode: data.partyPriceMode ?? "EXACT" } : {}),
+    ...(productType === "PARTY_PACKAGE" && data.packageComponents !== undefined ? {
+      packageComponents: data.packageComponents,
+      packageComponentsBaseline: data.packageComponentsBaseline ?? [],
+    } : {}),
     details: buildTypeDetails(data, opts?.preserveClassPricingDraft === true),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
@@ -1120,6 +1130,8 @@ function classScheduleFromOffer(offer: {
 
 /** Map Prisma offer row to wizard form (fields stored in DB only). */
 export function mapOfferToFormData(offer: {
+  components?: Array<{ id: string; title: string; category: import("./types").PartyCategory; isOptional?: boolean; removalPolicy: import("./types").PackageComponentFormRow["removalPolicy"]; removalCreditByn: unknown }>;
+  packageComponentsBaseline?: Array<{ id: string; title: string; category: import("./types").PartyCategory; isOptional?: boolean; removalPolicy: import("./types").PackageComponentFormRow["removalPolicy"]; removalCreditByn: unknown }>;
   classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
   placeId?: string | null;
   place?: { title?: string | null } | null;
@@ -1257,8 +1269,21 @@ export function mapOfferToFormData(offer: {
         .filter((item) => item.url.trim().length > 0)
     : [];
 
+  const componentRows = (rows: typeof offer.components) => rows?.map(row => ({
+    id: row.id, title: row.title, category: row.category, removalPolicy: row.removalPolicy,
+    removalCreditByn: row.removalCreditByn == null ? null : Number(String(row.removalCreditByn)).toFixed(2),
+  }));
   return {
     ...defaults,
+    partyPriceMode: usesPartyColumns ? offer.priceMode ?? "UNKNOWN" : undefined,
+    packageComponents: isPartyPackage ? [
+      ...(componentRows(offer.components) ?? []),
+      ...(serviceDetails?.includedCategories ?? []).filter(category =>
+        !offer.components?.some(row => row.category === category && !row.isOptional)).map(category => ({
+          title: category, category, removalPolicy: null, removalCreditByn: null,
+        })),
+    ] : undefined,
+    packageComponentsBaseline: componentRows(offer.packageComponentsBaseline ?? offer.components),
     offerWizardType: inferredWizardType,
     productType,
     requestedPlacements: ensurePrimaryPlacements(requestedPlacements, productType),

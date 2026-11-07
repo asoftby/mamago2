@@ -165,6 +165,7 @@ export function Step5Pricing({
   if (data.offerWizardType === "CAMP" && hideCta) {
     return (
       <p className="text-sm text-muted-foreground">
+
         Цена лагеря задаётся в сменах — на шаге «Расписание».
       </p>
     );
@@ -245,6 +246,17 @@ export function Step5Pricing({
 
   return (
     <div className="space-y-8">
+      {data.productType === "PARTY_PACKAGE" && <label className="grid min-w-0 gap-2 text-sm">
+        Как задана цена пакета
+        <select value={data.partyPriceMode ?? "EXACT"} disabled={!isEditable}
+          onChange={event => onChange({ partyPriceMode: event.target.value as OfferFormData["partyPriceMode"] })}
+          className="w-full min-w-0 rounded-md border bg-background p-2 text-base">
+          <option value="EXACT">Точная цена</option><option value="FROM">Цена от</option>
+          <option value="ON_REQUEST">Цена по запросу</option><option value="FREE">Бесплатно</option>
+          {data.partyPriceMode && !["EXACT", "FROM", "ON_REQUEST", "FREE"].includes(data.partyPriceMode) &&
+            <option value={data.partyPriceMode}>Цена требует уточнения</option>}
+        </select>
+      </label>}
       <div>
         <h2 className="text-xl font-semibold mb-2">Стоимость и участие</h2>
         <p className="text-muted-foreground">
