@@ -1,7 +1,14 @@
 import type { ContentStatus } from "@prisma/client";
 
 export type ArticlePublicationPrimaryAction =
-  | { kind: "submit"; label: "Отправить на модерацию" | "Исправить и отправить снова" }
+  | {
+      kind: "submit";
+      label:
+        | "Отправить на модерацию"
+        | "Исправить и отправить снова"
+        | "Опубликовать"
+        | "Исправить и опубликовать";
+    }
   | {
       kind: "approve";
       label: "Одобрить и опубликовать";
@@ -23,10 +30,14 @@ export function resolveArticlePublicationActionPolicy({
   hasPublicUrl: boolean;
 }) {
   let primary: ArticlePublicationPrimaryAction = null;
+  // canModerate (ADMIN/MODERATOR) публикует без очереди; сервер повторно проверяет роль в /submit.
   if (status === "DRAFT") {
-    primary = { kind: "submit", label: "Отправить на модерацию" };
+    primary = { kind: "submit", label: canModerate ? "Опубликовать" : "Отправить на модерацию" };
   } else if (status === "REJECTED") {
-    primary = { kind: "submit", label: "Исправить и отправить снова" };
+    primary = {
+      kind: "submit",
+      label: canModerate ? "Исправить и опубликовать" : "Исправить и отправить снова",
+    };
   } else if (status === "PENDING" && canModerate) {
     primary = {
       kind: "approve",

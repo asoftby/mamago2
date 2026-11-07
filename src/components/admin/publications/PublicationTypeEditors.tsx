@@ -613,7 +613,13 @@ export function NewsPublicationEditor({
       }
       clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
-      showBreakingNewsSuccess("submitted", id, publishedSnap, Boolean(articleId));
+      // Сервер решает по роли: ADMIN/MODERATOR публикуют сразу, остальные уходят на модерацию.
+      showBreakingNewsSuccess(
+        publishedSnap?.status === "PUBLISHED" ? "published" : "submitted",
+        id,
+        publishedSnap,
+        Boolean(articleId),
+      );
     } finally {
       setSubmitting(false);
       setActionsBusy(false);

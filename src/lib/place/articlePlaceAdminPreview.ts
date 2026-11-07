@@ -4,6 +4,7 @@ import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisib
 
 const previewSelect = {
   title: true,
+  status: true,
   shortAddress: true,
   formattedAddr: true,
   city: { select: { name: true } },
@@ -17,6 +18,23 @@ type PreviewClient = {
   };
 };
 
+/** Статусы «ещё не опубликовано, но место существует и редактируется» — не «недоступно». */
+export const ARTICLE_PLACE_DRAFT_LIKE_STATUSES = ["DRAFT", "PENDING", "NEEDS_REVISION"] as const;
+
+export type ArticlePlacePreviewAvailability = "public" | "draft" | "unavailable";
+
+export function resolveArticlePlacePreviewAvailability(
+  status: string,
+  publicAvailable: boolean,
+): ArticlePlacePreviewAvailability {
+  if (publicAvailable) return "public";
+  return (ARTICLE_PLACE_DRAFT_LIKE_STATUSES as readonly string[]).includes(status) ? "draft" : "unavailable";
+}
+
+/**
+ * Превью для редактора статьи: вызывается только из admin-маршрута (ADMIN/MODERATOR),
+ * поэтому неопубликованное место видно автору. Публичные страницы это не используют.
+ */
 export async function loadArticlePlaceAdminPreview(id: string, client: PreviewClient = prisma) {
   const [place, publicPlace] = await Promise.all([
     client.place.findUnique({ where: { id }, select: previewSelect }),
@@ -32,5 +50,6 @@ export async function loadArticlePlaceAdminPreview(id: string, client: PreviewCl
     city: place.city?.name ?? null,
     address: place.shortAddress ?? place.formattedAddr ?? null,
     publicAvailable: publicPlace != null,
+    availability: resolveArticlePlacePreviewAvailability(place.status, publicPlace != null),
   };
 }

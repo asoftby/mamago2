@@ -759,7 +759,12 @@ export function ArticleEditorClient({
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
       }
-      showArticleSuccess("submitted", articleId, next, Boolean(initial.id.trim()));
+      showArticleSuccess(
+        next?.status === "PUBLISHED" ? "published" : "submitted",
+        articleId,
+        next,
+        Boolean(initial.id.trim()),
+      );
       router.replace(`/admin/content/articles/${articleId}/edit`);
       router.refresh();
     } catch (e) {
