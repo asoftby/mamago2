@@ -30,10 +30,27 @@ export type ScenarioCard = {
   address: string | null;
 };
 
+/** Open ranges of a filler place on the target day, in epoch ms. */
+export type PlaceAvailability =
+  | { kind: "always" }
+  /** No hours record: offered with a "check the opening hours" note and a lower score. */
+  | { kind: "unknown" }
+  | { kind: "windows"; windows: { startMs: number; endMs: number }[] };
+
+/**
+ * One pool candidate: a dated event (fixed session starts) or a filler place (any
+ * start inside its opening hours). `activityId` is the Activity id for events and
+ * the Place id for places.
+ */
 export type PoolEvent = {
+  kind: "event" | "place";
+  /** Places only. */
+  availability?: PlaceAvailability;
+  /** Places only: no primary category; at most one such place per scenario. */
+  uncategorized?: boolean;
   activityId: string;
   card: ScenarioCard;
-  /** Confirmed session starts on the target day, ascending (epoch ms). */
+  /** Events: confirmed session starts on the target day, ascending (epoch ms). Places: empty. */
   sessionStartsMs: number[];
   durationMin: number;
   ageTags: string[];
@@ -81,6 +98,9 @@ export type TravelLeg = {
 };
 
 export type ScenarioItem = {
+  kind: "event" | "place";
+  /** Filler place with no hours record: UI shows "уточните часы работы". */
+  hoursUnconfirmed: boolean;
   activityId: string;
   card: ScenarioCard;
   startsAtMs: number;

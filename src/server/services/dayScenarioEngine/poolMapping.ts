@@ -1,5 +1,13 @@
+import { fromZonedTime } from "date-fns-tz";
 import { geoCellsFor } from "@/lib/geo/geoCell";
-import type { GeoPoint, PoolEvent, ScenarioCard } from "@/features/my-plan/lib/dayScenario/types";
+import { fillerDurationMin } from "@/features/my-plan/lib/dayScenario/fillers";
+import {
+  resolveDayAvailability,
+  type HoursDay,
+  type HoursMode,
+  type PlaceHours,
+} from "@/features/my-plan/lib/dayScenario/openingHours";
+import type { GeoPoint, PlaceAvailability, PoolEvent, ScenarioCard } from "@/features/my-plan/lib/dayScenario/types";
 
 export const DEFAULT_EVENT_DURATION_MIN = 90;
 
@@ -94,6 +102,7 @@ export function toPoolEvent(row: PoolActivityRow, engagementScore: number): Pool
     address: address(row),
   };
   return {
+    kind: "event",
     activityId: row.id,
     card,
     sessionStartsMs,
@@ -106,5 +115,93 @@ export function toPoolEvent(row: PoolActivityRow, engagementScore: number): Pool
     discoverySignalIds: row.discoverySignalIds,
     format: row.format,
     geo: resolveEventGeo(row),
+  };
+}
+
+// ---------- filler places ----------
+
+export type PoolPlaceRow = {
+  id: string;
+  slug: string | null;
+  title: string;
+  lat: number | null;
+  lng: number | null;
+  geoCell6: string | null;
+  geoCell5: string | null;
+  shortAddress: string | null;
+  formattedAddr: string | null;
+  customAddress: string | null;
+  primaryCategory: { id: string; slug: string; nameRu: string } | null;
+  /** Stored age restrictions; enforced exactly like for events. */
+  agePolicy: string;
+  ageTags: string[];
+  images: { url: string; kind: string }[];
+  openingHours: {
+    mode: HoursMode;
+    timezone: string;
+    rules: { dayOfWeek: HoursDay; isOpen: boolean; allDay: boolean; intervals: { startTime: string; endTime: string }[] }[];
+    exceptions: { date: string; isClosed: boolean; allDay: boolean; intervals: { startTime: string; endTime: string }[] }[];
+  } | null;
+};
+
+export function hasStaleStoredPlaceCells(row: Pick<PoolPlaceRow, "lat" | "lng" | "geoCell6" | "geoCell5">): boolean {
+  return placeHasStaleCells({ ...row, shortAddress: null, formattedAddr: null, customAddress: null });
+}
+
+const MS_PER_MIN = 60_000;
+
+function toAvailability(row: PoolPlaceRow, dateIso: string): PlaceAvailability | null {
+  const hours: PlaceHours | null = row.openingHours;
+  const day = resolveDayAvailability(hours, dateIso);
+  if (day.kind === "closed") return null;
+  if (day.kind === "always") return { kind: "always" };
+  if (day.kind === "unknown") return { kind: "unknown" };
+  const dayStartMs = fromZonedTime(`${dateIso}T00:00:00`, hours?.timezone ?? "Europe/Minsk").getTime();
+  return {
+    kind: "windows",
+    windows: day.windows.map((w) => ({ startMs: dayStartMs + w.startMin * MS_PER_MIN, endMs: dayStartMs + w.endMin * MS_PER_MIN })),
+  };
+}
+
+/**
+ * A published place as a day-scenario filler. Null when it cannot be offered that day:
+ * no usable coordinates, by-appointment / temporarily closed, or closed on the date.
+ * A place with no hours record is kept (availability "unknown") and flagged for the UI.
+ */
+export function toPoolPlace(row: PoolPlaceRow, dateIso: string): PoolEvent | null {
+  const geo = pointFrom(row.lat, row.lng, false);
+  if (!geo) return null;
+  const availability = toAvailability(row, dateIso);
+  if (!availability) return null;
+  const cover = row.images.find((image) => image.kind !== "LOGO") ?? row.images[0] ?? null;
+  const card: ScenarioCard = {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    coverImageUrl: cover?.url ?? null,
+    ageLabel: null,
+    categoryName: row.primaryCategory?.nameRu ?? null,
+    priceFrom: null,
+    priceTo: null,
+    priceText: null,
+    currency: null,
+    address: row.shortAddress ?? row.formattedAddr ?? row.customAddress ?? null,
+  };
+  return {
+    kind: "place",
+    availability,
+    uncategorized: row.primaryCategory == null,
+    activityId: row.id,
+    card,
+    sessionStartsMs: [],
+    durationMin: fillerDurationMin(row.primaryCategory),
+    ageTags: row.ageTags,
+    adultOnly: row.agePolicy === "ADULT_ONLY",
+    engagementScore: 0,
+    scheduleJson: null,
+    categoryId: row.primaryCategory?.id ?? null,
+    discoverySignalIds: [],
+    format: null,
+    geo,
   };
 }

@@ -66,6 +66,9 @@ export type DraftResponse = {
   suggestMode: TravelMode | null;
   variant: number;
   items: {
+    kind: "event" | "place";
+    /** Filler place without a hours record: show "уточните часы работы". */
+    hoursUnconfirmed: boolean;
     activityId: string;
     card: PoolEvent["card"];
     startsAt: string;
@@ -75,14 +78,14 @@ export type DraftResponse = {
     approximatePlace: boolean;
     far: boolean;
   }[];
-  meta: { poolCache: "hit" | "miss"; poolSize: number; staleGeoCells: number; candidateCount: number; buildMs: number };
+  meta: { poolCache: "hit" | "miss"; poolSize: number; poolPlaces: number; staleGeoCells: number; candidateCount: number; buildMs: number };
 };
 
 async function loadUserContext(userId: string, date: string, personaIds: string[]) {
   const [plan, profile] = await Promise.all([
     prisma.planItem.findMany({
       where: { ...(await activePlanScopeFor(userId)), date },
-      select: { activityId: true, startsAt: true, endsAt: true },
+      select: { activityId: true, placeId: true, startsAt: true, endsAt: true },
     }),
     personaIds.length > 0
       ? buildSelectedProfileContext({ userId, personaIds, targetDate: date })
@@ -92,6 +95,8 @@ async function loadUserContext(userId: string, date: string, personaIds: string[
   const planned: string[] = [];
   for (const item of plan) {
     if (item.activityId) planned.push(item.activityId);
+    // A place already in the plan that day is not offered again as a filler.
+    if (item.placeId) planned.push(item.placeId);
     if (item.startsAt) {
       const end = item.endsAt ?? new Date(item.startsAt.getTime() + DEFAULT_EVENT_DURATION_MIN * 60_000);
       busy.push({ startMs: item.startsAt.getTime(), endMs: end.getTime() });
@@ -168,6 +173,8 @@ export async function runDayScenarioDraft(
     suggestMode: result.suggestMode,
     variant: request.variant,
     items: result.items.map((item) => ({
+      kind: item.kind,
+      hoursUnconfirmed: item.hoursUnconfirmed,
       activityId: item.activityId,
       card: item.card,
       startsAt: new Date(item.startsAtMs).toISOString(),
@@ -180,6 +187,7 @@ export async function runDayScenarioDraft(
     meta: {
       poolCache: hit ? "hit" : "miss",
       poolSize: pool.events.length,
+      poolPlaces: pool.placeCount,
       staleGeoCells: pool.staleGeoCells,
       candidateCount: result.candidateCount,
       buildMs: Math.round((performance.now() - started) * 10) / 10,
