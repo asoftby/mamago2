@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import prisma from "@/lib/prisma";
-import { createPartyDraft, updatePartyDraft } from "./partyDraft.service";
+import { createPartyDraft, readPartyOrder, updatePartyDraft } from "./partyDraft.service";
 import { submitPartyAnchor } from "./partySubmit.service";
 import { replyToPartyRequest } from "./partyBusiness.service";
 import { acceptPartyQuote } from "./partyQuoteAcceptance.service";
@@ -35,6 +35,36 @@ async function main() {
   const bizB = await prisma.business.findFirstOrThrow({ where: { owner: { email: "owner-b@it.test" } } });
   const ownerA = await prisma.user.findUniqueOrThrow({ where: { email: "owner-a@it.test" } });
   const ownerB = await prisma.user.findUniqueOrThrow({ where: { email: "owner-b@it.test" } });
+  const component = await prisma.packageComponent.create({
+    data: {
+      id: "it-component-" + key, packageId: "it-offer-pkg", category: "ANIMATOR",
+      title: "IT package animator", priceSnapshot: 90, position: 0,
+    },
+  });
+  const packageDraft = await createPartyDraft(parent.id, { citySlug: "minsk", venueMode: "PACKAGE" });
+  const withPackage = await updatePartyDraft(parent.id, packageDraft.id, {
+    version: packageDraft.version, anchorOfferId: "it-offer-pkg", addonOfferIds: ["it-offer-photo"],
+  });
+  const included = withPackage.items.find(item => item.packageComponentId === component.id);
+  assert.ok(included);
+  assert.deepEqual(included.packageComponentSnapshot, {
+    id: component.id, title: component.title, category: "ANIMATOR", refOfferId: null,
+    isOptional: false, priceSnapshot: "90.00", priceDelta: null,
+  });
+  assert.ok(withPackage.items.some(item => item.role === "INCLUDED" && item.category === "VENUE" && !item.packageComponentId));
+  assert.ok("estimate" in withPackage);
+  assert.deepEqual(withPackage.estimate, {
+    exactByn: 120, fromByn: 650, unknownCount: 0,
+    lines: [
+      { offerId: "it-offer-pkg", mode: "FROM", amount: 650 },
+      { offerId: "it-offer-photo", mode: "EXACT", amount: 120 },
+    ],
+  });
+  await prisma.packageComponent.update({ where: { id: component.id }, data: { title: "Updated", priceSnapshot: 115 } });
+  const reloaded = await readPartyOrder(parent.id, packageDraft.id);
+  assert.deepEqual(reloaded.items.find(item => item.id === included.id)?.packageComponentSnapshot, included.packageComponentSnapshot);
+  console.log("PASS package snapshot preserves original component and excludes its amount from the estimate");
+
   const seedOffer = await prisma.offer.findUniqueOrThrow({ where: { id: "it-offer-venue" } });
   // An isolated per-run offer keeps old test allocations/disabled resources
   // from influencing subsequent runs on the same local test cluster.

@@ -8,6 +8,15 @@ import {
   assertCompatibleSelection, includedCategories, offerPriceSnapshot, type CatalogOffer,
 } from "./partySelection";
 
+const draftComponentSelect = {
+  id: true, title: true, category: true, refOfferId: true,
+  isOptional: true, priceSnapshot: true, priceDelta: true,
+} satisfies Prisma.PackageComponentSelect;
+
+type DraftCatalogOffer = Omit<CatalogOffer, "components"> & {
+  components: Prisma.PackageComponentGetPayload<{ select: typeof draftComponentSelect }>[];
+};
+
 export async function createPartyDraft(ownerUserId: string, input: {
   citySlug: string; venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
 }) {
@@ -56,7 +65,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
 /** Fetch all selected offers using the same public visibility and approved BIRTHDAY placement. */
 export async function verifyPartyOffers(
   citySlug: string, offerIds: string[], tx?: Prisma.TransactionClient,
-): Promise<Map<string, CatalogOffer>> {
+): Promise<Map<string, DraftCatalogOffer>> {
   const city = await findCityBySlug(citySlug, { select: { id: true }, isActive: true });
   if (!city) throw new PartyApiError(422, "Город не найден");
   if (new Set(offerIds).size !== offerIds.length) {
@@ -74,7 +83,11 @@ export async function verifyPartyOffers(
       id: true, productType: true, category: true, partyLocationType: true,
       priceFrom: true, priceMode: true, currency: true, details: true,
       ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
-      components: { select: { category: true, isOptional: true } },
+      components: {
+        where: { archivedAt: null },
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: draftComponentSelect,
+      },
       place: { select: { ownerBusinessId: true } },
     },
   });
@@ -106,7 +119,7 @@ export async function updatePartyDraft(
   if (input.venueMode && input.venueMode !== existing.venueMode && !selectionChange) {
     throw new PartyApiError(422, "При смене формата выберите основное предложение заново");
   }
-  let anchor: CatalogOffer | null = null;
+  let anchor: DraftCatalogOffer | null = null;
   let addons: CatalogOffer[] = [];
   if (selectionChange && input.anchorOfferId) {
     const ids = [input.anchorOfferId, ...(input.addonOfferIds ?? [])];
@@ -159,13 +172,27 @@ export async function updatePartyDraft(
         });
         let position = 1;
         const included = includedCategories(anchor);
+        const components = anchor.productType === "PARTY_PACKAGE"
+          ? anchor.components.filter(component => !component.isOptional) : [];
+        const componentCategories = new Set(components.map(component => component.category));
         const selectedCategories = new Set(addons.map(addon => addon.category));
         const requestedCategories = input.addonCategories ?? [];
         if (requestedCategories.some(category => selectedCategories.has(category) || included.includes(category))) {
           throw new PartyApiError(422, "Услуга этой категории уже выбрана");
         }
         const remainingItems: Prisma.PartyOrderItemCreateManyInput[] = [
-          ...included.map(category => ({
+          ...components.map(component => ({
+            partyOrderId: partyId, category: component.category, businessId, parentItemId: anchorItem.id,
+            packageComponentId: component.id,
+            packageComponentSnapshot: {
+              id: component.id, title: component.title, category: component.category,
+              refOfferId: component.refOfferId, isOptional: component.isOptional,
+              priceSnapshot: component.priceSnapshot?.toFixed(2) ?? null,
+              priceDelta: component.priceDelta?.toFixed(2) ?? null,
+            },
+            role: "INCLUDED" as const, position: position++,
+          })),
+          ...included.filter(category => !componentCategories.has(category)).map(category => ({
             partyOrderId: partyId, category, businessId, parentItemId: anchorItem.id,
             role: "INCLUDED" as const, position: position++,
           })),

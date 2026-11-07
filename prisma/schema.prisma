@@ -3003,6 +3003,7 @@ model PackageComponent {
   isOptional    Boolean       @default(false)
   priceDelta    Decimal?      @db.Decimal(10, 2)
   position      Int
+  archivedAt    DateTime?
 
   partyOrderItems PartyOrderItem[]
 
@@ -5984,6 +5985,7 @@ model PartyOrderItem {
   offerId String?
   businessId String?
   packageComponentId String?
+  packageComponentSnapshot Json?
   role PartyItemRole
   parentItemId String?
   offerPriceSnapshot Decimal? @db.Decimal(10, 2)
