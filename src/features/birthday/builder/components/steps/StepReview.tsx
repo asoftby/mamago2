@@ -295,7 +295,7 @@ export function StepReview({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || hasPackageChanges || !offers.length || hasUnavailableSelection || (scope && restoreState !== "ready")) return;
+    if (busy || !offers.length || hasUnavailableSelection || (scope && restoreState !== "ready")) return;
     if (!authenticated) { requestLogin(); return; }
     if (needsNameInput && !recipientName) {
       setError("Укажите имя ребёнка");
@@ -315,7 +315,7 @@ export function StepReview({
         childName: recipientName, childAge: recipientAge,
         contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
-        addonCategories,
+        addonCategories, preservePackageComposition: hasPackageChanges,
       });
       forgetReviewDraft(scope);
       onSent();
@@ -425,7 +425,7 @@ export function StepReview({
         </div>}
       </section>}
       {hasPackageChanges && <p role="status" className="text-sm text-muted-foreground">
-        Изменения сохранены в черновике. Отправка изменённого пакета пока недоступна.
+        Изменение требует согласования стоимости. Запрос получит владелец пакета; услуги других исполнителей согласуются отдельно.
       </p>}
       {!authLoading && !authenticated && anchor && <Button type="button" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal" onClick={requestLogin}>
         Войти, чтобы редактировать и сохранить состав
@@ -544,8 +544,8 @@ export function StepReview({
           </p>
         )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <button type="submit" disabled={busy || hasPackageChanges || authLoading || !offers.length || hasUnavailableSelection || Boolean(scope && restoreState !== "ready")} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
-          {busy ? "Отправляем…" : authenticated ? "Отправить заявку основному исполнителю" : "Войти и отправить заявку"}
+        <button type="submit" disabled={busy || authLoading || !offers.length || hasUnavailableSelection || Boolean(scope && restoreState !== "ready")} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
+          {busy ? "Отправляем…" : authenticated ? hasPackageChanges ? "Запросить согласование пакета" : "Отправить заявку основному исполнителю" : "Войти и отправить заявку"}
         </button>
         <p className="text-center text-xs text-muted-foreground">Остальные исполнители получат заявки после согласования основного исполнителя.</p>
       </form>

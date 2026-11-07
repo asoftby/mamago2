@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - dev
+      - "feat/birthday-package-business-rules-*"
 
 jobs:
   typecheck:

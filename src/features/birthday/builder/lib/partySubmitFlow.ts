@@ -28,6 +28,7 @@ export type PartyFlowState = {
   rememberDraft?: (id: string) => void;
 };
 export type PartySubmissionInput = {
+  preservePackageComposition?: boolean;
   citySlug: string;
   venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   eventDate: string;
@@ -93,7 +94,8 @@ export async function submitBirthdayParty(
 ): Promise<void> {
   if (state.submitted) return;
   const fingerprint = JSON.stringify(input);
-  const { citySlug, venueMode, ...updates } = input;
+  const { citySlug, venueMode, preservePackageComposition, anchorOfferId, addonOfferIds, addonCategories, ...details } = input;
+  const updates = preservePackageComposition ? details : { ...details, anchorOfferId, addonOfferIds, addonCategories };
 
   // A failed HTTP response can mean the submit actually succeeded.
   // If the parent edited the form, check the order before rewriting the draft.

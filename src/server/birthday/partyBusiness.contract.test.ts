@@ -9,7 +9,8 @@ const good = {
   includes: "Аренда зала на 2 часа", prepaymentTerms: "Предоплата 50 BYN",
 };
 assert.equal(partyBusinessReplySchema.safeParse(good).success, true);
-assert.equal(partyBusinessReplySchema.safeParse({ ...good, priceByn: 0 }).success, false);
+assert.equal(partyBusinessReplySchema.safeParse({ ...good, priceByn: 350.001 }).success, false);
+assert.equal(partyBusinessReplySchema.safeParse({ ...good, priceByn: 0 }).success, true);
 assert.equal(partyBusinessReplySchema.safeParse({ ...good, priceByn: -1 }).success, false);
 assert.equal(partyBusinessReplySchema.safeParse({ ...good, priceByn: 350, customerPhone: "+375291234567" }).success, false);
 assert.equal(partyBusinessReplySchema.safeParse({ ...good, expectedStage: "QUOTED" }).success, false);

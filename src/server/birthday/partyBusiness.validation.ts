@@ -1,11 +1,15 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
+
+const quotePrice = z.number().finite().nonnegative().max(1_000_000)
+  .refine(value => new Prisma.Decimal(value).decimalPlaces() <= 2, "Не более двух знаков после запятой");
 
 export const partyBusinessReplySchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("AS_REQUESTED"),
     expectedStage: z.enum(["SENT", "AWAITING_RECONFIRM"]),
     expectedQuoteVersion: z.number().int().nonnegative(),
-    priceByn: z.number().positive().max(1_000_000),
+    priceByn: quotePrice,
     includes: z.string().trim().min(1).max(2000),
     durationMinutes: z.number().int().min(15).max(1440).optional(),
     prepaymentTerms: z.string().trim().max(2000).optional(),
@@ -15,7 +19,7 @@ export const partyBusinessReplySchema = z.discriminatedUnion("type", [
     type: z.literal("MODIFIED"),
     expectedStage: z.enum(["SENT", "AWAITING_RECONFIRM"]),
     expectedQuoteVersion: z.number().int().nonnegative(),
-    priceByn: z.number().positive().max(1_000_000),
+    priceByn: quotePrice,
     includes: z.string().trim().min(1).max(2000),
     durationMinutes: z.number().int().min(15).max(1440).optional(),
     changeReason: z.string().trim().min(5).max(2000),

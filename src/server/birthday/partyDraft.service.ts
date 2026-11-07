@@ -44,12 +44,12 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
           requests: {
             orderBy: { createdAt: "desc" },
             select: {
-              id: true, partyStage: true, responseDueAt: true,
+              id: true, partyStage: true, responseDueAt: true, bookingPriceSnapshot: true,
               partyQuotes: {
                 select: {
                   id: true, version: true, status: true, type: true,
                   priceByn: true, includes: true, changeReason: true,
-                  prepaymentTerms: true, cancellationTerms: true, validUntil: true,
+                  prepaymentTerms: true, cancellationTerms: true, validUntil: true, declineReason: true, declineComment: true,
                 },
                 orderBy: { version: "desc" },
               },

@@ -1,5 +1,6 @@
 "use client";
 
+import { PartyPackageBrief } from "@/components/birthday/PartyPackageBrief";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, CheckCheck, Clock3, PartyPopper } from "lucide-react";
@@ -28,7 +29,8 @@ export function BookingsInbox() {
   const kind = parseInboxKind(searchParams.get("kind"));
 
   const [response, setResponse] = useState<{ query: string; result: InboxResponse } | null>(null);
-  const query = tab + ":" + kind;
+  const requestId = searchParams.get("request")?.slice(0, 128) ?? "";
+  const query = tab + ":" + kind + ":" + requestId;
   const data = response?.query === query ? response.result : null;
   const [standardId, setStandardId] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>("loading");
@@ -41,16 +43,16 @@ export function BookingsInbox() {
   const load = useCallback(async () => {
     const seq = ++requestSeq.current;
     try {
-      const res = await fetch(`/api/business/bookings/inbox?tab=${tab}&kind=${kind}`, { cache: "no-store" });
+      const res = await fetch(`/api/business/bookings/inbox?tab=${tab}&kind=${kind}${requestId ? "&request=" + encodeURIComponent(requestId) : ""}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as InboxResponse;
       if (seq !== requestSeq.current) return; // устаревший ответ после смены вкладки
-      setResponse({ query: tab + ":" + kind, result: json });
+      setResponse({ query: tab + ":" + kind + ":" + requestId, result: json });
       setState("ready");
     } catch {
       if (seq === requestSeq.current) setState("error");
     }
-  }, [tab, kind]);
+  }, [tab, kind, requestId]);
 
   useEffect(() => {
     setState("loading");
@@ -64,6 +66,7 @@ export function BookingsInbox() {
 
   const navigate = (next: { tab?: string; kind?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("request");
     params.set("tab", next.tab ?? tab);
     params.set("kind", next.kind ?? kind);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -75,6 +78,7 @@ export function BookingsInbox() {
 
   return (
     <div className="space-y-4" data-testid="bookings-inbox">
+      {requestId ? <p className="text-sm text-muted-foreground">Заявка по прямой ссылке. <button className="underline" onClick={() => navigate({})}>Все заявки</button></p> : null}
       <div role="tablist" aria-label="Раздел заявок" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {INBOX_TABS.map((t) => {
           const active = t.tab === tab;
@@ -136,7 +140,7 @@ export function BookingsInbox() {
       {data && state === "ready" ? (
         items.length === 0 ? (
           <EmptyInbox tab={tab} data={data} />
-        ) : tab === "action" ? (
+        ) : tab === "action" && !requestId ? (
           <div className="space-y-6">
             {waiting.length > 0 ? (
               <InboxSection title="Клиент ждёт" count={waiting.length}>
@@ -269,6 +273,7 @@ function InboxCard({
         </div>
         {primary ? <div className="shrink-0">{primary}</div> : null}
       </div>
+      {item.packageScope ? <div className="mt-3"><PartyPackageBrief scope={item.packageScope} /></div> : null}
     </article>
   );
 }

@@ -1,3 +1,4 @@
+import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import "server-only";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
@@ -14,6 +15,7 @@ export interface BusinessInboxOptions {
   kind?: BusinessInboxKind;
   limit?: number;
   now?: Date;
+  requestId?: string;
 }
 
 /** Дата без времени считается до конца дня по Минску (не закрываем посещение утром). */
@@ -71,13 +73,14 @@ function mapDecision(row: InboxRow, now: Date) {
 }
 
 export async function getBusinessInbox({
-  businessId, bucket = "ACTION_REQUIRED", kind = "all", limit = 100, now = new Date(),
+  businessId, bucket = "ACTION_REQUIRED", kind = "all", limit = 100, now = new Date(), requestId,
 }: BusinessInboxOptions) {
   // Scan every booking for exact deadline-dependent counts. Only one page and
   // bounded top-K rows are retained; a LIMIT on the initial query would change
   // bucket membership and badge counts for businesses with long histories.
+  const focused = requestId ? await prisma.bookingRequest.findFirst({ where: { id: requestId, businessId }, select: { ...INBOX_SELECT, bookingPriceSnapshot: true } }) : null;
   const result = await scanBusinessInboxPages({
-    fetchPage: (cursor?: string) => prisma.bookingRequest.findMany({
+    fetchPage: (cursor?: string) => requestId ? Promise.resolve(!cursor && focused ? [focused] : []) : prisma.bookingRequest.findMany({
       where: { businessId },
       select: INBOX_SELECT,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -85,12 +88,20 @@ export async function getBusinessInbox({
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     }),
     classify: (row: InboxRow) => mapDecision(row, now),
-    bucket, kind, limit,
+    bucket: focused ? mapDecision(focused, now).decision.bucket : bucket, kind, limit,
   });
 
+  // Read potentially large immutable briefs only for the bounded displayed rows,
+  // never for the full historical scan used to classify deadline badges.
+  const selectedIds = result.items.filter(({ row }) => row.kind === "PARTY").map(({ row }) => row.id);
+  const briefs = focused ? [focused] : selectedIds.length ? await prisma.bookingRequest.findMany({
+    where: { businessId, id: { in: selectedIds } }, select: { id: true, bookingPriceSnapshot: true },
+  }) : [];
+  const scopes = new Map(briefs.map(row => [row.id, readPackageChangeScope(row.bookingPriceSnapshot)]));
   return {
     items: result.items.map(({ row, decision, serviceEndsAt }) => ({
       id: row.id,
+      packageScope: scopes.get(row.id) ?? null,
       kind: row.kind,
       status: row.status,
       partyStage: row.partyStage,

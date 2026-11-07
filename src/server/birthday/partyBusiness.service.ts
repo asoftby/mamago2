@@ -1,3 +1,5 @@
+import { lockPartyRequestGroup } from "./partyRequestLock";
+import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import { BookingKind, BookingStatus, PartyItemStatus, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
@@ -80,7 +82,7 @@ export async function replyToPartyRequest(params: {
   const existing = await prisma.bookingRequest.findFirst({
     where: { id: requestId, businessId, kind: BookingKind.PARTY },
     select: {
-      id: true, createdAt: true, partyStage: true, lastActivityAt: true,
+      id: true, createdAt: true, partyStage: true, lastActivityAt: true, bookingPriceSnapshot: true,
       firstResponseAt: true, responseDueAt: true, partyOrderItemId: true, offerId: true,
       partyOrderItem: {
         select: {
@@ -135,10 +137,16 @@ export async function replyToPartyRequest(params: {
   }
   const version = (existing.partyQuotes[0]?.version ?? 0) + 1;
   const declined = input.type === "DECLINED";
+  const packageScope = readPackageChangeScope(existing.bookingPriceSnapshot);
+  if (packageScope && input.type === "AS_REQUESTED" &&
+      (packageScope.requestedPrice.mode !== "EXACT" || packageScope.requestedPrice.amountByn === null ||
+       !new Prisma.Decimal(packageScope.requestedPrice.amountByn).equals(input.priceByn))) {
+    throw new PartyApiError(422, "Укажите новую стоимость и условия изменённого пакета");
+  }
   const from = clockMinutes(order.timeFrom);
   const to = clockMinutes(order.timeTo);
   // With confirmations switched off the reply is still recorded, but only as a QUOTED offer.
-  const fixedPrice = !declined && isPartyConfirmationEnabled() && isAutoConfirmMode(order.venueMode) &&
+  const fixedPrice = !packageScope && !declined && isPartyConfirmationEnabled() && isAutoConfirmMode(order.venueMode) &&
     !item.confirmedBookingRequestId && isFixedPriceReply({
       type: input.type, pricingMode: item.pricingMode, snapshot: item.offerPriceSnapshot,
       priceByn: input.priceByn, replyDurationMinutes: input.durationMinutes,
@@ -159,9 +167,8 @@ export async function replyToPartyRequest(params: {
 
   try {
     return await prisma.$transaction(async (tx) => {
-      // Lock the request before any resource, in the same order as confirmPartyRequest,
-      // quote acceptance and expiry: concurrent paths must conflict (409), not deadlock.
-      await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE`;
+      // Lock competing requests before resources, consistently with confirmation/decisions.
+      await lockPartyRequestGroup(tx, requestId);
       let performerWindow: PartyUnitWindow | null = null;
       // Automatic confirmation skips confirmPartyRequest, so repeat its live check:
       // a withdrawn or reassigned publication must not become a confirmed booking.

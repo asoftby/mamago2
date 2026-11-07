@@ -30,14 +30,15 @@ export function partyOutboxCopy(params: {
   type: PartyOutboxEventType;
   offerTitle: string;
   dateLabel: string;
+  packageChange?: boolean;
 }) {
   switch (params.type) {
     case "PARTY_REQUEST_SENT":
       return {
         type: "BOOKING_CREATED" as const,
         audience: "BUSINESS" as const,
-        title: "Новая заявка на праздник",
-        body: "Новая заявка на «" + params.offerTitle + "» на " + params.dateLabel +
+        title: params.packageChange ? "Запрос на изменение пакета" : "Новая заявка на праздник",
+        body: (params.packageChange ? "Родитель запросил изменение пакета «" : "Новая заявка на «") + params.offerTitle + "» на " + params.dateLabel +
           ". Ответьте в разделе «Праздники».",
         actionUrl: "/business/bookings?tab=action&kind=party",
       };
@@ -135,4 +136,11 @@ export function inboxLinkedEventTypes(): PartyOutboxEventType[] {
 
 export function heldPartyOutboxEventTypes(env: Readonly<Record<string, string | undefined>>): PartyOutboxEventType[] {
   return env.BUSINESS_BOOKINGS_INBOX_UI === "true" ? [] : inboxLinkedEventTypes();
+}
+
+/** IDs are contextual links only; each destination rechecks the current account's ACL. */
+export function partyOutboxActionUrl(type: PartyOutboxEventType, requestId: string, orderId: string): string {
+  return isBusinessPartyEvent(type)
+    ? "/business/bookings?tab=action&kind=party&request=" + encodeURIComponent(requestId)
+    : "/me/birthdays/" + encodeURIComponent(orderId);
 }

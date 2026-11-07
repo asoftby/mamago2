@@ -1,5 +1,8 @@
 "use client";
 
+import { PartyPackageBrief } from "@/components/birthday/PartyPackageBrief";
+import type { PackageChangeScope } from "@/lib/birthday/packageChangeScope";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -25,12 +28,16 @@ export type PartyOrderScreenData = {
     request: {
       id: string;
       partyStage: string | null;
+      packageScope?: PackageChangeScope | null;
       quote: {
         id: string;
         version: number;
         status: string;
         priceByn: string | null;
         includes: string | null;
+        changeReason?: string | null;
+        declineReason?: string | null;
+        declineComment?: string | null;
         prepaymentTerms: string | null;
         cancellationTerms: string | null;
         validUntil: string | null;
@@ -52,7 +59,7 @@ const stageLabels: Record<string, string> = {
 };
 
 const orderNotices: Record<string, string> = {
-  NEEDS_ALTERNATIVE: "Основной исполнитель не подтвердил праздник. Можно выбрать другой вариант или отменить праздник.",
+  NEEDS_ALTERNATIVE: "Основная услуга не подтверждена. Можно выбрать другой вариант или отменить праздник.",
   CANCELLED: "Праздник отменён. Заявки исполнителям закрыты.",
 };
 
@@ -84,13 +91,13 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
     }
   };
 
-  const accept = async (requestId: string, quoteId: string, expectedVersion: number) => {
+  const accept = async (requestId: string, quoteId: string, expectedVersion: number, decision = "accept") => {
     if (pending) return;
     setPending(quoteId);
     setError(null);
     try {
       const res = await fetch(
-        `/api/parent/parties/${encodeURIComponent(party.id)}/quotes/${encodeURIComponent(quoteId)}/accept`,
+        `/api/parent/parties/${encodeURIComponent(party.id)}/quotes/${encodeURIComponent(quoteId)}/${decision}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -166,8 +173,13 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                     </span>
                   ) : null}
                 </div>
+                {item.request?.packageScope ? <PartyPackageBrief scope={item.request.packageScope} /> : null}
+                {stage === "DECLINED" && quote ? <p className="text-sm text-muted-foreground">
+                  Причина отказа: {quote.declineComment || ({ DATE_BUSY: "Дата занята", BUDGET: "Не подходит бюджет", FORMAT: "Не подходит формат", NOT_ENOUGH_TIME: "Недостаточно времени на подготовку", OTHER: "Другие условия" } as Record<string, string>)[quote.declineReason ?? ""] || "Уточните у исполнителя"}
+                </p> : null}
                 {quote && (isAvailable || stage === "AWAITING_RECONFIRM" || confirmed) ? (
                   <div className="space-y-2 rounded-xl bg-muted/50 p-3 text-sm">
+                    {quote.changeReason ? <p><span className="font-medium">Изменения исполнителя:</span> {quote.changeReason}</p> : null}
                     {quote.includes ? <p><span className="font-medium">Включено:</span> {quote.includes}</p> : null}
                     {quote.prepaymentTerms ? <p><span className="font-medium">Предоплата:</span> {quote.prepaymentTerms}</p> : null}
                     {quote.cancellationTerms ? <p><span className="font-medium">Отмена:</span> {quote.cancellationTerms}</p> : null}
@@ -179,7 +191,7 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                   </div>
                 ) : null}
                 {isAvailable && item.request && quote ? (
-                  <button
+                  <div className="flex flex-wrap gap-2"><button
                     type="button"
                     disabled={Boolean(pending)}
                     className={cn("inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground",
@@ -188,6 +200,8 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                   >
                     {pending === quote.id ? "Принимаем…" : "Принять предложение"}
                   </button>
+                  <Button type="button" variant="outline" disabled={Boolean(pending)}
+                    onClick={() => void accept(item.request!.id, quote.id, quote.version, "reject")}>Отклонить предложение</Button></div>
                 ) : null}
               </section>
             );
