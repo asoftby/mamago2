@@ -28,6 +28,7 @@ export default defineConfig({
     "ops/legacy-routes-article-media-backfill":
       "scripts/legacy-routes-article-media-backfill.ts",
     "ops/family-core-backfill": "scripts/family-core-backfill.ts",
+    "ops/seed-day-scenario-mocks": "scripts/ops/seed-day-scenario-mocks.ts",
   },
   format: ["cjs"],
   platform: "node",

@@ -112,6 +112,14 @@ async function main() {
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", mode: "bike" }).success, false);
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", targetCount: 9 }).success, false);
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", ageRanges: ["3-5"] }).success, true);
+  // planning window: defaults 09:00-20:00, narrowable (e.g. a weekday 16:00-20:00), at least an hour wide
+  assert.deepEqual([ok.dayStart, ok.dayEnd], ["09:00", "20:00"]);
+  const weekday = draftRequestSchema.parse({ date: "2026-11-11", dayStart: "16:00", dayEnd: "20:00" });
+  assert.deepEqual([weekday.dayStart, weekday.dayEnd], ["16:00", "20:00"]);
+  assert.equal(draftRequestSchema.safeParse({ date: "2026-11-11", dayStart: "19:30", dayEnd: "20:00" }).success, false, "window shorter than an hour");
+  assert.equal(draftRequestSchema.safeParse({ date: "2026-11-11", dayStart: "20:00", dayEnd: "16:00" }).success, false, "end before start");
+  assert.equal(draftRequestSchema.safeParse({ date: "2026-11-11", dayStart: "9:00" }).success, false, "HH:MM only");
+  assert.equal(draftRequestSchema.safeParse({ date: "2026-11-11", dayEnd: "24:00" }).success, false);
 
   // --- filler places ---
   const DAY = "2026-11-14"; // Saturday

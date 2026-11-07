@@ -163,3 +163,14 @@ replace) и in-memory `TravelEstimator`; загрузчик пула и TTL-кэ
 Вывод по замеру: из-за «не больше одного места без категории» при 87 % мест без
 категории пеший сценарий почти не наполняется (категоризировано ~13 % мест) — это
 прямое следствие данных, а не ошибка движка (BACKLOG-234).
+
+## 8. Повторяющиеся события: аудит разворота (2026-11-07)
+
+**Что уже есть в коде (переиспользовать, не дублировать):**
+- `src/lib/event/materializeScheduleSessions.ts`: `extractScheduleOccurrences(scheduleJson)` разворачивает `scheduleJson` (даты, `scheduleItems` с `recurringEnabled` / `recurrenceInterval` / `recurrenceUnit` day|week|month|year / `recurrenceUntil`, поля `repeat*`) в конкретные даты и время; `materializeEventScheduleSessions` строит из них сеансы. Календарная арифметика без часовых поясов, предел периодов 10 000.
+- `src/lib/business/syncEventActivitySessions.ts`: `replaceActivitySessionsFromScheduleJson` записывает развёрнутые сеансы в `ActivitySession` при сохранении события бизнесом; `scripts/resync-event-sessions-from-schedule-json.ts` (ops, `--apply`) находит и чинит расхождения `scheduleJson` ↔ сеансы по отпечатку.
+- Афиша без даты показывает `ALWAYS` / `ON_DEMAND` без `nextOccurrenceAt` (`buildKudaDiscoveryWhere`, окно по умолчанию), классификация (`getActivitySections`) относит `RECURRING` к разделу «Занятия» и `PERMANENT` + `ON_DEMAND/ALWAYS` к «Всегда рядом».
+
+**Датированная афиша не показывает такие события — так задумано, не баг.** При явной дате фильтр `buildEventRuntimeWhere` требует хотя бы один не снятый `ActivitySession` в этом дне (виртуальный разворот включается только флагом `includeNextOccurrenceWithoutSessions` для превью главной). События `RECURRING` по правилам классификации живут в «Занятиях», а `ALWAYS` / `ON_DEMAND` — в «Всегда рядом» и в афише без даты.
+
+**Реальный пробел (не баг афиши):** событие с `scheduleJson` без материализованных сеансов (старый импорт, правка мимо `replaceActivitySessionsFromScheduleJson`) не видно ни в датированной афише, ни в пуле сценария. Для сценария нужен тот же разворот: для события без сеанса на дату брать `extractScheduleOccurrences(scheduleJson)` и, если дата совпала, добавлять в пул «виртуальный сеанс» (`virtual: true`, время по расписанию, пометка «время по расписанию, уточните»). Объём событий без сеансов на PROD покажет раздел A2 запроса `scripts/sql/readonly/catalog-coverage-v2.sql`; мок-каталог содержит `RECURRING` без `ActivitySession` как тест. Реализация — после мок-прогонов, отдельным PR.
