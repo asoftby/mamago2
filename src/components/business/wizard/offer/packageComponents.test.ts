@@ -20,5 +20,5 @@ const rows = packageComponentInputSchema.parse(base.packageComponents);
 assert.doesNotThrow(() => validatePackageCredits(rows, "EXACT", 500));
 assert.throws(() => validatePackageCredits(rows, "FROM", 500));
 assert.throws(() => validatePackageCredits(rows, "EXACT", 49));
-assert.ok(!("includedCategories" in (buildOfferUpdatePayload(base).details ?? {})));
+assert.equal((buildOfferUpdatePayload(base).details as Record<string, unknown> | undefined)?.includedCategories, undefined);
 console.log("PASS package rules payload and price semantics");
