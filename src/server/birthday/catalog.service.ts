@@ -18,7 +18,7 @@ export async function getPublicBirthdayCatalog(citySlug: string, limit = BIRTHDA
       placeId: true, coverImage: true, priceFrom: true, priceMode: true, currency: true,
       ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
       partyLocationType: true, details: true,
-      components: { select: { category: true, isOptional: true } },
+      components: { where: { archivedAt: null }, select: { category: true, isOptional: true } },
       place: { select: { title: true, ownerBusiness: { select: { id: true, name: true } } } },
     },
     orderBy: [{ publishedAt: "desc" }, { id: "asc" }],

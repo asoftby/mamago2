@@ -6,6 +6,7 @@ import { replyToPartyRequest } from "./partyBusiness.service";
 import { acceptPartyQuote } from "./partyQuoteAcceptance.service";
 import { confirmPartyRequest } from "./partyConfirm.service";
 import { listPartyConfirmChoices } from "./partyConfirmChoices.service";
+import { getPublicBirthdayCatalog } from "./catalog.service";
 import { PartyApiError } from "./partyDraft.validation";
 
 const url = new URL(process.env.DATABASE_URL ?? "http://invalid");
@@ -48,10 +49,17 @@ async function main() {
     { packageId: "it-offer-pkg", category: "SHOW", title: "Quote required", position: 3, removalPolicy: "REMOVABLE_QUOTE_REQUIRED" },
     { packageId: "it-offer-pkg", category: "CAKE", title: "Legacy", position: 4 },
   ] });
+  const archived = await prisma.packageComponent.create({ data: {
+    packageId: "it-offer-pkg", category: "OTHER", title: "Archived service", position: 5, archivedAt: new Date(),
+  } });
+  const catalogPackage = (await getPublicBirthdayCatalog("minsk"))?.find(offer => offer.id === "it-offer-pkg");
+  assert.ok(catalogPackage);
+  assert.ok(!catalogPackage.includedCategories.includes("OTHER"));
   const packageDraft = await createPartyDraft(parent.id, { citySlug: "minsk", venueMode: "PACKAGE" });
   const withPackage = await updatePartyDraft(parent.id, packageDraft.id, {
     version: packageDraft.version, anchorOfferId: "it-offer-pkg", addonOfferIds: ["it-offer-photo"],
   });
+  assert.ok(!withPackage.items.some(item => item.packageComponentId === archived.id));
   const included = withPackage.items.find(item => item.packageComponentId === component.id);
   assert.ok(included);
   assert.deepEqual(included.packageComponentSnapshot, {
