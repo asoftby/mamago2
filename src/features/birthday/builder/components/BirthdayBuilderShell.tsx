@@ -287,6 +287,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             offers={selectedOffers}
             selectedBaseId={state.selection.selectedBaseId}
             onCompositionSaved={setCompositionSaved}
+            replacementCatalog={visibleOffers}
             candidates={eligibleAddons(visibleOffers, state.selection.selectedBaseId, state.quiz.placeType)}
             ownerId={builder.submissionOwnerId}
             restoredRecipient={builder.restoredRecipient}

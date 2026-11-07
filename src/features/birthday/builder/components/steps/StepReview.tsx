@@ -12,6 +12,7 @@ import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 type Props = {
   offers: BirthdayCatalogItem[];
   candidates: BirthdayCatalogItem[];
+  replacementCatalog?: BirthdayCatalogItem[];
   selectedBaseId: string | null;
   onCompositionSaved: (saved: boolean) => void;
   ownerId: string | null;
@@ -44,7 +45,7 @@ function forgetReviewDraft(scope: string | null) {
 }
 
 export function StepReview({
-  offers: initialOffers, candidates, ownerId, restoredRecipient, selectedBaseId, onCompositionSaved, addonCategories: initialCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso, statedAgeYears,
+  offers: initialOffers, candidates, replacementCatalog = candidates, ownerId, restoredRecipient, selectedBaseId, onCompositionSaved, addonCategories: initialCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso, statedAgeYears,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const anchor = initialOffers[0];
@@ -52,13 +53,27 @@ export function StepReview({
   const [review, setReview] = useState<PartyReviewDraft | null>(null);
   const [restoreState, setRestoreState] = useState<"loading" | "ready" | "error">("loading");
   const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [packageReplacement, setPackageReplacement] = useState<string | null>(null);
+  const [packageOfferId, setPackageOfferId] = useState("");
   const [replacementId, setReplacementId] = useState<string | null>(null);
   const [candidateId, setCandidateId] = useState("");
   const [updatedAge, setUpdatedAge] = useState("");
   const [updatedName, setUpdatedName] = useState("");
+  const packageItems = review?.items.filter(item => item.role === "INCLUDED") ?? [];
+  const hasPackageChanges = packageItems.some(item => item.packageComponentChange);
+  const originalPackagePrice = review?.items.find(item => item.role === "ANCHOR")?.offerPriceSnapshot;
+  const pendingReplacementIds = new Set(packageItems.flatMap(item => {
+    const change = item.packageComponentChange;
+    return change?.requiresQuote && change.replacementOfferId ? [change.replacementOfferId] : [];
+  }));
+  const replacementTarget = packageItems.find(item => item.id === packageReplacement);
+  const packageChoices = replacementTarget ? replacementCatalog.filter(offer =>
+    offer.category === replacementTarget.category && offer.productType === "PARTY_SERVICE" &&
+    offer.category !== "VENUE" && offer.businessId !== anchor?.businessId &&
+    !review?.items.some(item => item.offerId === offer.id)) : [];
   const savedIds = review?.items.filter(item => item.role === "STANDALONE").map(item => item.offerId);
   const offers = anchor && savedIds ? [anchor, ...savedIds.flatMap(id => {
-    const offer = candidates.find(candidate => candidate.id === id) ?? initialOffers.find(candidate => candidate.id === id);
+    const offer = candidates.find(candidate => candidate.id === id) ?? replacementCatalog.find(candidate => candidate.id === id) ?? initialOffers.find(candidate => candidate.id === id);
     return offer ? [offer] : [];
   })] : initialOffers;
   const hasUnavailableSelection = Boolean(savedIds && anchor && savedIds.length !== offers.length - 1);
@@ -75,7 +90,7 @@ export function StepReview({
       : catalogPriceLabel(offer);
   }
   const total = estimate
-    ? { minimumByn: estimate.exactByn + estimate.fromByn, hasUnknownPrices: estimate.unknownCount > 0 }
+    ? { minimumByn: estimate.minimumByn, hasUnknownPrices: estimate.unknownCount > 0 }
     : catalogPriceSummary(offers);
   const budgetWarning = partyBudgetWarning(total, maxBudget);
   const [date, setDate] = useState(dateIso ?? calendarDateKeyToIso(quizDateKey) ?? "");
@@ -144,8 +159,30 @@ export function StepReview({
     return () => { active = false; };
   }, [scope, sent, flowStateRef, onSent, onCompositionSaved, restoreAttempt]);
 
+  async function changeIncluded(itemId: string, replacementOfferId?: string, undo?: true) {
+    const flow = flowStateRef.current;
+    if (!flow.draft || flow.pending || busy || restoreState !== "ready") return;
+    onBusyChange(true);
+    setError(null);
+    try {
+      const updated = await partyRequest<PartyReviewDraft>("/api/parent/parties/" + encodeURIComponent(flow.draft.id), "PATCH", {
+        version: flow.draft.version, packageChange: { itemId, replacementOfferId, undo },
+      });
+      flow.draft = updated;
+      setReview(updated);
+      setPackageReplacement(null);
+      setPackageOfferId("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось сохранить изменение");
+      setRestoreState("loading");
+      setRestoreAttempt(value => value + 1);
+    } finally {
+      onBusyChange(false);
+    }
+  }
+
   async function changeComposition(ids: string[]) {
-    if (!anchor || busy || restoreState !== "ready") return;
+    if (!anchor || busy || hasPackageChanges || restoreState !== "ready") return;
     onBusyChange(true);
     setError(null);
     const selectedCategories = new Set(candidates.filter(offer => ids.includes(offer.id)).map(offer => offer.category));
@@ -258,7 +295,7 @@ export function StepReview({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !offers.length || hasUnavailableSelection || (scope && restoreState !== "ready")) return;
+    if (busy || hasPackageChanges || !offers.length || hasUnavailableSelection || (scope && restoreState !== "ready")) return;
     if (!authenticated) { requestLogin(); return; }
     if (needsNameInput && !recipientName) {
       setError("Укажите имя ребёнка");
@@ -323,6 +360,9 @@ export function StepReview({
             <div className="min-w-0">
               <p className="text-sm text-stone-500">{offer.businessName}</p>
               <h3 className="font-semibold">{offer.title}</h3>
+              {pendingReplacementIds.has(offer.id) && <p className="text-sm text-muted-foreground">
+                Предлагаемая замена. Изменение требует согласования стоимости
+              </p>}
               {offer.productType === "PARTY_PACKAGE" && offer.includedCategories.length > 0 && (
                 <p className="mt-1 text-xs text-stone-500">Включено несколько услуг в пакет</p>
               )}
@@ -330,7 +370,7 @@ export function StepReview({
             <div className="min-w-0 break-words font-semibold">
               {priceLabel(offer)}
             </div>
-            {index > 0 && scope && <div className="flex w-full flex-wrap gap-2">
+            {index > 0 && scope && !hasPackageChanges && <div className="flex w-full flex-wrap gap-2">
               <Button type="button" variant="outline" disabled={busy || restoreState !== "ready"}
                 onClick={() => { setReplacementId(offer.id); setCandidateId(""); }}>Заменить</Button>
               <Button type="button" variant="ghost" disabled={busy || restoreState !== "ready"}
@@ -340,6 +380,53 @@ export function StepReview({
           </div>
         ))}
       </div>
+      {packageItems.length > 0 && <section className="space-y-3" aria-label="Состав пакета">
+        <h3 className="font-semibold">Состав пакета</h3>
+        {hasPackageChanges && originalPackagePrice != null && <p className="text-sm text-muted-foreground">
+          Исходная цена пакета: {originalPackagePrice} BYN
+        </p>}
+        {packageItems.map(item => {
+          const policy = item.packageComponentSnapshot?.removalPolicy;
+          const changed = item.packageComponentChange;
+          const quote = !policy || policy === "REMOVABLE_QUOTE_REQUIRED";
+          const disabled = busy || restoreState !== "ready";
+          return <div key={item.id} className="space-y-2 rounded-md border border-border p-3">
+            <p className="break-words font-medium">{item.packageComponentSnapshot?.title ?? item.category}</p>
+            <p className="text-sm text-muted-foreground">{changed
+              ? changed.requiresQuote ? "Изменение требует согласования стоимости" : "Исключение сохранено в черновике"
+              : policy === "REQUIRED" ? "Обязательный компонент пакета"
+                : quote ? "Входит в пакет. Изменение требует согласования стоимости"
+                  : policy === "REMOVABLE_NO_REFUND" ? "Входит в пакет. При удалении цена сохранится"
+                    : "Входит в пакет. Уменьшение: " + item.packageComponentSnapshot?.removalCreditByn + " BYN"}</p>
+            {changed ? <Button type="button" variant="ghost" disabled={disabled}
+              onClick={() => void changeIncluded(item.id, undefined, true)}>Вернуть компонент</Button>
+              : policy !== "REQUIRED" && <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" disabled={disabled}
+                  onClick={() => void changeIncluded(item.id)}>{quote ? "Сохранить запрос" : "Убрать"}</Button>
+                <Button type="button" variant="ghost" disabled={disabled}
+                  onClick={() => { setPackageReplacement(item.id); setPackageOfferId(""); }}>Заменить</Button>
+              </div>}
+          </div>;
+        })}
+        {replacementTarget && <div className="grid min-w-0 grid-cols-1 gap-2">
+          <label className="grid min-w-0 grid-cols-1 gap-2">
+            Услуга другого исполнителя
+            <select className="w-full min-w-0 rounded-md border border-border bg-background p-2 text-base"
+              value={packageOfferId} onChange={event => setPackageOfferId(event.target.value)}>
+              <option value="">Выберите услугу</option>
+              {packageChoices.map(offer => <option key={offer.id} value={offer.id}>{offer.title} · {catalogPriceLabel(offer)}</option>)}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" disabled={!packageOfferId || busy}
+              onClick={() => void changeIncluded(replacementTarget.id, packageOfferId)}>Сохранить замену</Button>
+            <Button type="button" variant="ghost" onClick={() => setPackageReplacement(null)}>Отмена</Button>
+          </div>
+        </div>}
+      </section>}
+      {hasPackageChanges && <p role="status" className="text-sm text-muted-foreground">
+        Изменения сохранены в черновике. Отправка изменённого пакета пока недоступна.
+      </p>}
       {!authLoading && !authenticated && anchor && <Button type="button" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal" onClick={requestLogin}>
         Войти, чтобы редактировать и сохранить состав
       </Button>}
@@ -353,12 +440,12 @@ export function StepReview({
         Не удалось восстановить черновик.
         <Button type="button" variant="outline" onClick={() => setRestoreAttempt(value => value + 1)}>Повторить</Button>
       </div>}
-      {hasUnavailableSelection && <div role="alert">
+      {hasUnavailableSelection && !hasPackageChanges && <div role="alert">
         Некоторые сохранённые услуги больше не доступны.
         <Button type="button" variant="outline" disabled={busy || restoreState !== "ready"}
           onClick={() => void changeComposition(offers.slice(1).map(offer => offer.id))}>Убрать недоступные</Button>
       </div>}
-      {scope && anchor && candidates.some(offer => !offers.some(selected => selected.id === offer.id)) && (
+      {scope && anchor && !hasPackageChanges && candidates.some(offer => !offers.some(selected => selected.id === offer.id)) && (
         <div className="grid min-w-0 grid-cols-1 gap-2">
           <label className="grid min-w-0 grid-cols-1 gap-2">
             {replacementId ? "Новая услуга взамен выбранной" : "Дополнительная услуга"}
@@ -457,7 +544,7 @@ export function StepReview({
           </p>
         )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <button type="submit" disabled={busy || authLoading || !offers.length || hasUnavailableSelection || Boolean(scope && restoreState !== "ready")} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
+        <button type="submit" disabled={busy || hasPackageChanges || authLoading || !offers.length || hasUnavailableSelection || Boolean(scope && restoreState !== "ready")} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
           {busy ? "Отправляем…" : authenticated ? "Отправить заявку основному исполнителю" : "Войти и отправить заявку"}
         </button>
         <p className="text-center text-xs text-muted-foreground">Остальные исполнители получат заявки после согласования основного исполнителя.</p>
