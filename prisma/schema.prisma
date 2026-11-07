@@ -1790,6 +1790,9 @@ model Place {
   territory Territory? @relation("PlaceTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   lat                          Float?
   lng                          Float?
+  /// Geohash-6 / geohash-5 of (lat, lng); maintained by the Prisma place extension, null without coordinates.
+  geoCell6                     String? @db.VarChar(6)
+  geoCell5                     String? @db.VarChar(5)
   phone                        String?
   phoneLabel                   String?
   phone2                       String?
