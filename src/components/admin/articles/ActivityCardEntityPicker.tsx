@@ -25,6 +25,7 @@ type EntityPreviewPayload = {
   placeName?: string | null;
   address?: string | null;
   publicAvailable?: boolean;
+  availability?: "public" | "draft" | "unavailable";
 };
 
 type SearchResult = {
@@ -216,7 +217,13 @@ export function ActivityCardEntityPicker({
           {preview ? (
             <>
               <p className="font-medium text-gray-900 leading-snug">{preview.title}</p>
-              {entityType === "PLACE" && preview.publicAvailable === false ? (
+              {entityType === "PLACE" && preview.availability === "draft" ? (
+                <p className="text-xs font-medium text-amber-800">
+                  Черновик: связь сохранена, читатели увидят карточку после публикации места
+                </p>
+              ) : entityType === "PLACE" &&
+                (preview.availability === "unavailable" ||
+                  (preview.availability === undefined && preview.publicAvailable === false)) ? (
                 <p role="alert" className="text-xs font-medium text-amber-800">Место недоступно</p>
               ) : null}
               {(preview.placeName || preview.city || preview.address) ? (

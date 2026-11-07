@@ -46,6 +46,32 @@ export function resolveBreakingNewsExpiresAtOnPublish(expiresAt: Date | null, pu
     : defaultBreakingNewsExpiresAt(publishedAt);
 }
 
+/**
+ * Даты при публикации/повторной публикации статьи.
+ * Уже опубликованная статья (повторный /submit, «Опубликовать изменения») сохраняет
+ * исходные publishedAt и expiresAt: иначе правка поднимает новость в ленте и
+ * продлевает срок её актуальности.
+ */
+export function resolvePublishTimestamps(
+  current: {
+    status: string;
+    publishedAt: Date | null;
+    expiresAt: Date | null;
+    publicationType: ArticlePublicationType;
+  },
+  now: Date,
+): { publishedAt: Date; expiresAt?: Date | null } {
+  if (current.status === "PUBLISHED" && current.publishedAt) {
+    return { publishedAt: current.publishedAt };
+  }
+  return {
+    publishedAt: now,
+    ...(current.publicationType === "BREAKING_NEWS"
+      ? { expiresAt: resolveBreakingNewsExpiresAtOnPublish(current.expiresAt, now) }
+      : {}),
+  };
+}
+
 export function journalLinkedItemKey(item: JournalLinkedItemRef): string {
   return `${item.kind}:${item.id}`;
 }
