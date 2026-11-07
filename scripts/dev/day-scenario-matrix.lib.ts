@@ -70,7 +70,6 @@ export function specFor(title: string): SpecInfo | null {
 
 // ------------------------------------------------------------ opening-hours oracle
 
-const MIN = 60_000;
 function dayOfWeek(dateIso: string): number {
   const [y, m, d] = dateIso.split("-").map(Number);
   return new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay();
