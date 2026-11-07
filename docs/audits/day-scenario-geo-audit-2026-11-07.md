@@ -90,8 +90,12 @@ replace) и in-memory `TravelEstimator`; загрузчик пула и TTL-кэ
 Порядок на окружении (DEV → потом PROD по релизной процедуре):
 1. деплой образа (флаг выключен — поведение не меняется);
 2. `prisma migrate deploy` (аддитивные nullable-колонки `Place.geoCell6/geoCell5`);
-3. `pnpm backfill:place-geo-cells -- --apply`, затем `--check` (ожидаем exit 0);
-4. включить `DAY_SCENARIO_ENGINE_ENABLED=true` только на окружении замера.
+3. включить `DAY_SCENARIO_ENGINE_ENABLED=true` только на окружении замера
+   (расширение `Place` тоже за этим флагом: пока он выключен, любая запись `Place`
+   проходит без изменений — зона RC1 не затронута);
+4. `pnpm backfill:place-geo-cells -- --apply`, затем `--check` (ожидаем exit 0);
+   строки, записанные при выключенном флаге, добираются бэкфиллом, а движок до
+   тех пор считает ячейки из `lat/lng` на лету.
 
 Не вошло (осознанно): UI, сохранение, `groupId`, квота гостя, профиль режима
 передвижения, персистентная таблица `TravelEstimate` (BACKLOG-233),

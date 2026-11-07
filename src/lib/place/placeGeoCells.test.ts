@@ -19,6 +19,7 @@ assert.deepEqual(inspectPlaceCoordinateWrite({ lat: 1, lng: 2 }), { touchesCoord
 assert.deepEqual(inspectPlaceCoordinateWrite(undefined), { touchesCoordinates: false, needsCurrentRow: false });
 
 async function main() {
+  process.env.DAY_SCENARIO_ENGINE_ENABLED = "true";
   // --- extension wiring with a fake client ---
   type Rec = Record<string, unknown>;
   type Hook = (a: { args: Rec; query: (a: unknown) => Promise<unknown> }) => Promise<unknown>;
@@ -57,6 +58,13 @@ async function main() {
 
   await hooks.updateMany({ args: { where: {}, data: { lat: 1 } }, query });
   assert.equal("geoCell6" in (seen.pop() as { data: Rec }).data, false, "one-sided updateMany is left to backfill --check");
+
+  process.env.DAY_SCENARIO_ENGINE_ENABLED = "false";
+  await hooks.create({ args: { data: { title: "t", lat: 53.9006, lng: 27.559 } }, query });
+  assert.deepEqual((seen.pop() as { data: Rec }).data, { title: "t", lat: 53.9006, lng: 27.559 }, "flag off: Place writes pass through unchanged");
+  await hooks.update({ args: { where: { id: "p1" }, data: { lat: 53.9006 } }, query });
+  assert.equal(readerCalls, 1, "flag off: no extra read on partial updates");
+  seen.pop();
 
   console.log("placeGeoCells tests passed");
 }
