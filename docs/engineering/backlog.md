@@ -5977,3 +5977,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: определить точный fingerprint (SHA, dirty state, deps/Prisma, environment/toolchain, gate definition), сериализовать builds и добавить тесты инвалидации и interrupted cleanup.
 - Acceptance criteria: один проверенный полный gate для неизменённого candidate, повтор только при валидной инвалидации; запрет bypass; контент и конфиги остаются нетронутыми при crash; CI на текущем PR SHA обязателен; регрессии Git workflow зелёные.
 - Source: agent-instruction audit, PR #1100.
+
+## [BACKLOG-230] Единый «Сценарий дня» в виджете «Мой план» (PR 1a → 1 → 2–4)
+
+- Status: BLOCKED
+- Priority: P2
+- Area: Мой план / подбор дня
+- Added: 2026-11-07
+- Reason deferred: «Мой план» явно вне scope RC1 (#1103); по решению владельца сначала закрывается RC1 GO.
+- Context: три отдельных автоподбора (гостевой виджет, «Подборка для вас», admin-страница «Ваш выходной») и редактор Task 7 заменяются одним сценарием в виджете; движок на `DayScenario`/`/api/plan/scenario`/`scenarioTravel.ts`, UI по макету «Сценарий дня — просто». Полный аудит и решения: `docs/audits/day-scenario-unification-audit-2026-11-07.md`.
+- Current state: аудит и baseline готовы; код не начат.
+- Dependencies: RC1 GO (#1103); PR 1a (вынос компонентов `SaveToPlanModal`) → PR 1 (`buildDayScenario` + `TravelEstimate` + in-memory кэш пула, за флагом) → PR 2–4.
+- Acceptance criteria: см. раздел 6–7 аудита (0 чтений пула из БД в пределах TTL, 0 внешних запросов для времени в пути, существующие записи плана не меняются, старые реализации удалены).
+- Source: аудит PR 0, 2026-11-07.
