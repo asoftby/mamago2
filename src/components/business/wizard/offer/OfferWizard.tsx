@@ -914,7 +914,7 @@ export function OfferWizard({
                       <p className="text-sm text-muted-foreground">
                         Если у вас одна цена без допуслуг, можно сразу продолжить.
                       </p>
-                      <Button type="button" variant="outline" onClick={() => setAdvancedServicesOpen(true)}>
+                      <Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal" onClick={() => setAdvancedServicesOpen(true)}>
                         Настроить дополнительные услуги и цены (необязательно)
                       </Button>
                     </>

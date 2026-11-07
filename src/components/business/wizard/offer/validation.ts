@@ -254,6 +254,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
   const warnings: string[] = [];
   const isCampOffer = data.offerWizardType === "CAMP";
   const isRegularClass = data.productType === "REGULAR_ACTIVITY";
+  const nonNumericPackagePrice = data.productType === "PARTY_PACKAGE" && ["ON_REQUEST", "FREE"].includes(data.partyPriceMode ?? "");
   const groupTariffs = data.schedule.classSchedule.groups.flatMap((group) => group.tariffs ?? []);
   if (isRegularClass && groupTariffs.length === 0) {
     pricingErrors.push("Добавьте хотя бы один тариф в расписание группы");
@@ -266,7 +267,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
     pricingErrors.push("Выберите режим ценообразования");
   }
 
-  if (!isCampOffer && !isRegularClass && data.pricingMode === "single") {
+  if (!isCampOffer && !isRegularClass && !nonNumericPackagePrice && data.pricingMode === "single") {
     if (!data.singlePrice || data.singlePrice.trim().length === 0) {
       pricingErrors.push("Укажите цену");
     }
@@ -326,7 +327,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
     (isCampOffer ||
       (isRegularClass && pricingErrors.length === 0) ||
       (data.pricingMode &&
-        ((data.pricingMode === "single" && data.singlePrice.trim()) ||
+        ((data.pricingMode === "single" && (nonNumericPackagePrice || data.singlePrice.trim())) ||
          (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
           data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim()))))) &&
     (!requireLegacyAction || (
