@@ -93,25 +93,44 @@ assert.match(submit, /role: "STANDALONE"/);
 console.log("partySelection checks: OK");
 
 
+import { Prisma } from "@prisma/client";
 import { withDraftEstimate } from "./partyDraftEstimate";
 
 const estimate = withDraftEstimate({
   status: "DRAFT",
   items: [
-    { role: "ANCHOR", offerId: "pk", offer: { ...pkg, priceMode: "EXACT" } },
-    { role: "INCLUDED", offerId: "included", offer: cake },
-    { role: "STANDALONE", offerId: "show", offer: show },
-    { role: "STANDALONE", offerId: "unknown", offer: { ...cake, priceMode: "ON_REQUEST" } },
-    { role: "ADDON", offerId: null, offer: null },
+    { role: "ANCHOR", offerId: "pk", draftPriceModeSnapshot: "EXACT", offerPriceSnapshot: new Prisma.Decimal(100) },
+    { role: "INCLUDED", offerId: "included", draftPriceModeSnapshot: null, offerPriceSnapshot: null },
+    { role: "STANDALONE", offerId: "show", draftPriceModeSnapshot: "FROM", offerPriceSnapshot: new Prisma.Decimal(100) },
+    { role: "STANDALONE", offerId: "unknown", draftPriceModeSnapshot: "ON_REQUEST", offerPriceSnapshot: null },
+    { role: "ADDON", offerId: null, draftPriceModeSnapshot: null, offerPriceSnapshot: null },
+    { role: "STANDALONE", offerId: "legacy", draftPriceModeSnapshot: null, offerPriceSnapshot: new Prisma.Decimal(42) },
   ],
 });
 assert.ok("estimate" in estimate);
 assert.deepEqual(estimate.estimate, {
-  exactByn: 100, fromByn: 100, unknownCount: 2,
+  minimumByn: 200, exactByn: 100, fromByn: 100, unknownCount: 3,
   lines: [
     { offerId: "pk", mode: "EXACT", amount: 100 },
     { offerId: "show", mode: "FROM", amount: 100 },
     { offerId: "unknown", mode: "ON_REQUEST", amount: null },
     { offerId: null, mode: "ON_REQUEST", amount: null },
+    { offerId: "legacy", mode: "ON_REQUEST", amount: null },
+  ],
+});
+
+const fractionalEstimate = withDraftEstimate({
+  status: "DRAFT",
+  items: [0.1, 0.2].map((priceFrom, index) => ({
+    role: "STANDALONE", offerId: String(index),
+    draftPriceModeSnapshot: "EXACT", offerPriceSnapshot: new Prisma.Decimal(priceFrom),
+  })),
+});
+assert.ok("estimate" in fractionalEstimate);
+assert.deepEqual(fractionalEstimate.estimate, {
+  minimumByn: 0.3, exactByn: 0.3, fromByn: 0, unknownCount: 0,
+  lines: [
+    { offerId: "0", mode: "EXACT", amount: 0.1 },
+    { offerId: "1", mode: "EXACT", amount: 0.2 },
   ],
 });

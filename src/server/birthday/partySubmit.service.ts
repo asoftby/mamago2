@@ -1,4 +1,4 @@
-import { PartyOrderStatus } from "@prisma/client";
+import { PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt, validateSubmissionWindow } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
@@ -18,7 +18,7 @@ export async function submitPartyAnchor(
   const submitKey = partyId + ":" + idempotencyKey;
   const party = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
-    include: { items: { where: { role: "ANCHOR" } } },
+    include: { items: { where: { OR: [{ role: "ANCHOR" }, { packageComponentChange: { not: Prisma.DbNull } }] } } },
   });
   if (!party) throw new PartyApiError(404, "Праздник не найден");
   if (party.status !== PartyOrderStatus.DRAFT) {
@@ -35,6 +35,9 @@ export async function submitPartyAnchor(
     throw new PartyApiError(409, "Черновик изменился. Обновите страницу");
   }
 
+  if (party.items.some(item => item.packageComponentChange !== null)) {
+    throw new PartyApiError(422, "Изменения пакета сохранены в черновике. Отправка изменённого пакета пока недоступна");
+  }
   const anchor = party.items[0];
   if (party.items.length !== 1 || !anchor || !anchor.offerId || !anchor.businessId) {
     throw new PartyApiError(422, "Выберите основное предложение праздника");

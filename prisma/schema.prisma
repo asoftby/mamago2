@@ -2991,6 +2991,13 @@ model OfferScheduleException {
 
 /// Состав пакета «Праздник под ключ» (реляционный, не JSON).
 /// Fase 1: структура без CPA и vendor-constraint в схеме.
+enum PackageComponentRemovalPolicy {
+  REQUIRED
+  REMOVABLE_NO_REFUND
+  REMOVABLE_FIXED_CREDIT
+  REMOVABLE_QUOTE_REQUIRED
+}
+
 model PackageComponent {
   id            String        @id @default(cuid())
   packageId     String
@@ -3003,6 +3010,9 @@ model PackageComponent {
   isOptional    Boolean       @default(false)
   priceDelta    Decimal?      @db.Decimal(10, 2)
   position      Int
+  archivedAt    DateTime?
+  removalPolicy PackageComponentRemovalPolicy?
+  removalCreditByn Decimal? @db.Decimal(10, 2)
 
   partyOrderItems PartyOrderItem[]
 
@@ -5984,6 +5994,10 @@ model PartyOrderItem {
   offerId String?
   businessId String?
   packageComponentId String?
+  packageComponentSnapshot Json?
+  packageComponentChange Json?
+  packageComponentChangeHistory Json?
+  draftPriceModeSnapshot String?
   role PartyItemRole
   parentItemId String?
   offerPriceSnapshot Decimal? @db.Decimal(10, 2)
