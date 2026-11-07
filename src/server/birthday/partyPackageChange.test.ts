@@ -33,3 +33,7 @@ assert.match(groupLock, /ORDER BY r\."id" FOR UPDATE/);
 for (const name of ["partyBusiness", "partyConfirm", "partyQuoteAcceptance"]) {
   assert.match(readFileSync(new URL("./" + name + ".service.ts", import.meta.url), "utf8"), /lockPartyRequestGroup\(tx, requestId\)/);
 }
+
+const review = readFileSync(new URL("../../features/birthday/builder/components/steps/StepReview.tsx", import.meta.url), "utf8");
+assert.match(review, /unsupportedPackageChanges = hasPackageChanges && venueMode !== "PACKAGE"/);
+assert.match(review, /disabled=\{busy \|\| unsupportedPackageChanges/);

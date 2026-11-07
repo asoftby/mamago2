@@ -2,7 +2,7 @@
 
 Package rules are configured in the existing Offer wizard (prerequisite PR #1162). PackageComponent is the catalogue truth; existing PartyOrderItem snapshots retain the rules and monetary amounts selected for that order. `isOptional` never grants removal permission.
 
-The parent edits the existing StepReview draft. Sending a changed package requires the existing `PARTY_CONFIRMATION_ENABLED` flag. When disabled, submission returns a definitive 422 and the composition remains editable. The existing business inbox release flag still controls its notifications; no environment flag is enabled by this PR.
+The parent edits the existing StepReview draft. Changed-package submission is supported in PACKAGE mode; edited mobile packages in HOME/OUTDOOR retain an explicit safe draft-only block. Sending a changed package requires the existing `PARTY_CONFIRMATION_ENABLED` flag. When disabled, submission returns a definitive 422 and the composition remains editable. The existing business inbox release flag still controls its notifications; no environment flag is enabled by this PR.
 
 Submission CAS claims the exact PartyOrder version and stores a typed `PARTY_PACKAGE_CHANGE` brief in BookingRequest.bookingPriceSnapshot. It contains the original component snapshots, kept/removed/replaced actions, fixed credits, independently selected services, and the package-only requested estimate. Catalogue price edits do not rewrite it. Existing standard-booking snapshots have a different shape and are ignored by this reader.
 
