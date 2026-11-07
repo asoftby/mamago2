@@ -12,6 +12,7 @@ export type EntityPreviewPayload = {
   placeName?: string | null;
   address?: string | null;
   publicAvailable?: boolean;
+  availability?: "public" | "draft" | "unavailable";
 };
 
 const VALID_TYPES: ArticleBlockEntityType[] = ["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"];
