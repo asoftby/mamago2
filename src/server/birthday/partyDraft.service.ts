@@ -314,8 +314,8 @@ export async function updatePartyDraft(
               partyOrderId: partyId, category: addon.category ?? PartyCategory.OTHER,
               offerId: addon.id, businessId: addon.place?.ownerBusinessId,
               role: "STANDALONE" as const,
-              offerPriceSnapshot: saved?.draftPriceModeSnapshot ? saved.offerPriceSnapshot : snapshotDecimal(addon),
-              draftPriceModeSnapshot: saved?.draftPriceModeSnapshot ?? addon.priceMode,
+              offerPriceSnapshot: saved ? saved.offerPriceSnapshot : snapshotDecimal(addon),
+              draftPriceModeSnapshot: saved ? saved.draftPriceModeSnapshot : addon.priceMode,
               position: position++,
             };
           }),

@@ -1,9 +1,14 @@
 import { Prisma, type PartyOrderStatus } from "@prisma/client";
-import { offerPriceSnapshot, type CatalogOffer } from "./partySelection";
 
 export function withDraftEstimate<T extends {
   status: PartyOrderStatus;
-  items: { role: string; offerId: string | null; draftPriceModeSnapshot?: string | null; offerPriceSnapshot?: Prisma.Decimal | null; packageComponentChange?: Prisma.JsonValue; offer: Pick<CatalogOffer, "priceFrom" | "priceMode" | "currency"> | null }[];
+  items: {
+    role: string;
+    offerId: string | null;
+    draftPriceModeSnapshot: string | null;
+    offerPriceSnapshot: Prisma.Decimal | null;
+    packageComponentChange?: Prisma.JsonValue;
+  }[];
 }>(party: T) {
   if (party.status !== "DRAFT") return party;
   let exactByn = new Prisma.Decimal(0);
@@ -19,12 +24,10 @@ export function withDraftEstimate<T extends {
   }
   const lines = party.items.flatMap((item) => {
     if (item.role === "INCLUDED") return [];
-    const frozen = item.draftPriceModeSnapshot;
-    const livePrice = item.offer ? offerPriceSnapshot(item.offer) : null;
-    let price = frozen ? item.offerPriceSnapshot ?? null : livePrice === null ? null : new Prisma.Decimal(livePrice);
+    const priceMode = item.draftPriceModeSnapshot;
+    let price = priceMode ? item.offerPriceSnapshot : null;
     if (item.role === "ANCHOR" && price !== null) price = price.minus(credit);
     if (item.role === "ANCHOR" && requiresPackageQuote) price = null;
-    const priceMode = frozen ?? item.offer?.priceMode;
     const mode = price === null ? "ON_REQUEST"
       : priceMode === "EXACT" || priceMode === "FREE" ? "EXACT" : "FROM";
     const amount = price?.toNumber() ?? null;
