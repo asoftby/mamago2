@@ -99,9 +99,43 @@ function dayDistance(start: string, end: string): number {
   return Math.max(0, Math.round((endMs - startMs) / 86_400_000));
 }
 
+/** Inclusive local-date window (YYYY-MM-DD). Lets read paths avoid materializing unrelated days. */
+export type ScheduleOccurrenceWindow = { from: string; to: string };
+
+/**
+ * First recurrence period that can still reach `from`, found arithmetically instead of by walking
+ * every earlier period. Deliberately conservative (steps back two periods and the item's span):
+ * the loop below applies the exact filter, so being early only costs a couple of iterations,
+ * while being late would lose occurrences.
+ */
+function firstPeriodIndex(
+  baseStart: string,
+  spanDays: number,
+  interval: number,
+  unit: RecurrenceUnit,
+  from: string,
+): number {
+  if (from <= baseStart) return 0;
+  let elapsed: number;
+  let span: number;
+  if (unit === "day" || unit === "week") {
+    const days = dayDistance(baseStart, from);
+    elapsed = unit === "day" ? days : days / 7;
+    span = unit === "day" ? spanDays : spanDays / 7;
+  } else {
+    const s = parseLocalDateParts(baseStart);
+    const f = parseLocalDateParts(from);
+    const months = f.year * 12 + f.month - (s.year * 12 + s.month);
+    elapsed = unit === "month" ? months : months / 12;
+    span = unit === "month" ? spanDays / 28 : spanDays / 365;
+  }
+  return Math.max(0, Math.floor((elapsed - span) / interval) - 2);
+}
+
 function expandScheduleItemOccurrences(
   item: ScheduleItemLike,
   fallbackStartTime: string,
+  window?: ScheduleOccurrenceWindow,
 ): ScheduleOccurrence[] {
   const baseDates = expandScheduleItemDates([item]);
   if (baseDates.length === 0) return [];
@@ -127,11 +161,14 @@ function expandScheduleItemOccurrences(
   const spanDays = dayDistance(baseStart, baseEnd);
   const occurrences: ScheduleOccurrence[] = [];
 
-  for (let periodIndex = 0; periodIndex < MAX_RECURRENCE_PERIODS; periodIndex += 1) {
+  const firstPeriod = window ? firstPeriodIndex(baseStart, spanDays, interval, recurrenceUnit, window.from) : 0;
+  for (let periodIndex = firstPeriod; periodIndex < MAX_RECURRENCE_PERIODS; periodIndex += 1) {
     const periodStart = shiftLocalDate(baseStart, periodIndex * interval, recurrenceUnit);
     if (periodStart > recurrenceUntil) break;
+    if (window && periodStart > window.to) break;
 
     const periodEnd = addDaysLocal(periodStart, spanDays);
+    if (window && periodEnd < window.from) continue;
     const effectiveEnd = periodEnd <= recurrenceUntil ? periodEnd : recurrenceUntil;
     const periodDates = expandScheduleItemDates([{ date: periodStart, dateEnd: effectiveEnd }]);
     occurrences.push(...periodDates.map(withTitle));
@@ -148,8 +185,13 @@ function expandScheduleItemOccurrences(
  * interval/unit up to recurrenceUntil (inclusive). Duplicate date+time
  * occurrences are collapsed, while two different times on the same date are
  * preserved as two distinct sessions.
+ *
+ * With `window`, only occurrences inside the inclusive date window are returned,
+ * and periods outside it are skipped (not expanded) - the result equals the
+ * unwindowed list filtered by date, at a cost independent of how long the
+ * schedule has been running.
  */
-export function extractScheduleOccurrences(scheduleJson: unknown): ScheduleOccurrence[] {
+export function extractScheduleOccurrences(scheduleJson: unknown, window?: ScheduleOccurrenceWindow): ScheduleOccurrence[] {
   const j = scheduleJson as ScheduleJsonLike | null | undefined;
   const fallbackStartTime = normalizeStartTime(j?.startTime);
   const legacyRecurrenceDefaults: ScheduleItemLike = {
@@ -160,6 +202,10 @@ export function extractScheduleOccurrences(scheduleJson: unknown): ScheduleOccur
   };
 
   let occurrences: ScheduleOccurrence[] = [];
+  // Whether `scheduleItems` alone defines the schedule. The legacy `dates` list is only a fallback
+  // when the items expand to nothing, and that decision must not depend on the window: an item
+  // outside the window still defines the schedule.
+  let itemsDefineSchedule = false;
 
   if (j && Array.isArray(j.scheduleItems) && j.scheduleItems.length > 0) {
     occurrences = (j.scheduleItems as ScheduleItemLike[]).flatMap((item) =>
@@ -177,11 +223,18 @@ export function extractScheduleOccurrences(scheduleJson: unknown): ScheduleOccur
           recurrenceUntil: item.recurrenceUntil ?? legacyRecurrenceDefaults.recurrenceUntil,
         },
         fallbackStartTime,
+        window,
       ),
     );
   }
 
-  if (occurrences.length === 0 && j && Array.isArray(j.dates)) {
+  if (j && Array.isArray(j.scheduleItems) && j.scheduleItems.length > 0) {
+    itemsDefineSchedule = window
+      ? (j.scheduleItems as ScheduleItemLike[]).some((item) => expandScheduleItemDates([item]).length > 0)
+      : occurrences.length > 0;
+  }
+
+  if (!itemsDefineSchedule && j && Array.isArray(j.dates)) {
     const dates = (j.dates as unknown[]).filter(isLocalDateString);
     occurrences = dates.flatMap((date) =>
       expandScheduleItemOccurrences(
@@ -191,12 +244,14 @@ export function extractScheduleOccurrences(scheduleJson: unknown): ScheduleOccur
           ...legacyRecurrenceDefaults,
         },
         fallbackStartTime,
+        window,
       ),
     );
   }
 
   const unique = new Map<string, ScheduleOccurrence>();
   for (const occurrence of occurrences) {
+    if (window && (occurrence.date < window.from || occurrence.date > window.to)) continue;
     unique.set(`${occurrence.date}|${occurrence.startTime}`, occurrence);
   }
 

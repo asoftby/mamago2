@@ -178,7 +178,8 @@ export function buildDayScenario(events: PoolEvent[], input: BuildInput, deps: B
   const jitterOf = (event: PoolEvent) => (input.variant > 0 ? hash01(input.variant, event.activityId) * VARIANT_JITTER : 0);
   eventRows.forEach((event, i) => {
     const norm = hi > floor ? ((raw[i]! - floor) / (hi - floor)) * 100 : 50;
-    utility.set(event.activityId, EVENT_UTILITY_FLOOR + ((100 - EVENT_UTILITY_FLOOR) / 100) * norm + jitterOf(event));
+    const confirmedUtility = EVENT_UTILITY_FLOOR + ((100 - EVENT_UTILITY_FLOOR) / 100) * norm;
+    utility.set(event.activityId, confirmedUtility - (event.virtualSession ? FILLER_CONFIG.virtualSessionPenalty : 0) + jitterOf(event));
   });
   for (const event of eligible) {
     if (event.kind !== "place") continue;
@@ -247,6 +248,7 @@ export function buildDayScenario(events: PoolEvent[], input: BuildInput, deps: B
   const items: ScenarioItem[] = chain.map((p, i) => ({
     kind: p.event.kind,
     hoursUnconfirmed: isUnconfirmedHours(p.event),
+    scheduleUnconfirmed: p.event.kind === "event" && p.event.virtualSession === true,
     activityId: p.event.activityId,
     card: p.event.card,
     startsAtMs: p.startMs,

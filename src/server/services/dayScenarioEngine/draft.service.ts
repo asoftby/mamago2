@@ -69,6 +69,7 @@ export type DraftResponse = {
     kind: "event" | "place";
     /** Filler place without a hours record: show "уточните часы работы". */
     hoursUnconfirmed: boolean;
+    scheduleUnconfirmed: boolean;
     activityId: string;
     card: PoolEvent["card"];
     startsAt: string;
@@ -78,7 +79,7 @@ export type DraftResponse = {
     approximatePlace: boolean;
     far: boolean;
   }[];
-  meta: { poolCache: "hit" | "miss"; poolSize: number; poolPlaces: number; staleGeoCells: number; candidateCount: number; buildMs: number };
+  meta: { poolCache: "hit" | "miss"; poolSize: number; poolPlaces: number; poolVirtual: number; staleGeoCells: number; candidateCount: number; buildMs: number };
 };
 
 async function loadUserContext(userId: string, date: string, personaIds: string[]) {
@@ -175,6 +176,7 @@ export async function runDayScenarioDraft(
     items: result.items.map((item) => ({
       kind: item.kind,
       hoursUnconfirmed: item.hoursUnconfirmed,
+      scheduleUnconfirmed: item.scheduleUnconfirmed,
       activityId: item.activityId,
       card: item.card,
       startsAt: new Date(item.startsAtMs).toISOString(),
@@ -188,6 +190,7 @@ export async function runDayScenarioDraft(
       poolCache: hit ? "hit" : "miss",
       poolSize: pool.events.length,
       poolPlaces: pool.placeCount,
+      poolVirtual: pool.virtualCount,
       staleGeoCells: pool.staleGeoCells,
       candidateCount: result.candidateCount,
       buildMs: Math.round((performance.now() - started) * 10) / 10,

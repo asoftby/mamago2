@@ -39,6 +39,7 @@ export const PLAN_FIXTURE_TITLE = "[MOCK] Запись плана 12:00";
 export type ApiItem = {
   kind?: "event" | "place";
   hoursUnconfirmed?: boolean;
+  scheduleUnconfirmed?: boolean;
   activityId: string;
   card: { title: string; categoryName?: string | null; address?: string | null };
   startsAt: string;
@@ -202,7 +203,7 @@ function timeline(result: ApiResult): string {
   if (items.length === 0) return `<p class="muted">нет точек</p>`;
   const rows = items.map((i) => {
     const spec = specFor(i.card.title);
-    const notes = [i.hoursUnconfirmed ? "уточните часы работы" : "", i.approximatePlace ? "примерное место" : "", i.far ? "далеко — заменить?" : "", i.pinned ? "закреплено" : ""].filter(Boolean).join(", ");
+    const notes = [i.hoursUnconfirmed ? "уточните часы работы" : "", i.scheduleUnconfirmed ? "время по расписанию, уточните" : "", i.approximatePlace ? "примерное место" : "", i.far ? "далеко — заменить?" : "", i.pinned ? "закреплено" : ""].filter(Boolean).join(", ");
     const travel = i.travel ? `${i.travel.minutes} мин · ${(i.travel.distanceM / 1000).toFixed(2)} км · ${i.travel.mode === "walk" ? "пешком" : i.travel.mode === "car" ? "машина" : i.travel.mode}` : "—";
     return `<tr><td>${hm(i.startsAt)}–${hm(i.endsAt)}</td><td>${esc(i.card.title)}</td><td>${esc(spec?.clusterLabel ?? "?")}</td><td>${esc(spec?.geoCell5 ?? "—")}</td><td>${(i.kind ?? spec?.kind) === "place" ? "место" : "событие"}</td><td>${esc(notes)}</td><td>${esc(travel)}</td></tr>`;
   });
@@ -212,7 +213,7 @@ function timeline(result: ApiResult): string {
 function stepHtml(step: StepRecord): string {
   const r = step.result;
   const t = r ? totalsOf(r.items) : null;
-  const warn = r ? [r.status !== "ok" ? `статус: ${r.status}` : "", r.suggestMode ? `подсказка: переключиться на «${r.suggestMode === "car" ? "машину" : r.suggestMode}»` : "", r.items.some((i) => i.far) ? "есть переезд > 40 мин" : "", r.items.some((i) => i.approximatePlace) ? "есть «примерное место»" : "", r.items.some((i) => i.hoursUnconfirmed) ? "есть места без подтверждённых часов" : ""].filter(Boolean) : [];
+  const warn = r ? [r.status !== "ok" ? `статус: ${r.status}` : "", r.suggestMode ? `подсказка: переключиться на «${r.suggestMode === "car" ? "машину" : r.suggestMode}»` : "", r.items.some((i) => i.far) ? "есть переезд > 40 мин" : "", r.items.some((i) => i.approximatePlace) ? "есть «примерное место»" : "", r.items.some((i) => i.hoursUnconfirmed) ? "есть места без подтверждённых часов" : "", r.items.some((i) => i.scheduleUnconfirmed) ? "есть события со временем по расписанию (без сеанса)" : ""].filter(Boolean) : [];
   return `<div class="step"><h4>${esc(step.name)} <span class="muted">· HTTP ${step.httpStatus} · ${Math.round(step.ms)} мс${r?.meta ? ` · пул ${r.meta.poolCache}, ${r.meta.poolSize} (мест ${r.meta.poolPlaces ?? 0}), сборка ${r.meta.buildMs} мс` : ""}</span></h4>${r ? timeline(r) : "<p class='bad'>нет ответа</p>"}${t ? `<p>Итого: <b>${t.points}</b> точек · <b>${t.km.toFixed(2)} км</b> · <b>${t.travelMin} мин</b> в пути · переходов между geoCell5: <b>${t.cell5Transitions}</b></p>` : ""}${warn.length ? `<p class="warn">Предупреждения: ${esc(warn.join("; "))}</p>` : ""}${step.diffNote ? `<p class="muted">${esc(step.diffNote)}</p>` : ""}${step.alternatives ? `<p>Альтернативы: ${step.alternatives.map((a) => `<span class="chip">${esc(a)}</span>`).join(" ")}</p>` : ""}${step.violations.length ? `<p class="bad">Нарушения: ${step.violations.map((v) => esc(v.rule)).join("; ")}</p>` : ""}</div>`;
 }
 

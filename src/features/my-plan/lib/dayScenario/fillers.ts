@@ -12,6 +12,8 @@ export const FILLER_CONFIG = {
   baseUtility: 18,
   /** Subtracted when the place has no hours record. */
   unknownHoursPenalty: 8,
+  /** Subtracted from an event whose time is only derived from its schedule rules (no ActivitySession). */
+  virtualSessionPenalty: 10,
   /** Places without a primary category join the pool, but only this many per scenario. */
   maxUncategorizedPerScenario: 1,
   /** Candidate start times inside opening hours are generated on this grid. */
