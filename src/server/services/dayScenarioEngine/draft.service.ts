@@ -62,7 +62,7 @@ export type DraftResponse = {
     approximatePlace: boolean;
     far: boolean;
   }[];
-  meta: { poolCache: "hit" | "miss"; poolSize: number; candidateCount: number; buildMs: number };
+  meta: { poolCache: "hit" | "miss"; poolSize: number; staleGeoCells: number; candidateCount: number; buildMs: number };
 };
 
 async function loadUserContext(userId: string, date: string, personaIds: string[]) {
@@ -167,6 +167,7 @@ export async function runDayScenarioDraft(
     meta: {
       poolCache: hit ? "hit" : "miss",
       poolSize: pool.events.length,
+      staleGeoCells: pool.staleGeoCells,
       candidateCount: result.candidateCount,
       buildMs: Math.round((performance.now() - started) * 10) / 10,
     },

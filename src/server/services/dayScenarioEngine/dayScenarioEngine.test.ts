@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { isDayScenarioEngineEnabled } from "./flag";
-import { resolveEventGeo, toPoolEvent, type PoolActivityRow } from "./poolMapping";
+import type { PrismaClient } from "@prisma/client";
+import { geoCellsFor } from "@/lib/geo/geoCell";
+import { extendPrismaWithPlaceGeoCells } from "@/lib/place/placeGeoCellExtension";
+import { hasStaleStoredCells, resolveEventGeo, toPoolEvent, type PoolActivityRow } from "./poolMapping";
 import { createTtlCache } from "./ttlCache";
 import { draftRequestSchema } from "./draft.service";
 
@@ -51,8 +54,31 @@ async function main() {
     format: null, discoverySignalIds: [], place: null, venue: null, metroStation: null,
     sessions: [{ startsAt: new Date("2026-11-08T08:00:00Z") }],
   };
-  const fromPlace = resolveEventGeo({ ...base, place: placeGeo(53.9006, 27.559, "u9efk3", "u9efk") });
-  assert.deepEqual([fromPlace?.geoCell6, fromPlace?.approximate], ["u9efk3", false], "stored cells are used when present");
+  const truth = geoCellsFor(53.9006, 27.559)!;
+  const fromPlace = resolveEventGeo({ ...base, place: placeGeo(53.9006, 27.559, truth.geoCell6, truth.geoCell5) });
+  assert.deepEqual([fromPlace?.geoCell6, fromPlace?.geoCell5, fromPlace?.approximate], [truth.geoCell6, truth.geoCell5, false]);
+  assert.equal(hasStaleStoredCells({ ...base, place: placeGeo(53.9006, 27.559, truth.geoCell6, truth.geoCell5) }), false, "consistent cells are not stale");
+  // A Place moved while the Place extension was off: lat/lng changed, stored cells stayed old.
+  {
+    process.env.DAY_SCENARIO_ENGINE_ENABLED = "false";
+    type Hook = (a: { args: Record<string, unknown>; query: (a: unknown) => Promise<unknown> }) => Promise<unknown>;
+    let hooks: Record<string, Hook> = {};
+    const fake = { $extends: (def: { query: { place: Record<string, Hook> } }) => { hooks = def.query.place; return {}; } } as unknown as PrismaClient;
+    extendPrismaWithPlaceGeoCells(fake, fake);
+    const written: Record<string, unknown>[] = [];
+    await hooks.update({ args: { where: { id: "p" }, data: { lat: 53.9300, lng: 27.6200 } }, query: async (a) => { written.push((a as { data: Record<string, unknown> }).data); return a; } });
+    assert.equal("geoCell6" in written[0]!, false, "flag off: the write leaves the stored cells untouched (stale)");
+
+    const old = geoCellsFor(53.9006, 27.559)!; // cells stored before the move
+    const moved = geoCellsFor(53.9300, 27.6200)!;
+    assert.notEqual(old.geoCell6, moved.geoCell6);
+    const row: PoolActivityRow = { ...base, place: placeGeo(53.9300, 27.6200, old.geoCell6, old.geoCell5) };
+    const geo = resolveEventGeo(row)!;
+    assert.deepEqual([geo.geoCell6, geo.geoCell5], [moved.geoCell6, moved.geoCell5], "engine puts the moved place into the correct cell");
+    assert.equal(hasStaleStoredCells(row), true, "and the stale stored cells are detected for the pool log counter");
+    assert.equal(hasStaleStoredCells({ ...base, place: placeGeo(53.9300, 27.6200) }), false, "no stored cells -> nothing to compare");
+    assert.equal(hasStaleStoredCells({ ...base, venue: { addressLine: null, lat: null, lng: null, place: placeGeo(53.9300, 27.6200, old.geoCell6, old.geoCell5) } }), true, "venue place is checked too");
+  }
   const computed = resolveEventGeo({ ...base, place: placeGeo(53.9006, 27.559) });
   assert.equal(computed?.geoCell6.length, 6, "missing stored cells are computed from lat/lng");
   const viaVenuePlace = resolveEventGeo({ ...base, venue: { addressLine: "v", lat: 1, lng: 1, place: placeGeo(53.9, 27.55) } });

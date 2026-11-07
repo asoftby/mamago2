@@ -9,7 +9,7 @@ import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import { zonedDayRange } from "@/server/services/planSuggestions.service";
 import { TravelEstimator } from "@/features/my-plan/lib/dayScenario/travel";
 import type { PoolEvent } from "@/features/my-plan/lib/dayScenario/types";
-import { toPoolEvent, type PoolActivityRow } from "./poolMapping";
+import { hasStaleStoredCells, toPoolEvent, type PoolActivityRow } from "./poolMapping";
 import { createTtlCache } from "./ttlCache";
 
 export const POOL_TTL_MS = 10 * 60_000;
@@ -24,6 +24,8 @@ export type DayScenarioPool = {
   /** Shared by every build on this pool, so pair legs are computed once. */
   estimator: TravelEstimator;
   loadedAtMs: number;
+  /** Places whose stored geoCell disagreed with lat/lng (recomputed in memory). */
+  staleGeoCells: number;
 };
 
 const placeGeoSelect = {
@@ -38,7 +40,7 @@ const placeGeoSelect = {
 
 /** The only database read of a build: audience-agnostic public catalog facts. */
 export async function loadDayScenarioPool(citySlug: string, date: string, nowMs = Date.now()): Promise<DayScenarioPool> {
-  const empty: DayScenarioPool = { citySlug, date, events: [], estimator: new TravelEstimator(), loadedAtMs: nowMs };
+  const empty: DayScenarioPool = { citySlug, date, events: [], estimator: new TravelEstimator(), loadedAtMs: nowMs, staleGeoCells: 0 };
   const city = await findCityBySlug(citySlug.toLowerCase());
   if (!city) return empty;
   const scope = await resolveTerritoryScope(citySlug);
@@ -89,7 +91,16 @@ export async function loadDayScenarioPool(citySlug: string, date: string, nowMs 
   const events = rows
     .map((row) => toPoolEvent(row, scores.get(row.id) ?? 0))
     .filter((event): event is PoolEvent => event !== null);
-  return { citySlug, date, events, estimator: new TravelEstimator(), loadedAtMs: nowMs };
+  const staleGeoCells = rows.filter((row) => hasStaleStoredCells(row)).length;
+  if (staleGeoCells > 0) {
+    console.warn("[day-scenario-pool] stored Place.geoCell disagrees with lat/lng; recomputed in memory", {
+      citySlug,
+      date,
+      staleGeoCells,
+      hint: "run backfill:place-geo-cells -- --apply",
+    });
+  }
+  return { citySlug, date, events, estimator: new TravelEstimator(), loadedAtMs: nowMs, staleGeoCells };
 }
 
 const poolCache = createTtlCache<DayScenarioPool>({ ttlMs: POOL_TTL_MS, maxEntries: POOL_MAX_ENTRIES });

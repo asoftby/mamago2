@@ -35,22 +35,27 @@ export type PoolActivityRow = {
   sessions: { startsAt: Date }[];
 };
 
-function pointFrom(
-  lat: number | null,
-  lng: number | null,
-  stored: { geoCell6: string | null; geoCell5: string | null } | null,
-  approximate: boolean,
-): GeoPoint | null {
-  if (lat == null || lng == null) return null;
-  // Cells are computed at write time and stored on Place; fall back to computing
-  // them from the coordinates for rows that predate the backfill or bypassed the
-  // Place extension (venue coordinates and metro stations never have stored cells).
-  const geoCell6 = stored?.geoCell6 ?? null;
-  const geoCell5 = stored?.geoCell5 ?? null;
-  if (geoCell6 && geoCell5) return { lat, lng, geoCell6, geoCell5, approximate };
+/**
+ * The engine never trusts stored cells: they are always derived from lat/lng here
+ * (microseconds), so a Place whose coordinates changed while the Place extension
+ * was off (or by a writer that bypassed it) still lands in the right cell. Stored
+ * cells are only compared, see `hasStaleStoredCells`.
+ */
+function pointFrom(lat: number | null, lng: number | null, approximate: boolean): GeoPoint | null {
   const computed = geoCellsFor(lat, lng);
-  if (!computed) return null;
+  if (!computed || lat == null || lng == null) return null;
   return { lat, lng, ...computed, approximate };
+}
+
+/** True when a Place carries stored cells that disagree with its own lat/lng. */
+function placeHasStaleCells(place: PlaceGeo | null | undefined): boolean {
+  if (!place || (place.geoCell6 == null && place.geoCell5 == null)) return false;
+  const computed = geoCellsFor(place.lat, place.lng);
+  return (computed?.geoCell6 ?? null) !== place.geoCell6 || (computed?.geoCell5 ?? null) !== place.geoCell5;
+}
+
+export function hasStaleStoredCells(row: Pick<PoolActivityRow, "place" | "venue">): boolean {
+  return placeHasStaleCells(row.place) || placeHasStaleCells(row.venue?.place);
 }
 
 /**
@@ -60,10 +65,10 @@ function pointFrom(
 export function resolveEventGeo(row: Pick<PoolActivityRow, "place" | "venue" | "metroStation">): GeoPoint | null {
   const { place, venue, metroStation } = row;
   return (
-    (place ? pointFrom(place.lat, place.lng, place, false) : null) ??
-    (venue?.place ? pointFrom(venue.place.lat, venue.place.lng, venue.place, false) : null) ??
-    (venue ? pointFrom(venue.lat, venue.lng, null, false) : null) ??
-    (metroStation ? pointFrom(metroStation.lat, metroStation.lng, null, true) : null)
+    (place ? pointFrom(place.lat, place.lng, false) : null) ??
+    (venue?.place ? pointFrom(venue.place.lat, venue.place.lng, false) : null) ??
+    (venue ? pointFrom(venue.lat, venue.lng, false) : null) ??
+    (metroStation ? pointFrom(metroStation.lat, metroStation.lng, true) : null)
   );
 }
 
