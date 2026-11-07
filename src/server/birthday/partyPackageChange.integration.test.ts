@@ -60,7 +60,7 @@ async function main() {
   const send = (d: Draft, id = "submit" + (++serial)) => submitPartyAnchor(parent.id, d.id, d.version, key + id);
   async function reply(requestId: string, priceByn: number, expectedStage: "SENT" | "AWAITING_RECONFIRM" = "SENT", version = 0) {
     return replyToPartyRequest({ businessId: business.id, actorUserId: owner.id, requestId, idempotencyKey: key + "reply" + (++serial),
-      input: { type: "MODIFIED", expectedStage, expectedQuoteVersion: version, priceByn, includes: "Состав по запросу без удалённых услуг", changeReason: "Уточнена стоимость изменённого пакета" } });
+      input: { type: "MODIFIED", expectedStage, expectedQuoteVersion: version, priceByn, durationMinutes: 120, includes: "Состав по запросу без удалённых услуг", changeReason: "Уточнена стоимость изменённого пакета" } });
   }
   const raceDraft = await draft();
   const race = await Promise.allSettled(["A", "B"].map(contactName => updatePartyDraft(parent.id, raceDraft.id, { version: raceDraft.version, contactName })));
@@ -110,6 +110,9 @@ async function main() {
   await failure(409, () => updatePartyDraft(parent.id, changed.id, { version: changed.version, contactName: "Late" }));
   await failure(404, () => replyToPartyRequest({ businessId: otherBusiness.id, actorUserId: foreign.id, requestId: sent.request.id, idempotencyKey: key + "wrong",
     input: { type: "MODIFIED", expectedStage: "SENT", expectedQuoteVersion: 0, priceByn: 1, includes: "Wrong", changeReason: "Foreign access" } }));
+  await failure(422, () => replyToPartyRequest({ businessId: business.id, actorUserId: owner.id, requestId: sent.request.id, idempotencyKey: key + "oversized-duration",
+    input: { type: "MODIFIED", expectedStage: "SENT", expectedQuoteVersion: 0, priceByn: 430, durationMinutes: 240, includes: "Changed package", changeReason: "Different service duration" } }));
+  assert.equal(await prisma.partyQuote.count({ where: { bookingRequestId: sent.request.id } }), 0);
   const first = await reply(sent.request.id, 430);
   const decision = (quoteId: string, version: number, userId = parent.id) => ({ userId, orderId: changed.id, requestId: sent.request.id, quoteId, expectedVersion: version });
   await failure(404, () => acceptPartyQuote(decision(first.quote.id, 1, foreign.id)));

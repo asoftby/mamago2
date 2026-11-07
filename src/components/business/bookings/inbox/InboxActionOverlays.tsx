@@ -171,10 +171,12 @@ function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: (
                 <textarea id="reply-change" className={fieldClass} rows={2} maxLength={2000} value={changeReason} onChange={(e) => setChangeReason(e.target.value)} />
               </div>
             ) : null}
+            {item.packageScope ? <p className="text-sm text-muted-foreground">{"Изменение пакета согласуется в выбранном окне праздника. Для другого времени нужна новая заявка."}</p> : (
             <div>
               <label className={labelClass} htmlFor="reply-duration">Длительность, минут (необязательно)</label>
               <Input id="reply-duration" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />
             </div>
+            )}
             <div>
               <label className={labelClass} htmlFor="reply-prepay">Условия предоплаты (необязательно)</label>
               <textarea id="reply-prepay" className={fieldClass} rows={2} maxLength={2000} value={prepayment} onChange={(e) => setPrepayment(e.target.value)} />

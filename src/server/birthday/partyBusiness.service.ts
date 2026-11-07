@@ -145,6 +145,10 @@ export async function replyToPartyRequest(params: {
   }
   const from = clockMinutes(order.timeFrom);
   const to = clockMinutes(order.timeTo);
+  if (packageScope && input.type !== "DECLINED" && input.durationMinutes !== undefined &&
+      (from === null || to === null || input.durationMinutes !== to - from)) {
+    throw new PartyApiError(422, "Длительность изменённого пакета должна совпадать с выбранным временем. Для другого окна нужна новая заявка");
+  }
   // With confirmations switched off the reply is still recorded, but only as a QUOTED offer.
   const fixedPrice = !packageScope && !declined && isPartyConfirmationEnabled() && isAutoConfirmMode(order.venueMode) &&
     !item.confirmedBookingRequestId && isFixedPriceReply({
