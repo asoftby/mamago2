@@ -16,12 +16,12 @@ import { Prisma } from "@prisma/client";
 import { AgePolicy, ContentStatus, PlaceKind, LocationSource, MediaEntityType } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
-import { extractStreetName } from "@/lib/slug/slugUtils";
 import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
+import { deriveShortAddress } from "@/lib/place/placeAddressLabel";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
 import {
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     console.log("[places/POST] Creating place for user:", user.id, "title:", d.title, "status:", status);
 
     // Extract short address from formatted address
-    const shortAddress = extractStreetName(d.formattedAddr || "");
+    const shortAddress = deriveShortAddress(d.formattedAddr);
     console.log("[places/POST] Extracted shortAddress:", shortAddress);
 
     // Slug will be generated on publish, not on creation

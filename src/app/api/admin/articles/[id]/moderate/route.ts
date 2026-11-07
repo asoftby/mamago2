@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
 import { moderateArticle } from "@/lib/article/articleAdminService";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 
 const BodySchema = z.object({
   decision: z.enum(["publish", "reject"]),
@@ -37,6 +38,7 @@ export async function POST(
   try {
     const snapshot = await moderateArticle(id, parsed.data.decision);
     perf.mark("service");
+    invalidatePublicArticleLists();
     perf.log({ articleId: id, decision: parsed.data.decision, status: snapshot.status });
     return NextResponse.json(snapshot);
   } catch (e) {
