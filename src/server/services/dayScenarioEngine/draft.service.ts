@@ -18,9 +18,16 @@ import type {
 import { DEFAULT_EVENT_DURATION_MIN } from "./poolMapping";
 import { getDayScenarioPool } from "./pool";
 
-const HOUR_MS = 3_600_000;
-const DAY_PLAN_START_HOUR = 9;
-const DAY_PLAN_END_HOUR = 20;
+const MINUTE_MS = 60_000;
+/** Default planning window (local time) when the request does not narrow it. */
+const DEFAULT_DAY_START = "09:00";
+const DEFAULT_DAY_END = "20:00";
+const MIN_WINDOW_MINUTES = 60;
+
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+export function minutesOfDay(value: string): number {
+  return Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
+}
 /** Do not schedule something that starts in the next half hour. */
 const LEAD_TIME_MS = 30 * 60_000;
 const TODDLER_RANGES = new Set(["0-1", "1-3"]);
@@ -44,6 +51,12 @@ export const draftRequestSchema = z.object({
   replaceActivityId: z.string().min(1).max(64).optional(),
   variant: z.number().int().min(0).max(1000).optional().default(0),
   targetCount: z.number().int().min(1).max(4).optional().default(3),
+  /** Planning window inside the day, local "HH:MM" (default 09:00-20:00), e.g. 16:00-20:00 on a weekday. */
+  dayStart: hhmm.optional().default(DEFAULT_DAY_START),
+  dayEnd: hhmm.optional().default(DEFAULT_DAY_END),
+}).refine((value) => minutesOfDay(value.dayEnd) - minutesOfDay(value.dayStart) >= MIN_WINDOW_MINUTES, {
+  message: "dayEnd must be at least 60 minutes after dayStart",
+  path: ["dayEnd"],
 });
 export type DraftRequest = z.infer<typeof draftRequestSchema>;
 
@@ -109,11 +122,11 @@ export async function runDayScenarioDraft(
   const ageRanges = [...new Set([...request.ageRanges, ...ctx.childRanges])];
   const profileInterestSlugs = ctx.interests.filter((slug) => CANONICAL_EVENT_INTEREST_SLUGS.has(slug));
   const day = zonedDayRange(request.date, DEFAULT_TZ);
-  const windowStartMs = Math.max(day.start.getTime() + DAY_PLAN_START_HOUR * HOUR_MS, nowMs + LEAD_TIME_MS);
+  const windowStartMs = Math.max(day.start.getTime() + minutesOfDay(request.dayStart) * MINUTE_MS, nowMs + LEAD_TIME_MS);
 
   const input: BuildInput = {
     windowStartMs,
-    windowEndMs: day.start.getTime() + DAY_PLAN_END_HOUR * HOUR_MS,
+    windowEndMs: day.start.getTime() + minutesOfDay(request.dayEnd) * MINUTE_MS,
     mode: request.mode,
     audience: { ageRanges, profileInterestSlugs, hasToddler: ageRanges.some((range) => TODDLER_RANGES.has(range)) },
     busy: ctx.busy,
