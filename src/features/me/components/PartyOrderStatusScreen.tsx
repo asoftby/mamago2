@@ -200,7 +200,7 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                   >
                     {pending === quote.id ? "Принимаем…" : "Принять предложение"}
                   </button>
-                  <Button type="button" variant="outline" disabled={Boolean(pending)}
+                  <Button type="button" variant="outline" className="min-h-11" disabled={Boolean(pending)}
                     onClick={() => void accept(item.request!.id, quote.id, quote.version, "reject")}>Отклонить предложение</Button></div>
                 ) : null}
               </section>

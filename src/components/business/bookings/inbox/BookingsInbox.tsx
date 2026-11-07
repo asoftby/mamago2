@@ -47,12 +47,12 @@ export function BookingsInbox() {
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as InboxResponse;
       if (seq !== requestSeq.current) return; // устаревший ответ после смены вкладки
-      setResponse({ query: tab + ":" + kind + ":" + requestId, result: json });
+      setResponse({ query, result: json });
       setState("ready");
     } catch {
       if (seq === requestSeq.current) setState("error");
     }
-  }, [tab, kind, requestId]);
+  }, [tab, kind, requestId, query]);
 
   useEffect(() => {
     setState("loading");
@@ -78,7 +78,7 @@ export function BookingsInbox() {
 
   return (
     <div className="space-y-4" data-testid="bookings-inbox">
-      {requestId ? <p className="text-sm text-muted-foreground">Заявка по прямой ссылке. <button className="underline" onClick={() => navigate({})}>Все заявки</button></p> : null}
+      {requestId ? <p className="text-sm text-muted-foreground">Заявка по прямой ссылке. <Button variant="link" className="min-h-11 px-1" onClick={() => navigate({})}>Все заявки</Button></p> : null}
       <div role="tablist" aria-label="Раздел заявок" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {INBOX_TABS.map((t) => {
           const active = t.tab === tab;
