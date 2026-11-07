@@ -265,4 +265,19 @@ const UNKNOWN = { kind: "unknown" } as const;
   assert.ok(adultsOk.items.some((i) => i.activityId === "adults"), "an adult audience may get the adults-only place");
 }
 
+// F8. virtual-session events (time from the schedule rules) rank below confirmed ones and are flagged
+{
+  const confirmed = ev("confirmed", A.lat, A.lng, [10], 10);
+  const virtual = ev("virtual", B.lat, B.lng, [10], 10, { virtualSession: true });
+  const both = buildDayScenario([confirmed, virtual], baseInput({ targetCount: 1 }), deps());
+  assert.deepEqual(both.items.map((i) => i.activityId), ["confirmed"], "same score: the confirmed session wins");
+  assert.equal(both.items[0]!.scheduleUnconfirmed, false);
+  const alone = buildDayScenario([virtual], baseInput({ targetCount: 1 }), deps());
+  assert.equal(alone.items[0]!.activityId, "virtual", "a virtual event is still offered when nothing confirmed fits");
+  assert.equal(alone.items[0]!.scheduleUnconfirmed, true, "and is flagged so the UI can say the time is by schedule");
+  assert.equal(alone.items[0]!.hoursUnconfirmed, false);
+  const a = buildDayScenario([ev("c1", A.lat, A.lng, [10], 10), virtual], baseInput({ variant: 0 }), deps());
+  assert.ok(a.items.every((i) => i.startsAtMs >= at(9) && i.endsAtMs <= at(20)), "a virtual start obeys the same window and overlap rules");
+}
+
 console.log("dayScenario build tests passed");

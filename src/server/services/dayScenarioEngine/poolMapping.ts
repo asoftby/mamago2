@@ -1,5 +1,6 @@
 import { fromZonedTime } from "date-fns-tz";
 import { geoCellsFor } from "@/lib/geo/geoCell";
+import { extractScheduleOccurrences } from "@/lib/event/materializeScheduleSessions";
 import { fillerDurationMin } from "@/features/my-plan/lib/dayScenario/fillers";
 import {
   resolveDayAvailability,
@@ -116,6 +117,35 @@ export function toPoolEvent(row: PoolActivityRow, engagementScore: number): Pool
     format: row.format,
     geo: resolveEventGeo(row),
   };
+}
+
+// ---------- events without ActivitySession rows (virtual sessions) ----------
+
+/**
+ * Start times (epoch ms, ascending) the schedule rules put on `date` in `timeZone`, from
+ * `now` onwards. Reuses the canonical `extractScheduleOccurrences` that also writes real
+ * sessions, so a virtual start is exactly the session the writer would have created.
+ */
+export function virtualSessionStarts(scheduleJson: unknown, date: string, timeZone: string, notBeforeMs: number): number[] {
+  const starts = extractScheduleOccurrences(scheduleJson)
+    .filter((occurrence) => occurrence.date === date)
+    .map((occurrence) => fromZonedTime(`${occurrence.date}T${occurrence.startTime}:00`, timeZone).getTime())
+    .filter((ms) => Number.isFinite(ms) && ms >= notBeforeMs);
+  return [...new Set(starts)].sort((a, b) => a - b);
+}
+
+/** A pool event whose single source of time is the schedule rules; null when none lands on the day. */
+export function toVirtualPoolEvent(
+  row: Omit<PoolActivityRow, "sessions">,
+  engagementScore: number,
+  date: string,
+  timeZone: string,
+  notBeforeMs: number,
+): PoolEvent | null {
+  const starts = virtualSessionStarts(row.scheduleJson, date, timeZone, notBeforeMs);
+  if (starts.length === 0) return null;
+  const event = toPoolEvent({ ...row, sessions: starts.map((ms) => ({ startsAt: new Date(ms) })) }, engagementScore);
+  return event ? { ...event, virtualSession: true } : null;
 }
 
 // ---------- filler places ----------

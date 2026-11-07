@@ -9,6 +9,8 @@ import {
   resolveEventGeo,
   toPoolEvent,
   toPoolPlace,
+  toVirtualPoolEvent,
+  virtualSessionStarts,
   type PoolActivityRow,
   type PoolPlaceRow,
 } from "./poolMapping";
@@ -170,6 +172,33 @@ async function main() {
   const kids = toPoolPlace(placeRow({ agePolicy: "SPECIFIC", ageTags: ["3-5", "5-7"] }), DAY)!;
   assert.deepEqual([kids.adultOnly, kids.ageTags], [false, ["3-5", "5-7"]]);
   assert.deepEqual([unknown.adultOnly, unknown.ageTags], [false, []], "no restriction stored -> suitable for everyone");
+
+  // --- virtual sessions: events with a schedule but no ActivitySession rows ---
+  {
+    const TZ = "Europe/Minsk";
+    const weekly = { scheduleItems: [{ date: "2026-11-07", startTime: "11:00", recurringEnabled: true, recurrenceInterval: 1, recurrenceUnit: "week", recurrenceUntil: "2027-02-01" }] };
+    const noon = Date.parse("2026-11-14T00:00:00Z");
+    assert.deepEqual(virtualSessionStarts(weekly, "2026-11-14", TZ, noon), [Date.parse("2026-11-14T08:00:00Z")], "weekly rule lands on Saturday 11:00 Minsk (08:00Z)");
+    assert.deepEqual(virtualSessionStarts(weekly, "2026-11-11", TZ, noon), [], "a Wednesday is not on the weekly rule");
+    assert.deepEqual(virtualSessionStarts(weekly, "2027-02-13", TZ, noon), [], "after recurrenceUntil nothing is generated");
+    assert.deepEqual(virtualSessionStarts(weekly, "2026-11-14", TZ, Date.parse("2026-11-14T09:00:00Z")), [], "a start already in the past is dropped");
+    const twoTimes = { dates: ["2026-11-14"], scheduleItems: [{ date: "2026-11-14", startTime: "10:00" }, { date: "2026-11-14", startTime: "15:30" }] };
+    assert.deepEqual(virtualSessionStarts(twoTimes, "2026-11-14", TZ, noon), [Date.parse("2026-11-14T07:00:00Z"), Date.parse("2026-11-14T12:30:00Z")], "two times on a date stay two starts, ascending");
+    assert.deepEqual(virtualSessionStarts(null, "2026-11-14", TZ, noon), [], "no scheduleJson, no virtual session");
+    assert.deepEqual(virtualSessionStarts({ foo: 1 }, "2026-11-14", TZ, noon), [], "an unreadable schedule yields nothing instead of throwing");
+
+    const { sessions: _unused, ...rowWithoutSessions } = base;
+    void _unused;
+    const withRule = { ...rowWithoutSessions, scheduleJson: weekly, place: placeGeo(53.9006, 27.559) };
+    const virtual = toVirtualPoolEvent(withRule, 3, "2026-11-14", TZ, noon)!;
+    assert.equal(virtual.virtualSession, true);
+    assert.deepEqual(virtual.sessionStartsMs, [Date.parse("2026-11-14T08:00:00Z")]);
+    assert.equal(virtual.kind, "event");
+    assert.equal(virtual.engagementScore, 3);
+    assert.ok(virtual.geo, "a virtual event keeps its venue geo");
+    assert.equal(toVirtualPoolEvent(withRule, 3, "2026-11-11", TZ, noon), null, "no occurrence on the day -> not in the pool");
+    assert.equal(toPoolEvent(base, 0)?.virtualSession, undefined, "real sessions are never marked virtual");
+  }
 
   console.log("dayScenarioEngine tests passed");
 }
