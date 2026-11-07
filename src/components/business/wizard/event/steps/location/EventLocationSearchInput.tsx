@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { MapPin } from "lucide-react";
+import { MobilePlaceAutocomplete } from "@/components/business/place/MobilePlaceAutocomplete";
 import { GoogleMapsService } from "@/services/googleMaps";
 import { placeAutocompleteWidgetStyles } from "@/services/googleMaps/placeAutocompleteWidgetStyle";
 import { cn } from "@/lib/utils";
@@ -107,6 +108,14 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
     const [inputValue, setInputValue] = useState(initialValue ?? "");
     const [autocompleteRequested, setAutocompleteRequested] = useState(eagerInit && !disabled);
     const [isWidgetReady, setIsWidgetReady] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+      const media = window.matchMedia("(max-width: 767px)");
+      const update = () => setIsMobile(media.matches);
+      update();
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }, []);
 
     useImperativeHandle(forwardedRef, () => {
       const focusTarget = widgetRef.current ?? fallbackInputRef.current;
@@ -314,7 +323,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
     }, [autocompleteRequested, disabled]);
 
     useEffect(() => {
-      if (!autocompleteRequested) {
+      if (isMobile || !autocompleteRequested) {
         return;
       }
 
@@ -326,9 +335,24 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         window.clearTimeout(initId);
         cleanupRef.current?.();
       };
-    }, [autocompleteRequested, initAutocomplete]);
+    }, [autocompleteRequested, initAutocomplete, isMobile]);
 
-    return (
+    return isMobile ? (
+      <MobilePlaceAutocomplete
+        value={inputValue}
+        onChange={updateInputValue}
+        onSelect={async (place) => {
+          const lat = readCoordinate(place.location?.lat);
+          const lng = readCoordinate(place.location?.lng);
+          if (!place.id || lat === null || lng === null) return;
+          const formattedAddr = place.formattedAddress ?? "";
+          updateInputValue(formattedAddr);
+          onPlaceSelectRef.current({ googlePlaceId: place.id, lat, lng, formattedAddr, addressJson: place.addressComponents ?? [] });
+        }}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+    ) : (
       <div className="relative">
         <style>{placeAutocompleteWidgetStyles(EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS)}</style>
 
