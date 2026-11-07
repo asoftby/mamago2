@@ -1,12 +1,15 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
+import { resolvePlaceAddressLabel } from "@/lib/place/placeAddressLabel";
 
 const previewSelect = {
   title: true,
   status: true,
   shortAddress: true,
   formattedAddr: true,
+  lat: true,
+  lng: true,
   city: { select: { name: true } },
 } as const;
 
@@ -48,7 +51,7 @@ export async function loadArticlePlaceAdminPreview(id: string, client: PreviewCl
     entityType: "PLACE" as const,
     title: place.title,
     city: place.city?.name ?? null,
-    address: place.shortAddress ?? place.formattedAddr ?? null,
+    address: resolvePlaceAddressLabel(place),
     publicAvailable: publicPlace != null,
     availability: resolveArticlePlacePreviewAvailability(place.status, publicPlace != null),
   };

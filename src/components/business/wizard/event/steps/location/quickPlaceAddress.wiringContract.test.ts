@@ -35,4 +35,29 @@ assert.match(picker, /preview\.availability === "unavailable"/);
 // entityType/entityId are never reset by showing a preview.
 assert.doesNotMatch(picker, /onChangeId\(""\)/);
 
+
+// Touch targets: both "Подтвердить точку" buttons are at least 44px (min-h-11), Leaflet logic untouched.
+const map = read("./EventLocationMapModal.tsx");
+const confirmButtons = map.match(/<Button[\s\S]*?Подтвердить точку[\s\S]*?<\/Button>/g) ?? [];
+assert.equal(confirmButtons.length, 2, "inline + fullscreen confirm buttons");
+for (const b of confirmButtons) assert.match(b, /min-h-11/);
+assert.match(map, /EVENT_LOCATION_MAP_CLICK_MESSAGE/);
+
+// Breaking News editor derives every success message from the server status, never from the clicked action.
+const editor = read("../../../../../admin/publications/PublicationTypeEditors.tsx");
+assert.doesNotMatch(editor, /showBreakingNewsSuccess\("draft_saved"/);
+assert.doesNotMatch(editor, /showBreakingNewsSuccess\("published", id, moderatedSnap, true\);\s*\} else \{\s*toast\.success\("Публикация отклонена"\)/);
+assert.match(editor, /resolveBreakingNewsOutcome\("save", snap\.status\)/);
+assert.match(editor, /resolveBreakingNewsOutcome\("submit", publishedSnap\?\.status, statusBeforeAction\)/);
+assert.match(editor, /resolveBreakingNewsOutcome\("publish", moderatedSnap\?\.status, statusBeforeAction\)/);
+
+
+// Every Place-creating path derives shortAddress through the shared guard.
+const placesRoute = read("../../../../../../app/api/business/places/route.ts");
+const publishResolver = read("../../../../../../lib/business/resolvePendingLocationOnPublish.ts");
+for (const src of [placesRoute, publishResolver]) {
+  assert.match(src, /deriveShortAddress\(/);
+  assert.doesNotMatch(src, /extractStreetName\(/);
+}
+
 console.log("quickPlaceAddress.wiringContract.test.ts: OK");
