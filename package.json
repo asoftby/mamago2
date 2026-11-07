@@ -240,7 +240,7 @@
     "test:poster-frame": "tsx src/lib/media/posterFrame.test.ts && tsx src/components/ideas/orderedMasonryGeometry.test.ts && tsx src/lib/discovery/kudaListingPagination.test.ts",
     "test:recommendation-narrow-exposures": "tsx --test src/server/services/recommendations/narrowRunExposures.integration.test.ts",
     "test:article-actions": "tsx src/lib/save/parseArticleIdsForBatch.test.ts && tsx src/lib/post-auth/executePendingAction.test.ts && tsx src/server/services/articleSaveActions.test.ts && tsx src/features/save/persistArticleSave.test.ts && tsx src/components/activity/SaveToPlanModal.test.tsx",
-    "test:save-status": "tsx src/features/save/saveStatusFetchGuard.test.ts && tsx src/features/save/saveStatusFetchGuardWiring.test.ts && tsx src/app/api/save/status/route.test.ts",
+    "test:save-status": "tsx src/features/save/saveStatusFetchGuard.test.ts && tsx src/features/save/saveStatusFetchGuardWiring.test.ts && tsx src/app/api/save/status/route.test.ts && tsx src/components/save-flow/saveFlow.test.tsx",
     "test:article-gallery": "tsx src/lib/article/articleMainGallery.test.ts && tsx src/components/article/mvp/ArticleGallery.test.tsx",
     "test:article-editor-dirty-state": "tsx src/lib/article/articleEditorComparable.test.ts",
     "test:article-media-picker": "tsx src/lib/publications/articleMvp.test.ts && tsx src/lib/article/articleMediaLibrary.test.ts && tsx \"src/app/api/admin/articles/[id]/media/route.test.ts\" && tsx src/components/admin/articles/ArticleBlocksMvpEditor.test.ts",
