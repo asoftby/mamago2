@@ -99,7 +99,7 @@ assert.ok(!plainTicketHtml.includes('mask-image'), "plain save ticket has no sid
 assert.ok(!plainTicketHtml.includes('border-dashed'), "plain save ticket has no perforation");
 const saveModal = readFileSync(join(process.cwd(), "src/components/activity/SaveToPlanModal.tsx"), "utf8");
 const saveHeader = readFileSync(join(process.cwd(), "src/components/activity/SaveActivityHeader.tsx"), "utf8");
-const confirmBar = saveModal.split("function ConfirmBar(")[1]?.split("// ─── All-dates drawer")[0];
+const confirmBar = readFileSync(join(process.cwd(), "src/components/save-flow/SaveConfirmBar.tsx"), "utf8");
 assert.ok(confirmBar?.includes("{label}"), "save action keeps its label");
 assert.ok(!confirmBar?.includes("<ArrowIcon"), "Save button has no arrow");
 assert.ok(saveHeader.includes("marginTop: 18, marginBottom: 18"), "ticket outside spacing decreases another 5px on both sides");
