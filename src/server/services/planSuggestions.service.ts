@@ -87,7 +87,7 @@ function nextDateKey(dateIso: string): string {
 }
 
 /** [день, день+1) в Europe/Minsk для `date` вида "YYYY-MM-DD" — не локальное время процесса. */
-function zonedDayRange(dateIso: string, timeZone: string): { start: Date; end: Date } {
+export function zonedDayRange(dateIso: string, timeZone: string): { start: Date; end: Date } {
   const start = fromZonedTime(`${dateIso}T00:00:00`, timeZone);
   const end = fromZonedTime(`${nextDateKey(dateIso)}T00:00:00`, timeZone);
   return { start, end };
