@@ -363,7 +363,7 @@ export async function POST(request: NextRequest) {
 
       assertScheduleValid(data.schedule);
 
-      if (productType === "PARTY_PACKAGE" && data.partyPriceMode && data.partyPriceMode !== "RANGE") {
+      if (productType === "PARTY_PACKAGE" && data.pricingMode !== "MULTIPLE" && data.partyPriceMode && data.partyPriceMode !== "RANGE") {
         const normalized = normalizePublicationPrice({ mode: data.partyPriceMode, min: data.singlePrice });
         priceFrom = normalized.min; priceTo = normalized.max; priceMode = normalized.mode;
       }

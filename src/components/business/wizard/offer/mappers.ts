@@ -737,7 +737,7 @@ export function buildOfferCreatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    ...(productType === "PARTY_PACKAGE" ? { partyPriceMode: data.partyPriceMode ?? "EXACT" } : {}),
+    ...(productType === "PARTY_PACKAGE" && data.pricingMode !== "multiple" ? { partyPriceMode: data.partyPriceMode ?? "EXACT" } : {}),
     ...(productType === "PARTY_PACKAGE" && data.packageComponents !== undefined ? {
       packageComponents: data.packageComponents,
       packageComponentsBaseline: data.packageComponentsBaseline ?? [],
@@ -975,7 +975,7 @@ export function buildOfferUpdatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    ...(productType === "PARTY_PACKAGE" ? { partyPriceMode: data.partyPriceMode ?? "EXACT" } : {}),
+    ...(productType === "PARTY_PACKAGE" && data.pricingMode !== "multiple" ? { partyPriceMode: data.partyPriceMode ?? "EXACT" } : {}),
     ...(productType === "PARTY_PACKAGE" && data.packageComponents !== undefined ? {
       packageComponents: data.packageComponents,
       packageComponentsBaseline: data.packageComponentsBaseline ?? [],

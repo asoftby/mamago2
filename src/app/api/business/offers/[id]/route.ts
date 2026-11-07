@@ -395,7 +395,7 @@ export async function PATCH(
       priceMode = normalized.mode;
       priceItems = values.map((price) => ({ price })) as Prisma.InputJsonValue;
       priceText = priceFrom != null ? formatPriceFrom(priceFrom) : null;
-    } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
+    } else if (data.pricingMode === "SINGLE" && (data.singlePrice !== undefined || ((data.productType ?? existingOffer.productType) === "PARTY_PACKAGE" && data.partyPriceMode))) {
       const normalized = normalizePublicationPrice({ mode: "EXACT", min: data.singlePrice });
       priceFrom = normalized.min;
       priceTo = normalized.max;
@@ -554,7 +554,8 @@ export async function PATCH(
     }
 
     // Update price fields if they were recalculated
-    if ((data.productType ?? existingOffer.productType) === "PARTY_PACKAGE" && data.partyPriceMode && data.partyPriceMode !== "RANGE") {
+    if ((data.productType ?? existingOffer.productType) === "PARTY_PACKAGE" && data.pricingMode !== "MULTIPLE" &&
+        (data.pricingMode === "SINGLE" || !Array.isArray(priceItems)) && data.partyPriceMode && data.partyPriceMode !== "RANGE") {
       const normalized = normalizePublicationPrice({ mode: data.partyPriceMode, min: data.singlePrice });
       priceFrom = normalized.min; priceTo = normalized.max; priceMode = normalized.mode;
     }
