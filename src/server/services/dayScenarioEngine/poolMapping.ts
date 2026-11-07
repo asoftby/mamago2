@@ -124,11 +124,12 @@ export function toPoolEvent(row: PoolActivityRow, engagementScore: number): Pool
 /**
  * Start times (epoch ms, ascending) the schedule rules put on `date` in `timeZone`, from
  * `now` onwards. Reuses the canonical `extractScheduleOccurrences` that also writes real
- * sessions, so a virtual start is exactly the session the writer would have created.
+ * sessions, so a virtual start is exactly the session the writer would have created. Only the
+ * requested day is expanded (window mode), so a schedule that has run for years costs the same
+ * as a new one.
  */
 export function virtualSessionStarts(scheduleJson: unknown, date: string, timeZone: string, notBeforeMs: number): number[] {
-  const starts = extractScheduleOccurrences(scheduleJson)
-    .filter((occurrence) => occurrence.date === date)
+  const starts = extractScheduleOccurrences(scheduleJson, { from: date, to: date })
     .map((occurrence) => fromZonedTime(`${occurrence.date}T${occurrence.startTime}:00`, timeZone).getTime())
     .filter((ms) => Number.isFinite(ms) && ms >= notBeforeMs);
   return [...new Set(starts)].sort((a, b) => a - b);
