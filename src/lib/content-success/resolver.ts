@@ -220,9 +220,16 @@ function resolvePublicOriginReturnTo(payload: ContentSuccessPayload): string | n
 }
 
 function resolveDraftSavedTitle(payload: ContentSuccessPayload): string {
-  void payload;
-  return "Черновик сохранен";
+  return payload.kind === "breaking-news" ? "Черновик сохранён" : "Черновик сохранен";
 }
+
+/** Заголовки Breaking News: точные формулировки по фактическому исходу операции. */
+const BREAKING_NEWS_TITLES: Partial<Record<ContentSuccessPayload["outcome"], string>> = {
+  published: "Новость опубликована",
+  changes_published: "Изменения сохранены",
+  changes_saved: "Изменения сохранены",
+  submitted: "Новость отправлена на модерацию",
+};
 
 function resolveOpenAction(
   payload: ContentSuccessPayload,
@@ -238,7 +245,7 @@ function resolveOpenAction(
     };
   }
 
-  if (payload.outcome === "submitted") {
+  if (payload.outcome === "submitted" || payload.outcome === "changes_saved") {
     if (!links.previewUrl) {
       return null;
     }
@@ -290,6 +297,10 @@ function resolveDescription(
     return hasOpenAction
       ? "Публикация отправлена на модерацию. Можно открыть предпросмотр, продолжить редактирование или вернуться к списку."
       : "Публикация отправлена на модерацию. Можно продолжить редактирование или вернуться к списку.";
+  }
+
+  if (payload.outcome === "changes_saved") {
+    return "Изменения сохранены. Можно продолжить редактирование или вернуться к списку.";
   }
 
   if (payload.outcome === "changes_published") {
@@ -344,9 +355,21 @@ export function resolveContentSuccessState(
     };
   }
 
+  if (payload.outcome === "changes_saved") {
+    return {
+      title: BREAKING_NEWS_TITLES.changes_saved ?? "Изменения сохранены",
+      description: resolveDescription(payload, openAction != null, fromPublicPage),
+      openAction,
+      continueEditingAction,
+      listAction,
+    };
+  }
+
   if (payload.outcome === "submitted") {
     return {
-      title: "Отправлено на модерацию",
+      title:
+        (payload.kind === "breaking-news" ? BREAKING_NEWS_TITLES.submitted : undefined) ??
+        "Отправлено на модерацию",
       description: resolveDescription(payload, openAction != null, fromPublicPage),
       openAction,
       continueEditingAction,
@@ -356,9 +379,8 @@ export function resolveContentSuccessState(
 
   return {
     title:
-      payload.outcome === "changes_published"
-        ? "Публикация обновлена"
-        : "Опубликовано",
+      (payload.kind === "breaking-news" ? BREAKING_NEWS_TITLES[payload.outcome] : undefined) ??
+      (payload.outcome === "changes_published" ? "Публикация обновлена" : "Опубликовано"),
     description: resolveDescription(payload, openAction != null, fromPublicPage),
     openAction,
     continueEditingAction,

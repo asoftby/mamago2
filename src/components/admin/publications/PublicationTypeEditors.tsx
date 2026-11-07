@@ -38,6 +38,7 @@ import { ArticleBlocksEditor, ArticleTocToggle } from "@/components/admin/public
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import { UnsavedPublicationChangesDialog } from "@/components/admin/publications/UnsavedPublicationChangesDialog";
 import { PlaceLinkedContactsEditor } from "@/components/admin/publications/PlaceLinkedContactsEditor";
+import { resolveBreakingNewsOutcome } from "@/lib/content-success/breakingNewsOutcome";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
@@ -490,7 +491,8 @@ export function NewsPublicationEditor({
           applySnapshot(snap);
           clearBreakingNewsLocalDrafts(snap.id);
           if (!opts?.silent) {
-            showBreakingNewsSuccess("draft_saved", snap.id, snap, false);
+            const outcome = resolveBreakingNewsOutcome("save", snap.status);
+            if (outcome) showBreakingNewsSuccess(outcome, snap.id, snap, false);
           }
           router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(snap.id)}`);
           return true;
@@ -519,7 +521,8 @@ export function NewsPublicationEditor({
         applySnapshot(snap);
         clearBreakingNewsLocalDrafts(snap.id);
         if (!opts?.silent) {
-          showBreakingNewsSuccess("draft_saved", snap.id, snap, true);
+          const outcome = resolveBreakingNewsOutcome("save", snap.status);
+          if (outcome) showBreakingNewsSuccess(outcome, snap.id, snap, true);
         }
         return true;
       } catch (e) {
@@ -545,6 +548,7 @@ export function NewsPublicationEditor({
   const saveDraft = () => void saveArticle();
 
   const submitForModeration = async () => {
+    const statusBeforeAction = status;
     // Validate author before publishing / submitting for moderation.
     if (!authorUserId) {
       setAuthorError("Выберите автора публикации");
@@ -613,7 +617,14 @@ export function NewsPublicationEditor({
       }
       clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
-      showBreakingNewsSuccess("submitted", id, publishedSnap, Boolean(articleId));
+      // Сервер решает по роли: ADMIN/MODERATOR публикуют сразу, остальные уходят на модерацию.
+      // Исход — строго по статусу из ответа; без подтверждённого статуса успех не заявляем.
+      const submitOutcome = resolveBreakingNewsOutcome("submit", publishedSnap?.status, statusBeforeAction);
+      if (!submitOutcome) {
+        toast.error("Сервер не подтвердил публикацию или отправку на модерацию. Обновите страницу и проверьте статус.");
+        return;
+      }
+      showBreakingNewsSuccess(submitOutcome, id, publishedSnap, Boolean(articleId));
     } finally {
       setSubmitting(false);
       setActionsBusy(false);
@@ -621,6 +632,7 @@ export function NewsPublicationEditor({
   };
 
   const moderate = async (action: "publish" | "reject") => {
+    const statusBeforeAction = status;
     if (action === "publish" && !authorUserId) {
       setAuthorError("Выберите автора публикации");
       return;
@@ -687,9 +699,16 @@ export function NewsPublicationEditor({
       clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
       if (action === "publish") {
-        showBreakingNewsSuccess("published", id, moderatedSnap, true);
-      } else {
+        const publishOutcome = resolveBreakingNewsOutcome("publish", moderatedSnap?.status, statusBeforeAction);
+        if (publishOutcome) {
+          showBreakingNewsSuccess(publishOutcome, id, moderatedSnap, true);
+        } else {
+          toast.error("Сервер не подтвердил публикацию. Обновите страницу и проверьте статус.");
+        }
+      } else if (moderatedSnap?.status === "REJECTED") {
         toast.success("Публикация отклонена");
+      } else {
+        toast.error("Сервер не подтвердил отклонение. Обновите страницу и проверьте статус.");
       }
     } finally {
       setModerating(false);

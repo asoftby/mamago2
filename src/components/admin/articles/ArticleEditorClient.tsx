@@ -752,6 +752,7 @@ export function ArticleEditorClient({
         toast.error(msg);
         return;
       }
+      const submitBody = (await res.json().catch(() => null)) as { status?: string } | null;
       const next = await fetchSnapshot(articleId);
       if (next) {
         applyEditorSnapshot(next);
@@ -759,7 +760,18 @@ export function ArticleEditorClient({
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
       }
-      showArticleSuccess("submitted", articleId, next, Boolean(initial.id.trim()));
+      // Исход — по статусу сервера (снапшот или тело ответа /submit), а не по нажатой кнопке.
+      const confirmedStatus = next?.status ?? submitBody?.status;
+      if (confirmedStatus !== "PUBLISHED" && confirmedStatus !== "PENDING") {
+        toast.error("Сервер не подтвердил публикацию или отправку на модерацию. Обновите страницу и проверьте статус.");
+        return;
+      }
+      showArticleSuccess(
+        confirmedStatus === "PUBLISHED" ? "published" : "submitted",
+        articleId,
+        next,
+        Boolean(initial.id.trim()),
+      );
       router.replace(`/admin/content/articles/${articleId}/edit`);
       router.refresh();
     } catch (e) {

@@ -25,6 +25,12 @@ interface EventLocationSearchInputProps {
   disabled?: boolean;
   initialValue?: string;
   placeholder?: string;
+  /**
+   * Подключить виджет Google сразу при монтировании, а не по первому касанию.
+   * Для форм, которые пользователь уже открыл осознанно (быстрое создание места):
+   * на мобильных подмена поля виджетом после касания роняет клавиатуру.
+   */
+  eagerInit?: boolean;
 }
 
 type PlaceAutocompleteElementCtor = new () => HTMLElement & {
@@ -84,6 +90,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
       disabled,
       initialValue,
       placeholder = "Адрес или название места",
+      eagerInit = false,
     },
     forwardedRef,
   ) {
@@ -98,7 +105,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
     const inputValueRef = useRef(initialValue ?? "");
     const shouldFocusWidgetRef = useRef(false);
     const [inputValue, setInputValue] = useState(initialValue ?? "");
-    const [autocompleteRequested, setAutocompleteRequested] = useState(false);
+    const [autocompleteRequested, setAutocompleteRequested] = useState(eagerInit && !disabled);
     const [isWidgetReady, setIsWidgetReady] = useState(false);
 
     useImperativeHandle(forwardedRef, () => {
@@ -235,13 +242,16 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         widget.addEventListener("gmp-select", handlePlaceSelect);
         widget.addEventListener("gmp-placeselect", handlePlaceSelect);
 
+        // Поле-заглушка вот-вот будет заменено виджетом: если пользователь уже печатает
+        // в нём (eager-режим не ставит shouldFocusWidgetRef), передаём фокус виджету.
+        // Если фокус ушёл в другое место — фокус не перехватываем.
+        if (document.activeElement === fallbackInputRef.current) {
+          shouldFocusWidgetRef.current = true;
+        }
+
         host.innerHTML = "";
         host.appendChild(widget);
         setIsWidgetReady(true);
-        if (shouldFocusWidgetRef.current) {
-          shouldFocusWidgetRef.current = false;
-          widget.focus?.();
-        }
 
         cleanupRef.current = () => {
           console.debug("[EventLocationSearchInput] cleanup");
@@ -286,6 +296,15 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
       syncWidgetValue(widget, inputValue);
     }, [inputValue, syncWidgetValue]);
 
+    // Фокус переносим после рендера: до снятия `hidden` с контейнера виджет не фокусируем.
+    useEffect(() => {
+      if (!isWidgetReady || !shouldFocusWidgetRef.current) {
+        return;
+      }
+      shouldFocusWidgetRef.current = false;
+      widgetRef.current?.focus?.();
+    }, [isWidgetReady]);
+
     const requestAutocomplete = useCallback(() => {
       if (disabled || autocompleteRequested) {
         return;
@@ -329,6 +348,10 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
             autoComplete="off"
             value={inputValue}
             onChange={(event) => updateInputValue(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter в поле адреса не должен отправлять внешнюю форму / уводить со страницы.
+              if (event.key === "Enter") event.preventDefault();
+            }}
             onFocus={requestAutocomplete}
             onPointerDown={requestAutocomplete}
             className={cn(

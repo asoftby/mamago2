@@ -10,6 +10,7 @@ export type ContentSuccessKind =
 export type ContentSuccessOutcome =
   | "published"
   | "changes_published"
+  | "changes_saved"
   | "submitted"
   | "draft_saved";
 

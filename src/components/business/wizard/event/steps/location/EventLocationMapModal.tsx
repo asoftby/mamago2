@@ -163,7 +163,7 @@ function EventLocationMapModalOpen({
             onClick={handleConfirm}
             disabled={!tempPin}
             size="default"
-            className="shrink-0 shadow-sm"
+            className="min-h-11 shrink-0 shadow-sm"
             style={{ backgroundColor: "#EF8759" }}
           >
             Подтвердить точку
@@ -201,7 +201,7 @@ function EventLocationMapModalOpen({
           onClick={handleConfirm}
           disabled={!tempPin}
           size="lg"
-          className="pointer-events-auto shadow-xl"
+          className="pointer-events-auto min-h-11 shadow-xl"
           style={{ backgroundColor: "#EF8759" }}
         >
           Подтвердить точку

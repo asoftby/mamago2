@@ -32,7 +32,7 @@ import {
   assertCollectionItemCount,
   assertJournalExpiryShape,
   assertJournalLinkedItemsShape,
-  resolveBreakingNewsExpiresAtOnPublish,
+  resolvePublishTimestamps,
   resolveJournalExpiresAt,
 } from "@/lib/journal/publicationType";
 
@@ -828,7 +828,8 @@ export async function moderateArticle(
       where: { id },
       select: {
         title: true, slug: true, geoScope: true, cityId: true, regionId: true,
-        categoryId: true, publicationType: true, expiresAt: true, _count: { select: { linkedItems: true } },
+        categoryId: true, publicationType: true, expiresAt: true, status: true, publishedAt: true,
+        _count: { select: { linkedItems: true } },
       },
     });
     if (!row) throw new Error("Article not found");
@@ -841,15 +842,11 @@ export async function moderateArticle(
       await resolveArticleSlugOnSaveInTransaction(tx, id, row.title, null);
     }
     await syncArticleCanonicalInTransaction(tx, id);
-    const publishedAt = new Date();
     await tx.article.update({
       where: { id },
       data: {
         status: "PUBLISHED",
-        publishedAt,
-        ...(row.publicationType === "BREAKING_NEWS"
-          ? { expiresAt: resolveBreakingNewsExpiresAtOnPublish(row.expiresAt, publishedAt) }
-          : {}),
+        ...resolvePublishTimestamps(row, new Date()),
       },
       select: { id: true },
     });
