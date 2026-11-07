@@ -450,6 +450,23 @@ async function main() {
   assert.deepEqual(adminNotifications, []);
   assert.deepEqual(placeWrites, [], "no write reached the database");
 
+  // an authorized owner cannot publish through PATCH either: status in the body is not applied
+  resetState();
+  currentUser = { id: "owner-1", role: "BUSINESS_OWNER" };
+  businesses.set("biz-1", { verificationStatus: "APPROVED" });
+  memberships.set("owner-1", { businessId: "biz-1", permissions: new Set(["content.create", "content.update", "content.publish"]) });
+  places.set("place-1", validPlace());
+  const patchPublish = await placeByIdRoute.PATCH(
+    json("PATCH", "/api/business/places/place-1", { status: "PUBLISHED", title: "Олимпик" }),
+    idParams("place-1"),
+  );
+  assert.ok(patchPublish.status < 500, `owner PATCH handled (got ${patchPublish.status})`);
+  assert.notEqual(places.get("place-1")!.status, "PUBLISHED", "PATCH never publishes for a non-staff owner");
+  assert.deepEqual(moderationCalls, []);
+  currentUser = { id: "intruder-1", role: "BUSINESS_OWNER" };
+  memberships.set("intruder-1", { businessId: "biz-2", permissions: new Set(["content.update", "content.publish"]) });
+  businesses.set("biz-2", { verificationStatus: "APPROVED" });
+
   // legacy place without a business: only its creator, not another user
   places.set("place-2", validPlace({ id: "place-2", ownerBusinessId: null, createdByUserId: "owner-1" }));
   assert.equal((await submitPlace(json("POST", "/x", {}), idParams("place-2"))).status, 403);

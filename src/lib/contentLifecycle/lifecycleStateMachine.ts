@@ -363,12 +363,9 @@ export const LIFECYCLE_TRANSITIONS: Record<
 
   article: {
     draft: {
+      // Admin surface is staff-only (ADMIN/MODERATOR): /submit publishes immediately for them,
+      // so a "send to moderation" action would be misleading. `publish` is the honest action.
       admin: [
-        {
-          actionId: "submitForModeration",
-          toState: "pending",
-          endpointImplemented: true,
-        },
         {
           actionId: "publish",
           toState: "published",
