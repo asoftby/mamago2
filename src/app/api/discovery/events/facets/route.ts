@@ -8,7 +8,7 @@ import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { buildKudaDiscoveryWhere } from "@/server/discovery/kudaDiscoveryFeed";
 import { matchesPublicFreePrice, resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
-import { activeOccasionWhere } from "@/lib/discovery/occasionUtils";
+import { publicDiscoveryOccasionWhere } from "@/lib/discovery/occasionUtils";
 
 /**
  * Availability facets for Kuda: every visible option corresponds to at least
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       priceMode: true, priceFrom: true, priceText: true,
       ageTags: true, ageMinMonths: true, ageMaxMonths: true, agePolicy: true,
       occasionLinks: {
-        where: { occasion: activeOccasionWhere(now) },
+        where: { occasion: publicDiscoveryOccasionWhere(now) },
         select: { occasion: { select: { slug: true, name: true, sortOrder: true } } },
       },
     },

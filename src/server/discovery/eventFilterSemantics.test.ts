@@ -226,6 +226,7 @@ test("all occasion slugs use the admin-managed active period, not title keywords
       isActive: true,
       startsAt: { lte: now },
       endsAt: { gte: now },
+      type: { in: ["HOLIDAY", "SEASON", "EVENT"] },
     } } },
   }]);
   assert.deepEqual(buildEventRuntimeWhere({ ...input, occasionSlug: null }, now), []);
