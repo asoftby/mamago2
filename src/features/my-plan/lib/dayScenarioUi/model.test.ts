@@ -8,6 +8,8 @@ import {
   markExhausted,
   restartVariants,
   canGoBack,
+  initialPersonSelection,
+  itemHref,
   datesForChoice,
   dayTabLabel,
   dayTitle,
@@ -192,6 +194,31 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.equal(parsedGuest.city, "minsk");
   const alt = draftRequestSchema.parse(buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "alternatives", { items, replaceActivityId: "b" }));
   assert.deepEqual([alt.action, alt.replaceActivityId], ["alternatives", "b"]);
+}
+
+// ---- "С кем идём?" starts from the page's "Для кого?"; cards link to their public page
+{
+  const family = ["me", "taisiya", "stepan"];
+  assert.deepEqual(initialPersonSelection(family, ["stepan"]), ["stepan"], "Степан chosen on the page: his chip is on");
+  assert.deepEqual(initialPersonSelection(family, ["taisiya", "stepan"]), ["taisiya", "stepan"]);
+  assert.deepEqual(initialPersonSelection(family, []), [], "nobody chosen: «Все»");
+  assert.deepEqual(initialPersonSelection(family, family), [], "everybody chosen is «Все», not three pressed chips");
+  assert.deepEqual(initialPersonSelection(family, ["ghost"]), [], "a person who is not in this family is ignored");
+  assert.deepEqual(initialPersonSelection(family, ["stepan", "stepan", "ghost"]), ["stepan"], "duplicates and strangers dropped");
+
+  const card = (slug: string | null) => ({ id: "x", slug, title: "T", coverImageUrl: null, ageLabel: null, categoryName: null, priceFrom: null, priceTo: null, priceText: null, currency: null, address: null });
+  assert.equal(itemHref({ kind: "event", activityId: "ev1", card: card("kids-show") }, "minsk"), "/minsk/events/ev1", "city of the event unknown: by id (unique), never a slug guessed under the listing city");
+  const inCity = (slug: string | null, citySlug: string) => ({ ...card(slug), citySlug });
+  assert.equal(itemHref({ kind: "event", activityId: "ev1", card: inCity("kids-show", "kopishche") }, "minsk"), "/kopishche/events/kids-show", "a suburban event opens under its own city");
+  assert.equal(itemHref({ kind: "place", activityId: "pl1", card: inCity("park-1", "kopishche") }, "minsk"), "/kopishche/places/park-1", "a suburban place too: the same slug may exist in Minsk");
+  assert.equal(itemHref({ kind: "place", activityId: "pl1", card: card("park-1") }, "grodno"), "/grodno/places/park-1");
+  assert.equal(itemHref({ kind: "event", activityId: "ev1", card: card(null) }, "minsk"), "/minsk/events/ev1", "an event without a slug opens by id");
+  assert.equal(itemHref({ kind: "place", activityId: "pl1", card: card("park-1") }, "grodno"), "/grodno/places/park-1", "city unknown: the listing city");
+  assert.equal(itemHref({ kind: "place", activityId: "pl1", card: card(null) }, "minsk"), null, "a place has no id route: no link");
+  assert.equal(itemHref({ kind: "event", activityId: "ev1", card: card("a/b") }, "minsk"), null, "no path tricks");
+  assert.equal(itemHref({ kind: "event", activityId: "ev1", card: card("kids-show") }, undefined), null, "no city at all: no link");
+  assert.equal(itemHref({ kind: "event", activityId: "ev1", card: card("kids-show") }, "../x"), null);
+  assert.equal(itemHref({ kind: "event", activityId: "ev1", card: inCity("kids-show", "../x") }, undefined), null, "an unsafe city is never put into a path");
 }
 
 console.log("dayScenarioUi model tests passed");
