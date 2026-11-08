@@ -6057,6 +6057,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: нет; удобно сделать вместе с PR 4 «Сценария дня» (удаление старых реализаций), когда экран выбора и подборки окончательно меняется.
 - Acceptance criteria: тесты либо обновлены под текущую разметку и подключены в `check:push`, либо удалены с обоснованием; ни один упавший тест не остаётся вне ворот.
 - Source: проверка на чистом `dev` при PR 2 «Сценария дня», 2026-11-08.
+
 ## [BACKLOG-236] `googleMapsConfigContract.test.ts` падает на чистом `dev`: `EventLocationMapModal.tsx` не читает `NEXT_PUBLIC_GOOGLE_MAP_ID`
 
 - Status: OPEN

@@ -64,7 +64,15 @@ assert.match(shared, /shouldQuerySuggestions\(next\)/);
 assert.match(shared, /requestId !== requestIdRef\.current/);
 assert.match(shared, /setOpen\(isFocusedRef\.current\)/, "late results never open the list after the user left the field");
 assert.match(shared, /isResolvingRef\.current\) return/, "double tap does not start two selections");
-assert.match(client, /new placesLib\.AutocompleteSessionToken\(\)/);
+// Ревью: поздний поиск после выбора не оставляет «мёртвый» список; размонтированное поле не уведомляет родителя.
+assert.match(shared, /sessionRef\.current !== session\) return/, "results of an already ended session are dropped");
+assert.match(shared, /requestIdRef\.current \+= 1; \/\/ поиск, запущенный во время выбора/, "a successful selection invalidates in-flight searches");
+assert.match(shared, /requestIdRef\.current \+= 1; \/\/ поиск, запущенный во время выбора[\s\S]*?clearTimeout\(debounceRef\.current\)/, "...and cancels a pending debounced search typed while the selection resolved");
+assert.match(shared, /if \(!isMountedRef\.current\) return;/, "no onSelect after unmount");
+assert.match(shared, /aria-controls=\{showPanel \? listboxId : undefined\}/, "aria-controls never points to a missing element");
+assert.match(shared, /role="status"[\s\S]*?role="alert"/, "status and error messages are announced");
+assert.match(shared, /current === "empty" \|\| current === "error" \? "loading" : current/, "a stale empty/error message is replaced by «searching» as soon as the user types");
+assert.match(client, /new placesLib\.AutocompleteSessionToken\(\)/); // поведение — в addressSuggestionsClient.test.ts
 // Сессия поиска: один токен на сессию (не на запрос), завершается fetchFields() при ЛЮБОМ исходе.
 assert.match(client, /if \(!session\.token && placesLib\.AutocompleteSessionToken\)/, "token is created once per session, not per request");
 assert.match(client, /try \{[\s\S]*?place\.fetchFields\([\s\S]*?\} finally \{[\s\S]*?session\.token = undefined;/, "token is discarded even if fetchFields fails");

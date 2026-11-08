@@ -26,19 +26,24 @@ export function createAddressSuggestionsSession(): AddressSuggestionsSession {
   return { token: undefined, predictions: new Map() };
 }
 
+type PlacesLib = Awaited<ReturnType<typeof GoogleMapsService.getPlacesLibrary>>;
+
 export async function fetchAddressSuggestions(
   session: AddressSuggestionsSession,
   input: string,
+  // Внедряется только в тестах (без ключа Google); в приложении всегда настоящая библиотека.
+  loadPlaces: () => Promise<PlacesLib> = () => GoogleMapsService.getPlacesLibrary(),
 ): Promise<AddressSuggestionView[]> {
-  const placesLib = await GoogleMapsService.getPlacesLibrary();
-  const fetchSuggestions = placesLib.AutocompleteSuggestion?.fetchAutocompleteSuggestions;
-  if (!fetchSuggestions) throw new Error("Places AutocompleteSuggestion is unavailable");
+  const placesLib = await loadPlaces();
+  const suggestionApi = placesLib.AutocompleteSuggestion;
+  if (!suggestionApi?.fetchAutocompleteSuggestions) throw new Error("Places AutocompleteSuggestion is unavailable");
 
   if (!session.token && placesLib.AutocompleteSessionToken) {
     session.token = new placesLib.AutocompleteSessionToken();
   }
 
-  const { suggestions } = await fetchSuggestions({
+  // Вызываем как метод класса (как в документации Google), а не «оторванной» функцией.
+  const { suggestions } = await suggestionApi.fetchAutocompleteSuggestions({
     input,
     sessionToken: session.token,
     language: "ru",
@@ -50,7 +55,9 @@ export async function fetchAddressSuggestions(
     .filter((prediction): prediction is google.maps.places.PlacePrediction => Boolean(prediction));
 
   const views = mapSuggestions(predictions as unknown as RawPlacePrediction[]);
-  session.predictions.clear();
+  // Карту только дополняем и никогда не очищаем здесь: ответы приходят не по порядку, и
+  // устаревший ответ (UI его отбросит) не должен стереть подсказки, которые пользователь видит.
+  // Очищается карта при завершении сессии выбором (resolveAddressSuggestion).
   for (const prediction of predictions) {
     if (prediction.placeId) session.predictions.set(prediction.placeId, prediction);
   }

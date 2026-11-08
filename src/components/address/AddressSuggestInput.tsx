@@ -75,6 +75,7 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
     const requestIdRef = useRef(0);
     const isFocusedRef = useRef(false);
     const isResolvingRef = useRef(false);
+    const isMountedRef = useRef(true);
     const clientRef = useRef(client);
     const onSelectRef = useRef(onSelect);
 
@@ -83,13 +84,14 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
       onSelectRef.current = onSelect;
     }, [client, onSelect]);
 
-    useEffect(
-      () => () => {
+    useEffect(() => {
+      isMountedRef.current = true;
+      return () => {
+        isMountedRef.current = false;
         if (debounceRef.current) clearTimeout(debounceRef.current);
         requestIdRef.current += 1;
-      },
-      [],
-    );
+      };
+    }, []);
 
     const runSearch = useCallback(async (input: string) => {
       const requestId = ++requestIdRef.current;
@@ -99,8 +101,10 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
       try {
         const activeClient = clientRef.current;
         if (!sessionRef.current) sessionRef.current = activeClient.createSession();
-        const items = await activeClient.fetchSuggestions(sessionRef.current, input);
-        if (requestId !== requestIdRef.current) return; // устаревший ответ
+        const session = sessionRef.current;
+        const items = await activeClient.fetchSuggestions(session, input);
+        // Устаревший ответ, либо сессия уже завершена выбором: такие подсказки нельзя выбрать.
+        if (requestId !== requestIdRef.current || sessionRef.current !== session) return;
         setSuggestions(items);
         setActiveIndex(-1);
         setStatus(items.length > 0 ? "ready" : "empty");
@@ -124,6 +128,8 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
         setOpen(false);
         return;
       }
+      // Пока идёт новый поиск, прошлые «ничего не найдено»/ошибка не показываем: они уже не про этот ввод.
+      setStatus((current) => (current === "empty" || current === "error" ? "loading" : current));
       debounceRef.current = setTimeout(() => void runSearch(next.trim()), ADDRESS_SUGGEST_DEBOUNCE_MS);
     };
 
@@ -143,11 +149,14 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
         setSelectError(null);
         try {
           const place = await clientRef.current.resolve(session, suggestion.id);
+          if (!isMountedRef.current) return; // поле уже убрали: родителю ничего не сообщаем
           if (!place) {
             setSelectError("Не удалось получить координаты. Выберите другой вариант или точку на карте.");
             return;
           }
           sessionRef.current = null;
+          requestIdRef.current += 1; // поиск, запущенный во время выбора, больше не актуален
+          if (debounceRef.current) clearTimeout(debounceRef.current); // и отложенный поиск тоже
           setSuggestions([]);
           setStatus("idle");
           closeList();
@@ -225,7 +234,7 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
           type="text"
           role="combobox"
           aria-expanded={showPanel}
-          aria-controls={listboxId}
+          aria-controls={showPanel ? listboxId : undefined}
           aria-autocomplete="list"
           aria-activedescendant={activeId}
           aria-label={placeholder}
@@ -296,15 +305,15 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
               ))}
             </ul>
             {status === "loading" && suggestions.length === 0 ? (
-              <p className="px-3 py-3 text-sm text-gray-500">Ищем адрес…</p>
+              <p role="status" className="px-3 py-3 text-sm text-gray-500">Ищем адрес…</p>
             ) : null}
             {status === "empty" ? (
-              <p className="px-3 py-3 text-sm text-gray-500">
+              <p role="status" className="px-3 py-3 text-sm text-gray-500">
                 Ничего не найдено. Уточните адрес или выберите точку на карте.
               </p>
             ) : null}
             {status === "error" ? (
-              <p className="px-3 py-3 text-sm text-red-600">
+              <p role="alert" className="px-3 py-3 text-sm text-red-600">
                 Не удалось загрузить подсказки. Проверьте соединение или выберите точку на карте.
               </p>
             ) : null}
