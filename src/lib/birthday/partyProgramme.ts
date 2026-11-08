@@ -74,7 +74,10 @@ export function projectProgramme(party: ProgrammeSource, now = new Date()): Prog
       to: (!timeConflict ? override?.to : null) ?? localTime(item.serviceEnd) ?? (item.role === "ANCHOR" ? party.timeTo : null), status, ...(timeConflict ? { timeConflict: true } : {}) };
   }) };
 }
-export function validateProgramme(entries: ProgrammeEntry[], party: ProgrammeSource): string | null {
+type ProgrammeTimingSource = Pick<ProgrammeSource, "timeFrom" | "timeTo"> & {
+  items: ReadonlyArray<Pick<ProgrammeSource["items"][number], "id" | "serviceStart" | "serviceEnd">>;
+};
+export function validateProgramme(entries: ProgrammeEntry[], party: ProgrammeTimingSource): string | null {
   const items = new Map(party.items.map(item => [item.id, item]));
   for (const entry of entries) {
     const item = items.get(entry.itemId);

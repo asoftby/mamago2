@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BirthdayPartyDayPlan } from "./BirthdayPartyDayPlan";
@@ -38,6 +39,8 @@ export function PartyProgrammeEditor({ data }: { data: ProgrammeEditorData }) {
         const body = await response.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error || "Не удалось сохранить");
       }
+      const result = await response.json() as { participantsReset?: boolean };
+      if (result.participantsReset) toast("Семья изменилась. Проверьте участников праздника.", { duration: 6000 });
       setSaved(true); router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить"); }
     finally { setPending(false); }

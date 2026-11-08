@@ -2,7 +2,7 @@ name: Plan recurrence DB integration
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "test/birthday-complete-demo-catalog-*", "feat/birthday-final-scenario-family-*"]
     paths:
       - ".github/workflows/plan-recurrence-db-integration.yml"
       - "src/server/services/recurrenceMaterialization*"

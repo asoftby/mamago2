@@ -4,8 +4,9 @@ import appPrisma, { prismaBase } from '../../../src/lib/prisma';
 import { assertBirthdayDemoEnvironment } from './guard';
 import { seedBirthdayDemo } from './seed';
 import { demoId, demoDates } from './catalog';
-import { changePartyProgramme, readFamilyPartyProgramme, readPublicPartyProgramme } from '../../../src/server/birthday/partyPlan.service';
+import { changePartyProgramme, programmeSelect, readFamilyPartyProgramme, readPublicPartyProgramme } from '../../../src/server/birthday/partyPlan.service';
 import { createPartyDraft, updatePartyDraft, readPartyOrder } from '../../../src/server/birthday/partyDraft.service';
+import { leaveFamily, transferFamilyOwnership } from '../../../src/server/family/familyMembers.service';
 import { planScopeFor } from '../../../src/server/family/familyAccess';
 import { removePlanItem, listPlanItemsByDate } from '../../../src/server/services/plan.service';
 import { cancelPartyBeforeConfirmation } from '../../../src/server/birthday/partyCancel.service';
@@ -13,8 +14,15 @@ import { cancelPartyBeforeConfirmation } from '../../../src/server/birthday/part
 assertBirthdayDemoEnvironment(process.env);
 process.env.FAMILY_CORE_READS = '1';
 const db = new PrismaClient();
-let queryCount = 0;
-if (process.env.PRISMA_QUERY_EVENTS === '1') prismaBase.$on('query' as never, (() => { queryCount++; }) as never);
+let queryCount = 0, selectCount = 0, compositionReads = 0;
+if (process.env.PRISMA_QUERY_EVENTS === '1') {
+  assert.equal(process.env.NODE_ENV, 'test', 'query instrumentation requires NODE_ENV=test');
+  prismaBase.$on('query' as never, ((event: { query: string }) => {
+    queryCount++;
+    if (event.query.trimStart().startsWith('SELECT')) selectCount++;
+    if (/"PartyOrderItem"|"BookingRequest"|"PartyQuote"/.test(event.query)) compositionReads++;
+  }) as never);
+}
 const parent = demoId('parent'), adult = demoId('adult'), outsider = demoId('outsider');
 async function main() {
   await seedBirthdayDemo(db);
@@ -58,7 +66,20 @@ async function main() {
     const privateTask = await db.planItem.create({ data: { userId: parent, familyId: demoId('family'), visibility: 'PRIVATE', source: 'MANUAL', entryType: 'TASK', title: 'PRIVATE_SECRET' } });
     try { assert.equal(await db.planItem.findFirst({ where: { id: privateTask.id, ...(await planScopeFor(adult)) } }), null); }
     finally { await db.planItem.delete({ where: { id: privateTask.id } }); }
+    let baselineSelects = 0;
+    if (process.env.PRISMA_QUERY_EVENTS === '1') {
+      selectCount = 0;
+      await appPrisma.partyOrder.findFirst({ where: { id: party.id, ownerUserId: parent }, select: programmeSelect });
+      baselineSelects = selectCount;
+    }
+    queryCount = 0; selectCount = 0; compositionReads = 0;
     await changePartyProgramme(parent, party.id, { action: 'publicLink', version: version++, days: 1 });
+    if (process.env.PRISMA_QUERY_EVENTS === '1') {
+      console.log('MEASURE public-link command SELECTs:', baselineSelects, 'full-composition baseline ->', selectCount,
+        'actual command; total statements including transaction/CAS:', queryCount);
+      assert.ok(selectCount <= baselineSelects);
+      assert.equal(compositionReads, 0, 'sharing must not load services, requests or quotes');
+    }
     const enabled = await db.partyOrder.findUniqueOrThrow({ where: { id: party.id } });
     assert.ok(enabled.publicPlanToken);
     queryCount = 0;
@@ -94,4 +115,49 @@ async function main() {
     if (order?.planItemId) await db.planItem.deleteMany({ where: { id: order.planItemId, userId: parent } });
   }
 }
-main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => { await db.$disconnect(); await appPrisma.$disconnect(); });
+async function familyLifecycle() {
+  const user = await db.user.create({ data: { email: 'programme-lifecycle-' + Date.now() + '@it.test', role: 'USER', emailVerifiedAt: new Date() } });
+  const counterpart = await db.user.create({ data: { email: 'programme-lifecycle-other-' + Date.now() + '@it.test', role: 'USER', emailVerifiedAt: new Date() } });
+  try {
+    const draft = await createPartyDraft(user.id, { citySlug: 'minsk', venueMode: 'VENUE' });
+    const ready = await updatePartyDraft(user.id, draft.id, { version: draft.version, eventDate: demoDates().partyDate,
+      timeFrom: '14:00', timeTo: '16:00', anchorOfferId: demoId('venue-2'), addonOfferIds: [] });
+    let version = ready.version;
+    const saves = await Promise.allSettled([1, 2].map(() => changePartyProgramme(user.id, draft.id, { action: 'saveToPlan', version })));
+    assert.equal(saves.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(saves.filter(result => result.status === 'rejected').length, 1);
+    version++;
+    const first = await db.partyOrder.findUniqueOrThrow({ where: { id: draft.id }, include: { planItem: true } });
+    assert.ok(first.familyId, 'first plan save must use canonical lazy Family Core creation');
+    assert.ok(first.planItemId);
+    assert.ok(await db.planItem.findFirst({ where: { id: first.planItemId!, ...(await planScopeFor(user.id)) } }), 'first plan is visible to its owner');
+    const child = await db.child.create({ data: { parentId: user.id, familyId: first.familyId!, createdById: user.id, name: 'Old-family fixture child' } });
+    await changePartyProgramme(user.id, draft.id, { action: 'participants', version: version++, adultIds: [user.id], childIds: [child.id] });
+    await db.familyMembership.create({ data: { familyId: first.familyId!, userId: counterpart.id, role: 'ADULT', historyAccess: 'ALL' } });
+    await transferFamilyOwnership(db, { userId: user.id, targetUserId: counterpart.id });
+    const moved = await leaveFamily(db, { userId: user.id, copyChildren: false });
+    assert.notEqual(moved.familyId, first.familyId);
+    const afterLeave = await db.planItem.findUniqueOrThrow({ where: { id: first.planItemId! } });
+    assert.equal(afterLeave.familyId, moved.familyId);
+    assert.equal(afterLeave.childId, null, 'Family Core clears inaccessible child references');
+    const savedAfterLeave = await changePartyProgramme(user.id, draft.id, { action: 'saveToPlan', version: version++ });
+    assert.equal(savedAfterLeave.participantsReset, true);
+    const restored = await db.partyOrder.findUniqueOrThrow({ where: { id: draft.id }, include: { planItem: true } });
+    assert.equal(restored.planItemId, first.planItemId, 'family lifecycle never duplicates the projection');
+    assert.equal(restored.familyId, moved.familyId);
+    assert.equal(restored.planItem?.familyId, moved.familyId);
+    assert.equal(restored.planItem?.childId, null, 'must not reattach a live old-family child after leaving');
+    assert.deepEqual(restored.programmeAdultIds, []);
+    assert.deepEqual(restored.programmeChildIds, []);
+    assert.ok(await db.planItem.findFirst({ where: { id: first.planItemId!, ...(await planScopeFor(user.id)) } }));
+    console.log('programme family lifecycle PASS: lazy first family, actual leave, same visible private PlanItem, no old child reattachment');
+  } finally {
+    const memberships = await db.familyMembership.findMany({ where: { userId: user.id }, select: { familyId: true } });
+    await db.partyOrder.deleteMany({ where: { ownerUserId: user.id } });
+    await db.planItem.deleteMany({ where: { userId: user.id } });
+    await db.child.deleteMany({ where: { parentId: user.id } });
+    await db.family.deleteMany({ where: { id: { in: memberships.map(row => row.familyId) }, memberships: { every: { userId: { in: [user.id, counterpart.id] } } } } });
+    await db.user.deleteMany({ where: { id: { in: [user.id, counterpart.id] } } });
+  }
+}
+main().then(familyLifecycle).catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => { await db.$disconnect(); await appPrisma.$disconnect(); });

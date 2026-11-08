@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
-import { findActiveFamilyId } from "@/server/family/ensureFamily";
 import { prisma } from "@/lib/prisma";
-import { familyReadsEnabled, planScopeFor } from "@/server/family/familyAccess";
+import { familyIdForWrite, familyReadsEnabled, planScopeFor } from "@/server/family/familyAccess";
 import { generateShareToken, SHARE_TOKEN_PATTERN } from "@/server/wishlist/wishlistPure";
 import { projectProgramme, validateProgramme, type ProgrammeCommand } from "@/lib/birthday/partyProgramme";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
@@ -27,7 +26,8 @@ export async function createPartyPlan(tx: Prisma.TransactionClient, party: {
 }) {
   if (!party.eventDate || !party.timeFrom || !party.timeTo)
     throw new PartyApiError(422, "Сначала укажите дату и время праздника");
-  const familyId = party.familyId ?? await findActiveFamilyId(tx, party.ownerUserId);
+  const familyId = party.familyId;
+  if (!familyId) throw new PartyApiError(409, "Семья изменилась. Обновите страницу");
   const data = { userId: party.ownerUserId, familyId,
     visibility: party.programmeAdultIds.some(id => id !== party.ownerUserId) ? "FAMILY" as const : "PRIVATE" as const,
     source: "MANUAL" as const, entryType: "EVENT" as const,
@@ -47,13 +47,18 @@ export async function createPartyPlan(tx: Prisma.TransactionClient, party: {
 }
 
 export async function changePartyProgramme(ownerUserId: string, partyId: string, input: ProgrammeCommand) {
+  // Reuse Family Core's lazy first-write path, like the existing manual plan writer.
+  const planFamilyId = input.action === "saveToPlan" ? await familyIdForWrite(ownerUserId) : null;
   return prisma.$transaction(async tx => {
     const party = await tx.partyOrder.findFirst({ where: { id: partyId, ownerUserId },
-      select: { ...programmeSelect, id: true, version: true, ownerUserId: true, familyId: true,
+      select: { ...programmeSelect, items: input.action === "programme" ? programmeSelect.items : false, id: true, version: true, ownerUserId: true, familyId: true,
         planItemId: true, programmeAdultIds: true, programmeChildIds: true } });
     if (!party) throw new PartyApiError(404, "Праздник не найден");
     if (party.version !== input.version) throw new PartyApiError(409, "Праздник изменён. Обновите страницу");
     if (party.status === "CANCELLED") throw new PartyApiError(409, "Праздник отменён");
+    let nextAdults = party.programmeAdultIds;
+    let nextChildren = party.programmeChildIds;
+    let participantsReset = false;
     const data: Prisma.PartyOrderUncheckedUpdateManyInput = { version: { increment: 1 } };
     if (input.action === "programme") {
       const error = validateProgramme(input.entries, party);
@@ -74,8 +79,35 @@ export async function changePartyProgramme(ownerUserId: string, partyId: string,
       const count = await tx.child.count({ where: { familyId: membership.familyId, id: { in: children } } });
       if (count !== children.length) throw new PartyApiError(422, "Профиль ребёнка недоступен");
       data.familyId = membership.familyId;
-      data.programmeAdultIds = adults;
-      data.programmeChildIds = children;
+      data.programmeAdultIds = nextAdults = adults;
+      data.programmeChildIds = nextChildren = children;
+    }
+    if (input.action === "saveToPlan" && planFamilyId) {
+      await tx.$queryRaw`SELECT "id" FROM "Family" WHERE "id" = ${planFamilyId} FOR UPDATE`;
+      const members = await tx.familyMembership.findMany({ where: {
+        familyId: planFamilyId, leftAt: null, userId: { in: [...new Set([ownerUserId, ...nextAdults])] },
+      }, select: { userId: true } });
+      if (!members.some(row => row.userId === ownerUserId))
+        throw new PartyApiError(409, "Семья изменилась. Обновите страницу");
+      if (party.familyId !== planFamilyId) {
+        participantsReset = nextAdults.length > 0 || nextChildren.length > 0;
+        nextAdults = []; nextChildren = [];
+      } else {
+        const activeIds = new Set(members.map(row => row.userId));
+        const children = nextChildren.length ? await tx.child.findMany({ where: {
+          familyId: planFamilyId, id: { in: nextChildren },
+        }, select: { id: true } }) : [];
+        const childIds = new Set(children.map(row => row.id));
+        const adults = nextAdults.filter(id => activeIds.has(id));
+        const currentChildren = nextChildren.filter(id => childIds.has(id));
+        participantsReset = adults.length !== nextAdults.length || currentChildren.length !== nextChildren.length;
+        nextAdults = adults; nextChildren = currentChildren;
+      }
+      data.familyId = planFamilyId;
+      if (participantsReset) {
+        data.programmeAdultIds = nextAdults;
+        data.programmeChildIds = nextChildren;
+      }
     }
     if (input.action === "publicLink") {
       data.publicPlanToken = input.days ? generateShareToken() : null;
@@ -86,11 +118,11 @@ export async function changePartyProgramme(ownerUserId: string, partyId: string,
     if (input.action === "saveToPlan" || (input.action === "participants" && party.planItemId)) {
       await createPartyPlan(tx, { ...party,
         familyId: typeof data.familyId === "string" ? data.familyId : party.familyId,
-        programmeAdultIds: input.action === "participants" ? [...new Set(input.adultIds)] : party.programmeAdultIds,
-        programmeChildIds: input.action === "participants" ? [...new Set(input.childIds)] : party.programmeChildIds,
+        programmeAdultIds: nextAdults,
+        programmeChildIds: nextChildren,
       });
     }
-    return { version: input.version + 1 };
+    return { version: input.version + 1, participantsReset };
   });
 }
 

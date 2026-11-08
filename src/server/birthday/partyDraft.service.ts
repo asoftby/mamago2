@@ -330,9 +330,7 @@ export async function updatePartyDraft(
       include: { items: { orderBy: { position: "asc" }, include: { offer: { select: draftOfferSelect } } } },
     });
     if (input.eventDate !== undefined || input.timeFrom !== undefined || input.timeTo !== undefined) {
-      const programmeError = validateProgramme(programmeEntries(updated.programme), {
-        ...updated, items: updated.items.map(item => ({ ...item, requests: [] })),
-      });
+      const programmeError = validateProgramme(programmeEntries(updated.programme), updated);
       if (programmeError) throw new PartyApiError(422, programmeError);
       if (updated.planItemId) await tx.planItem.updateMany({ where: { id: updated.planItemId, userId: ownerUserId }, data: {
         date: updated.eventDate?.toISOString().slice(0, 10) ?? null,

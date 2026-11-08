@@ -183,4 +183,5 @@ jobs:
         env:
           APP_ENV: local
           BIRTHDAY_DEMO_LOCAL: "1"
+          PRISMA_QUERY_EVENTS: "1"
         run: pnpm test:birthday-programme:integration
