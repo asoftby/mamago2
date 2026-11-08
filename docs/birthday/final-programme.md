@@ -30,7 +30,7 @@ Draft #1148 remains unmerged. A5's exact `20261106043000_party_plan_link` migrat
 - Owner widths 320/375/390/768/1200; family/public 320/390/1200: document content width equals viewport width. Screenshots `/private/tmp/mamago-programme-{owner,family,public}-*.png` are local QA evidence, not deployed assets. UI Lab previews all seven canonical statuses using the actual timeline component.
 - Initial targeted birthday-contract invocation without DATABASE_URL failed (existing honestBuilder test needs DB); rerun uses guarded isolated DB. This was not a product failure or a full gate.
 - Independent review found and fixed: generic scenario delete/replace bypass; newest losing request masking canonical confirmation; date/plan drift; date/programme conflict before saving My Plan; analytics capability exclusion; changed INCLUDED confirmation. Browser QA fixed time-input event handling and disabled interactive fields before hydration.
-- Full local pre-push gate: pending final candidate; no earlier full gate run for B. Exact final SHA/CI evidence belongs in the PR description.
+- First B pre-push candidate `6d59af233` stopped before production build on two historical literal-regex Telegram/My Plan contracts after adding the linked-order guard. Expectations were corrected without weakening source/ACL/version checks; both targeted contracts pass. Meanwhile dev advanced to #1176: parent A is deliberately aligned first, then B merges that parent for a task-only stacked diff. The next full gate is for this corrected, aligned final SHA, not a duplicate unchanged run. Exact final SHA/CI evidence belongs in the PR description.
 
 ## Explicit limits / PR C
 
