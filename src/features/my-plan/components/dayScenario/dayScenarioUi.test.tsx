@@ -116,6 +116,10 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(shell, /intent === "kuda" \? <KudaDayScenarioEntry \/> : null/);
   const screen = readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8");
   assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "saving the day is inactive until PR 3");
+  assert.match(screen, /\{current \? \(\s*<div aria-busy/, "the action row is shown for any draft, also an emptied one (undo stays reachable)");
+  assert.match(screen, /api\.goBack\(activeDate\)/);
+  assert.match(main, /<DayScenarioScreen[\s\S]*?city=\{city\}/, "the member screen gets the page's city");
+  assert.match(panel, /<DayScenarioScreen audience="guest" city=\{city\}/, "the guest screen gets the page's city");
 }
 
 console.log("dayScenario UI tests passed");

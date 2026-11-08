@@ -1787,6 +1787,7 @@ export function PlanMainContent({
             <DayScenarioScreen
               key={`${nestedScreenVersion}-${selectedDate}`}
               audience="member"
+              city={city}
               todayIso={todayKey}
               initialDate={selectedDate}
               people={personas.map((persona) => ({

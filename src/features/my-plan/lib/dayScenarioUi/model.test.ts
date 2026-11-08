@@ -121,6 +121,18 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.equal(last.current?.items.length, 0);
 }
 
+// ---- removing a point must not leave a travel leg that describes a different pair
+{
+  const leg = (min: number) => ({ mode: "car" as const, minutes: min, distanceM: min * 400 });
+  const abc: Draft = { items: [item("a", "2026-11-14T07:00:00Z", "2026-11-14T08:30:00Z"), item("b", "2026-11-14T09:00:00Z", "2026-11-14T10:30:00Z", { travel: leg(15) }), item("c", "2026-11-14T11:00:00Z", "2026-11-14T12:30:00Z", { travel: leg(20) })], status: "ok", suggestMode: null, mode: "car" };
+  const travelOf = (h: ReturnType<typeof removeItem>) => h.current?.items.map((i) => [i.activityId, i.travel?.minutes ?? null]);
+  const base = pushDraft(emptyHistory(), abc, 0);
+  assert.deepEqual(travelOf(removeItem(base, "b")), [["a", null], ["c", null]], "A -> C is not B -> C: the leg is dropped, not shown wrong");
+  assert.deepEqual(travelOf(removeItem(base, "a")), [["b", null], ["c", 20]], "the new first point has no leg; B -> C is still B -> C");
+  assert.deepEqual(travelOf(removeItem(base, "c")), [["a", null], ["b", 15]], "removing the last point keeps the others' legs");
+  assert.equal(popDraft(removeItem(base, "b")).current?.items[2]?.travel?.minutes, 20, "undo brings the original legs back");
+}
+
 // ---- alternatives
 {
   const current = draft("a", "b", "c");
@@ -135,20 +147,23 @@ assert.equal(AGE_ANSWERS.length, 4);
 
 // ---- request bodies parse with the server schema, for guests and members
 {
-  const guest = buildDraftBody({ date: "2026-11-14", mode: "car", ageRanges: ["3-5", "5-7"], personaIds: [] }, "build");
+  const guest = buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: ["3-5", "5-7"], personaIds: [] }, "build");
   const parsedGuest = draftRequestSchema.parse(guest);
   assert.deepEqual([parsedGuest.ageRanges, parsedGuest.personaIds, parsedGuest.dayStart, parsedGuest.dayEnd], [["3-5", "5-7"], [], "10:00", "20:00"]);
-  const member = buildDraftBody({ date: "2026-11-11", mode: "walk", ageRanges: ["3-5"], personaIds: ["p1", "p2"] }, "build");
+  const member = buildDraftBody({ city: "minsk", date: "2026-11-11", mode: "walk", ageRanges: ["3-5"], personaIds: ["p1", "p2"] }, "build");
   const parsedMember = draftRequestSchema.parse(member);
   assert.deepEqual([parsedMember.ageRanges, parsedMember.personaIds, parsedMember.dayStart, parsedMember.mode], [[], ["p1", "p2"], "16:00", "walk"], "a member sends personas only: the server resolves ages");
   const items = draft("a", "b").items;
-  const rebuild = draftRequestSchema.parse(buildDraftBody({ date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "rebuild", { variant: 2, items }));
+  const rebuild = draftRequestSchema.parse(buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "rebuild", { variant: 2, items }));
   assert.deepEqual([rebuild.variant, rebuild.current.length, rebuild.pinnedActivityIds.length], [2, 2, 0]);
-  const more = draftRequestSchema.parse(buildDraftBody({ date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "rebuild", { items, pinAll: true, targetCount: items.length + 1 }));
+  const more = draftRequestSchema.parse(buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "rebuild", { items, pinAll: true, targetCount: items.length + 1 }));
   assert.deepEqual([more.pinnedActivityIds, more.targetCount], [["a", "b"], 3]);
-  const capped = draftRequestSchema.parse(buildDraftBody({ date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "rebuild", { items, pinAll: true, targetCount: 9 }));
+  const capped = draftRequestSchema.parse(buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "rebuild", { items, pinAll: true, targetCount: 9 }));
   assert.equal(capped.targetCount, 4, "the engine never gets more than 4 points");
-  const alt = draftRequestSchema.parse(buildDraftBody({ date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "alternatives", { items, replaceActivityId: "b" }));
+  const otherCity = draftRequestSchema.parse(buildDraftBody({ city: "grodno", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "build"));
+  assert.equal(otherCity.city, "grodno", "the page's city reaches the engine (its pool is per city)");
+  assert.equal(parsedGuest.city, "minsk");
+  const alt = draftRequestSchema.parse(buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "alternatives", { items, replaceActivityId: "b" }));
   assert.deepEqual([alt.action, alt.replaceActivityId], ["alternatives", "b"]);
 }
 

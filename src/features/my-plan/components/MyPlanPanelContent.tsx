@@ -9,6 +9,7 @@ import { PlanMainContent } from "./PlanMainContent";
 import { GuestMyPlanPanel } from "./GuestMyPlanPanel";
 import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
 import { useDayScenarioEnabled } from "../hooks/useDayScenarioEnabled";
+import { useOptionalCity } from "@/contexts/CityContext";
 
 interface MyPlanPanelContentProps {
   open: boolean;
@@ -41,6 +42,7 @@ export function MyPlanPanelContent({
 }: MyPlanPanelContentProps) {
   /** DAY_SCENARIO_ENGINE_ENABLED: off, the guest panel below is exactly as before. */
   const dayScenarioEnabled = useDayScenarioEnabled();
+  const city = useOptionalCity()?.citySlug ?? "minsk";
   const {
     isLoading,
     accessPhase,
@@ -167,7 +169,7 @@ export function MyPlanPanelContent({
   if (!isAuthenticated && dayScenarioEnabled) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <DayScenarioScreen audience="guest" todayIso={todayIso} initialDate={todayIso} onBack={onRequestClose} onClose={onRequestClose} />
+        <DayScenarioScreen audience="guest" city={city} todayIso={todayIso} initialDate={todayIso} onBack={onRequestClose} onClose={onRequestClose} />
       </div>
     );
   }

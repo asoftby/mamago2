@@ -166,11 +166,21 @@ export function popDraft(history: DraftHistory): DraftHistory {
   return { current: previous, past: rest, variant: history.variant };
 }
 
-/** "Убрать": drops one point locally (the engine is not asked); the old draft stays undoable. */
+/**
+ * "Убрать": drops one point locally (the engine is not asked); the old draft stays undoable.
+ * A travel leg describes the pair (previous point -> this point). When the neighbour changes the leg
+ * no longer says anything true, so it is dropped (the first point never has one) rather than shown wrong.
+ */
 export function removeItem(history: DraftHistory, activityId: string): DraftHistory {
   if (!history.current) return history;
-  const items = history.current.items.filter((item) => item.activityId !== activityId);
-  if (items.length === history.current.items.length) return history;
+  const before = history.current.items;
+  const kept = before.filter((item) => item.activityId !== activityId);
+  if (kept.length === before.length) return history;
+  const items = kept.map((item, index) => {
+    const previousBefore = before[before.findIndex((x) => x.activityId === item.activityId) - 1];
+    const unchanged = index > 0 && previousBefore?.activityId === kept[index - 1]!.activityId;
+    return unchanged ? item : { ...item, travel: null };
+  });
   return pushDraft(history, { ...history.current, items, status: items.length > 0 ? history.current.status : "empty" });
 }
 
@@ -188,6 +198,8 @@ export function freshItemOf(variantItems: readonly DraftItem[], currentIds: Read
 // ---------- requests ----------
 
 export type ScenarioQuery = {
+  /** City slug of the page the screen was opened on; the engine's pool is per city. */
+  city: string;
   date: string;
   mode: ScenarioMode;
   /** Guest answers; ignored for a signed-in user, who sends `personaIds`. */
@@ -210,6 +222,7 @@ export function buildDraftBody(
   const { dayStart, dayEnd } = windowFor(query.date);
   const items = options.items ?? [];
   return {
+    city: query.city,
     date: query.date,
     action,
     mode: query.mode,

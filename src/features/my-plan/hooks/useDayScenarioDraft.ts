@@ -90,21 +90,22 @@ export type DayScenarioDraftApi = {
  */
 export function useDayScenarioDraft(input: {
   enabled: boolean;
+  city: string;
   dates: string[];
   mode: ScenarioMode;
   ageRanges: string[];
   personaIds: string[];
 }): DayScenarioDraftApi {
-  const { enabled, dates, mode, ageRanges, personaIds } = input;
+  const { enabled, city, dates, mode, ageRanges, personaIds } = input;
   const [byDate, dispatch] = useReducer(reducer, {} as Record<string, DateDraftState>);
   const stateRef = useRef(byDate);
   stateRef.current = byDate;
   const seq = useRef<Record<string, number>>({});
   const controllers = useRef<Record<string, AbortController>>({});
 
-  const queryKey = JSON.stringify([enabled, dates, mode, ageRanges, personaIds]);
+  const queryKey = JSON.stringify([enabled, city, dates, mode, ageRanges, personaIds]);
   const query = useMemo(
-    () => (date: string) => ({ date, mode, ageRanges, personaIds }),
+    () => (date: string) => ({ city, date, mode, ageRanges, personaIds }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- queryKey is the serialized identity of these inputs
     [queryKey],
   );
@@ -145,7 +146,7 @@ export function useDayScenarioDraft(input: {
     return () => {
       for (const controller of Object.values(running)) controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- queryKey covers enabled/dates/mode/ages/personas
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- queryKey covers enabled/city/dates/mode/ages/personas
   }, [queryKey, build]);
 
   const another = useCallback(

@@ -46,6 +46,7 @@ const QUIET_BTN = `mp-font-ui flex min-h-[52px] items-center justify-center gap-
  */
 export function DayScenarioScreen({
   audience,
+  city,
   todayIso,
   initialDate,
   people = [],
@@ -55,6 +56,8 @@ export function DayScenarioScreen({
   onClose,
 }: {
   audience: "guest" | "member";
+  /** City slug of the page the screen was opened on. */
+  city: string;
   todayIso: string;
   /** Member: the day open in the widget. */
   initialDate: string;
@@ -81,6 +84,7 @@ export function DayScenarioScreen({
 
   const api = useDayScenarioDraft({
     enabled: phase === "draft" && dates.length > 0,
+    city,
     dates,
     mode,
     ageRanges: isGuest ? rangesForAnswers(ageKeys) : [],
@@ -207,26 +211,31 @@ export function DayScenarioScreen({
               />
             ) : null}
 
-            {current && items.length > 0 ? (
+            {current ? (
               <div aria-busy={loading} className={cn("transition-opacity", loading && "opacity-60")}>
-                <p className="mp-font-ui m-0 mt-4 text-[17px] leading-[1.45] text-[var(--mp-tx)]">
-                  {summaryLine(items)}
-                  {hasPlanItems ? <span className="block text-[14px] text-[var(--mp-tx2)]">Подобрали к тому, что уже в плане</span> : null}
-                </p>
-                {showFewNearby ? <FewNearbyBanner onSwitchToCar={() => setMode("car")} /> : null}
-                <ScenarioTimeline
-                  items={items}
-                  ownEntries={ownEntries}
-                  busy={loading}
-                  onRemove={(item) => activeDate && api.remove(activeDate, item.activityId)}
-                  onReplace={(item) => void openReplace(item)}
-                />
+                {items.length > 0 ? (
+                  <>
+                    <p className="mp-font-ui m-0 mt-4 text-[17px] leading-[1.45] text-[var(--mp-tx)]">
+                      {summaryLine(items)}
+                      {hasPlanItems ? <span className="block text-[14px] text-[var(--mp-tx2)]">Подобрали к тому, что уже в плане</span> : null}
+                    </p>
+                    {showFewNearby ? <FewNearbyBanner onSwitchToCar={() => setMode("car")} /> : null}
+                    <ScenarioTimeline
+                      items={items}
+                      ownEntries={ownEntries}
+                      busy={loading}
+                      onRemove={(item) => activeDate && api.remove(activeDate, item.activityId)}
+                      onReplace={(item) => void openReplace(item)}
+                    />
+                  </>
+                ) : null}
                 {items.length < MAX_TARGET_COUNT ? (
                   <button type="button" disabled={loading} onClick={() => activeDate && api.addMore(activeDate)} className={cn(QUIET_BTN, "mt-4 w-full border-dashed")}>
                     <Plus className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
                     Добавить место
                   </button>
                 ) : null}
+                {/* Also when the day was emptied by hand: the previous draft must stay one tap away. */}
                 <div className="mb-10 mt-4 grid grid-cols-2 gap-2">
                   <button type="button" disabled={loading} onClick={() => activeDate && api.another(activeDate)} className={QUIET_BTN}>
                     <RefreshCw className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden />
