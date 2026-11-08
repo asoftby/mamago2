@@ -2,6 +2,8 @@
  * Test matrix for the day-scenario engine on DEV (BACKLOG-230). Read-only against the
  * draft API; the only writes are three "[MOCK]" manual plan notes at 12:00 for the test
  * user (skip with --skip-plan-items). At most --max-calls (default 300) HTTP calls.
+ * Repeats are judged like the UI would live them: "another" sends what was already shown;
+ * anchors (events) may come back (counted, not a violation), a shown filler place may not.
  *
  *   DEV_TEST_USER_EMAIL=... DEV_TEST_USER_PASSWORD=... \
  *     pnpm tsx scripts/dev/day-scenario-matrix.ts --report=/path/report.html [--apply-date=YYYY-MM-DD]
@@ -15,6 +17,8 @@ import { minskDateOf, resolveSlotDates, sessionInstant } from "../ops/seed-day-s
 import {
   checkResult,
   oracleAgeRanges,
+  repeatsOf,
+  unseenSeedFillers,
   PLAN_FIXTURE_TITLE,
   renderReport,
   TODDLER_RANGES,
@@ -22,6 +26,7 @@ import {
   type ApiResult,
   type RunParams,
   type RunRecord,
+  type StepKind,
   type StepRecord,
   type Violation,
 } from "./day-scenario-matrix.lib";
@@ -30,6 +35,7 @@ const args = process.argv.slice(2);
 const argValue = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? null;
 const BASE = (argValue("base-url") ?? "https://dev.mamago.by").replace(/\/$/, "");
 const REPORT = argValue("report");
+const MAX_ANOTHER = 6;
 const MAX_CALLS = Number(argValue("max-calls") ?? 300);
 const APPLY_DATE = argValue("apply-date") ?? minskDateOf(new Date());
 const SKIP_PLAN_ITEMS = args.includes("--skip-plan-items");
@@ -199,35 +205,65 @@ async function main(): Promise<void> {
         };
         const common = { city: "minsk", date: d.date, mode, targetCount: 3, dayStart: d.window.start, dayEnd: d.window.end, ...(aud.authed ? { personaIds } : { ageRanges: aud.ageRanges }) };
         const steps: StepRecord[] = [];
+        // What the UI knows about this day: every point shown so far (it sends them as `shownActivityIds`).
+        const shownIds = new Set<string>();
+        const shownTitles = new Set<string>();
         const signatures: string[] = [];
-        const add = (name: string, base: Omit<StepRecord, "name" | "violations">, extra: Partial<StepRecord> = {}) => {
-          const violations: Violation[] = base.result ? checkResult(params, name, base.result, { dates, priorSignatures: signatures }) : [{ run: params.id, step: name, rule: "Ответ API", detail: `HTTP ${base.httpStatus}` }];
-          if (base.result) signatures.push(sig(base.result));
-          steps.push({ name, ...base, violations, ...extra });
+        const remember = (res: ApiResult) => {
+          for (const i of res.items) {
+            shownIds.add(i.activityId);
+            shownTitles.add(i.card.title);
+          }
+          signatures.push(sig(res));
+        };
+        const add = (name: string, base: Omit<StepRecord, "name" | "violations">, kind: StepKind, extra: Partial<StepRecord> = {}, currentItems?: ApiResult["items"]) => {
+          const violations: Violation[] = base.result
+            ? checkResult(params, name, base.result, { dates, stepKind: kind, shownIds: new Set(shownIds), shownTitles: new Set(shownTitles), priorSignatures: [...signatures], currentItems })
+            : [{ run: params.id, step: name, rule: "Ответ API", detail: `HTTP ${base.httpStatus}` }];
+          const repeats = kind === "another" && base.result ? repeatsOf(base.result.items, shownIds) : undefined;
+          const exhausted = base.result?.exhausted === true;
+          const unseenLeft = exhausted ? unseenSeedFillers(params, { dates, shownTitles, currentItems }) : undefined;
+          steps.push({ name, ...base, violations, repeats, exhausted, unseenLeft, ...extra });
         };
 
         const built = await draft({ ...common, action: "build", variant: 0 }, aud.authed);
-        add("Собрать", built.step);
+        add("Собрать", built.step, "build");
+        if (built.result) remember(built.result);
         let current = built.result;
-        for (let v = 1; v <= 3; v++) {
-          const next = await draft({ ...common, action: "rebuild", variant: v, current: current ? toCurrent(current) : [], pinnedActivityIds: [] }, aud.authed);
-          add(`Другой вариант ${v}`, next.step, { diffNote: diffNote(current, next.result) });
-          current = next.result ?? current;
+        // a chain of "Другой вариант" until the engine says everything was shown (at most MAX_ANOTHER steps)
+        let nextVariant = 1;
+        for (let v = 1; v <= MAX_ANOTHER; v++) {
+          const next = await draft({ ...common, action: "another", variant: nextVariant, current: current ? toCurrent(current) : [], shownActivityIds: [...shownIds] }, aud.authed);
+          const shownNote = next.result?.exhausted ? "Нового варианта нет: на экране остаётся прежний." : diffNote(current, next.result);
+          add(`Другой вариант ${v}`, next.step, "another", { diffNote: shownNote, anotherNo: v }, current?.items);
+          if (next.result?.exhausted) break;
+          if (next.result && !next.result.exhausted) {
+            remember(next.result);
+            current = next.result;
+            nextVariant = (next.result.variant ?? nextVariant) + 1;
+          }
         }
-        // "Заменить": one point, three alternatives against the original build
+        // "Заменить": one request returns up to three whole-day variants for one point
         const base = built.result;
         if (base && base.items.length > 0) {
           const sorted = [...base.items].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
           const victim = sorted[Math.min(1, sorted.length - 1)]!;
-          const alternatives = new Set<string>();
-          for (let v = 1; v <= 3; v++) {
-            const rep = await draft({ ...common, action: "replace", variant: v, current: toCurrent(base), replaceActivityId: victim.activityId }, aud.authed);
-            const kept = new Set(sorted.filter((i) => i.activityId !== victim.activityId).map((i) => i.activityId));
-            const fresh = (rep.result?.items ?? []).filter((i) => !kept.has(i.activityId)).map((i) => i.card.title);
-            fresh.forEach((t) => alternatives.add(t));
-            add(`Заменить «${victim.card.title}» (попытка ${v})`, rep.step, { alternatives: fresh.length ? fresh : ["— замены не нашлось —"], diffNote: diffNote(base, rep.result) });
+          const rep = await draft({ ...common, action: "alternatives", variant: 0, current: toCurrent(base), replaceActivityId: victim.activityId }, aud.authed);
+          const kept = new Set(sorted.filter((i) => i.activityId !== victim.activityId).map((i) => i.activityId));
+          const variants = rep.result?.alternatives ?? [];
+          const freshTitles = variants.map((items) => items.find((i) => !kept.has(i.activityId))?.card.title ?? "—");
+          if (variants.length === 0) {
+            add(`Заменить «${victim.card.title}»`, rep.step, "other", { alternatives: ["— замены не нашлось —"] });
+            notes.push(`${params.id}: для «Заменить» альтернатив не найдено.`);
           }
-          if (alternatives.size === 0) notes.push(`${params.id}: для «Заменить» альтернатив не найдено.`);
+          variants.forEach((items, k) => {
+            const asResult: ApiResult = { status: "ok", mode: common.mode, suggestMode: null, items };
+            add(`Заменить «${victim.card.title}» (вариант ${k + 1})`, { result: asResult, httpStatus: rep.step.httpStatus, ms: rep.step.ms }, "alternative", {
+              alternatives: k === 0 ? freshTitles : undefined,
+              diffNote: diffNote(base, asResult),
+            });
+          });
+          if (new Set(freshTitles).size !== freshTitles.length) notes.push(`${params.id}: «Заменить» предложил одну альтернативу дважды.`);
         }
         runs.push({ params, steps });
         console.log(`${params.id}: ${built.result?.status ?? "HTTP " + built.step.httpStatus}, calls=${calls}`);

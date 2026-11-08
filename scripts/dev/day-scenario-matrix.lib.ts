@@ -3,7 +3,7 @@
  * No I/O: the runner feeds it API responses, the oracle comes from the mock seed specs,
  * so violations are judged against what the seed *says* (independent of the engine).
  */
-import { geoCellsFor } from "../../src/lib/geo/geoCell";
+import { geoCellsFor, geoCellWithNeighbors } from "../../src/lib/geo/geoCell";
 import { haversineMeters } from "../../src/lib/geo/haversineMeters";
 import { ageRangeAt } from "../../src/lib/child/birth";
 import { CLUSTER_LABEL, MOCK_PLACES, type MockPlaceSpec } from "../ops/day-scenario-mocks/places.data";
@@ -49,7 +49,7 @@ export type ApiItem = {
   approximatePlace: boolean;
   far: boolean;
 };
-export type ApiResult = { status: string; mode: string; suggestMode: string | null; items: ApiItem[]; meta?: { poolCache?: string; poolSize?: number; poolPlaces?: number; candidateCount?: number; buildMs?: number } };
+export type ApiResult = { variant?: number; status: string; mode: string; suggestMode: string | null; items: ApiItem[]; exhausted?: boolean; alternatives?: ApiItem[][]; meta?: { poolCache?: string; poolSize?: number; poolPlaces?: number; candidateCount?: number; buildMs?: number } };
 
 export type RunParams = {
   id: string;
@@ -139,11 +139,48 @@ export function totalsOf(items: ApiItem[]): Totals {
 
 const hm = (iso: string) => new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Minsk", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 
+/** What a step is, for the repeat rules: only "another" steps are judged for repeats. */
+export type StepKind = "build" | "another" | "alternative" | "other";
+
+export type CheckContext = {
+  dates: Record<DaySlot, string>;
+  stepKind?: StepKind;
+  /** Activity ids shown by the earlier build/"another" steps of this run (what the UI would send as `shownActivityIds`). */
+  shownIds?: ReadonlySet<string>;
+  /** Titles of the same, for the seed oracle. */
+  shownTitles?: ReadonlySet<string>;
+  /** Signatures (id@start) of the earlier build/"another" steps. */
+  priorSignatures?: string[];
+  /** The draft the parent had when asking for another variant (the oracle looks around its points). */
+  currentItems?: ApiItem[];
+};
+
+/**
+ * Unseen filler places the SEED says could still be shown: age-eligible, not closed that day, not shown
+ * yet, and within the mode's reach of the current draft (walking: the same or a neighbouring ~1 km cell;
+ * car: the same ~5 km cell). Only seeded places are known to the oracle, so "none" proves nothing about the
+ * real catalog - but "some" while the engine says "nothing new" is a premature claim.
+ */
+export function unseenSeedFillers(run: RunParams, ctx: Pick<CheckContext, "dates" | "shownTitles" | "currentItems">): string[] {
+  const near = (ctx.currentItems ?? []).map((i) => specFor(i.card.title)).filter((s): s is SpecInfo => s !== null && s.geoCell5 !== null);
+  const found: string[] = [];
+  MOCK_PLACES.forEach((place, ordinal) => {
+    if (place.lat == null || place.lng == null || ctx.shownTitles?.has(place.title)) return;
+    if (run.ageRanges.length > 0 && (place.adultOnly || (place.ages.length > 0 && !place.ages.some((a) => run.ageRanges.includes(a))))) return;
+    if (seededAvailability(hoursPlanFor(place, ctx.dates, ordinal), run.date) === "closed") return;
+    const cells = geoCellsFor(place.lat, place.lng);
+    if (!cells) return;
+    const reachable = near.some((s) => (run.mode === "walk" ? s.geoCell6 !== null && geoCellWithNeighbors(s.geoCell6).includes(cells.geoCell6) : s.geoCell5 === cells.geoCell5));
+    if (reachable) found.push(place.title);
+  });
+  return found;
+}
+
 export function checkResult(
   run: RunParams,
   step: string,
   result: ApiResult,
-  ctx: { dates: Record<DaySlot, string>; priorSignatures: string[] },
+  ctx: CheckContext,
 ): Violation[] {
   const out: Violation[] = [];
   const v = (rule: string, detail: string) => out.push({ run: run.id, step, rule, detail });
@@ -187,7 +224,17 @@ export function checkResult(
   const ids = items.map((i) => i.activityId);
   if (new Set(ids).size !== ids.length) v("Повтор точки внутри сценария", ids.join(","));
   const signature = items.map((i) => `${i.activityId}@${i.startsAt}`).join("|");
-  if (ctx.priorSignatures.includes(signature) && items.length > 0) v("Повтор варианта", "набор точек и времён совпал с одним из предыдущих");
+  if (ctx.stepKind === "another") {
+    const kindOf = (i: ApiItem) => i.kind ?? specFor(i.card.title)?.kind ?? "event";
+    const repeatedFillers = items.filter((i) => kindOf(i) === "place" && ctx.shownIds?.has(i.activityId));
+    if (repeatedFillers.length > 0) v("Повтор заполнителя", `уже показывали: ${repeatedFillers.map((i) => i.card.title).join("; ")}`);
+    const sameDay = items.length > 0 && (ctx.priorSignatures ?? []).includes(signature);
+    if (sameDay && repeatedFillers.length === 0) v("Повтор якорей без «показали всё»", "тот же набор событий и времён, движок не сказал, что вариантов больше нет");
+  }
+  if (result.exhausted) {
+    const unseen = unseenSeedFillers(run, ctx);
+    if (unseen.length > 0) v("Преждевременное «показали всё»", `по сиду ещё есть непоказанные места рядом: ${unseen.slice(0, 4).join("; ")}${unseen.length > 4 ? ` … (${unseen.length})` : ""}`);
+  }
   return out;
 }
 
@@ -195,7 +242,19 @@ export function checkResult(
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export type StepRecord = { name: string; result: ApiResult | null; httpStatus: number; ms: number; violations: Violation[]; diffNote?: string; alternatives?: string[] };
+/** Anchors (events with a fixed time) that came back from an earlier variant: normal, only counted. */
+export type RepeatInfo = { anchors: string[]; fillers: string[] };
+export type StepRecord = { name: string; result: ApiResult | null; httpStatus: number; ms: number; violations: Violation[]; diffNote?: string; alternatives?: string[]; repeats?: RepeatInfo; exhausted?: boolean; unseenLeft?: string[]; anotherNo?: number };
+
+/** Which of this step's points an earlier variant already showed, split into anchors and fillers. */
+export function repeatsOf(items: readonly ApiItem[], shownIds: ReadonlySet<string>): RepeatInfo {
+  const out: RepeatInfo = { anchors: [], fillers: [] };
+  for (const i of items) {
+    if (!shownIds.has(i.activityId)) continue;
+    ((i.kind ?? specFor(i.card.title)?.kind) === "place" ? out.fillers : out.anchors).push(i.card.title);
+  }
+  return out;
+}
 export type RunRecord = { params: RunParams; steps: StepRecord[] };
 
 function timeline(result: ApiResult): string {
@@ -214,7 +273,7 @@ function stepHtml(step: StepRecord): string {
   const r = step.result;
   const t = r ? totalsOf(r.items) : null;
   const warn = r ? [r.status !== "ok" ? `статус: ${r.status}` : "", r.suggestMode ? `подсказка: переключиться на «${r.suggestMode === "car" ? "машину" : r.suggestMode}»` : "", r.items.some((i) => i.far) ? "есть переезд > 40 мин" : "", r.items.some((i) => i.approximatePlace) ? "есть «примерное место»" : "", r.items.some((i) => i.hoursUnconfirmed) ? "есть места без подтверждённых часов" : "", r.items.some((i) => i.scheduleUnconfirmed) ? "есть события со временем по расписанию (без сеанса)" : ""].filter(Boolean) : [];
-  return `<div class="step"><h4>${esc(step.name)} <span class="muted">· HTTP ${step.httpStatus} · ${Math.round(step.ms)} мс${r?.meta ? ` · пул ${r.meta.poolCache}, ${r.meta.poolSize} (мест ${r.meta.poolPlaces ?? 0}), сборка ${r.meta.buildMs} мс` : ""}</span></h4>${r ? timeline(r) : "<p class='bad'>нет ответа</p>"}${t ? `<p>Итого: <b>${t.points}</b> точек · <b>${t.km.toFixed(2)} км</b> · <b>${t.travelMin} мин</b> в пути · переходов между geoCell5: <b>${t.cell5Transitions}</b></p>` : ""}${warn.length ? `<p class="warn">Предупреждения: ${esc(warn.join("; "))}</p>` : ""}${step.diffNote ? `<p class="muted">${esc(step.diffNote)}</p>` : ""}${step.alternatives ? `<p>Альтернативы: ${step.alternatives.map((a) => `<span class="chip">${esc(a)}</span>`).join(" ")}</p>` : ""}${step.violations.length ? `<p class="bad">Нарушения: ${step.violations.map((v) => esc(v.rule)).join("; ")}</p>` : ""}</div>`;
+  return `<div class="step"><h4>${esc(step.name)} <span class="muted">· HTTP ${step.httpStatus} · ${Math.round(step.ms)} мс${r?.meta ? ` · пул ${r.meta.poolCache}, ${r.meta.poolSize} (мест ${r.meta.poolPlaces ?? 0}), сборка ${r.meta.buildMs} мс` : ""}</span></h4>${r ? timeline(r) : "<p class='bad'>нет ответа</p>"}${t ? `<p>Итого: <b>${t.points}</b> точек · <b>${t.km.toFixed(2)} км</b> · <b>${t.travelMin} мин</b> в пути · переходов между geoCell5: <b>${t.cell5Transitions}</b></p>` : ""}${warn.length ? `<p class="warn">Предупреждения: ${esc(warn.join("; "))}</p>` : ""}${step.diffNote ? `<p class="muted">${esc(step.diffNote)}</p>` : ""}${step.exhausted ? `<p class="warn">Движок ответил «Мы показали всё, что подходит» (нового варианта нет, на экране остаётся прежний).</p>` : ""}${step.repeats && step.repeats.anchors.length ? `<p class="muted">Повтор якорей (норма): ${esc(step.repeats.anchors.join("; "))}</p>` : ""}${step.repeats && step.repeats.fillers.length ? `<p class="bad">Повтор заполнителей: ${esc(step.repeats.fillers.join("; "))}</p>` : ""}${step.alternatives ? `<p>Альтернативы: ${step.alternatives.map((a) => `<span class="chip">${esc(a)}</span>`).join(" ")}</p>` : ""}${step.violations.length ? `<p class="bad">Нарушения: ${step.violations.map((v) => esc(v.rule)).join("; ")}</p>` : ""}</div>`;
 }
 
 export function renderReport(input: { generatedAt: string; base: string; build: string; dates: Record<string, string>; runs: RunRecord[]; calls: number; notes: string[] }): string {
@@ -225,7 +284,17 @@ export function renderReport(input: { generatedAt: string; base: string; build: 
     const build = r.steps[0]?.result;
     const t = build ? totalsOf(build.items) : null;
     const nv = r.steps.reduce((n, s) => n + s.violations.length, 0);
-    return `<tr><td><a href="#${esc(r.params.id)}">${esc(r.params.id)}</a></td><td>${esc(r.params.dateLabel)}</td><td>${r.params.mode === "walk" ? "Пешком" : "Машина"}</td><td>${esc(r.params.audience)}</td><td>${esc(build?.status ?? "—")}</td><td>${t ? `${t.points} / ${t.km.toFixed(2)} км / ${t.travelMin} мин / ${t.cell5Transitions}` : "—"}</td><td class="${nv ? "bad" : "ok"}">${nv}</td></tr>`;
+    const anchorRepeats = r.steps.reduce((n, st) => n + (st.repeats?.anchors.length ?? 0), 0);
+    const fillerRepeats = r.steps.reduce((n, st) => n + (st.repeats?.fillers.length ?? 0), 0);
+    const allShown = r.steps.filter((st) => st.exhausted).length;
+    return `<tr><td><a href="#${esc(r.params.id)}">${esc(r.params.id)}</a></td><td>${esc(r.params.dateLabel)}</td><td>${r.params.mode === "walk" ? "Пешком" : "Машина"}</td><td>${esc(r.params.audience)}</td><td>${esc(build?.status ?? "—")}</td><td>${t ? `${t.points} / ${t.km.toFixed(2)} км / ${t.travelMin} мин / ${t.cell5Transitions}` : "—"}</td><td>${anchorRepeats}</td><td class="${fillerRepeats ? "bad" : "ok"}">${fillerRepeats}</td><td>${allShown}</td><td class="${nv ? "bad" : "ok"}">${nv}</td></tr>`;
+  });
+  const chainRows = input.runs.map((r) => {
+    const anothers = r.steps.filter((st) => st.anotherNo !== undefined);
+    const stop = anothers.find((st) => st.exhausted);
+    const verdict = !stop ? "«показали всё» не наступило" : (stop.unseenLeft?.length ?? 0) > 0 ? `<span class="bad">преждевременно</span>` : `<span class="ok">обосновано</span>`;
+    const left = stop?.unseenLeft ?? [];
+    return `<tr><td><a href="#${esc(r.params.id)}">${esc(r.params.id)}</a></td><td>${anothers.filter((st) => !st.exhausted).length}</td><td>${stop ? `шаг ${stop.anotherNo}` : "—"}</td><td class="${left.length ? "bad" : "ok"}">${stop ? left.length : "—"}</td><td>${esc(left.slice(0, 4).join("; "))}${left.length > 4 ? ` … (${left.length})` : ""}</td><td>${verdict}</td></tr>`;
   });
   const violationRows = all.map((v) => `<tr><td><a href="#${esc(v.run)}">${esc(v.run)}</a></td><td>${esc(v.step)}</td><td>${esc(v.rule)}</td><td>${esc(v.detail)}</td></tr>`);
   const sections = input.runs.map((r) => `<section id="${esc(r.params.id)}"><h3>${esc(r.params.id)}</h3><p class="params">Дата: <b>${esc(r.params.dateLabel)}</b> · окно ${esc(r.params.window.start)}–${esc(r.params.window.end)} · режим: <b>${r.params.mode === "walk" ? "Пешком" : "Машина"}</b> · аудитория: <b>${esc(r.params.audience)}</b>${r.params.ageRanges.length ? ` (${esc(r.params.ageRanges.join(", "))})` : ""} · запись плана 12:00: <b>${r.params.planItem ? "да" : "нет"}</b></p>${r.steps.map(stepHtml).join("")}</section>`);
@@ -241,7 +310,10 @@ table{border-collapse:collapse;width:100%;margin:6px 0;font-size:13px}th,td{bord
 <p class="muted">${esc(input.generatedAt)} · ${esc(input.base)} · сборка ${esc(input.build)} · вызовов к API: ${input.calls} · даты: ${Object.entries(input.dates).map(([k, d]) => `${k}=${d}`).join(", ")}</p>
 ${input.notes.map((n) => `<p class="muted">${esc(n)}</p>`).join("")}
 <h2>Сводка</h2>
-<table><thead><tr><th>Прогон</th><th>Дата</th><th>Режим</th><th>Аудитория</th><th>Статус сборки</th><th>Точек / км / мин / переходов geoCell5</th><th>Нарушений</th></tr></thead><tbody>${summaryRows.join("")}</tbody></table>
+<table><thead><tr><th>Прогон</th><th>Дата</th><th>Режим</th><th>Аудитория</th><th>Статус сборки</th><th>Точек / км / мин / переходов geoCell5</th><th>Повторы якорей (норма)</th><th>Повторы заполнителей</th><th>«Показали всё»</th><th>Нарушений</th></tr></thead><tbody>${summaryRows.join("")}</tbody></table>
+<h2>Цепочки «Другой вариант»: когда пришло «показали всё»</h2>
+<p class="muted">Столбец «Остаток» — сколько ещё непоказанных мест из сида подходят по возрасту и часам работы в тот день и лежат в радиусе режима (пешком: своя и соседняя ячейка ~1 км; машина: ячейка ~5 км) от прежнего черновика. Оракул знает только места мок-каталога, но не весь пул DEV, поэтому «0» подтверждает «обоснованно» только по сиду.</p>
+<table><thead><tr><th>Прогон</th><th>Новых вариантов до конца</th><th>«Показали всё» на</th><th>Остаток</th><th>Какие</th><th>Вывод</th></tr></thead><tbody>${chainRows.join("")}</tbody></table>
 <h2>Нарушения (${all.length})</h2>
 ${all.length ? `<table><thead><tr><th>Прогон</th><th>Шаг</th><th>Правило</th><th>Детали</th></tr></thead><tbody>${violationRows.join("")}</tbody></table><p>По правилам: ${[...byRule].map(([k, n]) => `${esc(k)} — ${n}`).join("; ")}</p>` : `<p class="ok">Нарушений не найдено.</p>`}
 <h2>Прогоны</h2>
