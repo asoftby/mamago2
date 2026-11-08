@@ -111,6 +111,7 @@ const calendarActivitySelect = {
 } satisfies Prisma.ActivitySelect;
 
 const calendarItemSelect = {
+  partyOrder: { select: { id: true } },
   id: true,
   source: true,
   entryType: true,
@@ -148,6 +149,7 @@ type CalendarRow = Prisma.PlanItemGetPayload<{ select: typeof calendarItemSelect
 
 export type FamilyCalendarItemDto = {
   id: string;
+  partyOrder?: { id: string } | null;
   source: PlanItemSource;
   entryType: PlanEntryType | null;
   date: string;
@@ -379,6 +381,7 @@ async function updateEditablePlanEntry(
       id: planItemId,
       ...(await activePlanScopeFor(owner.userId)),
       source,
+      partyOrder: { is: null },
       status: "CONFIRMED",
     },
     select: calendarItemSelect,
@@ -423,7 +426,7 @@ async function updateEditablePlanEntry(
   const reminderLeadMinutes = leadApplicable ? requestedLeadMinutes : null;
 
   const result = await prisma.planItem.updateMany({
-    where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source, status: "CONFIRMED", updatedAt: expected },
+    where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source, partyOrder: { is: null }, status: "CONFIRMED", updatedAt: expected },
     data: {
       updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)),
       ...(patch.entryType === undefined ? {} : { entryType: patch.entryType }),
@@ -491,13 +494,13 @@ export async function updateTelegramPlanEntry(
 export async function cancelManualPlanEntry(owner: PlanOwner, planItemId: string, expectedUpdatedAt: string): Promise<void> {
   const expected = expectedVersion(expectedUpdatedAt);
   const current = await prisma.planItem.findFirst({
-    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED" },
+    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, partyOrder: { is: null }, status: "CONFIRMED" },
     select: { updatedAt: true },
   });
   if (!current) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
   if (current.updatedAt.getTime() !== expected.getTime()) throw new ManualPlanEntryError("CONFLICT", "conflict");
   const result = await prisma.planItem.updateMany({
-    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
+    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, partyOrder: { is: null }, status: "CONFIRMED", updatedAt: expected },
     data: { status: "CANCELLED", cancelledAt: new Date(), updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) },
   });
   if (result.count === 0) throw new ManualPlanEntryError("CONFLICT", "conflict");
@@ -547,6 +550,7 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
   const presentation = row.activity ? buildPlanCardPresentation(row.activity) : null;
   return {
     id: row.id,
+    partyOrder: row.partyOrder,
     visibility: row.visibility,
     status: row.status,
     authorId: row.userId,

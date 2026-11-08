@@ -122,3 +122,5 @@ console.log("pageViewObserver.test.ts: OK");
 }
 
 main();
+
+assert.equal(isPublicPageViewPath("/p/secret-token"), false);

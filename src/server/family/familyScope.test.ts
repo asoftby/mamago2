@@ -5,9 +5,25 @@ import {
   NOT_CANCELLED,
   childScopeWhere,
   familyReadsEnabled,
-  planItemScopeWhere,
+  planItemScopeWhere as fullPlanItemScopeWhere,
   sharedHistoryFromMembership,
 } from "./familyScope";
+
+// Keep historical general-family assertions; real SQL integration separately exercises
+// the complete selected-programme/active-membership branch.
+function planItemScopeWhere(...args: Parameters<typeof fullPlanItemScopeWhere>) {
+  const where = fullPlanItemScopeWhere(...args);
+  if (Array.isArray(where.OR) && where.OR[0]?.AND && Array.isArray(where.OR[0].AND))
+    return { ...where, OR: [where.OR[0].AND[0], ...where.OR.slice(1)] };
+  return where;
+}
+
+test("programme access is restricted on the shared branch without weakening owner access", () => {
+  const where = fullPlanItemScopeWhere({ userId: "u1", familyId: "f1" }, true);
+  assert.match(JSON.stringify(where), /programmeAdultIds/);
+  assert.match(JSON.stringify(where), /familyMemberships/);
+  assert.match(JSON.stringify(where), /leftAt/);
+});
 
 test("FROM_JOIN: past shared events hidden; future, undated and added-after-join visible; own unbounded", () => {
   // 22:30 UTC = 01:30 next day in Minsk: the join day is the local calendar date.

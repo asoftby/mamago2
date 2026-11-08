@@ -678,6 +678,7 @@ model PlanItem {
   child             Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
   assignee          User?                     @relation("PlanItemAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
   recurrenceSeries  PlanRecurrenceSeries? @relation(fields: [recurrenceSeriesId], references: [id], onDelete: SetNull)
+  partyOrder PartyOrder?
   scenarioOverrides DayScenarioItemOverride[]
   requirements      PlanItemRequirement[]
 
@@ -5977,7 +5978,14 @@ model PartyOrder {
   submitKey String? @unique
   submittedAt DateTime?
   cancelledAt DateTime?
-  planItemId String?
+  planItemId String? @unique
+  selectedChildId String?
+  programme Json?
+  programmeAdultIds String[] @default([])
+  programmeChildIds String[] @default([])
+  publicPlanToken String? @unique
+  publicPlanExpiresAt DateTime?
+  planItem PlanItem? @relation(fields: [planItemId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

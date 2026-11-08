@@ -1,5 +1,6 @@
 "use client";
 
+import { programmeStatusLabels, type ProgrammeView } from "@/lib/birthday/partyProgramme";
 import { useEffect, useMemo, useState } from "react";
 import { Surface } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,24 @@ function buildOriginShareUrl(partyId: string): string {
   return `${window.location.origin}${buildPublicPlanPath(partyId)}`;
 }
 
-export function BirthdayPartyDayPlan({
+export function BirthdayPartyDayPlan(props: BirthdayPartyDayPlanProps | { programme: ProgrammeView }) {
+  if ("programme" in props) return <ProgrammeTimeline programme={props.programme} />;
+  return <LegacyBirthdayPartyDayPlan {...props} />;
+}
+
+export function ProgrammeTimeline({ programme }: { programme: ProgrammeView }) {
+  return <section className="space-y-3" aria-label="Программа праздника">
+    <h2 className="text-xl font-semibold">Программа праздника</h2>
+    <p className="text-sm text-muted-foreground">{programme.date ?? "Дата уточняется"}. Время программы не изменяет бронирования. Подтверждение каждой услуги показано отдельно.</p>
+    <ol className="divide-y divide-border">{programme.rows.map(row => <li key={row.id} className="space-y-1 py-3">
+      <p className="font-medium">{row.from ? `${row.from}${row.to ? `–${row.to}` : ""}` : "Время уточняется"} — {row.title}</p>
+      <p className="text-sm text-muted-foreground">{programmeStatusLabels[row.status] ?? "Запланировано"}</p>
+      {row.timeConflict ? <p className="text-sm text-warning">Время программы нужно уточнить: условия услуги изменились.</p> : null}
+    </li>)}</ol>
+  </section>;
+}
+
+function LegacyBirthdayPartyDayPlan({
   partyTitle,
   dateTimeLine,
   organizers,

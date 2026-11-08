@@ -57,7 +57,11 @@ export function planItemScopeWhere(
     : { visibility: "FAMILY" };
   return {
     familyId: scope.familyId,
-    OR: [shared, { userId: scope.userId }],
+    OR: [{ AND: [shared, { OR: [
+      { partyOrder: { is: null } },
+      { partyOrder: { is: { programmeAdultIds: { has: scope.userId },
+        owner: { familyMemberships: { some: { familyId: scope.familyId, leftAt: null } } } } } },
+    ] }] }, { userId: scope.userId }],
   };
 }
 

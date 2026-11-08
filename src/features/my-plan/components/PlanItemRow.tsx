@@ -53,7 +53,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
   const { title, poster, time } = planEntryDisplay(item);
   const isManual = item.source === "MANUAL";
   // Тап по карточке: событие mamaGo → его страница; свой пункт → страница плана на этот день.
-  const openHref = activityDetailHref ?? (isManual ? `/me/plan?date=${item.date}` : null);
+  const openHref = item.partyOrder ? `/me/birthdays/${encodeURIComponent(item.partyOrder.id)}` : activityDetailHref ?? (isManual ? `/me/plan?date=${item.date}` : null);
 
   const isCatalogEvent = planItemVisualKind(item) === "event";
   const [category, setCategory] = useState<PlanItemCategoryKey>(() =>
@@ -107,7 +107,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
         )}
 
         <div className="min-w-0 flex-1">
-          {onOpen && (item.activity || item.articleId || isManual) ? (
+          {!item.partyOrder && onOpen && (item.activity || item.articleId || isManual) ? (
             <button
               type="button"
               onClick={onOpen}
@@ -148,7 +148,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
         </div>
 
         <div className="relative z-10 flex shrink-0 items-center self-center">
-          {onMove ? (
+          {onMove && !item.partyOrder ? (
             <button
               type="button"
               onClick={onMove}
@@ -161,6 +161,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
           ) : null}
           <button
             type="button"
+            disabled={Boolean(item.partyOrder)}
             onClick={onRemove}
             aria-label={`Убрать «${title}» из плана`}
             title="Удалить"

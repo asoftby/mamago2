@@ -1,3 +1,5 @@
+import { isCapabilityUrlPath } from "./privatePaths";
+
 /**
  * Pure decision rule for the PAGE_VIEW route observer (`PageViewTracker`).
  * CI verification after re-targeting PR #838 to dev.
@@ -67,6 +69,7 @@ const NON_PUBLIC_TOP_SEGMENTS = [
  * observe.
  */
 export function isPublicPageViewPath(pathname: string): boolean {
+  if (isCapabilityUrlPath(pathname)) return false;
   const firstSegment = pathname.split("/", 2)[1] ?? "";
   return !(NON_PUBLIC_TOP_SEGMENTS as readonly string[]).includes(firstSegment);
 }

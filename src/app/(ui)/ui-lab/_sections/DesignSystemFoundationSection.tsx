@@ -1,5 +1,6 @@
 "use client";
 
+import { BirthdayPartyDayPlan } from "@/features/me/components/BirthdayPartyDayPlan";
 import * as React from "react";
 import { DemoSection } from "../_components/DemoSection";
 import { InventoryGrid } from "../_components/InventoryGrid";
@@ -31,6 +32,11 @@ export function DesignSystemFoundationSection() {
         Navigate with Tab to inspect focus states. Check mobile widths before approving global changes.
       </p>
       <InventoryGrid>
+        <RenderSafe title="Birthday programme — all canonical states (review)" file="src/features/me/components/BirthdayPartyDayPlan.tsx">
+          <BirthdayPartyDayPlan programme={{ date: "2026-11-22", rows: [
+            "PLANNED", "REQUESTED", "AGREEMENT", "CONFIRMED", "DECLINED", "REPLACE", "CANCELLED",
+          ].map((status, index) => ({ id: String(index), title: "Услуга", from: index ? "14:00" : null, to: index ? "15:00" : null, status })) }} />
+        </RenderSafe>
         <RenderSafe title="Buttons — variants" file="src/components/ui/button.tsx">
           <div className="flex flex-wrap items-center gap-3">
             <Button>Основная</Button>
