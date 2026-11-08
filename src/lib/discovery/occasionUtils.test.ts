@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activeOccasionWhere, isOccasionCurrentlyActive, isOccasionWithinActiveWindow } from "./occasionUtils";
+import {
+  PUBLIC_DISCOVERY_OCCASION_TYPES,
+  activeOccasionWhere,
+  publicDiscoveryOccasionWhere,
+  isOccasionCurrentlyActive,
+  isOccasionWithinActiveWindow,
+} from "./occasionUtils";
 
 const configured = {
   isActive: true,
@@ -31,4 +37,19 @@ test("query predicate and in-memory checks use the same inclusive dates", () => 
     startsAt: { lte: now },
     endsAt: { gte: now },
   });
+});
+
+test("public discovery excludes family occasions even when active for many years", () => {
+  const now = new Date("2026-11-08T12:00:00.000Z");
+  assert.deepEqual(PUBLIC_DISCOVERY_OCCASION_TYPES, ["HOLIDAY", "SEASON", "EVENT"]);
+  assert.deepEqual(publicDiscoveryOccasionWhere(now), {
+    ...activeOccasionWhere(now),
+    type: { in: ["HOLIDAY", "SEASON", "EVENT"] },
+  });
+  // Birthday remains a valid FAMILY occasion for editor/birthday flows.
+  assert.equal(isOccasionWithinActiveWindow({
+    isActive: true,
+    startsAt: new Date("2026-01-01T00:00:00.000Z"),
+    endsAt: new Date("2036-12-31T23:59:59.999Z"),
+  }, now), true);
 });

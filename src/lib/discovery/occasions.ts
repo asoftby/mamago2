@@ -10,7 +10,7 @@
 import { prismaBase as prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { Occasion } from "@prisma/client";
-import { activeOccasionWhere } from "./occasionUtils";
+import { activeOccasionWhere, publicDiscoveryOccasionWhere } from "./occasionUtils";
 
 // ─── Type helpers ────────────────────────────────────────────────────────────
 
@@ -55,10 +55,10 @@ async function hasOccasionBoostScoreColumn(): Promise<boolean> {
 
 export type PublicOccasionOption = { slug: string; name: string };
 
-/** Public occasion chips and API validation use the same admin date range. */
+/** Public occasion chips and API validation use the same admin date range and calendar types. */
 export async function getActivePublicOccasions(now: Date = new Date()): Promise<PublicOccasionOption[]> {
   return prisma.occasion.findMany({
-    where: activeOccasionWhere(now),
+    where: publicDiscoveryOccasionWhere(now),
     select: { slug: true, name: true },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });

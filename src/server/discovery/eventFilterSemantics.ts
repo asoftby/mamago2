@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { activeOccasionWhere } from "@/lib/discovery/occasionUtils";
+import { publicDiscoveryOccasionWhere } from "@/lib/discovery/occasionUtils";
 import { addDateKeyDays, weekdayFromDateKey, zonedDateKey, zonedDayRange } from "@/lib/stories/ranges";
 import type { DateRange } from "@/lib/stories/types";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
@@ -171,7 +171,7 @@ export function buildEventRuntimeWhere(
   // Only explicitly linked events qualify: no title keyword guessing.
   if (filters.occasionSlug) {
     parts.push({
-      occasionLinks: { some: { occasion: { ...activeOccasionWhere(now), slug: filters.occasionSlug } } },
+      occasionLinks: { some: { occasion: { ...publicDiscoveryOccasionWhere(now), slug: filters.occasionSlug } } },
     });
   }
   if (filters.dateRange) {
