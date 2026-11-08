@@ -14,7 +14,7 @@ import {
   type DateKey,
 } from "@/lib/date/dateKey";
 import { ownerColor } from "@/features/plan-calendar/lib/ownerColor";
-import { usePlanDayCounts } from "@/features/plan-calendar/usePlanDayCounts";
+import { usePlanDayCounts, usePlanScenarioDays } from "@/features/plan-calendar/usePlanDayCounts";
 import { cn } from "@/lib/utils";
 import { PLAN_FOCUS } from "./planChipStyles";
 
@@ -55,6 +55,8 @@ export function PlanDayRibbon({
   const to = value > last ? addDays(value, 6) : last;
   const days = useMemo(() => Array.from({ length: diffDays(from, to) + 1 }, (_, i) => addDays(from, i)), [from, to]);
   const markers = usePlanDayCounts({ from, to });
+  // Days saved as «День от mamaGo» (flag on): from the same cached chunks, no extra request.
+  const savedDays = usePlanScenarioDays({ from, to });
 
   const stripRef = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ left: true, right: false });
@@ -131,6 +133,7 @@ export function PlanDayRibbon({
             const selected = day === value;
             const isToday = day === today;
             const owners = markers[day] ?? [];
+            const saved = savedDays[day];
             return (
               <button
                 key={day}
@@ -141,7 +144,7 @@ export function PlanDayRibbon({
                 data-day={day}
                 onClick={() => onChange(day)}
                 className={cn(
-                  "flex h-[92px] w-[76px] shrink-0 snap-start flex-col items-center justify-center gap-[3px] rounded-[20px] border transition-colors",
+                  "relative flex h-[92px] w-[76px] shrink-0 snap-start flex-col items-center justify-center gap-[3px] rounded-[20px] border transition-colors",
                   selected
                     ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
                     : isToday
@@ -150,6 +153,12 @@ export function PlanDayRibbon({
                   PLAN_FOCUS,
                 )}
               >
+                {saved ? (
+                  <>
+                    <span aria-hidden className="absolute right-2.5 top-2 text-[11px] leading-none text-[var(--mp-ac)]">✦</span>
+                    <span className="sr-only">день от mamaGo, {saved.count} мест</span>
+                  </>
+                ) : null}
                 <span className="mp-font-meta text-[10px] uppercase tracking-[.1em] text-[var(--mp-tx2)]">
                   {weekdayShort(day)}
                 </span>
