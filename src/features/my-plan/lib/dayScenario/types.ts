@@ -59,7 +59,7 @@ export type PoolEvent = {
   sessionStartsMs: number[];
   /**
    * Events only: the event has no ActivitySession rows at all and its start comes from the
-   * expanded `scheduleJson` ("время по расписанию, уточните"). Ranked below confirmed events.
+   * expanded `scheduleJson` ("время по расписанию — уточните у организатора"). Ranked below confirmed events.
    */
   virtualSession?: boolean;
   durationMin: number;
@@ -111,7 +111,7 @@ export type ScenarioItem = {
   kind: "event" | "place";
   /** Filler place with no hours record: UI shows "уточните часы работы". */
   hoursUnconfirmed: boolean;
-  /** Event time taken from the schedule rules, not from a session: UI shows "время по расписанию, уточните". */
+  /** Event time taken from the schedule rules, not from a session: UI shows "время по расписанию — уточните у организатора". */
   scheduleUnconfirmed: boolean;
   activityId: string;
   card: ScenarioCard;

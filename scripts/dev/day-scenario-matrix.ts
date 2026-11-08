@@ -19,6 +19,8 @@ import {
   oracleAgeRanges,
   repeatsOf,
   unseenSeedFillers,
+  weeklyCoverage,
+  weeklyViolation,
   PLAN_FIXTURE_TITLE,
   renderReport,
   TODDLER_RANGES,
@@ -274,10 +276,14 @@ async function main(): Promise<void> {
     await teardown();
   }
 
-  const html = renderReport({ generatedAt: new Date().toISOString(), base: BASE, build, dates: dates as Record<string, string>, runs, calls, notes });
+  // The recurring mock event (no sessions) must reach a scenario somewhere it fits: otherwise its virtual session is shadowed.
+  const weekly = weeklyCoverage(runs, dates);
+  const weeklyProblem = weeklyViolation(weekly);
+  if (weeklyProblem) runs.find((r) => r.params.id === weeklyProblem.run)?.steps[0]?.violations.push(weeklyProblem);
+  const html = renderReport({ generatedAt: new Date().toISOString(), base: BASE, build, dates: dates as Record<string, string>, runs, calls, notes, weekly });
   writeFileSync(REPORT, html, "utf8");
   const violations = runs.flatMap((r) => r.steps.flatMap((s) => s.violations));
-  console.log(JSON.stringify({ report: REPORT, runs: runs.length, calls, violations: violations.length }));
+  console.log(JSON.stringify({ report: REPORT, runs: runs.length, calls, violations: violations.length, weeklyEligibleRuns: weekly.eligible.length, weeklySeenIn: weekly.seenIn }));
 }
 
 main().catch((error) => {

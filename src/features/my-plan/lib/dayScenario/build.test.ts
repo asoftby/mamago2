@@ -280,6 +280,20 @@ const UNKNOWN = { kind: "unknown" } as const;
   assert.ok(a.items.every((i) => i.startsAtMs >= at(9) && i.endsAtMs <= at(20)), "a virtual start obeys the same window and overlap rules");
 }
 
+// F8b. a recurring event without sessions is a full anchor with only a small markdown: even at the bottom of
+// the event scale it stays above a filler place with confirmed hours (it was 25 - 10 = 15 < 18 and never got picked)
+{
+  const top = ev("top", A.lat, A.lng, [10], 50);
+  const weekly = ev("weekly", B.lat, B.lng, [13], 0, { virtualSession: true });
+  const filler = place("filler", C.lat, C.lng, ALWAYS);
+  const r = buildDayScenario([top, weekly, filler], baseInput({ targetCount: 2 }), deps());
+  assert.deepEqual(r.items.map((i) => i.activityId).sort(), ["top", "weekly"], "the lowest-scored virtual event still beats a confirmed-hours filler");
+  assert.equal(r.items.find((i) => i.activityId === "weekly")!.scheduleUnconfirmed, true, "and is flagged: the time is by schedule");
+  const confirmedTwin = ev("confirmed", B.lat, B.lng, [13], 0);
+  const withTwin = buildDayScenario([top, weekly, confirmedTwin], baseInput({ targetCount: 2 }), deps());
+  assert.deepEqual(withTwin.items.map((i) => i.activityId).sort(), ["confirmed", "top"], "but a confirmed session of the same score is still preferred");
+}
+
 // F9. "Чем заменить?": distinct alternatives, each swapping only the chosen point
 {
   const events = [ev("a", A.lat, A.lng, [10]), ev("b", B.lat, B.lng, [13]), ev("c", C.lat, C.lng, [16]), ev("x", A.lat + 0.001, A.lng, [14], 9), ev("y", B.lat + 0.001, B.lng, [14], 8), ev("z", C.lat + 0.001, C.lng, [14], 7)];

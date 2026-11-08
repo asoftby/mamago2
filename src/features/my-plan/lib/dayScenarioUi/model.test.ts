@@ -77,7 +77,7 @@ assert.deepEqual([1, 2, 5, 11, 12, 21, 24, 25].map(pluralPlaces), ["1 место
 assert.equal(summaryLine([]), "");
 assert.equal(summaryLine([item("a", "2026-11-14T07:30:00Z", "2026-11-14T09:00:00Z"), item("b", "2026-11-14T12:00:00Z", "2026-11-14T14:40:00Z")]), "2 места · с 10:30 до 17:40");
 assert.deepEqual(itemNotes(item("a", "x", "y")), []);
-assert.deepEqual(itemNotes(item("a", "x", "y", { hoursUnconfirmed: true, scheduleUnconfirmed: true, approximatePlace: true, far: true })), ["уточните часы работы", "время по расписанию, уточните", "примерное место", "далеко — заменить?"]);
+assert.deepEqual(itemNotes(item("a", "x", "y", { hoursUnconfirmed: true, scheduleUnconfirmed: true, approximatePlace: true, far: true })), ["уточните часы работы", "время по расписанию — уточните у организатора", "примерное место", "далеко — заменить?"]);
 const card = (over: Partial<DraftItem["card"]>) => ({ ...item("a", "x", "y").card, ...over });
 assert.equal(metaLine(card({ categoryName: "Музей", ageLabel: "3+", priceFrom: 12, currency: "BYN" })), "Музей · 3+ · 12 BYN");
 assert.equal(metaLine(card({ categoryName: "Музей", priceFrom: 12, priceTo: 20, currency: "BYN" })), "Музей · от 12 BYN");

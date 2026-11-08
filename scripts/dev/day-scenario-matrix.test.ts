@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { MOCK_EVENTS } from "../ops/day-scenario-mocks/events.data";
 import { MOCK_PLACES } from "../ops/day-scenario-mocks/places.data";
 import { resolveSlotDates, sessionInstant } from "../ops/seed-day-scenario-mocks";
-import { checkResult, oracleAgeRanges, PLAN_FIXTURE_TITLE, renderReport, repeatsOf, seededAvailability, specFor, totalsOf, unseenSeedFillers, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
+import { checkResult, oracleAgeRanges, PLAN_FIXTURE_TITLE, renderReport, repeatsOf, seededAvailability, specFor, totalsOf, unseenSeedFillers, WEEKLY_TITLE, weeklyCoverage, weeklyEligible, weeklyViolation, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
 import { hoursPlanFor } from "../ops/seed-day-scenario-mocks";
 
 const dates = resolveSlotDates("2026-11-07");
@@ -106,5 +106,26 @@ const html = renderReport({
 assert.ok(html.includes("<!doctype html>") && html.includes("Нарушения (1)") && html.includes("уточните часы работы"));
 assert.ok(html.includes("note &lt;b&gt;") && !html.includes("note <b>"), "text is escaped");
 assert.ok(html.includes("geoCell5"), "timeline shows the geoCell5 column");
+
+// ---- the recurring event (no sessions) must reach a scenario where it fits
+{
+  assert.equal(WEEKLY_TITLE, MOCK_EVENTS.find((e) => e.key === "c-weekly")!.title);
+  assert.equal(weeklyEligible(run({ ageRanges: ["5-7"] }), dates), true, "Saturday, age 5-7, wide window");
+  assert.equal(weeklyEligible(run({ ageRanges: ["0-1", "1-3"], toddler: true }), dates), false, "ages do not fit");
+  assert.equal(weeklyEligible(run({ ageRanges: ["5-7"], date: dates.wed1, window: { start: "16:00", end: "20:00" } }), dates), false, "a Wednesday is not on the rule");
+  assert.equal(weeklyEligible(run({ ageRanges: ["5-7"], window: { start: "13:00", end: "20:00" } }), dates), false, "the 11:00 slot is outside the window");
+  assert.equal(weeklyEligible(run({ ageRanges: ["5-7"], planItem: true }), dates), false, "the plan fixture 12:00-13:30 overlaps the 11:00-12:30 slot");
+  const runRec = (id: string, over: Partial<RunParams>, titles: string[]) => ({ params: run({ id, ...over }), steps: [{ result: result(titles.map((t) => item(t, "11:00", "12:30"))) }] });
+  const without = [runRec("A", { ageRanges: ["5-7"] }, [park.title]), runRec("B", { ageRanges: ["0-1"] }, [park.title])];
+  const none = weeklyCoverage(without, dates);
+  assert.deepEqual(none, { eligible: ["A"], seenIn: [] });
+  assert.equal(weeklyViolation(none)?.rule, "Повторяющееся событие без сеансов ни разу не попало в сценарий", "eligible but never offered: a violation");
+  const withIt = weeklyCoverage([...without, runRec("C", { ageRanges: ["7-9"] }, [park.title, WEEKLY_TITLE])], dates);
+  assert.deepEqual(withIt, { eligible: ["A", "C"], seenIn: ["C"] });
+  assert.equal(weeklyViolation(withIt), null, "offered at least once: fine");
+  assert.equal(weeklyViolation(weeklyCoverage([runRec("B", { ageRanges: ["0-1"] }, [])], dates)), null, "no eligible run: nothing to demand");
+  const page = renderReport({ generatedAt: "x", base: "b", build: "d", dates, calls: 0, notes: [], runs: [], weekly: withIt });
+  assert.ok(page.includes("c-weekly") && page.includes("Подходящих прогонов: <b>2</b>"), "the report says where it was checked");
+}
 
 console.log("day-scenario matrix tests passed");
