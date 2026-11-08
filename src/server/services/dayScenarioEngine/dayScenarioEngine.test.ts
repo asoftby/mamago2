@@ -200,6 +200,21 @@ async function main() {
     assert.equal(toPoolEvent(base, 0)?.virtualSession, undefined, "real sessions are never marked virtual");
   }
 
+  // --- config route: the browser learns the flag from the server, read at request time ---
+  {
+    const { GET } = await import("@/app/api/plan/day-scenario/config/route");
+    const previous = process.env.DAY_SCENARIO_ENGINE_ENABLED;
+    delete process.env.DAY_SCENARIO_ENGINE_ENABLED;
+    const off = await GET();
+    assert.deepEqual(await off.json(), { enabled: false });
+    process.env.DAY_SCENARIO_ENGINE_ENABLED = "true";
+    const on = await GET();
+    assert.deepEqual(await on.json(), { enabled: true }, "read per request, not frozen at import");
+    assert.equal(on.headers.get("cache-control"), "private, max-age=300", "no shared cache; the browser keeps it five minutes");
+    if (previous === undefined) delete process.env.DAY_SCENARIO_ENGINE_ENABLED;
+    else process.env.DAY_SCENARIO_ENGINE_ENABLED = previous;
+  }
+
   console.log("dayScenarioEngine tests passed");
 }
 

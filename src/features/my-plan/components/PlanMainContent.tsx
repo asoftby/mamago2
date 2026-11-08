@@ -38,6 +38,10 @@ import { PlanDayRibbon } from "./v3/PlanDayRibbon";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMonthScreen } from "./v3/PlanMonthScreen";
 import { PlanPicksScreen } from "./v3/PlanPicksScreen";
+import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
+import { entryLabel } from "../lib/dayScenarioUi/model";
+import { useDayScenarioEnabled } from "../hooks/useDayScenarioEnabled";
+import { useOptionalPlanOverlay } from "@/lib/my-plan/usePlanOverlay";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, hasPendingPlanFeedback, type PlanExperienceFeed } from "./v3/planExperienceApi";
 import { ArrowRight, Bookmark, Heart, Lightbulb, Search } from "lucide-react";
@@ -419,6 +423,9 @@ export function PlanMainContent({
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? "minsk";
   const family = useFamilyPersona();
+  /** DAY_SCENARIO_ENGINE_ENABLED: off (and until answered) the widget is exactly as before. */
+  const dayScenarioEnabled = useDayScenarioEnabled();
+  const planOverlay = useOptionalPlanOverlay();
   const isDesktop = layout === "desktop";
   const [removingIdeaActivityId, setRemovingIdeaActivityId] = useState<string | null>(null);
   const [addingActivityId, setAddingActivityId] = useState<string | null>(null);
@@ -427,20 +434,33 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
   /** Счётчик идей, пересчитанный на экране «Мои идеи» (удаления там не обновляют useMyPlan). */
   const [ideasCountOverride, setIdeasCountOverride] = useState<number | null>(null);
   const shownIdeasCount = ideasCountOverride ?? ideasCount;
-  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
   }, []);
-  const closeNestedScreen = useCallback(() => setScreen("plan"), []);
+  const clearLanding = planOverlay?.clearLanding;
+  const closeNestedScreen = useCallback(() => {
+    clearLanding?.();
+    setScreen("plan");
+  }, [clearLanding]);
+
+  /**
+   * «Куда пойти» → «Собрать день»: the open plan lands on the day scenario (only when it is on). The
+   * request lives in the overlay state, so a remount of this content while the plan is open lands again.
+   */
+  const landing = planOverlay?.landing ?? null;
+  useEffect(() => {
+    if (landing === "dayScenario" && dayScenarioEnabled) openNestedScreen("dayScenario");
+  }, [landing, dayScenarioEnabled, openNestedScreen]);
 
   useEffect(() => {
     if (screen !== "plan" || mountedNestedScreen === null) return;
@@ -1302,6 +1322,10 @@ export function PlanMainContent({
 
   /** Экран подборки; саму подборку запрашиваем, только если её ещё не было. */
   const openPicks = () => {
+    if (dayScenarioEnabled) {
+      openNestedScreen("dayScenario");
+      return;
+    }
     openNestedScreen("picks");
     if (!hasRequestedSuggestions) handleDecideClick();
   };
@@ -1399,8 +1423,8 @@ export function PlanMainContent({
           <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
-          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Активности на {posterDayWord(selectedDate, todayKey)}</span>
+          <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{dayScenarioEnabled ? entryLabel(dayItems.length > 0) : "Подобрать, куда сходить"}</span>
+          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">{dayScenarioEnabled ? "Места и события на" : "Активности на"} {posterDayWord(selectedDate, todayKey)}</span>
         </span>
         <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--primary-hover)]" strokeWidth={1.8} aria-hidden />
       </button>
@@ -1758,6 +1782,26 @@ export function PlanMainContent({
               changed={scenarioCtaState === "changed"}
               onBack={closeNestedScreen}
               onOpen={handleOpenScenarioPage}
+            />
+          ) : mountedNestedScreen === "dayScenario" ? (
+            <DayScenarioScreen
+              key={`${nestedScreenVersion}-${selectedDate}`}
+              audience="member"
+              city={city}
+              todayIso={todayKey}
+              initialDate={selectedDate}
+              people={personas.map((persona) => ({
+                id: persona.id,
+                label: persona.kind === "adult" ? "Я" : persona.displayName?.trim() || "Ребёнок",
+                kind: persona.kind === "adult" ? ("adult" as const) : ("child" as const),
+              }))}
+              ownEntries={dayItemsSorted.map((item) => ({
+                startsAt: item.startsAt ? new Date(item.startsAt).toISOString() : null,
+                title: item.title?.trim() || item.activity?.title || "Запись",
+              }))}
+              hasPlanItems={dayItems.length > 0}
+              onBack={closeNestedScreen}
+              onClose={onRequestClose}
             />
           ) : mountedNestedScreen === "ideas" ? (
             <PlanIdeasScreen key={nestedScreenVersion} onBack={closeNestedScreen} onClose={onRequestClose} onCountChange={setIdeasCountOverride} />

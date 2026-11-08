@@ -6,7 +6,7 @@ import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { MyPlanWidget, MyPlanMobileWidget, MyPlanOverlay } from "@/features/my-plan";
 import { PlanQuickAddHost } from "@/features/my-plan/components/PlanQuickAddHost";
 import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
-import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
+import { appendMyPlanOpenToHref, landingFromOpenEvent, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 import { isMyPlanShellExcludedPath, shouldHideMyPlanWidget } from "@/lib/intent";
 import { isMyPlanFullPageRoute, resolveMobileBottomSlot } from "@/lib/mobile/bottomSlot";
 import { PlanOverlayProvider, usePlanOverlay } from "@/lib/my-plan/usePlanOverlay";
@@ -34,9 +34,12 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
     queueMicrotask(() => openPlan());
   }, [authLoading, router, pathname, openPlan]);
 
-  const handleOpenMyPlan = useCallback(() => {
-    openPlan();
-  }, [openPlan]);
+  const handleOpenMyPlan = useCallback(
+    (event: Event) => {
+      openPlan(landingFromOpenEvent(event) ?? undefined);
+    },
+    [openPlan],
+  );
 
   useEffect(() => {
     window.addEventListener(MY_PLAN_OPEN_EVENT, handleOpenMyPlan);

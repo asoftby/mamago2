@@ -25,6 +25,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 import { EventQuickFilters } from "@/components/discovery/EventQuickFilters";
+import { KudaDayScenarioEntry } from "@/components/discovery/KudaDayScenarioEntry";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
 import { buildScopedEventHref } from "@/lib/city/scopedEventBrowsing";
 import { useCity } from "@/contexts/CityContext";
@@ -244,6 +245,7 @@ export function CityDiscoveryShell({
             <Link href={`/${city}/weekend`} className="inline-flex shrink-0 justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">Подобрать мой выходной →</Link>
           </section>
         ) : null}
+        {intent === "kuda" ? <KudaDayScenarioEntry /> : null}
         {intent === "kuda" ? <EventQuickFilters halloweenEnabled={halloweenEnabled} /> : null}
         {intent === "classes" && classChips && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />

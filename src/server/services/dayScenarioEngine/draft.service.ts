@@ -7,7 +7,7 @@ import { buildSelectedProfileContext } from "@/lib/decision/subjects";
 import { CanonicalAgeRangeSchema } from "@/lib/decision/decisionContext";
 import { CANONICAL_EVENT_INTEREST_SLUGS } from "@/lib/event/eventSystemInterests";
 import { planSuggestionScore, zonedDayRange } from "@/server/services/planSuggestions.service";
-import { buildDayScenario, replaceScenarioItem } from "@/features/my-plan/lib/dayScenario/build";
+import { buildDayScenario, listReplacementAlternatives, replaceScenarioItem } from "@/features/my-plan/lib/dayScenario/build";
 import type {
   BuildInput,
   BuildResult,
@@ -35,7 +35,7 @@ const TODDLER_RANGES = new Set(["0-1", "1-3"]);
 export const draftRequestSchema = z.object({
   city: z.string().min(1).max(64).optional().default("minsk"),
   date: calendarDaySchema,
-  action: z.enum(["build", "rebuild", "replace"]).default("build"),
+  action: z.enum(["build", "rebuild", "replace", "alternatives"]).default("build"),
   /** The UI exposes walk/car; transit stays in the model but is not offered yet. */
   mode: z.enum(["walk", "car", "transit"]).optional().default("car"),
   ageRanges: z.array(CanonicalAgeRangeSchema).max(12).optional().default([]),
@@ -60,27 +60,60 @@ export const draftRequestSchema = z.object({
 });
 export type DraftRequest = z.infer<typeof draftRequestSchema>;
 
+export type DraftItem = {
+  kind: "event" | "place";
+  /** Filler place without a hours record: show "уточните часы работы". */
+  hoursUnconfirmed: boolean;
+  /** Event time comes from the schedule rules (no ActivitySession): show "время по расписанию, уточните". */
+  scheduleUnconfirmed: boolean;
+  activityId: string;
+  card: PoolEvent["card"];
+  startsAt: string;
+  endsAt: string;
+  pinned: boolean;
+  travel: { mode: TravelMode; minutes: number; distanceM: number } | null;
+  approximatePlace: boolean;
+  far: boolean;
+};
+
 export type DraftResponse = {
   status: BuildResult["status"];
   mode: TravelMode;
   suggestMode: TravelMode | null;
   variant: number;
-  items: {
-    kind: "event" | "place";
-    /** Filler place without a hours record: show "уточните часы работы". */
-    hoursUnconfirmed: boolean;
-    scheduleUnconfirmed: boolean;
-    activityId: string;
-    card: PoolEvent["card"];
-    startsAt: string;
-    endsAt: string;
-    pinned: boolean;
-    travel: { mode: TravelMode; minutes: number; distanceM: number } | null;
-    approximatePlace: boolean;
-    far: boolean;
-  }[];
+  items: DraftItem[];
+  /**
+   * action "alternatives" only: up to 3 whole-day variants, each with `replaceActivityId`
+   * swapped for a different point (the point not in the current draft is the alternative).
+   * `items` is empty for that action; every other action returns [].
+   */
+  alternatives: DraftItem[][];
   meta: { poolCache: "hit" | "miss"; poolSize: number; poolPlaces: number; poolVirtual: number; staleGeoCells: number; candidateCount: number; buildMs: number };
 };
+
+/** How many replacement variants one "alternatives" call tries before giving up. */
+const MAX_ALTERNATIVE_TRIES = 8;
+const ALTERNATIVES_SHOWN = 3;
+
+function toDraftItems(result: BuildResult): DraftItem[] {
+  return toDraftItemsFrom(result.items);
+}
+
+function toDraftItemsFrom(items: BuildResult["items"]): DraftItem[] {
+  return items.map((item) => ({
+    kind: item.kind,
+    hoursUnconfirmed: item.hoursUnconfirmed,
+    scheduleUnconfirmed: item.scheduleUnconfirmed,
+    activityId: item.activityId,
+    card: item.card,
+    startsAt: new Date(item.startsAtMs).toISOString(),
+    endsAt: new Date(item.endsAtMs).toISOString(),
+    pinned: item.pinned,
+    travel: item.travelFromPrev,
+    approximatePlace: item.approximatePlace,
+    far: item.far,
+  }));
+}
 
 async function loadUserContext(userId: string, date: string, personaIds: string[]) {
   const [plan, profile] = await Promise.all([
@@ -159,7 +192,16 @@ export async function runDayScenarioDraft(
     startsAtMs: Date.parse(item.startsAt),
   }));
   let result: BuildResult;
-  if (request.action === "replace" && request.replaceActivityId) {
+  let alternatives: DraftItem[][] = [];
+  if (request.action === "alternatives" && request.replaceActivityId) {
+    // Every variant is a pure in-memory build on the already cached pool (microseconds), so the
+    // whole sheet is one request instead of three.
+    alternatives = listReplacementAlternatives(pool.events, input, current, request.replaceActivityId, deps, {
+      maxTries: MAX_ALTERNATIVE_TRIES,
+      limit: ALTERNATIVES_SHOWN,
+    }).map(toDraftItemsFrom);
+    result = { status: alternatives.length > 0 ? "ok" : "empty", items: [], mode: input.mode, suggestMode: null, candidateCount: alternatives.length };
+  } else if (request.action === "replace" && request.replaceActivityId) {
     result = replaceScenarioItem(pool.events, input, current, request.replaceActivityId, deps);
   } else if (request.action === "rebuild") {
     const keep = new Set(request.pinnedActivityIds);
@@ -173,19 +215,8 @@ export async function runDayScenarioDraft(
     mode: result.mode,
     suggestMode: result.suggestMode,
     variant: request.variant,
-    items: result.items.map((item) => ({
-      kind: item.kind,
-      hoursUnconfirmed: item.hoursUnconfirmed,
-      scheduleUnconfirmed: item.scheduleUnconfirmed,
-      activityId: item.activityId,
-      card: item.card,
-      startsAt: new Date(item.startsAtMs).toISOString(),
-      endsAt: new Date(item.endsAtMs).toISOString(),
-      pinned: item.pinned,
-      travel: item.travelFromPrev,
-      approximatePlace: item.approximatePlace,
-      far: item.far,
-    })),
+    items: toDraftItems(result),
+    alternatives,
     meta: {
       poolCache: hit ? "hit" : "miss",
       poolSize: pool.events.length,

@@ -302,3 +302,31 @@ export function replaceScenarioItem(
     deps,
   );
 }
+
+/**
+ * "Чем заменить?": up to `limit` whole-day variants, each with `replaceActivityId` swapped for a
+ * different point. Variants are pure in-memory builds on the same pool; the point that is not in
+ * the current draft is the alternative, and a point is never offered twice.
+ */
+export function listReplacementAlternatives(
+  events: PoolEvent[],
+  input: BuildInput,
+  current: { activityId: string; startsAtMs: number }[],
+  replaceActivityId: string,
+  deps: BuildDeps,
+  options: { maxTries?: number; limit?: number } = {},
+): ScenarioItem[][] {
+  const maxTries = options.maxTries ?? 8;
+  const limit = options.limit ?? 3;
+  const keptIds = new Set(current.filter((item) => item.activityId !== replaceActivityId).map((item) => item.activityId));
+  const offered = new Set<string>();
+  const variants: ScenarioItem[][] = [];
+  for (let tryNo = 0; tryNo < maxTries && variants.length < limit; tryNo += 1) {
+    const result = replaceScenarioItem(events, { ...input, variant: tryNo }, current, replaceActivityId, deps);
+    const fresh = result.items.find((item) => !keptIds.has(item.activityId));
+    if (!fresh || offered.has(fresh.activityId)) continue;
+    offered.add(fresh.activityId);
+    variants.push(result.items);
+  }
+  return variants;
+}
