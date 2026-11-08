@@ -102,6 +102,9 @@ async function main() {
 
   // --- pool event mapping ---
   assert.equal(toPoolEvent({ ...base, sessions: [] }, 5), null, "no session on the day -> not poolable");
+  assert.equal(toPoolEvent({ ...base, place: { ...placeGeo(53.9, 27.55), city: { slug: "kopishche" } } }, 5)!.card.citySlug, "kopishche", "the event card carries the city of its place (links open under it)");
+  assert.equal(toPoolEvent({ ...base, place: null, venue: { addressLine: null, lat: null, lng: null, place: { ...placeGeo(53.9, 27.55), city: { slug: "minsk" } } } }, 5)!.card.citySlug, "minsk", "...or of its venue's place");
+  assert.equal(toPoolEvent({ ...base, place: placeGeo(53.9, 27.55) }, 5)!.card.citySlug, null, "unknown city stays null");
   const mapped = toPoolEvent({ ...base, place: placeGeo(53.9, 27.55), agePolicy: "ADULT_ONLY" }, 7)!;
   assert.equal(mapped.adultOnly, true);
   assert.equal(mapped.engagementScore, 7);
@@ -136,6 +139,7 @@ async function main() {
   const weeklyHours = (rules: NonNullable<PoolPlaceRow["openingHours"]>["rules"], extra: Partial<NonNullable<PoolPlaceRow["openingHours"]>> = {}): PoolPlaceRow["openingHours"] =>
     ({ mode: "WEEKLY", timezone: "Europe/Minsk", rules, exceptions: [], ...extra });
 
+  assert.equal(toPoolPlace(placeRow({ city: { slug: "kopishche" } }), DAY)!.card.citySlug, "kopishche", "the place card carries its own city");
   const unknown = toPoolPlace(placeRow(), DAY)!;
   assert.deepEqual([unknown.kind, unknown.availability?.kind, unknown.uncategorized, unknown.durationMin], ["place", "unknown", false, 90], "no hours record -> kept as unknown");
   assert.equal(unknown.card.coverImageUrl, "https://x/cover.jpg", "cover prefers a non-logo image");

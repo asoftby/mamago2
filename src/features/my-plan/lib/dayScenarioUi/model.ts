@@ -275,14 +275,23 @@ export function initialPersonSelection(peopleIds: readonly string[], pageSelecte
 }
 
 /**
- * Public page of a point of the draft: the event card or the place card of the city the screen was
- * opened on. null when the slug or city cannot make a safe path (the card then simply is not a link).
+ * Public page of a point of the draft. It lives under the city the item is published in
+ * (`card.citySlug`): the pool also holds items of cities below the listing city, and a slug can exist in
+ * both. An event whose city is unknown opens by id (globally unique) under the listing city; a place
+ * falls back to the listing city. null when no safe path can be made (the card is then not a link).
  */
-export function itemHref(item: Pick<DraftItem, "kind" | "activityId" | "card">, city: string | undefined): string | null {
-  if (!city || !/^[a-z-]+$/i.test(city)) return null;
-  const segment = (item.card.slug ?? "").trim() || (item.kind === "event" ? item.activityId : "");
-  if (!segment || segment.includes("/")) return null;
-  return `/${city}/${item.kind === "event" ? "events" : "places"}/${encodeURIComponent(segment)}`;
+export function itemHref(item: Pick<DraftItem, "kind" | "activityId" | "card">, listingCity: string | undefined): string | null {
+  const safeCity = (value: string | null | undefined) => (value && /^[a-z-]+$/i.test(value) ? value : null);
+  const slug = (item.card.slug ?? "").trim();
+  if (slug.includes("/")) return null;
+  const own = safeCity(item.card.citySlug);
+  if (item.kind === "event") {
+    if (own && slug) return `/${own}/events/${encodeURIComponent(slug)}`;
+    const city = own ?? safeCity(listingCity);
+    return city ? `/${city}/events/${encodeURIComponent(item.activityId)}` : null;
+  }
+  const city = own ?? safeCity(listingCity);
+  return city && slug ? `/${city}/places/${encodeURIComponent(slug)}` : null;
 }
 
 /** Entry label of the widget button: a day with something in it is "extended", an empty one "built". */
