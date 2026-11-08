@@ -26,7 +26,27 @@ assert.match(quick, /<EventLocationSearchInput/, "quick create keeps using the s
 assert.match(shared, /text-base[^"]*md:text-sm/, "input is 16px on mobile, 14px from md");
 assert.match(shared, /min-h-11/, "suggestion rows are at least 44px tall");
 assert.match(shared, /onMouseDown=\{\(event\) => event\.preventDefault\(\)\}/, "tapping the list keeps focus (keyboard stays open)");
-assert.match(shared, /max-h-64 overflow-y-auto/, "list scrolls instead of growing the page");
+assert.match(shared, /overflow-y-auto overscroll-contain/, "list scrolls instead of growing the page");
+// Открытая клавиатура: высота по visualViewport, прокрутка страницы к списку, обновление при resize.
+assert.match(shared, /window\.visualViewport/);
+assert.match(shared, /computeSuggestListMaxHeight\(/);
+assert.match(shared, /scrollIntoView\(\{ block: "nearest" \}\)/);
+assert.match(shared, /viewport\?\.addEventListener\("resize", fit\)/);
+assert.match(shared, /style=\{\{ maxHeight: listMaxHeight \}\}/);
+// Введённый текст принадлежит обёртке (value) и не сбрасывается ни поиском, ни закрытием списка.
+assert.doesNotMatch(shared, /onValueChange\(""\)/, "the component never clears what the user typed");
+
+// Атрибуция Google (требования Google Maps Platform): текст «Google Maps» ≥12px, цвет #5E5E5E,
+// без переноса/перевода, внутри того же контейнера внизу, отделён границей. Старая подпись удалена.
+const attribution = shared.match(/<p\s[^>]*translate="no"[\s\S]*?<\/p>/)?.[0] ?? "";
+assert.match(attribution, />\s*Google Maps\s*</, "text is exactly «Google Maps»");
+assert.match(attribution, /text-xs/, "12px (Google minimum for the text form)");
+assert.match(attribution, /text-\[#5E5E5E\]/, "an allowed Google attribution color with ≥4.5:1 contrast on white");
+assert.match(attribution, /whitespace-nowrap/, "never wraps");
+assert.match(attribution, /border-t/, "separated from the suggestions");
+for (const cls of ["font-sans", "font-normal", "tracking-normal"]) assert.match(attribution, new RegExp(`\\b${cls}\\b`), `attribution uses ${cls}`);
+assert.doesNotMatch(shared, /Powered by Google|text-\[10px\]/, "non-compliant legacy label is gone");
+assert.ok(shared.indexOf("Google Maps\n") > shared.indexOf('role="listbox"'), "attribution sits below the list, inside the panel");
 
 // Подсказки подсвечивают совпадение и работают с клавиатурой.
 assert.match(shared, /<mark[^>]*font-semibold/, "matched fragment is highlighted");
@@ -45,7 +65,14 @@ assert.match(shared, /requestId !== requestIdRef\.current/);
 assert.match(shared, /setOpen\(isFocusedRef\.current\)/, "late results never open the list after the user left the field");
 assert.match(shared, /isResolvingRef\.current\) return/, "double tap does not start two selections");
 assert.match(client, /new placesLib\.AutocompleteSessionToken\(\)/);
-assert.match(client, /session\.token = undefined/, "billing session ends after a selection");
+// Сессия поиска: один токен на сессию (не на запрос), завершается fetchFields() при ЛЮБОМ исходе.
+assert.match(client, /if \(!session\.token && placesLib\.AutocompleteSessionToken\)/, "token is created once per session, not per request");
+assert.match(client, /try \{[\s\S]*?place\.fetchFields\([\s\S]*?\} finally \{[\s\S]*?session\.token = undefined;/, "token is discarded even if fetchFields fails");
+assert.doesNotMatch(client, /fetchFields\([^)]*sessionToken/, "sessionToken is not passed to fetchFields (the session rides on the prediction)");
+// Платные поля: только Essentials; displayName (Place Details Pro) не запрашивается — подпись берётся из подсказки.
+assert.match(client, /fields: \["id", "formattedAddress", "location", "addressComponents"\]/);
+assert.doesNotMatch(client, /fields:[^\]]*displayName/, "no Pro-tier field in fetchFields");
+assert.match(client, /prediction\.mainText\?\.text/);
 assert.match(client, /language: "ru",\s*region: "by"/);
 for (const pattern of [/new\s+[\w.]+\.Autocomplete\(/, /google\.maps\.places\.Autocomplete\b/, /\bAutocompleteService\b/, /\bPlacesService\b/]) {
   assert.doesNotMatch(client, pattern, `legacy Places API ${pattern} is blocked for this Google Cloud project`);

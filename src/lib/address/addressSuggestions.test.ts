@@ -4,6 +4,9 @@
 import assert from "node:assert/strict";
 import {
   ADDRESS_SUGGEST_MAX_ITEMS,
+  SUGGEST_LIST_MAX_HEIGHT,
+  SUGGEST_LIST_MIN_HEIGHT,
+  computeSuggestListMaxHeight,
   mapSuggestions,
   moveActiveIndex,
   shouldAdoptExternalValue,
@@ -74,5 +77,13 @@ assert.equal(shouldAdoptExternalValue("ул", "ул "), false, "trailing space t
 assert.equal(shouldAdoptExternalValue(undefined, ""), false);
 assert.equal(shouldAdoptExternalValue("Минск, Притыцкого 12", "Прит"), true, "real external change is adopted");
 assert.equal(shouldAdoptExternalValue("", "Прит"), true, "form reset clears the field");
+
+// ── computeSuggestListMaxHeight: список под открытой клавиатурой ─────────────
+assert.equal(computeSuggestListMaxHeight({ visibleBottom: 844, panelTop: 120 }), SUGGEST_LIST_MAX_HEIGHT, "plenty of room: capped at the max");
+assert.equal(computeSuggestListMaxHeight({ visibleBottom: 400, panelTop: 120 }), 244, "keyboard open: fits above the keyboard (400-120-36)");
+assert.equal(computeSuggestListMaxHeight({ visibleBottom: 300, panelTop: 200 }), SUGGEST_LIST_MIN_HEIGHT, "tiny viewport: never below the minimum (page scrolls instead)");
+assert.equal(computeSuggestListMaxHeight({ visibleBottom: 300, panelTop: 500 }), SUGGEST_LIST_MIN_HEIGHT, "panel below the visible area: minimum");
+assert.equal(computeSuggestListMaxHeight({ visibleBottom: Number.NaN, panelTop: 0 }), SUGGEST_LIST_MAX_HEIGHT, "garbage input falls back to the max");
+assert.ok(SUGGEST_LIST_MIN_HEIGHT >= 2 * 44, "minimum shows at least two 44px rows");
 
 console.log("addressSuggestions.test.ts: OK");

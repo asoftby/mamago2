@@ -5,6 +5,8 @@ import { Loader2, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ADDRESS_SUGGEST_DEBOUNCE_MS,
+  SUGGEST_LIST_MAX_HEIGHT,
+  computeSuggestListMaxHeight,
   moveActiveIndex,
   shouldQuerySuggestions,
   type AddressSuggestionView,
@@ -65,6 +67,8 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
     const [activeIndex, setActiveIndex] = useState(-1);
     const [isResolving, setIsResolving] = useState(false);
     const [selectError, setSelectError] = useState<string | null>(null);
+    const [listMaxHeight, setListMaxHeight] = useState(SUGGEST_LIST_MAX_HEIGHT);
+    const panelRef = useRef<HTMLDivElement>(null);
 
     const sessionRef = useRef<AddressSuggestionsSession | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -189,6 +193,29 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
     const showPanel = open && (status !== "idle" || suggestions.length > 0);
     const activeId = activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined;
 
+    // Мобильная клавиатура сужает видимую область (visualViewport), а не окно: подгоняем высоту
+    // списка под неё и, если списку всё равно не хватает места, прокручиваем страницу к нему.
+    useEffect(() => {
+      if (!showPanel) return;
+      const viewport = window.visualViewport;
+      const fit = () => {
+        const panel = panelRef.current;
+        if (!panel) return;
+        const visibleBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+        setListMaxHeight(computeSuggestListMaxHeight({ visibleBottom, panelTop: panel.getBoundingClientRect().top }));
+      };
+      fit();
+      panelRef.current?.scrollIntoView({ block: "nearest" });
+      viewport?.addEventListener("resize", fit);
+      viewport?.addEventListener("scroll", fit);
+      window.addEventListener("resize", fit);
+      return () => {
+        viewport?.removeEventListener("resize", fit);
+        viewport?.removeEventListener("scroll", fit);
+        window.removeEventListener("resize", fit);
+      };
+    }, [showPanel, status, suggestions.length]);
+
     return (
       <div className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -232,11 +259,12 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
 
         {showPanel ? (
           <div
+            ref={panelRef}
             // Не отбираем фокус у поля при касании списка: клавиатура остаётся открытой.
             onMouseDown={(event) => event.preventDefault()}
             className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
           >
-            <ul id={listboxId} role="listbox" className="max-h-64 overflow-y-auto overscroll-contain">
+            <ul id={listboxId} role="listbox" style={{ maxHeight: listMaxHeight }} className="overflow-y-auto overscroll-contain">
               {suggestions.map((suggestion, index) => (
                 <li
                   key={suggestion.id}
@@ -280,7 +308,14 @@ export const AddressSuggestInput = forwardRef<HTMLInputElement, AddressSuggestIn
                 Не удалось загрузить подсказки. Проверьте соединение или выберите точку на карте.
               </p>
             ) : null}
-            <p className="border-t border-gray-100 px-3 py-1 text-[10px] text-gray-400">Powered by Google</p>
+            {/* Атрибуция Google Maps Platform: текст «Google Maps» (когда места мало), 12px, #5E5E5E
+                (контраст ≥ 4.5:1), без переноса/перевода, внизу того же контейнера, отделён границей. */}
+            <p
+              translate="no"
+              className="whitespace-nowrap border-t border-gray-100 px-3 py-1.5 font-sans text-xs font-normal tracking-normal text-[#5E5E5E]"
+            >
+              Google Maps
+            </p>
           </div>
         ) : null}
 

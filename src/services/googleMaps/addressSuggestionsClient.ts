@@ -70,23 +70,31 @@ export async function resolveAddressSuggestion(
   const prediction = session.predictions.get(suggestionId);
   if (!prediction?.toPlace) return null;
 
+  // Подпись берём из подсказки (бесплатно): displayName относится к более дорогому
+  // уровню Place Details Pro и для адреса не нужен.
+  const displayName = prediction.mainText?.text ?? prediction.text?.text ?? "";
+
   const place = prediction.toPlace();
-  await place.fetchFields({
-    fields: ["id", "displayName", "formattedAddress", "location", "addressComponents"],
-  });
+  try {
+    // Только поля уровня Essentials. sessionToken сюда не передаётся: сессия подхватывается
+    // из подсказки, а вызов fetchFields() её завершает.
+    await place.fetchFields({ fields: ["id", "formattedAddress", "location", "addressComponents"] });
+  } finally {
+    // Сессия завершена при любом исходе fetchFields: токен использовать повторно нельзя
+    // (иначе каждый следующий запрос тарифицируется отдельно). Следующий поиск — с новым токеном.
+    session.token = undefined;
+  }
 
   const location = place.location as { lat: number | (() => number); lng: number | (() => number) } | null | undefined;
   const lat = readCoordinate(location?.lat);
   const lng = readCoordinate(location?.lng);
   if (!place.id || lat === null || lng === null) return null;
 
-  // Выбор завершает сессию биллинга: следующий поиск начинается с нового токена.
-  session.token = undefined;
   session.predictions.clear();
 
   return {
     googlePlaceId: place.id,
-    displayName: place.displayName ?? "",
+    displayName,
     formattedAddress: place.formattedAddress ?? "",
     lat,
     lng,

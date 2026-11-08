@@ -98,3 +98,21 @@ export function moveActiveIndex(current: number, direction: "down" | "up", count
 export function shouldAdoptExternalValue(external: string | undefined | null, current: string): boolean {
   return (external ?? "").trim() !== current.trim();
 }
+
+/** Нижняя граница высоты прокручиваемого списка подсказок, px (≈ 2,5 строки). */
+export const SUGGEST_LIST_MIN_HEIGHT = 132;
+/** Верхняя граница, px (как max-h-64). */
+export const SUGGEST_LIST_MAX_HEIGHT = 256;
+/** Высота футера с атрибуцией Google + отступ от края видимой области, px. */
+const SUGGEST_LIST_CHROME = 36;
+
+/**
+ * Высота списка так, чтобы он помещался между полем и низом ВИДИМОЙ области
+ * (с открытой мобильной клавиатурой visualViewport заметно ниже окна).
+ * Если места меньше минимума, возвращает минимум: остаток решает прокрутка страницы.
+ */
+export function computeSuggestListMaxHeight(input: { visibleBottom: number; panelTop: number }): number {
+  const available = Math.floor(input.visibleBottom - input.panelTop - SUGGEST_LIST_CHROME);
+  if (!Number.isFinite(available)) return SUGGEST_LIST_MAX_HEIGHT;
+  return Math.max(SUGGEST_LIST_MIN_HEIGHT, Math.min(SUGGEST_LIST_MAX_HEIGHT, available));
+}
