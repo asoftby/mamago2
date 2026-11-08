@@ -49,7 +49,7 @@ export type ApiItem = {
   approximatePlace: boolean;
   far: boolean;
 };
-export type ApiResult = { status: string; mode: string; suggestMode: string | null; items: ApiItem[]; exhausted?: boolean; alternatives?: ApiItem[][]; meta?: { poolCache?: string; poolSize?: number; poolPlaces?: number; candidateCount?: number; buildMs?: number } };
+export type ApiResult = { variant?: number; status: string; mode: string; suggestMode: string | null; items: ApiItem[]; exhausted?: boolean; alternatives?: ApiItem[][]; meta?: { poolCache?: string; poolSize?: number; poolPlaces?: number; candidateCount?: number; buildMs?: number } };
 
 export type RunParams = {
   id: string;
@@ -244,7 +244,7 @@ const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g,
 
 /** Anchors (events with a fixed time) that came back from an earlier variant: normal, only counted. */
 export type RepeatInfo = { anchors: string[]; fillers: string[] };
-export type StepRecord = { name: string; result: ApiResult | null; httpStatus: number; ms: number; violations: Violation[]; diffNote?: string; alternatives?: string[]; repeats?: RepeatInfo; exhausted?: boolean };
+export type StepRecord = { name: string; result: ApiResult | null; httpStatus: number; ms: number; violations: Violation[]; diffNote?: string; alternatives?: string[]; repeats?: RepeatInfo; exhausted?: boolean; unseenLeft?: string[]; anotherNo?: number };
 
 /** Which of this step's points an earlier variant already showed, split into anchors and fillers. */
 export function repeatsOf(items: readonly ApiItem[], shownIds: ReadonlySet<string>): RepeatInfo {
@@ -289,6 +289,13 @@ export function renderReport(input: { generatedAt: string; base: string; build: 
     const allShown = r.steps.filter((st) => st.exhausted).length;
     return `<tr><td><a href="#${esc(r.params.id)}">${esc(r.params.id)}</a></td><td>${esc(r.params.dateLabel)}</td><td>${r.params.mode === "walk" ? "Пешком" : "Машина"}</td><td>${esc(r.params.audience)}</td><td>${esc(build?.status ?? "—")}</td><td>${t ? `${t.points} / ${t.km.toFixed(2)} км / ${t.travelMin} мин / ${t.cell5Transitions}` : "—"}</td><td>${anchorRepeats}</td><td class="${fillerRepeats ? "bad" : "ok"}">${fillerRepeats}</td><td>${allShown}</td><td class="${nv ? "bad" : "ok"}">${nv}</td></tr>`;
   });
+  const chainRows = input.runs.map((r) => {
+    const anothers = r.steps.filter((st) => st.anotherNo !== undefined);
+    const stop = anothers.find((st) => st.exhausted);
+    const verdict = !stop ? "«показали всё» не наступило" : (stop.unseenLeft?.length ?? 0) > 0 ? `<span class="bad">преждевременно</span>` : `<span class="ok">обосновано</span>`;
+    const left = stop?.unseenLeft ?? [];
+    return `<tr><td><a href="#${esc(r.params.id)}">${esc(r.params.id)}</a></td><td>${anothers.filter((st) => !st.exhausted).length}</td><td>${stop ? `шаг ${stop.anotherNo}` : "—"}</td><td class="${left.length ? "bad" : "ok"}">${stop ? left.length : "—"}</td><td>${esc(left.slice(0, 4).join("; "))}${left.length > 4 ? ` … (${left.length})` : ""}</td><td>${verdict}</td></tr>`;
+  });
   const violationRows = all.map((v) => `<tr><td><a href="#${esc(v.run)}">${esc(v.run)}</a></td><td>${esc(v.step)}</td><td>${esc(v.rule)}</td><td>${esc(v.detail)}</td></tr>`);
   const sections = input.runs.map((r) => `<section id="${esc(r.params.id)}"><h3>${esc(r.params.id)}</h3><p class="params">Дата: <b>${esc(r.params.dateLabel)}</b> · окно ${esc(r.params.window.start)}–${esc(r.params.window.end)} · режим: <b>${r.params.mode === "walk" ? "Пешком" : "Машина"}</b> · аудитория: <b>${esc(r.params.audience)}</b>${r.params.ageRanges.length ? ` (${esc(r.params.ageRanges.join(", "))})` : ""} · запись плана 12:00: <b>${r.params.planItem ? "да" : "нет"}</b></p>${r.steps.map(stepHtml).join("")}</section>`);
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Матрица прогонов: сценарий дня</title><style>
@@ -304,6 +311,9 @@ table{border-collapse:collapse;width:100%;margin:6px 0;font-size:13px}th,td{bord
 ${input.notes.map((n) => `<p class="muted">${esc(n)}</p>`).join("")}
 <h2>Сводка</h2>
 <table><thead><tr><th>Прогон</th><th>Дата</th><th>Режим</th><th>Аудитория</th><th>Статус сборки</th><th>Точек / км / мин / переходов geoCell5</th><th>Повторы якорей (норма)</th><th>Повторы заполнителей</th><th>«Показали всё»</th><th>Нарушений</th></tr></thead><tbody>${summaryRows.join("")}</tbody></table>
+<h2>Цепочки «Другой вариант»: когда пришло «показали всё»</h2>
+<p class="muted">Столбец «Остаток» — сколько ещё непоказанных мест из сида подходят по возрасту и часам работы в тот день и лежат в радиусе режима (пешком: своя и соседняя ячейка ~1 км; машина: ячейка ~5 км) от прежнего черновика. Оракул знает только места мок-каталога, но не весь пул DEV, поэтому «0» подтверждает «обоснованно» только по сиду.</p>
+<table><thead><tr><th>Прогон</th><th>Новых вариантов до конца</th><th>«Показали всё» на</th><th>Остаток</th><th>Какие</th><th>Вывод</th></tr></thead><tbody>${chainRows.join("")}</tbody></table>
 <h2>Нарушения (${all.length})</h2>
 ${all.length ? `<table><thead><tr><th>Прогон</th><th>Шаг</th><th>Правило</th><th>Детали</th></tr></thead><tbody>${violationRows.join("")}</tbody></table><p>По правилам: ${[...byRule].map(([k, n]) => `${esc(k)} — ${n}`).join("; ")}</p>` : `<p class="ok">Нарушений не найдено.</p>`}
 <h2>Прогоны</h2>

@@ -198,6 +198,7 @@ export async function runDayScenarioDraft(
   let result: BuildResult;
   let alternatives: DraftItem[][] = [];
   let exhausted = false;
+  let variant = request.variant;
   if (request.action === "alternatives" && request.replaceActivityId) {
     // Every variant is a pure in-memory build on the already cached pool (microseconds), so the
     // whole sheet is one request instead of three.
@@ -209,6 +210,7 @@ export async function runDayScenarioDraft(
   } else if (request.action === "another") {
     const another = buildAnotherVariant(pool.events, input, current, new Set(request.shownActivityIds), deps);
     exhausted = another.exhausted;
+    variant = another.variant;
     result = exhausted ? { ...another.result, items: [] } : another.result;
   } else if (request.action === "replace" && request.replaceActivityId) {
     result = replaceScenarioItem(pool.events, input, current, request.replaceActivityId, deps);
@@ -223,7 +225,7 @@ export async function runDayScenarioDraft(
     status: result.status,
     mode: result.mode,
     suggestMode: result.suggestMode,
-    variant: request.variant,
+    variant,
     items: toDraftItems(result),
     alternatives,
     exhausted,

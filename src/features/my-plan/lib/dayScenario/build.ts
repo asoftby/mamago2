@@ -333,18 +333,24 @@ export function listReplacementAlternatives(
 
 export type AnotherVariant = {
   result: BuildResult;
-  /** No new variant exists: every unseen filler is used up, or nothing at all would change. */
+  /** No new variant exists: every candidate was already shown, or the day cannot be made different. */
   exhausted: boolean;
+  /** The variant number that produced `result`; the caller continues from the next one. */
+  variant: number;
 };
 
 const signatureOf = (items: readonly { activityId: string; startsAtMs: number }[]) =>
   items.map((item) => `${item.activityId}@${item.startsAtMs}`).sort().join("|");
 
+const ANOTHER_MAX_TRIES = 6;
+
 /**
- * «Другой вариант»: a new variant of the whole day. Events are anchors with a fixed time, so they may
- * come back; a filler place the user has already seen (`shownIds`) never does. When excluding the
- * seen fillers makes the day smaller than it would otherwise be, or leaves it exactly as it is, there
- * is nothing new to show: `exhausted` is true and the caller says so instead of repeating silently.
+ * «Другой вариант»: a different day. Events are anchors with a fixed time, so they may come back; a
+ * filler place the user has already seen never does. A candidate day is new when it differs from the
+ * current one and contains at least one point never shown before (a shorter day built from the last
+ * unseen places is still new). A single deterministic variant can coincide with the current day while
+ * the next ones differ, so a few variants are tried before concluding there is nothing left; only then
+ * `exhausted` is true and the caller says so instead of repeating silently.
  */
 export function buildAnotherVariant(
   events: PoolEvent[],
@@ -352,11 +358,21 @@ export function buildAnotherVariant(
   current: { activityId: string; startsAtMs: number }[],
   shownIds: ReadonlySet<string>,
   deps: BuildDeps,
+  options: { maxTries?: number } = {},
 ): AnotherVariant {
-  const shownFillers = events.filter((event) => event.kind === "place" && shownIds.has(event.activityId)).map((event) => event.activityId);
-  const fresh = buildDayScenario(events, { ...input, excludeActivityIds: [...input.excludeActivityIds, ...shownFillers] }, deps);
-  const baseline = shownFillers.length > 0 ? buildDayScenario(events, input, deps) : fresh;
-  const shrank = fresh.items.length < baseline.items.length;
-  const unchanged = current.length > 0 && signatureOf(fresh.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }))) === signatureOf(current);
-  return { result: fresh, exhausted: shrank || unchanged };
+  const seen = new Set([...shownIds, ...current.map((item) => item.activityId)]);
+  const seenFillers = events.filter((event) => event.kind === "place" && seen.has(event.activityId)).map((event) => event.activityId);
+  const excludeActivityIds = [...input.excludeActivityIds, ...seenFillers];
+  const currentSignature = signatureOf(current);
+  const maxTries = options.maxTries ?? ANOTHER_MAX_TRIES;
+  let first: BuildResult | null = null;
+  for (let tryNo = 0; tryNo < maxTries; tryNo += 1) {
+    const variant = input.variant + tryNo;
+    const result = buildDayScenario(events, { ...input, excludeActivityIds, variant }, deps);
+    first ??= result;
+    const hasUnseen = result.items.some((item) => !seen.has(item.activityId));
+    const sameAsCurrent = current.length > 0 && signatureOf(result.items) === currentSignature;
+    if (hasUnseen && !sameAsCurrent) return { result, exhausted: false, variant };
+  }
+  return { result: first as BuildResult, exhausted: true, variant: input.variant };
 }

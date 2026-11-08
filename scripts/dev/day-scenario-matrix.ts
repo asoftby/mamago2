@@ -18,6 +18,7 @@ import {
   checkResult,
   oracleAgeRanges,
   repeatsOf,
+  unseenSeedFillers,
   PLAN_FIXTURE_TITLE,
   renderReport,
   TODDLER_RANGES,
@@ -34,6 +35,7 @@ const args = process.argv.slice(2);
 const argValue = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? null;
 const BASE = (argValue("base-url") ?? "https://dev.mamago.by").replace(/\/$/, "");
 const REPORT = argValue("report");
+const MAX_ANOTHER = 6;
 const MAX_CALLS = Number(argValue("max-calls") ?? 300);
 const APPLY_DATE = argValue("apply-date") ?? minskDateOf(new Date());
 const SKIP_PLAN_ITEMS = args.includes("--skip-plan-items");
@@ -219,20 +221,26 @@ async function main(): Promise<void> {
             ? checkResult(params, name, base.result, { dates, stepKind: kind, shownIds: new Set(shownIds), shownTitles: new Set(shownTitles), priorSignatures: [...signatures], currentItems })
             : [{ run: params.id, step: name, rule: "Ответ API", detail: `HTTP ${base.httpStatus}` }];
           const repeats = kind === "another" && base.result ? repeatsOf(base.result.items, shownIds) : undefined;
-          steps.push({ name, ...base, violations, repeats, exhausted: base.result?.exhausted === true, ...extra });
+          const exhausted = base.result?.exhausted === true;
+          const unseenLeft = exhausted ? unseenSeedFillers(params, { dates, shownTitles, currentItems }) : undefined;
+          steps.push({ name, ...base, violations, repeats, exhausted, unseenLeft, ...extra });
         };
 
         const built = await draft({ ...common, action: "build", variant: 0 }, aud.authed);
         add("Собрать", built.step, "build");
         if (built.result) remember(built.result);
         let current = built.result;
-        for (let v = 1; v <= 3; v++) {
-          const next = await draft({ ...common, action: "another", variant: v, current: current ? toCurrent(current) : [], shownActivityIds: [...shownIds] }, aud.authed);
+        // a chain of "Другой вариант" until the engine says everything was shown (at most MAX_ANOTHER steps)
+        let nextVariant = 1;
+        for (let v = 1; v <= MAX_ANOTHER; v++) {
+          const next = await draft({ ...common, action: "another", variant: nextVariant, current: current ? toCurrent(current) : [], shownActivityIds: [...shownIds] }, aud.authed);
           const shownNote = next.result?.exhausted ? "Нового варианта нет: на экране остаётся прежний." : diffNote(current, next.result);
-          add(`Другой вариант ${v}`, next.step, "another", { diffNote: shownNote }, current?.items);
+          add(`Другой вариант ${v}`, next.step, "another", { diffNote: shownNote, anotherNo: v }, current?.items);
+          if (next.result?.exhausted) break;
           if (next.result && !next.result.exhausted) {
             remember(next.result);
             current = next.result;
+            nextVariant = (next.result.variant ?? nextVariant) + 1;
           }
         }
         // "Заменить": one request returns up to three whole-day variants for one point

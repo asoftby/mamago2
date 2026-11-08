@@ -340,4 +340,42 @@ const UNKNOWN = { kind: "unknown" } as const;
   assert.equal(none.exhausted, false, "no draft yet: nothing to repeat");
 }
 
+{
+  // fewer unseen places than a normal day holds: a shorter new day is a new variant, not exhaustion
+  const events = [
+    place("f1", A.lat + 0.0004, A.lng, ALWAYS),
+    place("f2", A.lat + 0.0008, A.lng, ALWAYS),
+    place("f3", A.lat + 0.0012, A.lng, ALWAYS),
+    place("f4", A.lat + 0.0016, A.lng, ALWAYS),
+  ];
+  const first = buildDayScenario(events, baseInput(), deps());
+  assert.equal(first.items.length, 3);
+  const cur = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const another = buildAnotherVariant(events, baseInput({ variant: 1 }), cur, new Set(cur.map((c) => c.activityId)), deps());
+  assert.equal(another.exhausted, false, "the fourth place was never shown: a (shorter) new variant");
+  assert.deepEqual(another.result.items.map((i) => i.activityId), events.map((e) => e.activityId).filter((id) => !cur.some((c) => c.activityId === id)));
+  const cur2 = another.result.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const done = buildAnotherVariant(events, baseInput({ variant: another.variant + 1 }), cur2, new Set(events.map((e) => e.activityId)), deps());
+  assert.equal(done.exhausted, true, "all four were shown: now it is exhaustion");
+}
+{
+  // equally scored colocated events at one time: one variant may coincide with the current day, later ones differ
+  const events = ["a", "b", "c", "d", "e"].map((id) => ev(id, A.lat, A.lng, [10]));
+  const first = buildDayScenario(events, baseInput({ targetCount: 1 }), deps());
+  const cur = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const seen = new Set(cur.map((c) => c.activityId));
+  const chain: string[] = [];
+  let variant = 1;
+  for (let step = 0; step < 8; step += 1) {
+    const next = buildAnotherVariant(events, baseInput({ variant, targetCount: 1 }), cur, seen, deps());
+    if (next.exhausted) break;
+    assert.ok(next.result.items.every((i) => !seen.has(i.activityId)), "a new variant brings an unseen point");
+    next.result.items.forEach((i) => seen.add(i.activityId));
+    cur.splice(0, cur.length, ...next.result.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs })));
+    chain.push(...next.result.items.map((i) => i.activityId));
+    variant = next.variant + 1;
+  }
+  assert.equal(new Set([...chain, ...first.items.map((i) => i.activityId)]).size, 5, "the chain walks through all five events before saying it is done");
+}
+
 console.log("dayScenario build tests passed");

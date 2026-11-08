@@ -164,7 +164,7 @@ export function useDayScenarioDraft(input: {
       );
       if (!response) return;
       const latest = stateRef.current[date]?.history ?? history;
-      dispatch({ type: "history", date, history: response.exhausted ? markExhausted(latest) : pushDraft(latest, toDraft(response), variant) });
+      dispatch({ type: "history", date, history: response.exhausted ? markExhausted(latest) : pushDraft(latest, toDraft(response), response.variant) });
     },
     [request],
   );
