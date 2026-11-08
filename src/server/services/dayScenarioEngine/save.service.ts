@@ -115,7 +115,7 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
       for (const date of dates) {
         await tx.dayScenario.upsert({ where: { userId_date: { userId, date } }, create: { userId, date, planFingerprint: "", source: "ENGINE" }, update: {} });
       }
-      await tx.$queryRaw`SELECT id FROM "DayScenario" WHERE "userId" = ${userId} AND date = ANY(${dates}) ORDER BY date FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "DayScenario" WHERE "userId" = ${userId} AND "date" = ANY(${dates}::text[]) ORDER BY "date" FOR UPDATE`;
       const rows = await tx.dayScenario.findMany({ where: { userId, date: { in: dates } }, orderBy: { date: "asc" } });
       const first = rows[0]!;
 
