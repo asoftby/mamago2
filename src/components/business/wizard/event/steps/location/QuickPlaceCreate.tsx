@@ -329,7 +329,6 @@ export function QuickPlaceCreate({
           <div className="mt-1 space-y-2">
             <EventLocationSearchInput
               ref={addressInputRef}
-              eagerInit
               onPlaceSelect={handleAddressSelect}
               onInputValueChange={handleAddressInputChange}
               disabled={isSaving}

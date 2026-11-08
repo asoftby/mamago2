@@ -7,30 +7,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
-const input = read("./EventLocationSearchInput.tsx");
 const quick = read("./QuickPlaceCreate.tsx");
 const picker = read("../../../../../admin/articles/ActivityCardEntityPicker.tsx");
 
-// One shared address component: QuickPlaceCreate must not grow its own copy.
+// One shared address component: QuickPlaceCreate must not grow its own copy
+// (the widget-specific and input-level contracts live in components/address/addressSuggestInput.wiringContract.test.ts).
 assert.match(quick, /import \{ EventLocationSearchInput \} from "\.\/EventLocationSearchInput"/);
-assert.match(quick, /<EventLocationSearchInput[\s\S]*?\beagerInit\b/, "widget mounts without the swap-on-focus that drops the mobile keyboard");
-
-// Widget init is lazy by default (no Google Maps cost for other consumers) and eager only on request.
-assert.match(input, /eagerInit = false/);
-assert.match(input, /useState\(eagerInit && !disabled\)/);
-
-// Focus survives the fallback -> widget swap when the user is already typing (slow Maps load),
-// and is handed over only after render, once the host is no longer hidden.
-assert.match(input, /document\.activeElement === fallbackInputRef\.current[\s\S]*?shouldFocusWidgetRef\.current = true/);
-assert.match(input, /if \(!isWidgetReady \|\| !shouldFocusWidgetRef\.current\)[\s\S]*?widgetRef\.current\?\.focus\?\.\(\)/);
-
-// Typing/selecting never navigates: Enter in the fallback field is swallowed, no router usage.
-assert.match(input, /event\.key === "Enter"\) event\.preventDefault\(\)/);
-assert.doesNotMatch(input, /useRouter|router\.(push|replace)|window\.location/);
 assert.doesNotMatch(quick, /useRouter|router\.(push|replace)|window\.location/);
 
-// Selection keeps coordinates: select handler forwards lat/lng/googlePlaceId to the form.
-assert.match(input, /onPlaceSelectRef\.current\(\{[\s\S]*?lat,[\s\S]*?lng,/);
+// Selection keeps coordinates: the resolved location (lat/lng) is what gets saved.
 assert.match(quick, /lat: resolvedLocation\.lat,[\s\S]*?lng: resolvedLocation\.lng,/);
 
 // Article place picker: draft is a distinct, non-alarming state; "Место недоступно" only for truly unavailable.
