@@ -79,6 +79,21 @@ async function main() {
     await assert.rejects(() => cleanupBirthdayDemo(prisma), /foreign consumers/);
     assert.ok(await prisma.bookingUnit.findUnique({ where: { id: manualUnit.id } }));
     await prisma.bookingUnit.delete({ where: { id: manualUnit.id } });
+    const fixturePlace = await prisma.place.findUniqueOrThrow({ where: { id: demoId('place-1') }, select: { cityId: true } });
+    // Protect both cascade paths independently: User.createdBy and Business ownership.
+    for (const ownership of [
+      { createdByUserId: demoId('owner-1'), ownerBusinessId: null },
+      { createdByUserId: sentinel.id, ownerBusinessId: demoId('business-1') },
+    ]) {
+      const manualPlace = await prisma.place.create({ data: { ...ownership, cityId: fixturePlace.cityId,
+        title: 'Manual top-level place', shortDesc: 'Nonfixture content must survive', status: 'DRAFT' } });
+      const childOffer = await prisma.offer.create({ data: { placeId: manualPlace.id, kind: 'SERVICE', title: 'Manual place offer' } });
+      await assert.rejects(() => cleanupBirthdayDemo(prisma), /foreign consumers/);
+      assert.ok(await prisma.place.findUnique({ where: { id: manualPlace.id } }));
+      assert.ok(await prisma.offer.findUnique({ where: { id: childOffer.id } }));
+      await prisma.offer.delete({ where: { id: childOffer.id } });
+      await prisma.place.delete({ where: { id: manualPlace.id } });
+    }
     await cleanupBirthdayDemo(prisma);
     assert.equal(await prisma.offer.count({ where: { id: { in: DEMO_OFFERS.map(o => demoId(o.key)) } } }), 0);
     assert.ok(await prisma.user.findUnique({ where: { id: sentinel.id } }));

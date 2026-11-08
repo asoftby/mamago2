@@ -147,7 +147,9 @@ export async function cleanupBirthdayDemo(prisma: PrismaClient) {
       db.directThread.count({ where: { businessId: { in: businessIds }, customerUserId: { notIn: userIds } } }),
       db.activity.count({ where: { placeId: { in: placeIds } } }),
       db.articleLinkedItem.count({ where: { offerId: { in: offerIds } } }),
-      db.place.count({ where: { parentPlaceId: { in: placeIds }, id: { notIn: placeIds } } }),
+      db.place.count({ where: { id: { notIn: placeIds }, OR: [
+        { parentPlaceId: { in: placeIds } }, { createdByUserId: { in: userIds } }, { ownerBusinessId: { in: businessIds } },
+      ] } }),
       db.partyOrderItem.count({ where: { offerId: { in: offerIds }, partyOrder: { ownerUserId: { notIn: userIds } } } }),
       db.bookingRequest.count({ where: { businessId: { in: businessIds }, OR: [{ userId: null }, { userId: { notIn: userIds } }] } }),
       db.planItem.count({ where: { offerId: { in: offerIds }, userId: { notIn: userIds } } }),
