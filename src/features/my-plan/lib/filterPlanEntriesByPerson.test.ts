@@ -37,3 +37,11 @@ assert.deepEqual(
   [],
   "explicit exclusion wins over inclusion",
 );
+
+const programme = [{ id: "party", childId: "child-1", assigneeUserId: null,
+  partyOrder: { id: "order", programmeAdultIds: ["adult-2"], programmeChildIds: ["child-1", "child-2"] } }];
+assert.equal(filterPlanEntriesByPerson(programme, { kind: "child", id: "child-2" }).length, 1);
+assert.equal(filterVisiblePlanEntries(programme, { include: [{ kind: "adult", id: "adult-2" }] }).length, 1);
+assert.equal(filterVisiblePlanEntries(programme, { include: [{ kind: "adult", id: "adult-1" }] }).length, 0,
+  "ownership alone is not attendance");
+assert.equal(filterVisiblePlanEntries(programme, { include: [{ kind: "all" }], exclude: [{ kind: "child", id: "child-2" }] }).length, 0);

@@ -10,18 +10,21 @@ export type PlanPersonSelection =
   | { kind: "adult"; id: string }
   | { kind: "child"; id: string };
 
-export function filterPlanEntriesByPerson<T extends {
+type PlanParticipantFields = {
   childId?: string | null;
   assigneeUserId?: string | null;
-}>(entries: readonly T[], selection: PlanPersonSelection): T[] {
-  switch (selection.kind) {
-    case "all":
-      return [...entries];
-    case "child":
-      return entries.filter((entry) => entry.childId === selection.id);
-    case "adult":
-      return entries.filter((entry) => !entry.childId && entry.assigneeUserId === selection.id);
-  }
+  /** Canonical order participants, loaded only after the server's Family Core ACL. */
+  partyOrder?: { id?: string; programmeAdultIds?: readonly string[]; programmeChildIds?: readonly string[] } | null;
+};
+function matchesExplicitPerson(entry: PlanParticipantFields, selection: PlanPersonSelection): boolean {
+  if (selection.kind === "all") return true;
+  if (entry.partyOrder) return (selection.kind === "child"
+    ? entry.partyOrder.programmeChildIds : entry.partyOrder.programmeAdultIds)?.includes(selection.id) ?? false;
+  return selection.kind === "child" ? entry.childId === selection.id
+    : !entry.childId && entry.assigneeUserId === selection.id;
+}
+export function filterPlanEntriesByPerson<T extends PlanParticipantFields>(entries: readonly T[], selection: PlanPersonSelection): T[] {
+  return entries.filter(entry => matchesExplicitPerson(entry, selection));
 }
 
 
@@ -37,17 +40,12 @@ export type PlanAudienceSelection = {
   visibility?: "ALL" | "PRIVATE" | "FAMILY";
 };
 
-export function filterVisiblePlanEntries<T extends {
-  childId?: string | null;
-  assigneeUserId?: string | null;
+export function filterVisiblePlanEntries<T extends PlanParticipantFields & {
   visibility?: "PRIVATE" | "FAMILY" | null;
 }>(entries: readonly T[], selection: PlanAudienceSelection): T[] {
-  const matches = (entry: T, person: PlanPersonSelection): boolean =>
-    person.kind === "all" ||
-    (person.kind === "child" ? entry.childId === person.id : !entry.childId && entry.assigneeUserId === person.id);
   return entries.filter(entry =>
     (selection.visibility === undefined || selection.visibility === "ALL" || entry.visibility === selection.visibility) &&
-    (selection.include.length === 0 || selection.include.some(person => matches(entry, person))) &&
-    !(selection.exclude ?? []).some(person => matches(entry, person))
+    (selection.include.length === 0 || selection.include.some(person => matchesExplicitPerson(entry, person))) &&
+    !(selection.exclude ?? []).some(person => matchesExplicitPerson(entry, person))
   );
 }

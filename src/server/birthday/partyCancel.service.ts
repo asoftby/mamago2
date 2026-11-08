@@ -27,7 +27,7 @@ export async function cancelPartyBeforeConfirmation(
     const order = await tx.partyOrder.findFirst({
       where: { id: partyId, ownerUserId },
       select: {
-        id: true, status: true, version: true,
+        id: true, status: true, version: true, planItemId: true,
         items: { select: { id: true, status: true, confirmedBookingRequestId: true } },
       },
     });
@@ -85,6 +85,8 @@ export async function cancelPartyBeforeConfirmation(
       data: { status: PartyOrderStatus.CANCELLED, cancelledAt: now, version: { increment: 1 } },
     });
     if (claimed.count !== 1) throw new PartyApiError(409, "Праздник изменился. Обновите страницу");
+    if (order.planItemId) await tx.planItem.updateMany({ where: { id: order.planItemId, userId: ownerUserId },
+      data: { status: "CANCELLED", cancelledAt: now } });
     return { partyId, cancelled: true, alreadyCancelled: false, closedRequests: open.length,
       closedRequestIds: open.map((request) => request.id) };
   });

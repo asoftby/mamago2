@@ -5,7 +5,7 @@ import type { PackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowLeft, CheckCircle2, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +63,7 @@ const orderNotices: Record<string, string> = {
   CANCELLED: "Праздник отменён. Заявки исполнителям закрыты.",
 };
 
-export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData }) {
+export function PartyOrderStatusScreen({ party, children }: { party: PartyOrderScreenData; children?: ReactNode }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -207,6 +207,7 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             );
           })}
         </div>
+        {children}
         {!cancelled && party.giftsHref ? (
           <section className="space-y-2 border-t border-border pt-5">
             <h2 className="text-lg font-semibold text-foreground">Подарки</h2>

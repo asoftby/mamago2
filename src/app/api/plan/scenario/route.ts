@@ -175,6 +175,12 @@ export async function saveScenarioDraftForUser(
       throw new ScenarioSaveError(422, "INVALID_PLAN_ITEM");
     }
 
+    const mutationTargets = [...intent.replacements.map(row => row.planItemId), ...intent.removals];
+    const protectedCount = mutationTargets.length ? await tx.planItem.count({ where: {
+      id: { in: mutationTargets },
+      partyOrder: { isNot: null },
+    } }) : 0;
+    if (protectedCount) throw new ScenarioSaveError(422, "INVALID_PLAN_ITEM");
     for (const replacement of intent.replacements) {
       const activity = await tx.activity.findUnique({ where: { id: replacement.newActivityId }, select: activitySelect });
       if (!activity || activity.status !== "PUBLISHED") throw new ScenarioSaveError(422, "INVALID_REPLACEMENT", replacement.newActivityId);

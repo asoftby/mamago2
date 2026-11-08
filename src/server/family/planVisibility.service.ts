@@ -23,7 +23,7 @@ type ChangeInput = {
 async function loadItem(userId: string, planItemId: string) {
   if (!familyReadsEnabled()) throw new PlanVisibilityError("disabled");
   const item = await prisma.planItem.findFirst({
-    where: { id: planItemId, ...(await planScopeFor(userId)) },
+    where: { id: planItemId, partyOrder: { is: null }, ...(await planScopeFor(userId)) },
     select: { id: true, userId: true, familyId: true, visibility: true, status: true, createdAt: true, updatedAt: true },
   });
   if (!item) throw new PlanVisibilityError("not_found");

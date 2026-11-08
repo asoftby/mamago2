@@ -1,3 +1,5 @@
+import { programmeEntries, validateProgramme } from "@/lib/birthday/partyProgramme";
+import { partyStartAt } from "./partyDraft.validation";
 import { PartyCategory, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
@@ -327,6 +329,15 @@ export async function updatePartyDraft(
       where: { id: partyId },
       include: { items: { orderBy: { position: "asc" }, include: { offer: { select: draftOfferSelect } } } },
     });
+    if (input.eventDate !== undefined || input.timeFrom !== undefined || input.timeTo !== undefined) {
+      const programmeError = validateProgramme(programmeEntries(updated.programme), updated);
+      if (programmeError) throw new PartyApiError(422, programmeError);
+      if (updated.planItemId) await tx.planItem.updateMany({ where: { id: updated.planItemId, userId: ownerUserId }, data: {
+        date: updated.eventDate?.toISOString().slice(0, 10) ?? null,
+        startsAt: updated.eventDate && updated.timeFrom ? partyStartAt(updated.eventDate, updated.timeFrom) : null,
+        endsAt: updated.eventDate && updated.timeTo ? partyStartAt(updated.eventDate, updated.timeTo) : null,
+      } });
+    }
     return withDraftEstimate(updated);
   });
 }

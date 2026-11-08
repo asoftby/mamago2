@@ -179,3 +179,9 @@ jobs:
         run: |
           pnpm test:birthday-demo
           pnpm test:birthday-demo:integration
+      - name: Verify programme, family ACL and public capabilities
+        env:
+          APP_ENV: local
+          BIRTHDAY_DEMO_LOCAL: "1"
+          PRISMA_QUERY_EVENTS: "1"
+        run: pnpm test:birthday-programme:integration

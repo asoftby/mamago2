@@ -13,7 +13,7 @@ test("both My Plan surfaces open time editing for Telegram notes", () => {
   assert.match(modal, /movingItem\?\.source === "TELEGRAM_FORWARD"/);
   assert.match(editor, /editItem\.source === "TELEGRAM_FORWARD"/);
   assert.match(editor, /endsAt: null/);
-  assert.match(fullPlan, /canEdit: item\.source === "MANUAL" \|\| item\.source === "TELEGRAM_FORWARD"/);
+  assert.match(fullPlan, /canEdit: !item\.partyOrder && \(item\.source === "MANUAL" \|\| item\.source === "TELEGRAM_FORWARD"\)/);
   assert.match(dialog, /item\.source === "TELEGRAM_FORWARD"/);
 });
 
@@ -26,7 +26,7 @@ test("Telegram plan edit is owner-scoped, versioned, source-restricted and never
   assert.match(endpoint, /updateTelegramPlanEntry/);
   assert.doesNotMatch(endpoint, /\.\.\.body/);
   assert.doesNotMatch(endpoint, /inboxItemId: body/);
-  assert.match(service, /source, status: "CONFIRMED", updatedAt: expected/);
+  assert.match(service, /source, partyOrder: \{ is: null \}, status: "CONFIRMED", updatedAt: expected/);
   assert.match(service, /source:|source,/);
   assert.match(service, /activePlanScopeFor\(owner\.userId\)/);
 });

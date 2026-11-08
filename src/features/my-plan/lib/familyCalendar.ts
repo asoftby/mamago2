@@ -3,6 +3,7 @@ import type { PlanEntryType, PlanItemSource } from "@prisma/client";
 export type FamilyCalendarFilter = "all" | "family" | `child:${string}`;
 
 export type FamilyCalendarPresentationInput = {
+  partyOrder?: { id: string } | null;
   id: string;
   source: PlanItemSource;
   entryType: PlanEntryType | null;
@@ -52,7 +53,7 @@ export function buildFamilyCalendarItemPresentation(
     personLabel: item.childId ? (item.childName ?? "Ребёнок") : "Взрослые",
     locationLabel: isCatalog ? catalogLocation : item.locationText,
     isCatalog,
-    canEdit: item.source === "MANUAL" || item.source === "TELEGRAM_FORWARD",
+    canEdit: !item.partyOrder && (item.source === "MANUAL" || item.source === "TELEGRAM_FORWARD"),
   };
 }
 

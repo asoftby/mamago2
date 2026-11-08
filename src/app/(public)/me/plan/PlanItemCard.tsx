@@ -76,7 +76,7 @@ export function PlanItemCard({
     item.planAvailability === "missing_activity"
   );
 
-  const href = item.offerId && item.offer?.slug
+  const href = item.partyOrder ? `/me/birthdays/${encodeURIComponent(item.partyOrder.id)}` : item.offerId && item.offer?.slug
     ? `/${item.offer.place?.city?.slug ?? "minsk"}/offers/${item.offer.slug}`
     : item.activityId && !unavailable
       ? publicActivityPath(item.activityId, "minsk", item.activity?.slug)
@@ -359,7 +359,7 @@ export function PlanItemCard({
           <span className="h-9 w-9 max-sm:h-8 max-sm:w-8" />
         )}
 
-        {familyUi && isOwn && item.status !== "PROPOSED" && (
+        {!item.partyOrder && familyUi && isOwn && item.status !== "PROPOSED" && (
           <button
             type="button"
             onClick={handleVisibility}
@@ -374,7 +374,7 @@ export function PlanItemCard({
           </button>
         )}
 
-        {item.source !== "TELEGRAM_FORWARD" && item.status !== "PROPOSED" ? (
+        {!item.partyOrder && item.source !== "TELEGRAM_FORWARD" && item.status !== "PROPOSED" ? (
           <button
             type="button"
             onClick={() => item.recurrenceSeriesId ? setRecurrenceOpen(true) : void handleRemove()}
