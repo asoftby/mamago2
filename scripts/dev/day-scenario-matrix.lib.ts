@@ -61,6 +61,8 @@ export type RunParams = {
   toddler: boolean;
   window: { start: string; end: string };
   planItem: boolean;
+  /** A deliberately narrow run (few candidates) that exists to reach «показали всё». */
+  narrow?: boolean;
 };
 
 export type SpecInfo = {
@@ -155,6 +157,24 @@ export type CheckContext = {
   currentItems?: ApiItem[];
 };
 
+/** Visit length the engine gives a filler: a cafe 60 min, anything else 90 (FILLER_CONFIG). */
+const fillerMinutes = (place: MockPlaceSpec) => (place.primary === "food" ? 60 : 90);
+
+/**
+ * Could the place be visited inside the run's day window? Closed that day: no. Open windows (or no hours
+ * record / always open): the visit length must fit into the overlap with the window - a place that opens for
+ * 30 minutes of an evening window is not a candidate the engine could have used.
+ */
+export function placeFitsWindow(place: MockPlaceSpec, plan: HoursPlan, run: Pick<RunParams, "date" | "window">): boolean {
+  const availability = seededAvailability(plan, run.date);
+  if (availability === "closed") return false;
+  const winStart = sessionInstant(run.date, run.window.start).getTime();
+  const winEnd = sessionInstant(run.date, run.window.end).getTime();
+  const need = fillerMinutes(place) * 60_000;
+  if (availability === "always" || availability === "unknown") return winEnd - winStart >= need;
+  return availability.some((w) => Math.min(w.endMs, winEnd) - Math.max(w.startMs, winStart) >= need);
+}
+
 /**
  * Unseen filler places the SEED says could still be shown: age-eligible, not closed that day, not shown
  * yet, and within the mode's reach of the current draft (walking: the same or a neighbouring ~1 km cell;
@@ -167,7 +187,7 @@ export function unseenSeedFillers(run: RunParams, ctx: Pick<CheckContext, "dates
   MOCK_PLACES.forEach((place, ordinal) => {
     if (place.lat == null || place.lng == null || ctx.shownTitles?.has(place.title)) return;
     if (run.ageRanges.length > 0 && (place.adultOnly || (place.ages.length > 0 && !place.ages.some((a) => run.ageRanges.includes(a))))) return;
-    if (seededAvailability(hoursPlanFor(place, ctx.dates, ordinal), run.date) === "closed") return;
+    if (!placeFitsWindow(place, hoursPlanFor(place, ctx.dates, ordinal), run)) return;
     const cells = geoCellsFor(place.lat, place.lng);
     if (!cells) return;
     const reachable = near.some((s) => (run.mode === "walk" ? s.geoCell6 !== null && geoCellWithNeighbors(s.geoCell6).includes(cells.geoCell6) : s.geoCell5 === cells.geoCell5));
@@ -280,6 +300,33 @@ export function weeklyViolation(cov: WeeklyCoverage): Violation | null {
   return { run: cov.eligible[0]!, step: "Все шаги подходящих прогонов", rule: "Повторяющееся событие без сеансов ни разу не попало в сценарий", detail: `подходит по дате, возрасту и окну в ${cov.eligible.length} прогонах (${cov.eligible.join(", ")}), в сценарии не было ни разу` };
 }
 
+// ------------------------------------------------------------ «показали всё» on a narrow pool
+
+export type ExhaustedRow = { id: string; newVariants: number; stopAt: number | null; left: string[] };
+export type ExhaustedCoverage = { rows: ExhaustedRow[]; justified: number; premature: number };
+
+/**
+ * What the narrow runs did with their «Другой вариант» chain: where «показали всё» came and how many seeded
+ * candidates the oracle still saw at that moment (empty = justified by the seed, otherwise premature).
+ */
+export function exhaustedCoverage(runs: readonly RunRecord[]): ExhaustedCoverage {
+  const rows = runs
+    .filter((r) => r.params.narrow)
+    .map((r) => {
+      const anothers = r.steps.filter((st) => st.anotherNo !== undefined);
+      const stop = anothers.find((st) => st.exhausted);
+      return { id: r.params.id, newVariants: anothers.filter((st) => !st.exhausted).length, stopAt: stop?.anotherNo ?? null, left: stop?.unseenLeft ?? [] };
+    });
+  const reached = rows.filter((r) => r.stopAt !== null);
+  return { rows, justified: reached.filter((r) => r.left.length === 0).length, premature: reached.filter((r) => r.left.length > 0).length };
+}
+
+/** The violation to attach when narrow runs exist but none of them reached a justified «показали всё». */
+export function exhaustedViolation(cov: ExhaustedCoverage): Violation | null {
+  if (cov.rows.length === 0 || cov.justified > 0) return null;
+  return { run: cov.rows[0]!.id, step: "Цепочки узких прогонов", rule: "Ветка «показали всё» не проверена вживую", detail: `ни один из ${cov.rows.length} узких прогонов (${cov.rows.map((r) => r.id).join(", ")}) не дошёл до обоснованного «показали всё»` };
+}
+
 // ------------------------------------------------------------ report
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -318,7 +365,7 @@ function stepHtml(step: StepRecord): string {
   return `<div class="step"><h4>${esc(step.name)} <span class="muted">· HTTP ${step.httpStatus} · ${Math.round(step.ms)} мс${r?.meta ? ` · пул ${r.meta.poolCache}, ${r.meta.poolSize} (мест ${r.meta.poolPlaces ?? 0}), сборка ${r.meta.buildMs} мс` : ""}</span></h4>${r ? timeline(r) : "<p class='bad'>нет ответа</p>"}${t ? `<p>Итого: <b>${t.points}</b> точек · <b>${t.km.toFixed(2)} км</b> · <b>${t.travelMin} мин</b> в пути · переходов между geoCell5: <b>${t.cell5Transitions}</b></p>` : ""}${warn.length ? `<p class="warn">Предупреждения: ${esc(warn.join("; "))}</p>` : ""}${step.diffNote ? `<p class="muted">${esc(step.diffNote)}</p>` : ""}${step.exhausted ? `<p class="warn">Движок ответил «Мы показали всё, что подходит» (нового варианта нет, на экране остаётся прежний).</p>` : ""}${step.repeats && step.repeats.anchors.length ? `<p class="muted">Повтор якорей (норма): ${esc(step.repeats.anchors.join("; "))}</p>` : ""}${step.repeats && step.repeats.fillers.length ? `<p class="bad">Повтор заполнителей: ${esc(step.repeats.fillers.join("; "))}</p>` : ""}${step.alternatives ? `<p>Альтернативы: ${step.alternatives.map((a) => `<span class="chip">${esc(a)}</span>`).join(" ")}</p>` : ""}${step.violations.length ? `<p class="bad">Нарушения: ${step.violations.map((v) => esc(v.rule)).join("; ")}</p>` : ""}</div>`;
 }
 
-export function renderReport(input: { generatedAt: string; base: string; build: string; dates: Record<string, string>; runs: RunRecord[]; calls: number; notes: string[]; weekly?: WeeklyCoverage }): string {
+export function renderReport(input: { generatedAt: string; base: string; build: string; dates: Record<string, string>; runs: RunRecord[]; calls: number; notes: string[]; weekly?: WeeklyCoverage; exhausted?: ExhaustedCoverage }): string {
   const all = input.runs.flatMap((r) => r.steps.flatMap((s) => s.violations));
   const byRule = new Map<string, number>();
   for (const v of all) byRule.set(v.rule, (byRule.get(v.rule) ?? 0) + 1);
@@ -358,6 +405,8 @@ ${input.notes.map((n) => `<p class="muted">${esc(n)}</p>`).join("")}
 <table><thead><tr><th>Прогон</th><th>Новых вариантов до конца</th><th>«Показали всё» на</th><th>Остаток</th><th>Какие</th><th>Вывод</th></tr></thead><tbody>${chainRows.join("")}</tbody></table>
 <h2>Повторяющееся событие без сеансов (c-weekly)</h2>
 ${input.weekly ? `<p class="muted">Событие из сида: еженедельно по субботам 11:00, возраст 5–7 / 7–9, без ActivitySession (время по расписанию). Должно попасть в сценарий хотя бы в одном из прогонов, где подходят дата, возраст и окно дня.</p><p>Подходящих прогонов: <b>${input.weekly.eligible.length}</b>${input.weekly.eligible.length ? ` (${input.weekly.eligible.map(esc).join(", ")})` : ""}. Попало в сценарий в: <b class="${input.weekly.eligible.length && input.weekly.seenIn.length === 0 ? "bad" : "ok"}">${input.weekly.seenIn.length ? input.weekly.seenIn.map(esc).join(", ") : "—"}</b>.</p>` : `<p class="muted">Проверка не выполнялась.</p>`}
+<h2>Узкие прогоны: «показали всё» вживую</h2>
+${input.exhausted && input.exhausted.rows.length ? `<p class="muted">Прогоны N-… с заведомо малым выбором (узкое окно дня, возраст, режим). Они нужны, чтобы ветка exhausted сработала на DEV. «Обосновано» — оракул не видит в сиде ни одного подходящего непоказанного места рядом; пул DEV шире сида, поэтому это проверка по мок-каталогу.</p><table><thead><tr><th>Прогон</th><th>Новых вариантов до конца</th><th>«Показали всё» на</th><th>Остаток по сиду</th><th>Вывод</th></tr></thead><tbody>${input.exhausted.rows.map((r) => `<tr><td><a href="#${esc(r.id)}">${esc(r.id)}</a></td><td>${r.newVariants}</td><td>${r.stopAt === null ? "—" : `шаг ${r.stopAt}`}</td><td>${r.stopAt === null ? "—" : r.left.length}${r.left.length ? `: ${esc(r.left.slice(0, 4).join("; "))}` : ""}</td><td>${r.stopAt === null ? "не наступило" : r.left.length ? `<span class="bad">преждевременно</span>` : `<span class="ok">обосновано</span>`}</td></tr>`).join("")}</tbody></table><p>Обоснованных: <b class="${input.exhausted.justified ? "ok" : "bad"}">${input.exhausted.justified}</b>, преждевременных: <b class="${input.exhausted.premature ? "bad" : "ok"}">${input.exhausted.premature}</b>.</p>` : `<p class="muted">Узких прогонов не было.</p>`}
 <h2>Нарушения (${all.length})</h2>
 ${all.length ? `<table><thead><tr><th>Прогон</th><th>Шаг</th><th>Правило</th><th>Детали</th></tr></thead><tbody>${violationRows.join("")}</tbody></table><p>По правилам: ${[...byRule].map(([k, n]) => `${esc(k)} — ${n}`).join("; ")}</p>` : `<p class="ok">Нарушений не найдено.</p>`}
 <h2>Прогоны</h2>

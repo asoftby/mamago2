@@ -21,6 +21,8 @@ import {
   unseenSeedFillers,
   weeklyCoverage,
   weeklyViolation,
+  exhaustedCoverage,
+  exhaustedViolation,
   PLAN_FIXTURE_TITLE,
   renderReport,
   TODDLER_RANGES,
@@ -38,6 +40,7 @@ const argValue = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?
 const BASE = (argValue("base-url") ?? "https://dev.mamago.by").replace(/\/$/, "");
 const REPORT = argValue("report");
 const MAX_ANOTHER = 6;
+const NARROW_MAX_ANOTHER = 8;
 const MAX_CALLS = Number(argValue("max-calls") ?? 300);
 const APPLY_DATE = argValue("apply-date") ?? minskDateOf(new Date());
 const SKIP_PLAN_ITEMS = args.includes("--skip-plan-items");
@@ -182,6 +185,87 @@ async function main(): Promise<void> {
     }
   };
 
+  // One run: build, a chain of «Другой вариант», «Заменить». `window` and `maxAnother` differ for the narrow runs.
+  const runOne = async (aud: (typeof audiences)[number], d: (typeof days)[number], mode: "walk" | "car", window: { start: string; end: string }, id: string, maxAnother: number, narrow = false): Promise<void> => {
+    const ages = aud.authed ? authedAges[d.key]! : aud.ageRanges;
+    const params: RunParams = {
+      id,
+      date: d.date,
+      dateLabel: d.label,
+      mode,
+      audience: aud.label,
+      ageRanges: ages,
+      toddler: aud.authed ? ages.some((a) => TODDLER_RANGES.has(a)) : aud.toddler,
+      window,
+      planItem: aud.plan,
+      ...(narrow ? { narrow: true } : {}),
+    };
+    const common = { city: "minsk", date: d.date, mode, targetCount: 3, dayStart: window.start, dayEnd: window.end, ...(aud.authed ? { personaIds } : { ageRanges: aud.ageRanges }) };
+    const steps: StepRecord[] = [];
+    // What the UI knows about this day: every point shown so far (it sends them as `shownActivityIds`).
+    const shownIds = new Set<string>();
+    const shownTitles = new Set<string>();
+    const signatures: string[] = [];
+    const remember = (res: ApiResult) => {
+      for (const i of res.items) {
+        shownIds.add(i.activityId);
+        shownTitles.add(i.card.title);
+      }
+      signatures.push(sig(res));
+    };
+    const add = (name: string, base: Omit<StepRecord, "name" | "violations">, kind: StepKind, extra: Partial<StepRecord> = {}, currentItems?: ApiResult["items"]) => {
+      const violations: Violation[] = base.result
+        ? checkResult(params, name, base.result, { dates, stepKind: kind, shownIds: new Set(shownIds), shownTitles: new Set(shownTitles), priorSignatures: [...signatures], currentItems })
+        : [{ run: params.id, step: name, rule: "Ответ API", detail: `HTTP ${base.httpStatus}` }];
+      const repeats = kind === "another" && base.result ? repeatsOf(base.result.items, shownIds) : undefined;
+      const exhausted = base.result?.exhausted === true;
+      const unseenLeft = exhausted ? unseenSeedFillers(params, { dates, shownTitles, currentItems }) : undefined;
+      steps.push({ name, ...base, violations, repeats, exhausted, unseenLeft, ...extra });
+    };
+
+    const built = await draft({ ...common, action: "build", variant: 0 }, aud.authed);
+    add("Собрать", built.step, "build");
+    if (built.result) remember(built.result);
+    let current = built.result;
+    // a chain of "Другой вариант" until the engine says everything was shown (at most MAX_ANOTHER steps)
+    let nextVariant = 1;
+    for (let v = 1; v <= maxAnother; v++) {
+      const next = await draft({ ...common, action: "another", variant: nextVariant, current: current ? toCurrent(current) : [], shownActivityIds: [...shownIds] }, aud.authed);
+      const shownNote = next.result?.exhausted ? "Нового варианта нет: на экране остаётся прежний." : diffNote(current, next.result);
+      add(`Другой вариант ${v}`, next.step, "another", { diffNote: shownNote, anotherNo: v }, current?.items);
+      if (next.result?.exhausted) break;
+      if (next.result && !next.result.exhausted) {
+        remember(next.result);
+        current = next.result;
+        nextVariant = (next.result.variant ?? nextVariant) + 1;
+      }
+    }
+    // "Заменить": one request returns up to three whole-day variants for one point
+    const base = built.result;
+    if (base && base.items.length > 0) {
+      const sorted = [...base.items].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      const victim = sorted[Math.min(1, sorted.length - 1)]!;
+      const rep = await draft({ ...common, action: "alternatives", variant: 0, current: toCurrent(base), replaceActivityId: victim.activityId }, aud.authed);
+      const kept = new Set(sorted.filter((i) => i.activityId !== victim.activityId).map((i) => i.activityId));
+      const variants = rep.result?.alternatives ?? [];
+      const freshTitles = variants.map((items) => items.find((i) => !kept.has(i.activityId))?.card.title ?? "—");
+      if (variants.length === 0) {
+        add(`Заменить «${victim.card.title}»`, rep.step, "other", { alternatives: ["— замены не нашлось —"] });
+        notes.push(`${params.id}: для «Заменить» альтернатив не найдено.`);
+      }
+      variants.forEach((items, k) => {
+        const asResult: ApiResult = { status: "ok", mode: common.mode, suggestMode: null, items };
+        add(`Заменить «${victim.card.title}» (вариант ${k + 1})`, { result: asResult, httpStatus: rep.step.httpStatus, ms: rep.step.ms }, "alternative", {
+          alternatives: k === 0 ? freshTitles : undefined,
+          diffNote: diffNote(base, asResult),
+        });
+      });
+      if (new Set(freshTitles).size !== freshTitles.length) notes.push(`${params.id}: «Заменить» предложил одну альтернативу дважды.`);
+    }
+    runs.push({ params, steps });
+    console.log(`${params.id}: ${built.result?.status ?? "HTTP " + built.step.httpStatus}, calls=${calls}`);
+  };
+
   try {
   for (const aud of audiences) {
     if (aud.plan && !SKIP_PLAN_ITEMS) {
@@ -193,85 +277,20 @@ async function main(): Promise<void> {
     }
     for (const d of days) {
       for (const mode of ["walk", "car"] as const) {
-        const ages = aud.authed ? authedAges[d.key]! : aud.ageRanges;
-        const params: RunParams = {
-          id: `${aud.key}-${d.key}-${mode}`,
-          date: d.date,
-          dateLabel: d.label,
-          mode,
-          audience: aud.label,
-          ageRanges: ages,
-          toddler: aud.authed ? ages.some((a) => TODDLER_RANGES.has(a)) : aud.toddler,
-          window: d.window,
-          planItem: aud.plan,
-        };
-        const common = { city: "minsk", date: d.date, mode, targetCount: 3, dayStart: d.window.start, dayEnd: d.window.end, ...(aud.authed ? { personaIds } : { ageRanges: aud.ageRanges }) };
-        const steps: StepRecord[] = [];
-        // What the UI knows about this day: every point shown so far (it sends them as `shownActivityIds`).
-        const shownIds = new Set<string>();
-        const shownTitles = new Set<string>();
-        const signatures: string[] = [];
-        const remember = (res: ApiResult) => {
-          for (const i of res.items) {
-            shownIds.add(i.activityId);
-            shownTitles.add(i.card.title);
-          }
-          signatures.push(sig(res));
-        };
-        const add = (name: string, base: Omit<StepRecord, "name" | "violations">, kind: StepKind, extra: Partial<StepRecord> = {}, currentItems?: ApiResult["items"]) => {
-          const violations: Violation[] = base.result
-            ? checkResult(params, name, base.result, { dates, stepKind: kind, shownIds: new Set(shownIds), shownTitles: new Set(shownTitles), priorSignatures: [...signatures], currentItems })
-            : [{ run: params.id, step: name, rule: "Ответ API", detail: `HTTP ${base.httpStatus}` }];
-          const repeats = kind === "another" && base.result ? repeatsOf(base.result.items, shownIds) : undefined;
-          const exhausted = base.result?.exhausted === true;
-          const unseenLeft = exhausted ? unseenSeedFillers(params, { dates, shownTitles, currentItems }) : undefined;
-          steps.push({ name, ...base, violations, repeats, exhausted, unseenLeft, ...extra });
-        };
-
-        const built = await draft({ ...common, action: "build", variant: 0 }, aud.authed);
-        add("Собрать", built.step, "build");
-        if (built.result) remember(built.result);
-        let current = built.result;
-        // a chain of "Другой вариант" until the engine says everything was shown (at most MAX_ANOTHER steps)
-        let nextVariant = 1;
-        for (let v = 1; v <= MAX_ANOTHER; v++) {
-          const next = await draft({ ...common, action: "another", variant: nextVariant, current: current ? toCurrent(current) : [], shownActivityIds: [...shownIds] }, aud.authed);
-          const shownNote = next.result?.exhausted ? "Нового варианта нет: на экране остаётся прежний." : diffNote(current, next.result);
-          add(`Другой вариант ${v}`, next.step, "another", { diffNote: shownNote, anotherNo: v }, current?.items);
-          if (next.result?.exhausted) break;
-          if (next.result && !next.result.exhausted) {
-            remember(next.result);
-            current = next.result;
-            nextVariant = (next.result.variant ?? nextVariant) + 1;
-          }
-        }
-        // "Заменить": one request returns up to three whole-day variants for one point
-        const base = built.result;
-        if (base && base.items.length > 0) {
-          const sorted = [...base.items].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-          const victim = sorted[Math.min(1, sorted.length - 1)]!;
-          const rep = await draft({ ...common, action: "alternatives", variant: 0, current: toCurrent(base), replaceActivityId: victim.activityId }, aud.authed);
-          const kept = new Set(sorted.filter((i) => i.activityId !== victim.activityId).map((i) => i.activityId));
-          const variants = rep.result?.alternatives ?? [];
-          const freshTitles = variants.map((items) => items.find((i) => !kept.has(i.activityId))?.card.title ?? "—");
-          if (variants.length === 0) {
-            add(`Заменить «${victim.card.title}»`, rep.step, "other", { alternatives: ["— замены не нашлось —"] });
-            notes.push(`${params.id}: для «Заменить» альтернатив не найдено.`);
-          }
-          variants.forEach((items, k) => {
-            const asResult: ApiResult = { status: "ok", mode: common.mode, suggestMode: null, items };
-            add(`Заменить «${victim.card.title}» (вариант ${k + 1})`, { result: asResult, httpStatus: rep.step.httpStatus, ms: rep.step.ms }, "alternative", {
-              alternatives: k === 0 ? freshTitles : undefined,
-              diffNote: diffNote(base, asResult),
-            });
-          });
-          if (new Set(freshTitles).size !== freshTitles.length) notes.push(`${params.id}: «Заменить» предложил одну альтернативу дважды.`);
-        }
-        runs.push({ params, steps });
-        console.log(`${params.id}: ${built.result?.status ?? "HTTP " + built.step.httpStatus}, calls=${calls}`);
+        await runOne(aud, d, mode, d.window, `${aud.key}-${d.key}-${mode}`, MAX_ANOTHER);
       }
     }
   }
+  // Narrow runs: so few candidates that «Другой вариант» must run dry. Guests only (no plan fixtures); the window is
+  // cut to the evening / early morning so the seeded places that fit are a handful (see exhaustedCoverage).
+  const day = (key: string) => days.find((d) => d.key === key)!;
+  const guest = (key: string, label: string, ageRanges: string[], toddler: boolean) => ({ key, label, ageRanges, toddler, authed: false, plan: false });
+  const narrowRuns = [
+    { id: "N-wed-walk-03", aud: guest("G03", "гость, 0–3 года", ["0-1", "1-3"], true), d: day("wed"), mode: "walk" as const, window: { start: "18:00", end: "19:30" } },
+    { id: "N-wed-car-03", aud: guest("G03", "гость, 0–3 года", ["0-1", "1-3"], true), d: day("wed"), mode: "car" as const, window: { start: "18:00", end: "19:30" } },
+    { id: "N-sat-walk-35", aud: guest("G35", "гость, 3–5 лет", ["3-5"], false), d: day("sat"), mode: "walk" as const, window: { start: "09:00", end: "11:30" } },
+  ];
+  for (const n of narrowRuns) await runOne(n.aud, n.d, n.mode, n.window, n.id, NARROW_MAX_ANOTHER, true);
   } finally {
     await teardown();
   }
@@ -280,10 +299,14 @@ async function main(): Promise<void> {
   const weekly = weeklyCoverage(runs, dates);
   const weeklyProblem = weeklyViolation(weekly);
   if (weeklyProblem) runs.find((r) => r.params.id === weeklyProblem.run)?.steps[0]?.violations.push(weeklyProblem);
-  const html = renderReport({ generatedAt: new Date().toISOString(), base: BASE, build, dates: dates as Record<string, string>, runs, calls, notes, weekly });
+  // The «показали всё» branch must be exercised live: at least one narrow run has to end justified.
+  const exhausted = exhaustedCoverage(runs);
+  const exhaustedProblem = exhaustedViolation(exhausted);
+  if (exhaustedProblem) runs.find((r) => r.params.id === exhaustedProblem.run)?.steps[0]?.violations.push(exhaustedProblem);
+  const html = renderReport({ generatedAt: new Date().toISOString(), base: BASE, build, dates: dates as Record<string, string>, runs, calls, notes, weekly, exhausted });
   writeFileSync(REPORT, html, "utf8");
   const violations = runs.flatMap((r) => r.steps.flatMap((s) => s.violations));
-  console.log(JSON.stringify({ report: REPORT, runs: runs.length, calls, violations: violations.length, weeklyEligibleRuns: weekly.eligible.length, weeklySeenIn: weekly.seenIn }));
+  console.log(JSON.stringify({ report: REPORT, runs: runs.length, calls, violations: violations.length, weeklyEligibleRuns: weekly.eligible.length, weeklySeenIn: weekly.seenIn, narrowJustified: exhausted.justified, narrowPremature: exhausted.premature }));
 }
 
 main().catch((error) => {
