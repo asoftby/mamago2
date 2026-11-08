@@ -10,6 +10,7 @@
 import { prismaBase as prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { Occasion } from "@prisma/client";
+import { activeOccasionWhere } from "./occasionUtils";
 
 // ─── Type helpers ────────────────────────────────────────────────────────────
 
@@ -52,6 +53,18 @@ async function hasOccasionBoostScoreColumn(): Promise<boolean> {
 
 // ─── DB queries ───────────────────────────────────────────────────────────────
 
+export type PublicOccasionOption = { slug: string; name: string };
+
+/** Public occasion chips and API validation use the same admin date range. */
+export async function getActivePublicOccasions(now: Date = new Date()): Promise<PublicOccasionOption[]> {
+  return prisma.occasion.findMany({
+    where: activeOccasionWhere(now),
+    select: { slug: true, name: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+}
+
+
 /**
  * Returns occasions that should be suggested to editors right now.
  * Ordered by: sortOrder asc, boostScore desc, name asc.
@@ -64,10 +77,8 @@ export async function getActiveOccasionsForEditor(
   if (hasBoostScore) {
     return prisma.occasion.findMany({
       where: {
-        isActive: true,
+        ...activeOccasionWhere(now),
         autoSuggest: true,
-        startsAt: { lte: now },
-        endsAt: { gte: now },
       },
       select: {
         id: true,
@@ -84,10 +95,8 @@ export async function getActiveOccasionsForEditor(
 
   const fallback = await prisma.occasion.findMany({
     where: {
-      isActive: true,
+      ...activeOccasionWhere(now),
       autoSuggest: true,
-      startsAt: { lte: now },
-      endsAt: { gte: now },
     },
     select: {
       id: true,
@@ -118,9 +127,7 @@ export async function getOccasionBoostMap(
 
   const active = await prisma.occasion.findMany({
     where: {
-      isActive: true,
-      startsAt: { lte: now },
-      endsAt: { gte: now },
+      ...activeOccasionWhere(now),
     },
     select: { id: true, boostScore: true },
   });
@@ -150,9 +157,7 @@ export async function getActivityOccasionBoosts(
 
   const occasions = await prisma.occasion.findMany({
     where: {
-      isActive: true,
-      startsAt: { lte: now },
-      endsAt: { gte: now },
+      ...activeOccasionWhere(now),
       activityLinks: {
         some: {
           activityId: { in: activityIds },

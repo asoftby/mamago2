@@ -306,7 +306,7 @@ export function serializeAppliedToSearchParams(
   else params.delete("category");
   if (next.genres.length > 0) params.set("genre", next.genres.join(","));
   else params.delete("genre");
-  if (next.occasionSlug === "halloween") params.set("occasion", next.occasionSlug);
+  if (next.occasionSlug && /^[a-z0-9-]{1,80}$/.test(next.occasionSlug)) params.set("occasion", next.occasionSlug);
   else params.delete("occasion");
   // Legacy persona identifiers must never be exposed in shareable URLs.
   params.delete("profile");

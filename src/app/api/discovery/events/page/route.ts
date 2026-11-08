@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
-import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
+import { getActivePublicOccasions } from "@/lib/discovery/occasions";
 import { loadKudaListingPage, parseListingPage } from "@/server/discovery/kudaListingPage";
 
 /**
@@ -14,14 +14,14 @@ export async function GET(request: NextRequest) {
   const city = await findCityBySlug(params.get("listingCity") ?? "minsk");
   if (!city) return NextResponse.json({ error: "CITY_NOT_FOUND" }, { status: 404 });
 
-  const [user, halloweenEnabled] = await Promise.all([getCurrentUser(), isHalloweenOccasionActive()]);
+  const [user, activeOccasions] = await Promise.all([getCurrentUser(), getActivePublicOccasions()]);
   const listing = await loadKudaListingPage({
     cityId: city.id,
     citySlug: city.slug,
     userId: user?.id ?? null,
     searchParams: params,
     page: parseListingPage(params.get("page")),
-    halloweenEnabled,
+    activeOccasionSlugs: new Set(activeOccasions.map(occasion => occasion.slug)),
     // Same scope as the SSR render and the count/facets APIs (#795).
     explicitTerritorySlug: params.get("explore") === "1" ? city.slug : null,
   });

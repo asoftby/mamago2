@@ -33,7 +33,7 @@ import {
 import type { ActivityMock } from "@/types/activity";
 import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
 import type { EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
-import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
+import { getActivePublicOccasions } from "@/lib/discovery/occasions";
 
 export type BudgetConfig = { max: number; step: number } | null;
 
@@ -90,9 +90,8 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
   let activeClassChipSlug = undefined;
   let budgetConfig: BudgetConfig = null;
   let alternativeEventFilters: EventRuntimeFilters | null = null;
-  const halloweenEnabled = intent === "kuda"
-    ? await isHalloweenOccasionActive()
-    : false;
+  const activeOccasions = intent === "kuda" ? await getActivePublicOccasions() : [];
+  const activeOccasionSlugs = new Set(activeOccasions.map((occasion) => occasion.slug));
 
   if (intent === "birthday") {
     // Only published party-specific offers approved for this section.
@@ -116,7 +115,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
     // candidate query to this city's territory; pagination keeps that scope.
     const explicitTerritorySlug = (Array.isArray(searchParams.explore) ? searchParams.explore[0] : searchParams.explore) === "1" ? citySlug : null;
     const urlParams = toUrlSearchParams(searchParams);
-    const eventFilters = buildKudaEventFilters(urlParams, halloweenEnabled);
+    const eventFilters = buildKudaEventFilters(urlParams, activeOccasionSlugs);
     alternativeEventFilters = { ...eventFilters, districtId: null, metroId: null };
     const listing = await loadKudaListingPage({
       cityId: city.id,
@@ -124,7 +123,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
       userId: user?.id ?? null,
       searchParams: urlParams,
       page: parseListingPage(searchParams.page),
-      halloweenEnabled,
+      activeOccasionSlugs,
       explicitTerritorySlug,
     });
     // A page past the end of a non-empty result set does not exist.
@@ -279,8 +278,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
       pageTitleOverride={pageTitleOverride}
-      weekendPlannerEnabled={intent === "kuda" && user?.role === "ADMIN"}
-      halloweenEnabled={halloweenEnabled}
+      activeOccasions={activeOccasions}
       kudaListing={kudaListing}
       implicitFilters={implicitFilters}
     />
