@@ -6057,3 +6057,15 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: нет; удобно сделать вместе с PR 4 «Сценария дня» (удаление старых реализаций), когда экран выбора и подборки окончательно меняется.
 - Acceptance criteria: тесты либо обновлены под текущую разметку и подключены в `check:push`, либо удалены с обоснованием; ни один упавший тест не остаётся вне ворот.
 - Source: проверка на чистом `dev` при PR 2 «Сценария дня», 2026-11-08.
+## [BACKLOG-236] `googleMapsConfigContract.test.ts` падает на чистом `dev`: `EventLocationMapModal.tsx` не читает `NEXT_PUBLIC_GOOGLE_MAP_ID`
+
+- Status: OPEN
+- Priority: P3
+- Area: Google Maps / тесты
+- Added: 2026-11-08
+- Reason deferred: замечен при работе над общим полем адреса (мобильный ввод); к нему не относится, чинить в том PR не стали.
+- Context: `src/services/googleMaps/googleMapsConfigContract.test.ts` проверяет, что каждый файл из `MAP_ID_FILES` содержит `NEXT_PUBLIC_GOOGLE_MAP_ID`; `src/components/business/wizard/event/steps/location/EventLocationMapModal.tsx` не содержит. Тест падает с `AssertionError` на чистом `dev` (`e8c435a67`); скрипт `test:google-maps-config` не входит ни в `check:push:steps`, ни в CI, поэтому ворота остаются зелёными.
+- Current state: не чинился; причина установлена (ожидание теста не совпадает с исходником), не предположена. Остальные проверки этого теста (запрет legacy Places API) продублированы в `addressSuggestInput.wiringContract.test.ts`.
+- Dependencies: нет.
+- Acceptance criteria: либо `EventLocationMapModal.tsx` читает canonical `NEXT_PUBLIC_GOOGLE_MAP_ID`, либо тест обновлён под фактический код; `test:google-maps-config` подключён в `check:push:steps`.
+- Source: запуск теста на чистом `dev` при исправлении поля адреса, 2026-11-08.
