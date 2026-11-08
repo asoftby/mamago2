@@ -20,6 +20,7 @@ type PlaceGeo = {
   shortAddress: string | null;
   formattedAddr: string | null;
   customAddress: string | null;
+  city?: { slug: string } | null;
 };
 
 export type PoolActivityRow = {
@@ -101,6 +102,7 @@ export function toPoolEvent(row: PoolActivityRow, engagementScore: number): Pool
     priceText: row.priceText,
     currency: row.currency,
     address: address(row),
+    citySlug: row.place?.city?.slug ?? row.venue?.place?.city?.slug ?? null,
   };
   return {
     kind: "event",
@@ -162,6 +164,7 @@ export type PoolPlaceRow = {
   shortAddress: string | null;
   formattedAddr: string | null;
   customAddress: string | null;
+  city?: { slug: string } | null;
   primaryCategory: { id: string; slug: string; nameRu: string } | null;
   /** Stored age restrictions; enforced exactly like for events. */
   agePolicy: string;
@@ -217,6 +220,7 @@ export function toPoolPlace(row: PoolPlaceRow, dateIso: string): PoolEvent | nul
     priceText: null,
     currency: null,
     address: row.shortAddress ?? row.formattedAddr ?? row.customAddress ?? null,
+    citySlug: row.city?.slug ?? null,
   };
   return {
     kind: "place",

@@ -4,6 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ScenarioTimeline, mergeTimeline } from "./ScenarioTimeline";
 import { ScenarioParams } from "./ScenarioParams";
+import { ReplaceOptionsList } from "./ScenarioReplaceSheet";
 import { AllShown, DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
 import { useDayScenarioEnabled } from "../../hooks/useDayScenarioEnabled";
 import { KudaDayScenarioEntry } from "@/components/discovery/KudaDayScenarioEntry";
@@ -48,6 +49,21 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(html.includes("Бассейн") && html.includes("уже в плане") && !html.includes("Без времени"));
 }
 
+// ---- a card opens its public page (new tab, the draft stays); without a city it is not a link
+{
+  const linked = renderToStaticMarkup(<ScenarioTimeline items={[museum]} city="minsk" busy={false} onRemove={() => {}} onReplace={() => {}} />);
+  assert.ok(linked.includes('href="/minsk/events/m"') && linked.includes('target="_blank"') && linked.includes('rel="noopener"'));
+  assert.ok(linked.includes(">Подробнее<") && linked.includes("откроется в новой вкладке"));
+  const plain = renderToStaticMarkup(<ScenarioTimeline items={[museum]} busy={false} onRemove={() => {}} onReplace={() => {}} />);
+  assert.ok(!plain.includes("Подробнее"), "no city: no link");
+}
+{
+  const sheet = renderToStaticMarkup(<ReplaceOptionsList city="minsk" options={[{ fresh: puppets, items: [puppets] }]} onPick={() => {}} />);
+  assert.ok(sheet.includes("Кукольный спектакль"));
+  assert.ok(sheet.includes('href="/minsk/events/p"') && sheet.includes(">Подробнее<"), "an option can be looked at before it is chosen");
+  assert.ok(sheet.includes('aria-label="Выбрать «Кукольный спектакль»"'), "choosing is a separate button next to the link");
+}
+
 // ---- guest params: two questions, pressed state, a day picker only for «Другой день»
 {
   const base = { onWhen: () => {}, otherIso: null, onOtherIso: () => {}, todayIso: "2026-11-08", onToggleAge: () => {} };
@@ -63,7 +79,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
 // ---- states
 {
   assert.ok(renderToStaticMarkup(<FewNearbyBanner onSwitchToCar={() => {}} />).includes("Рядом мало вариантов"));
-  assert.ok(renderToStaticMarkup(<FewNearbyBanner onSwitchToCar={() => {}} />).includes("На машину"));
+  assert.ok(renderToStaticMarkup(<FewNearbyBanner onSwitchToCar={() => {}} />).includes("На машине"));
   const walking = renderToStaticMarkup(<EmptyResult walking onSwitchToCar={() => {}} onChangeParams={() => {}} changeLabel="Изменить параметры" />);
   assert.ok(walking.includes("На этот день ничего не нашли") && walking.includes("Подобрать на машине") && walking.includes("Изменить параметры"));
   const driving = renderToStaticMarkup(<EmptyResult walking={false} onSwitchToCar={() => {}} onChangeParams={() => {}} changeLabel="Назад в план" />);
@@ -123,6 +139,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(screen, /disabled=\{loading \|\| exhausted\}[^>]*onClick=\{\(\) => activeDate && api\.another\(activeDate\)\}/, "«Другой вариант» is off while nothing new is left");
   assert.match(screen, /exhausted \? <AllShown/, "the «Мы показали всё» state is shown");
   assert.match(main, /<DayScenarioScreen[\s\S]*?city=\{city\}/, "the member screen gets the page's city");
+  assert.match(main, /<DayScenarioScreen[\s\S]*?initialPersonaIds=\{selectedPersonaIds\}/, "«С кем идём?» starts from the page's «Для кого?»");
   assert.match(panel, /<DayScenarioScreen audience="guest" city=\{city\}/, "the guest screen gets the page's city");
 }
 

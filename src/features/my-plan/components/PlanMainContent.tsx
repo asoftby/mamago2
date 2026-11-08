@@ -1790,6 +1790,7 @@ export function PlanMainContent({
               city={city}
               todayIso={todayKey}
               initialDate={selectedDate}
+              initialPersonaIds={selectedPersonaIds}
               people={personas.map((persona) => ({
                 id: persona.id,
                 label: persona.kind === "adult" ? "Я" : persona.displayName?.trim() || "Ребёнок",

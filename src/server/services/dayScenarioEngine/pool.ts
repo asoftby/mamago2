@@ -53,6 +53,7 @@ const placeGeoSelect = {
   shortAddress: true,
   formattedAddr: true,
   customAddress: true,
+  city: { select: { slug: true } },
 } as const;
 
 const activityPoolSelect = {
@@ -150,6 +151,7 @@ export async function loadDayScenarioPool(citySlug: string, date: string, nowMs 
       primaryCategory: { select: { id: true, slug: true, nameRu: true } },
       agePolicy: true,
       ageTags: true,
+      city: { select: { slug: true } },
       images: { select: { url: true, kind: true }, orderBy: { sortOrder: "asc" }, take: 3 },
       openingHours: {
         select: {
