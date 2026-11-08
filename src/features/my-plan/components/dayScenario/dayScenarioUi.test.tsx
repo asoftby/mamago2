@@ -6,6 +6,7 @@ import { ScenarioTimeline, mergeTimeline } from "./ScenarioTimeline";
 import { ScenarioParams } from "./ScenarioParams";
 import { ReplaceOptionsList, ScenarioReplaceScreen } from "./ScenarioReplaceScreen";
 import { ScenarioItemPreview } from "./ScenarioItemPreview";
+import { SavedDayBanner } from "./SavedDayBanner";
 import { AllShown, DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
 import { useDayScenarioEnabled } from "../../hooks/useDayScenarioEnabled";
 import type { DraftItem } from "../../lib/dayScenarioUi/model";
@@ -97,6 +98,17 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(noCity.includes('href="/minsk/events/muzej-nauki"'), "the item's own city is enough");
 }
 
+// ---- the saved day: banner, link to the other day, ⋯ menu
+{
+  const pair = { date: "2026-11-15", count: 2, direction: "next" as const };
+  const weekend = renderToStaticMarkup(<SavedDayBanner date="2026-11-14" count={3} pair={pair} onOpenDate={() => {}} />);
+  assert.ok(weekend.includes("Выходные от mamaGo · суббота") && weekend.includes("Воскресенье: 2 места →"), "a weekend day names its weekday and links to the other day");
+  assert.ok(weekend.includes('aria-label="Действия с днём от mamaGo"'), "the ⋯ menu button is labelled");
+  const lone = renderToStaticMarkup(<SavedDayBanner date="2026-11-14" count={3} pair={null} onOpenDate={() => {}} />);
+  assert.ok(lone.includes("День от mamaGo · 3 места") && !lone.includes("→"), "a lone day: how many places, no link");
+  assert.ok(!weekend.includes("Удалить"), "the menu is closed until opened");
+}
+
 // ---- guest params: two questions, pressed state, a day picker only for «Другой день»
 {
   const base = { onWhen: () => {}, otherIso: null, onOtherIso: () => {}, todayIso: "2026-11-08", onToggleAge: () => {} };
@@ -178,6 +190,13 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(screen, /if \(staleStack\) closeStack\(\)/, "the stack closes when its point left the draft");
   assert.ok(!screen.includes("SaveFlowContainer") && !screen.includes("ScenarioReplaceSheet"), "no modal on top of the widget");
   assert.match(main, /<DayScenarioScreen[\s\S]*?city=\{city\}/, "the member screen gets the page's city");
+  assert.match(main, /const savedDay = dayScenarioEnabled \? savedDays\[selectedDate\] : undefined;/, "the banner exists only with the flag on");
+  assert.match(main, /\{renderPersonFilter\(false\)\}\s*\{savedDayBanner\}/, "the banner sits in the desktop layout");
+  assert.match(main, /\{renderPersonFilter\(true\)\}\s*\{savedDayBanner\}/, "and in the mobile one");
+  const ribbon = readFileSync("src/features/my-plan/components/v3/PlanDayRibbon.tsx", "utf8");
+  assert.match(ribbon, /usePlanScenarioDays\(\{ from, to \}\)/, "the ribbon reads saved days from the cached chunks");
+  assert.match(ribbon, /✦/, "a ✦ on days saved as «от mamaGo»");
+  assert.match(ribbon, /sr-only">день от mamaGo/, "and the day says so to a screen reader");
   assert.match(main, /<DayScenarioScreen[\s\S]*?initialPersonaIds=\{selectedPersonaIds\}/, "«С кем идём?» starts from the page's «Для кого?»");
   assert.match(panel, /<DayScenarioScreen audience="guest" city=\{city\}/, "the guest screen gets the page's city");
 }

@@ -358,3 +358,37 @@ export const SAVE_FAILURE_TEXT: Record<SaveFailure, string> = {
 
 /** Label of the save button: one day or the two days of a weekend. */
 export const saveLabel = (days: number): string => (days > 1 ? "Сохранить выходные" : "Сохранить в план");
+
+// ---------- the saved day in the plan widget
+
+/** "Воскресенье" from a calendar date (nominative, capitalised). */
+export const weekdayName = (iso: string): string => WEEKDAYS[weekdayOf(iso)]!;
+
+/** What the banner says: a weekend's day names its weekday, a lone day says only how many places. */
+export function savedDayTitle(date: string, count: number, hasPair: boolean): string {
+  return hasPair ? `Выходные от mamaGo · ${weekdayName(date).toLowerCase()}` : `День от mamaGo · ${pluralPlaces(count)}`;
+}
+
+export type PairDay = { date: string; count: number; direction: "prev" | "next" };
+
+/**
+ * The other day of the saved group among the neighbouring days of the selected one (the weekend's pair is the
+ * adjacent day). null when the day has no group or its pair is gone (deleted, emptied).
+ */
+export function pairOf(
+  date: string,
+  saved: Readonly<Record<string, { groupId: string | null; count: number }>>,
+): PairDay | null {
+  const own = saved[date];
+  if (!own?.groupId) return null;
+  for (const [delta, direction] of [[1, "next"], [-1, "prev"]] as const) {
+    const other = addDaysIso(date, delta);
+    if (saved[other]?.groupId === own.groupId) return { date: other, count: saved[other]!.count, direction };
+  }
+  return null;
+}
+
+/** Label of the link to the other day: "Воскресенье: 3 места →" / "← Суббота". */
+export function pairLinkLabel(pair: PairDay): string {
+  return pair.direction === "next" ? `${weekdayName(pair.date)}: ${pluralPlaces(pair.count)} →` : `← ${weekdayName(pair.date)}`;
+}

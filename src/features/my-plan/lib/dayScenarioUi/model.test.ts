@@ -10,6 +10,10 @@ import {
   canGoBack,
   initialPersonSelection,
   isEdgeSwipeBack,
+  pairLinkLabel,
+  pairOf,
+  savedDayTitle,
+  weekdayName,
   buildSaveBody,
   saveFailureOf,
   saveLabel,
@@ -268,6 +272,24 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.ok(Object.values(SAVE_FAILURE_TEXT).every((text) => text.length > 10));
   assert.equal(saveLabel(1), "Сохранить в план");
   assert.equal(saveLabel(2), "Сохранить выходные");
+}
+
+// ---- the saved day in the plan widget
+{
+  assert.equal(weekdayName("2026-11-14"), "Суббота");
+  assert.equal(weekdayName("2026-11-15"), "Воскресенье");
+  assert.equal(savedDayTitle("2026-11-14", 3, false), "День от mamaGo · 3 места");
+  assert.equal(savedDayTitle("2026-11-14", 3, true), "Выходные от mamaGo · суббота");
+  assert.equal(savedDayTitle("2026-11-15", 2, true), "Выходные от mamaGo · воскресенье");
+  const weekend = { "2026-11-14": { groupId: "g1", count: 3 }, "2026-11-15": { groupId: "g1", count: 2 } };
+  assert.deepEqual(pairOf("2026-11-14", weekend), { date: "2026-11-15", count: 2, direction: "next" });
+  assert.deepEqual(pairOf("2026-11-15", weekend), { date: "2026-11-14", count: 3, direction: "prev" });
+  assert.equal(pairOf("2026-11-14", { "2026-11-14": { groupId: "g1", count: 3 } }), null, "the pair was deleted or emptied");
+  assert.equal(pairOf("2026-11-14", { "2026-11-14": { groupId: null, count: 3 }, "2026-11-15": { groupId: null, count: 2 } }), null, "two lone days are not a pair");
+  assert.equal(pairOf("2026-11-14", { "2026-11-14": { groupId: "g1", count: 3 }, "2026-11-15": { groupId: "g2", count: 2 } }), null, "another group is not the pair");
+  assert.equal(pairOf("2026-11-20", weekend), null, "a day without a scenario");
+  assert.equal(pairLinkLabel({ date: "2026-11-15", count: 3, direction: "next" }), "Воскресенье: 3 места →");
+  assert.equal(pairLinkLabel({ date: "2026-11-14", count: 3, direction: "prev" }), "← Суббота");
 }
 
 console.log("dayScenarioUi model tests passed");

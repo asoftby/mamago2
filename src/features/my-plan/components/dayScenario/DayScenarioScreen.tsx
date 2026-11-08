@@ -17,6 +17,7 @@ import {
 import { useDayScenarioDraft } from "../../hooks/useDayScenarioDraft";
 import { useDayScenarioSave } from "../../hooks/useDayScenarioSave";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { invalidatePlanDayMarkers } from "@/features/plan-calendar/usePlanDayCounts";
 import { toast } from "@/lib/toast";
 import {
   MAX_TARGET_COUNT,
@@ -196,6 +197,7 @@ export function DayScenarioScreen({
     if (!activeDate || !canSave) return;
     const ok = await saver.save([{ date: activeDate, items }]);
     if (!ok) return;
+    invalidatePlanDayMarkers();
     requestPlanRefetchForDate(activeDate);
     toast.success("День сохранён в план");
     onBack();

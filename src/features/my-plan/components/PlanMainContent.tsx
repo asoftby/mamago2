@@ -39,6 +39,9 @@ import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMonthScreen } from "./v3/PlanMonthScreen";
 import { PlanPicksScreen } from "./v3/PlanPicksScreen";
 import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
+import { SavedDayBanner } from "./dayScenario/SavedDayBanner";
+import { pairOf } from "../lib/dayScenarioUi/model";
+import { usePlanScenarioDays } from "@/features/plan-calendar/usePlanDayCounts";
 import { entryLabel } from "../lib/dayScenarioUi/model";
 import { useDayScenarioEnabled } from "../hooks/useDayScenarioEnabled";
 import { useOptionalPlanOverlay } from "@/lib/my-plan/usePlanOverlay";
@@ -1161,6 +1164,10 @@ export function PlanMainContent({
       onOpenMonth={() => openNestedScreen("month")}
     />
   ) : null;
+  // «День от mamaGo»: the day and its neighbours (a weekend's pair is the adjacent day), from the ribbon's cached chunks.
+  const savedDays = usePlanScenarioDays(dayScenarioEnabled ? { from: addDaysIso(selectedDate, -1), to: addDaysIso(selectedDate, 1) } : null, { enabled: dayScenarioEnabled });
+  const savedDay = dayScenarioEnabled ? savedDays[selectedDate] : undefined;
+  const savedDayBanner = savedDay ? <SavedDayBanner date={selectedDate} count={savedDay.count} pair={pairOf(selectedDate, savedDays)} onOpenDate={(date) => onChangeDate?.(date)} /> : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
   const filteredAudience = includedPeople.length > 0 || excludedPeople.length > 0 || planVisibilityFilter !== "ALL";
@@ -1580,6 +1587,8 @@ export function PlanMainContent({
 
           {renderPersonFilter(false)}
 
+          {savedDayBanner}
+
           {isPastDay ? (
             renderPastDay(false)
           ) : (
@@ -1643,6 +1652,8 @@ export function PlanMainContent({
         {planCalendar}
 
         {renderPersonFilter(true)}
+
+        {savedDayBanner}
 
         {isPastDay ? (
           renderPastDay(true)
