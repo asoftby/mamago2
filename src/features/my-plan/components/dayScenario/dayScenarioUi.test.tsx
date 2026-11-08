@@ -87,7 +87,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(view.includes("Музей науки") && view.includes("6+") && view.includes("https://img.example/c.jpg"), "title, age, cover");
   assert.ok(view.includes("Суббота, 14 ноября · 10:30–12:00"), "day and time range in Minsk time");
   assert.ok(view.includes("ул. Мястровская 8") && view.includes("Музей · 12 BYN"), "address, category and price");
-  assert.ok(view.includes("время по расписанию, уточните"), "what to double-check");
+  assert.ok(view.includes("время по расписанию — уточните у организатора"), "what to double-check");
   assert.ok(view.includes('href="/minsk/events/muzej-nauki"') && view.includes('target="_blank"') && view.includes("откроется в новой вкладке"), "the public page is a new tab, the draft stays");
   assert.ok(view.includes(">Заменить<") && view.includes('aria-label="Убрать из дня"') && !view.includes("Выбрать это"), "view actions");
   const pick = renderToStaticMarkup(<ScenarioItemPreview item={detailed} city="minsk" back="Замена" onBack={() => {}} onPick={() => {}} />);
