@@ -1,8 +1,6 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { HalloweenChip } from "@/components/discovery/HalloweenChip";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { JournalCard } from "@/components/content-cards/JournalCard";
 import { OfferCard } from "@/components/offers/OfferCard";
@@ -73,15 +71,8 @@ function buildKudaSectionTitle(input: {
   return `Куда пойти ${cityPart}`;
 }
 
-export function CityHomeKudaSection({
-  activities,
-  halloweenEnabled = false,
-}: {
-  activities: ActivityMock[];
-  halloweenEnabled?: boolean;
-}) {
+export function CityHomeKudaSection({ activities }: { activities: ActivityMock[] }) {
   const { appendCityQuery, citySlug } = useCity();
-  const router = useRouter();
   const { applied } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const baseTitle = buildKudaSectionTitle({
@@ -111,15 +102,6 @@ export function CityHomeKudaSection({
 
   const eventsHref = appendCityQuery(`/${citySlug}/events`);
   const eventsLabel = "[все события]";
-  const halloweenHref = appendCityQuery(`/${citySlug}/events?occasion=halloween`);
-  const halloweenChip = halloweenEnabled ? (
-    <div className="mb-4 mt-4 flex items-center px-1">
-      <HalloweenChip
-        aria-label="Показать мероприятия на Хэллоуин"
-        onClick={() => router.push(halloweenHref)}
-      />
-    </div>
-  ) : null;
 
   if (preview.length === 0) {
     return (
@@ -131,7 +113,6 @@ export function CityHomeKudaSection({
         actionHref={eventsHref}
         actionInlineText
       >
-        {halloweenChip}
         <p className="text-sm text-neutral-500 px-1 py-2 leading-relaxed">
           Пока нет опубликованных событий — загляните позже в раздел «Куда пойти».
         </p>
@@ -149,7 +130,6 @@ export function CityHomeKudaSection({
       <HorizontalCardRow
         headerTitle={<HomeCarouselHeading title={title} />}
         navLeading={<CityHomeAllLink href={eventsHref} label={eventsLabel} />}
-        underHeader={halloweenChip}
       >
         {preview.map((activity, index) => (
           <div key={activity.id} className={kudaCardShell}>
