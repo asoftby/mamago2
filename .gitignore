@@ -90,3 +90,6 @@ graphify-out/
 
 # Raw ABWS API snapshots (research/debug only, not fixtures — large, not for git)
 /datasets/abws/
+
+# Isolated birthday browser acceptance output (never source or private session state)
+/artifacts/birthday-journey/

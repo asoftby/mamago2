@@ -25,3 +25,8 @@ export function readPackageChangeScope(value: unknown): PackageChangeScope | nul
   const result = packageChangeScopeSchema.safeParse(value);
   return result.success ? result.data : null;
 }
+
+/** Both on-site wizard modes use the existing package agreement flow. */
+export function supportsPackageChanges(venueMode: string): boolean {
+  return venueMode === "VENUE" || venueMode === "PACKAGE";
+}

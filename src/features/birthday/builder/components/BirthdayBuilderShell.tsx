@@ -19,7 +19,7 @@ import {
   catalogPriceSummary, compatibleCatalogSelection, eligibleAddons, hasValidCatalogAnchor,
   isLocationCompatible, selectedCatalogOffers,
 } from "../lib/catalogSelection";
-import { ageMonthsOnDate, calendarDateKeyToIso } from "../lib/partyDate";
+import { catalogueAgeMonths } from "../lib/partyDate";
 import { budgetMaxByn } from "../lib/budgetRanges";
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
@@ -106,14 +106,9 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   // Soft budget: compared with the whole party in review, never used to hide single offers.
   const maxBudget = budgetMaxByn(state.quiz.budgetGroup);
 
-  const ageMonths = useMemo(() => {
-    const person = state.quiz.partyForChild;
-    if (person?.recipientType === "adult") return null;
-    if (person?.recipientType === "guest" && person.statedAgeYears != null) {
-      return person.statedAgeYears >= 18 ? null : person.statedAgeYears * 12;
-    }
-    return ageMonthsOnDate(person?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom));
-  }, [state.quiz.partyForChild, state.quiz.dateRangeFrom]);
+  const ageMonths = useMemo(() => catalogueAgeMonths(
+    state.quiz.partyForChild, state.quiz.dateRangeFrom, builder.restoredRecipient,
+  ), [state.quiz.partyForChild, state.quiz.dateRangeFrom, builder.restoredRecipient]);
 
   const guests = GUESTS_RANGE[state.quiz.guestsGroup ?? ""] ?? null;
 

@@ -1,6 +1,6 @@
 import { redactPartyContacts } from "./partyPrivacy";
 import { Prisma } from "@prisma/client";
-import { packageChangeScopeSchema, type PackageChangeScope } from "@/lib/birthday/packageChangeScope";
+import { packageChangeScopeSchema, supportsPackageChanges, type PackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import { PartyApiError } from "./partyDraft.validation";
 
 type Item = { note?: string | null; id: string; role: string; offerId: string | null; businessId: string | null;
@@ -19,7 +19,7 @@ function price(item: Item): PackageChangeScope["originalPrice"] {
 export function packageChangeScope(party: { id: string; version: number; venueMode: string; items: Item[] }): PackageChangeScope | null {
   if (!party.items.some(item => item.packageComponentChange !== null)) return null;
   const anchor = party.items.find(item => item.role === "ANCHOR");
-  if (party.venueMode !== "PACKAGE" || !anchor?.offerId) throw new PartyApiError(422, "Состав пакета не поддерживает согласование");
+  if (!supportsPackageChanges(party.venueMode) || !anchor?.offerId) throw new PartyApiError(422, "Состав пакета не поддерживает согласование");
   let credit = new Prisma.Decimal(0);
   let requiresQuote = false;
   const components = party.items.filter(item => item.role === "INCLUDED").map(item => {

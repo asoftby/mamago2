@@ -20,6 +20,7 @@ import {
   clearPendingBirthdayBuilderAction,
   consumePendingBirthdayBuilderAction,
 } from "../lib/pendingBirthdayBuilderAction";
+import { catalogueAgeMonths, type PartyRecipientContext } from "../lib/partyDate";
 import { formatYearsRu } from "../lib/partyChildUtils";
 import {
   profileChildAgeYears,
@@ -62,7 +63,7 @@ export function useBirthdayBuilderWithGate(citySlug: string) {
 
   const sessionDraftKey = user?.id ? `mamago.birthdayBuilder.session:${user.id}:${citySlug}` : null;
   const [restoredSessionKey, setRestoredSessionKey] = useState<string | null>(null);
-  const [restoredRecipient, setRestoredRecipient] = useState<{ name: boolean; age: boolean } | null>(null);
+  const [restoredRecipient, setRestoredRecipient] = useState<PartyRecipientContext | null>(null);
   const completedSessionKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -75,7 +76,9 @@ export function useBirthdayBuilderWithGate(citySlug: string) {
           if (draft?.quiz && draft?.selection && draft?.ui && draft?.partyPlanning) {
             replaceState(draft);
             if (draft.recipient?.name === true || draft.recipient?.age === true) {
-              setRestoredRecipient({ name: draft.recipient.name === true, age: draft.recipient.age === true });
+              setRestoredRecipient({ name: draft.recipient.name === true, age: draft.recipient.age === true,
+                ageMonths: catalogueAgeMonths(null, draft.quiz.dateRangeFrom, draft.recipient),
+                dateKey: draft.quiz.dateRangeFrom });
             }
           }
         } catch { /* Storage is optional. */ }
@@ -92,6 +95,7 @@ export function useBirthdayBuilderWithGate(citySlug: string) {
       const person = quiz.partyForChild;
       const recipient = person ? {
         name: Boolean(person.name),
+        ageMonths: catalogueAgeMonths(person, quiz.dateRangeFrom), dateKey: quiz.dateRangeFrom,
         age: person.recipientType !== "adult" && Boolean(person.birthDateIso ||
           (person.statedAgeYears != null && person.statedAgeYears <= 20)),
       } : restoredRecipient;

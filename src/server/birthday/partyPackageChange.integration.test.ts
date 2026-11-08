@@ -45,9 +45,9 @@ async function main() {
     title: "IT food replacement", status: "PUBLISHED", publishedAt: new Date(), priceFrom: 70, priceMode: "FROM",
     placements: { create: { key: "BIRTHDAY", status: "APPROVED" } } } });
   let serial = 0;
-  async function draft(mode: "EXACT" | "FROM" | "ON_REQUEST" = "EXACT") {
+  async function draft(mode: "EXACT" | "FROM" | "ON_REQUEST" = "EXACT", venueMode: "PACKAGE" | "VENUE" = "PACKAGE") {
     await prisma.offer.update({ where: { id: offer.id }, data: { priceMode: mode, priceFrom: mode === "ON_REQUEST" ? null : 500 } });
-    const created = await createPartyDraft(parent.id, { citySlug: "minsk", venueMode: "PACKAGE" });
+    const created = await createPartyDraft(parent.id, { citySlug: "minsk", venueMode });
     const chosen = await updatePartyDraft(parent.id, created.id, { version: created.version, anchorOfferId: offer.id, addonOfferIds: ["it-offer-photo"] });
     return updatePartyDraft(parent.id, created.id, { version: chosen.version, eventDate: date, timeFrom: "12:00", timeTo: "14:00",
       childrenCount: 8, adultsCount: 4, contactName: "Local parent", contactPhone: "+375291112233" });
@@ -69,6 +69,12 @@ async function main() {
   const plain = await draft(); const plainSent = await send(plain);
   assert.equal((await prisma.bookingRequest.findUniqueOrThrow({ where: { id: plainSent.request.id } })).bookingPriceSnapshot, null);
   const required = await draft(); await failure(422, () => edit(required, "VENUE"));
+  // Actual StepFormat writes VENUE even when the chosen anchor is a package.
+  const onSiteDraft = await edit(await draft("EXACT", "VENUE"), "ANIMATOR");
+  const onSiteSent = await send(onSiteDraft, "onsite");
+  const onSiteRequest = await prisma.bookingRequest.findUniqueOrThrow({ where: { id: onSiteSent.request.id } });
+  assert.equal(readPackageChangeScope(onSiteRequest.bookingPriceSnapshot)?.requestedPrice.amountByn, "450.00");
+  assert.equal((await send(onSiteDraft, "onsite")).alreadySubmitted, true);
   const noRefund = await edit(await draft(), "FOOD");
   process.env.PARTY_CONFIRMATION_ENABLED = "false";
   await failure(422, () => send(noRefund));

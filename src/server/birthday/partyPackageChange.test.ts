@@ -3,7 +3,7 @@ import { partyBusinessReplySchema } from "./partyBusiness.validation";
 import assert from "node:assert/strict";
 import { Prisma } from "@prisma/client";
 import { packageChangeScope } from "./partyPackageChange";
-import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
+import { readPackageChangeScope, supportsPackageChanges } from "@/lib/birthday/packageChangeScope";
 import { partyOutboxActionUrl } from "./partyOutbox.logic";
 const item = { id: "anchor", role: "ANCHOR", category: "VENUE", businessId: "business", offerId: "package",
   offerPriceSnapshot: new Prisma.Decimal("100.10"), draftPriceModeSnapshot: "EXACT", packageComponentSnapshot: null,
@@ -35,5 +35,13 @@ for (const name of ["partyBusiness", "partyConfirm", "partyQuoteAcceptance"]) {
 }
 
 const review = readFileSync(new URL("../../features/birthday/builder/components/steps/StepReview.tsx", import.meta.url), "utf8");
-assert.match(review, /unsupportedPackageChanges = hasPackageChanges && venueMode !== "PACKAGE"/);
+assert.match(review, /unsupportedPackageChanges = hasPackageChanges && !supportsPackageChanges\(venueMode\)/);
+for (const venueMode of ["VENUE", "PACKAGE"]) {
+  assert.equal(supportsPackageChanges(venueMode), true);
+  assert.deepEqual(packageChangeScope({ id: "order", version: 7, venueMode, items: [item, component] }), scope);
+}
+for (const venueMode of ["HOME", "OUTDOOR", "unknown"]) {
+  assert.equal(supportsPackageChanges(venueMode), false);
+  assert.throws(() => packageChangeScope({ id: "order", version: 7, venueMode, items: [item, component] }));
+}
 assert.match(review, /disabled=\{busy \|\| unsupportedPackageChanges/);

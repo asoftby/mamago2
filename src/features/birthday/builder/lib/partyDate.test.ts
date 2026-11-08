@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ageMonthsOnDate, calendarDateKeyToIso, childAgeYearsOnDate } from "./partyDate";
+import { ageMonthsOnDate, calendarDateKeyToIso, childAgeYearsOnDate, catalogueAgeMonths } from "./partyDate";
 
 test("calendar keys use a zero-based month", () => {
   assert.equal(calendarDateKeyToIso("2027-0-5"), "2027-01-05");
@@ -42,4 +42,19 @@ test("child age in full years is sent with the order", () => {
   assert.equal(childAgeYearsOnDate("2020-03-15", "2026-03-15"), 6);
   assert.equal(childAgeYearsOnDate("2000-01-01", "2026-03-15"), null);
   assert.equal(childAgeYearsOnDate(null, "2026-03-15"), null);
+});
+
+
+// Reload keeps exact catalogue eligibility without retaining child identity or DOB.
+test("reload catalogue age is identity-free and bound to the party date", () => {
+const recipient = { name: true, age: true, ageMonths: 96, dateKey: "2026-10-22" };
+assert.equal(catalogueAgeMonths(null, "2026-10-22", recipient), 96);
+assert.equal(catalogueAgeMonths(null, "2026-10-23", recipient), null);
+for (const ageMonths of [-1, 252, 1.5, NaN]) {
+  assert.equal(catalogueAgeMonths(null, "2026-10-22", { ...recipient, ageMonths }), null);
+}
+assert.equal(catalogueAgeMonths({ recipientType: "adult" }, "2026-10-22", recipient), null);
+assert.equal(catalogueAgeMonths({ recipientType: "guest", statedAgeYears: 8 }, "2026-10-22"), 96);
+assert.equal(catalogueAgeMonths({ birthDateIso: "2018-11-22" }, "2026-10-22"), 96);
+
 });
