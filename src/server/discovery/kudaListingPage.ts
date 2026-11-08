@@ -39,6 +39,7 @@ export function buildKudaEventFilters(
   activeOccasionSlugs: ReadonlySet<string>,
 ): EventRuntimeFilters {
   const preset = params.get("preset");
+  const occasion = params.get("occasion");
   const free = params.get("free") === "true";
   const num = (key: string, min: (value: number) => boolean) => {
     if (free) return null;
@@ -49,9 +50,7 @@ export function buildKudaEventFilters(
   };
   return {
     categorySlugs: params.get("category")?.split(",").filter(Boolean) ?? [],
-    occasionSlug: params.get("occasion") && activeOccasionSlugs.has(params.get("occasion")!)
-      ? params.get("occasion")
-      : null,
+    occasionSlug: occasion && activeOccasionSlugs.has(occasion) ? occasion : null,
     genreSlugs: params.get("genre")?.split(",").filter(Boolean) ?? [],
     dateRange: resolveEventDateRange({
       preset: parseQuickFilterPreset(preset),

@@ -210,19 +210,25 @@ test("absent category and genre preserve the existing predicates", () => {
 });
 
 
-test("Halloween quick chip filters by linked active Occasion, not title keywords", () => {
+test("all occasion slugs use the admin-managed active period, not title keywords", () => {
+  const now = new Date("2026-11-08T12:00:00.000Z");
   const input = {
-    occasionSlug: "halloween",
+    occasionSlug: "new-year",
     dateRange: null,
     free: false,
     districtId: null,
     metroId: null,
     adultOnly: false,
   };
-  assert.deepEqual(buildEventRuntimeWhere(input), [{
-    occasionLinks: { some: { occasion: { slug: "halloween", isActive: true } } },
+  assert.deepEqual(buildEventRuntimeWhere(input, now), [{
+    occasionLinks: { some: { occasion: {
+      slug: "new-year",
+      isActive: true,
+      startsAt: { lte: now },
+      endsAt: { gte: now },
+    } } },
   }]);
-  assert.deepEqual(buildEventRuntimeWhere({ ...input, occasionSlug: null }), []);
+  assert.deepEqual(buildEventRuntimeWhere({ ...input, occasionSlug: null }, now), []);
 });
 
 test("home weekly preview includes no-session next occurrences without admitting out-of-range or withdrawn sessions", () => {
