@@ -22,6 +22,7 @@ import {
   dayTabLabel,
   dayTitle,
   freshItemOf,
+  initialPersonSelection,
   rangesForAnswers,
   summaryLine,
   type DraftItem,
@@ -50,6 +51,7 @@ export function DayScenarioScreen({
   todayIso,
   initialDate,
   people = [],
+  initialPersonaIds = [],
   ownEntries = [],
   hasPlanItems = false,
   onBack,
@@ -62,6 +64,8 @@ export function DayScenarioScreen({
   /** Member: the day open in the widget. */
   initialDate: string;
   people?: ScenarioPerson[];
+  /** The page's "Для кого?" choice: the screen opens with the same people picked. */
+  initialPersonaIds?: string[];
   ownEntries?: OwnPlanEntry[];
   hasPlanItems?: boolean;
   onBack: () => void;
@@ -74,7 +78,7 @@ export function DayScenarioScreen({
   const [ageKeys, setAgeKeys] = useState<string[]>([]);
   const [guestDates, setGuestDates] = useState<string[]>([]);
   const [mode, setMode] = useState<ScenarioMode>("car");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => initialPersonSelection(people.map((person) => person.id), initialPersonaIds));
   const [activeIdx, setActiveIdx] = useState(0);
 
   const dates = useMemo(() => (isGuest ? guestDates : [initialDate]), [isGuest, guestDates, initialDate]);
@@ -223,6 +227,7 @@ export function DayScenarioScreen({
                     {showFewNearby ? <FewNearbyBanner onSwitchToCar={() => setMode("car")} /> : null}
                     <ScenarioTimeline
                       items={items}
+                      city={city}
                       ownEntries={ownEntries}
                       busy={loading}
                       onRemove={(item) => activeDate && api.remove(activeDate, item.activityId)}
@@ -274,6 +279,7 @@ export function DayScenarioScreen({
         open={replacing !== null}
         onOpenChange={(open) => !open && closeReplace()}
         target={replacing}
+        city={city}
         options={options}
         loading={optionsLoading}
         onPick={(option) => {

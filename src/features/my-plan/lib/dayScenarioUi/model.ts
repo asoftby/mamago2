@@ -265,6 +265,26 @@ export function minutesBetween(fromIso: string, toIso: string): number {
   return Math.max(0, Math.round((Date.parse(toIso) - Date.parse(fromIso)) / MINUTE_MS));
 }
 
+/**
+ * "С кем идём?" starts from the page's "Для кого?" choice: the people chosen there that are in this
+ * family. Nobody chosen (or everybody) is the "Все" chip, which is the empty selection.
+ */
+export function initialPersonSelection(peopleIds: readonly string[], pageSelectedIds: readonly string[]): string[] {
+  const chosen = pageSelectedIds.filter((id, index, all) => peopleIds.includes(id) && all.indexOf(id) === index);
+  return chosen.length === peopleIds.length ? [] : chosen;
+}
+
+/**
+ * Public page of a point of the draft: the event card or the place card of the city the screen was
+ * opened on. null when the slug or city cannot make a safe path (the card then simply is not a link).
+ */
+export function itemHref(item: Pick<DraftItem, "kind" | "activityId" | "card">, city: string | undefined): string | null {
+  if (!city || !/^[a-z-]+$/i.test(city)) return null;
+  const segment = (item.card.slug ?? "").trim() || (item.kind === "event" ? item.activityId : "");
+  if (!segment || segment.includes("/")) return null;
+  return `/${city}/${item.kind === "event" ? "events" : "places"}/${encodeURIComponent(segment)}`;
+}
+
 /** Entry label of the widget button: a day with something in it is "extended", an empty one "built". */
 export function entryLabel(hasPlanItems: boolean): "Собрать день" | "Дополнить день" {
   return hasPlanItems ? "Дополнить день" : "Собрать день";
