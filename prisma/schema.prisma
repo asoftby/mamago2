@@ -403,6 +403,14 @@ enum PlanDecisionStatus {
   CANCELLED
 }
 
+/// Откуда время записи плана, собранной «Сценарием дня»: CONFIRMED — реальный сеанс события,
+/// SUGGESTED — время выбрал движок (по расписанию без сеанса или по часам работы места).
+/// null у всех записей, созданных не сценарием.
+enum PlanItemTimeType {
+  CONFIRMED
+  SUGGESTED
+}
+
 /// Family Core: семья (общий профиль детей и «Мой план»).
 model Family {
   id          String             @id @default(cuid())
@@ -680,7 +688,14 @@ model PlanItem {
   recurrenceSeries  PlanRecurrenceSeries? @relation(fields: [recurrenceSeriesId], references: [id], onDelete: SetNull)
   scenarioOverrides DayScenarioItemOverride[]
   requirements      PlanItemRequirement[]
+  /// «Сценарий дня»: сценарий, который создал запись (null = запись не из сценария).
+  scenarioId        String?
+  scenario          DayScenario?              @relation("DayScenarioPlanItems", fields: [scenarioId], references: [id], onDelete: SetNull)
+  timeType          PlanItemTimeType?
+  /// Закреплена пользователем: «Изменить день» её не переставляет.
+  pinned            Boolean                   @default(false)
 
+  @@index([scenarioId])
   @@index([userId, date])
   @@index([userId])
   @@index([activityId])
@@ -864,13 +879,21 @@ model DayScenario {
   lastSaveIdempotencyKey String?
   lastSaveRequestHash    Json?
   lastSaveResponse       Json?
+  /// Общий для дней одного сохранения («Сохранить выходные»: Сб и Вс). null = день сам по себе.
+  groupId                String?
+  /// 'ENGINE' — день собран движком «Сценария дня»; null — день редактора Task 7.
+  source                 String?
+  /// Время в пути между точками дня: [{ planItemId, mode, minutes, distanceM }].
+  legsJson               Json?
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
   user                   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   itemOverrides          DayScenarioItemOverride[]
+  planItems              PlanItem[]                @relation("DayScenarioPlanItems")
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([groupId])
 }
 
 /// Сценарий-специфичная организация одного PlanItem внутри Сценария дня —

@@ -167,7 +167,10 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   const shell = readFileSync("src/components/city/CityDiscoveryShell.tsx", "utf8");
   assert.match(shell, /intent === "kuda" \? <KudaDayScenarioEntry \/> : null/);
   const screen = readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8");
-  assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "saving the day is inactive until PR 3");
+  assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "a guest cannot save until PR 3c");
+  assert.match(screen, /useDayScenarioSave\(\)/);
+  assert.match(screen, /const canSave = !isGuest && Boolean\(activeDate\) && items\.length > 0 && !loading && !saving;/, "a member saves a shown, non-empty, settled draft");
+  assert.match(screen, /requestPlanRefetchForDate\(activeDate\);[\s\S]{0,120}onBack\(\)/, "after a save the plan refetches the day and the widget goes back to it");
   assert.match(screen, /\{current \? \(\s*<div aria-busy/, "the action row is shown for any draft, also an emptied one (undo stays reachable)");
   assert.match(screen, /api\.goBack\(activeDate\)/);
   assert.match(screen, /disabled=\{loading \|\| exhausted\}[^>]*onClick=\{\(\) => activeDate && api\.another\(activeDate\)\}/, "«Другой вариант» is off while nothing new is left");

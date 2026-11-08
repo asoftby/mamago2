@@ -320,3 +320,41 @@ export function itemHref(item: Pick<DraftItem, "kind" | "activityId" | "card">, 
 export function entryLabel(hasPlanItems: boolean): "Собрать день" | "Дополнить день" {
   return hasPlanItems ? "Дополнить день" : "Собрать день";
 }
+
+// ---------- saving the day
+
+export type SaveFailure = "duplicate" | "sign_in" | "rate_limited" | "past_day" | "stale" | "failed";
+
+/** The body of POST /api/plan/day-scenario/save for one or two days of the draft (only what the server needs). */
+export function buildSaveBody(days: readonly { date: string; items: readonly DraftItem[] }[]) {
+  return {
+    days: days.map((day) => ({
+      date: day.date,
+      items: [...day.items]
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+        .map((item) => ({ kind: item.kind, activityId: item.activityId, startsAt: item.startsAt, endsAt: item.endsAt, pinned: item.pinned, travel: item.travel })),
+    })),
+  };
+}
+
+/** Maps the save endpoint's answer to what the screen tells the user. */
+export function saveFailureOf(status: number, code: string | null | undefined): SaveFailure {
+  if (status === 401) return "sign_in";
+  if (status === 429) return "rate_limited";
+  if (code === "DUPLICATE_ACTIVITY" || code === "DUPLICATE_PLACE") return "duplicate";
+  if (code === "PAST_DAY") return "past_day";
+  if (code === "INVALID_POINT" || code === "INVALID_OCCURRENCE" || code === "INVALID_TIME") return "stale";
+  return "failed";
+}
+
+export const SAVE_FAILURE_TEXT: Record<SaveFailure, string> = {
+  duplicate: "Часть этих мест уже есть в вашем плане. Нажмите «Другой вариант» или уберите их из дня.",
+  sign_in: "Войдите, чтобы сохранить день в план.",
+  rate_limited: "Слишком частые сохранения. Подождите минуту.",
+  past_day: "Этот день уже прошёл — выберите другой.",
+  stale: "Данные одного из мест изменились. Нажмите «Другой вариант», чтобы собрать день заново.",
+  failed: "Не удалось сохранить. Попробуйте ещё раз.",
+};
+
+/** Label of the save button: one day or the two days of a weekend. */
+export const saveLabel = (days: number): string => (days > 1 ? "Сохранить выходные" : "Сохранить в план");
