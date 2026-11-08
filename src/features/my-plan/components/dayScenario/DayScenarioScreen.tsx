@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlanScreenHeader } from "../v3/PlanScreenHeader";
@@ -30,11 +30,22 @@ import {
   type WhenChoice,
 } from "../../lib/dayScenarioUi/model";
 import { ScenarioParams } from "./ScenarioParams";
-import { ScenarioReplaceSheet, type ReplaceOption } from "./ScenarioReplaceSheet";
+import { ScenarioItemPreview } from "./ScenarioItemPreview";
+import { ScenarioReplaceScreen, type ReplaceOption } from "./ScenarioReplaceScreen";
+import { ScenarioStackLayer } from "./ScenarioStackLayer";
 import { AllShown, DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
 import { ScenarioTimeline, type OwnPlanEntry } from "./ScenarioTimeline";
 
 export type ScenarioPerson = { id: string; label: string; kind: "adult" | "child" };
+
+/**
+ * The screens stacked over the draft. A card opens its preview; «Заменить» opens the alternatives,
+ * and an alternative opens its own preview, where it can be taken.
+ */
+type StackView =
+  | { kind: "preview"; item: DraftItem }
+  | { kind: "replace" }
+  | { kind: "pick"; option: ReplaceOption };
 
 const PRIMARY_BTN = `mp-font-ui flex min-h-[62px] w-full items-center justify-center gap-2 rounded-full bg-[var(--mp-tx)] px-6 text-[18px] font-semibold text-[var(--surface)] transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 ${PLAN_FOCUS}`;
 const QUIET_BTN = `mp-font-ui flex min-h-[52px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--mp-line-strong)] bg-[var(--surface)] px-2.5 text-[14px] font-semibold text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-tx)] disabled:cursor-not-allowed disabled:opacity-40 ${PLAN_FOCUS}`;
@@ -99,7 +110,8 @@ export function DayScenarioScreen({
   const loading = phase === "draft" && (state?.loading ?? !state);
   const items = current?.items ?? [];
 
-  // "Чем заменить?"
+  // The stack of screens over the draft, and the state of "Чем заменить?" (its screen is one of them).
+  const [views, setViews] = useState<StackView[]>([]);
   const [replacing, setReplacing] = useState<DraftItem | null>(null);
   const [options, setOptions] = useState<ReplaceOption[] | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(false);
@@ -108,6 +120,7 @@ export function DayScenarioScreen({
   const openReplace = async (item: DraftItem) => {
     if (!activeDate) return;
     const mine = ++replaceToken.current;
+    setViews((prev) => [...prev, { kind: "replace" }]);
     setReplacing(item);
     setOptions(null);
     setOptionsLoading(true);
@@ -128,6 +141,30 @@ export function DayScenarioScreen({
     setReplacing(null);
     setOptions(null);
     setOptionsLoading(false);
+  };
+  /** One screen back; leaving the alternatives forgets them (a late answer is dropped by the token). */
+  const popView = () => {
+    const top = views[views.length - 1];
+    if (!top) return;
+    if (top.kind === "replace") closeReplace();
+    setViews((prev) => prev.slice(0, -1));
+  };
+  const closeStack = () => {
+    closeReplace();
+    setViews([]);
+  };
+  // A screen of the stack is about a point of the draft. If the draft changes under it and that point is
+  // gone (another variant, removed elsewhere), the stack closes: its buttons would act on an obsolete id.
+  const stackTargets = views.flatMap((view) => (view.kind === "preview" ? [view.item.activityId] : []));
+  const staleStack = stackTargets.some((id) => !items.some((it) => it.activityId === id)) || (replacing !== null && views.length > 0 && !items.some((it) => it.activityId === replacing.activityId));
+  useEffect(() => {
+    if (staleStack) closeStack();
+    // closeStack only resets local state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staleStack]);
+  const pickOption = (option: ReplaceOption) => {
+    if (activeDate) api.chooseAlternative(activeDate, option.items);
+    closeStack();
   };
 
   const toggleAge = (key: string) => setAgeKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -154,7 +191,9 @@ export function DayScenarioScreen({
   const exhausted = state?.history.exhausted ?? false;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
+    <div className="relative h-full min-h-0 bg-[var(--mp-bg)]">
+      {/* The draft stays mounted under the stack (scroll, filters, history survive) but is inert while a screen is over it. */}
+      <div className="flex h-full min-h-0 flex-col" inert={views.length > 0} aria-hidden={views.length > 0 ? true : undefined}>
       <PlanScreenHeader kicker={kicker} title={title} onBack={handleBack} onClose={onClose} backLabel={isGuest && phase === "draft" ? "Назад к вопросам" : "Назад в план"} />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-40 pt-0 md:px-8">
@@ -227,9 +266,9 @@ export function DayScenarioScreen({
                     {showFewNearby ? <FewNearbyBanner onSwitchToCar={() => setMode("car")} /> : null}
                     <ScenarioTimeline
                       items={items}
-                      city={city}
                       ownEntries={ownEntries}
                       busy={loading}
+                      onOpen={(item) => setViews([{ kind: "preview", item }])}
                       onRemove={(item) => activeDate && api.remove(activeDate, item.activityId)}
                       onReplace={(item) => void openReplace(item)}
                     />
@@ -275,18 +314,49 @@ export function DayScenarioScreen({
         )}
       </div>
 
-      <ScenarioReplaceSheet
-        open={replacing !== null}
-        onOpenChange={(open) => !open && closeReplace()}
-        target={replacing}
-        city={city}
-        options={options}
-        loading={optionsLoading}
-        onPick={(option) => {
-          if (activeDate) api.chooseAlternative(activeDate, option.items);
-          closeReplace();
-        }}
-      />
+      </div>
+
+      {views.map((view, index) => {
+        const active = index === views.length - 1;
+        const previous = views[index - 1];
+        if (view.kind === "replace") {
+          return (
+            <ScenarioStackLayer key={`replace-${index}`} active={active} onBack={popView} label="Чем заменить?">
+              <ScenarioReplaceScreen
+                target={replacing}
+                options={options}
+                loading={optionsLoading}
+                onBack={popView}
+                onOpen={(option) => setViews((prev) => [...prev, { kind: "pick", option }])}
+                onPick={pickOption}
+              />
+            </ScenarioStackLayer>
+          );
+        }
+        if (view.kind === "pick") {
+          return (
+            <ScenarioStackLayer key={`pick-${index}`} active={active} onBack={popView} label={view.option.fresh.card.title}>
+              <ScenarioItemPreview item={view.option.fresh} city={city} back="Замена" onBack={popView} onPick={() => pickOption(view.option)} />
+            </ScenarioStackLayer>
+          );
+        }
+        return (
+          <ScenarioStackLayer key={`preview-${index}`} active={active} onBack={popView} label={view.item.card.title}>
+            <ScenarioItemPreview
+              item={view.item}
+              city={city}
+              back={previous ? "Назад" : "День"}
+              onBack={popView}
+              busy={loading}
+              onReplace={() => void openReplace(view.item)}
+              onRemove={() => {
+                if (activeDate) api.remove(activeDate, view.item.activityId);
+                closeStack();
+              }}
+            />
+          </ScenarioStackLayer>
+        );
+      })}
     </div>
   );
 }
