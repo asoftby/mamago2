@@ -34,6 +34,12 @@ async function main() {
 
     await assert.rejects(changePartyProgramme(parent, party.id, { action: 'participants', version, adultIds: [outsider], childIds: [] }), /действующих/);
     await assert.rejects(changePartyProgramme(parent, party.id, { action: 'participants', version, adultIds: [adult], childIds: [demoId('other-child')] }), /ребёнка/);
+    await changePartyProgramme(parent, party.id, { action: 'participants', version: version++, adultIds: [parent], childIds: [demoId('child')] });
+    await changePartyProgramme(parent, party.id, { action: 'saveToPlan', version: version++ });
+    const selfOnly = await db.partyOrder.findUniqueOrThrow({ where: { id: party.id }, select: { programmeAdultIds: true, planItem: { select: { visibility: true } } } });
+    assert.deepEqual(selfOnly.programmeAdultIds, [parent]);
+    assert.equal(selfOnly.planItem?.visibility, 'PRIVATE');
+    assert.equal(await readFamilyPartyProgramme(adult, party.id), null, 'self participation is not family sharing');
     await changePartyProgramme(parent, party.id, { action: 'participants', version: version++, adultIds: [adult], childIds: [demoId('child')] });
     await changePartyProgramme(parent, party.id, { action: 'saveToPlan', version: version++ });
     const linked = await db.partyOrder.findUniqueOrThrow({ where: { id: party.id } });

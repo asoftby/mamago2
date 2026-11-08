@@ -111,7 +111,7 @@ const calendarActivitySelect = {
 } satisfies Prisma.ActivitySelect;
 
 const calendarItemSelect = {
-  partyOrder: { select: { id: true } },
+  partyOrder: { select: { id: true, programmeAdultIds: true, programmeChildIds: true } },
   id: true,
   source: true,
   entryType: true,
@@ -149,7 +149,7 @@ type CalendarRow = Prisma.PlanItemGetPayload<{ select: typeof calendarItemSelect
 
 export type FamilyCalendarItemDto = {
   id: string;
-  partyOrder?: { id: string } | null;
+  partyOrder?: { id: string; programmeAdultIds?: string[]; programmeChildIds?: string[] } | null;
   source: PlanItemSource;
   entryType: PlanEntryType | null;
   date: string;

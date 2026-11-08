@@ -35,7 +35,7 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
   }
   const scope = familyReadsEnabled() ? await resolveFamilyScope(user.id) : null;
   const [members, children] = scope?.familyId ? await Promise.all([
-    prisma.familyMembership.findMany({ where: { familyId: scope.familyId, leftAt: null, userId: { not: user.id } },
+    prisma.familyMembership.findMany({ where: { familyId: scope.familyId, leftAt: null },
       select: { userId: true, user: { select: { displayName: true } } }, take: 20 }),
     prisma.child.findMany({ where: { familyId: scope.familyId }, select: { id: true, name: true }, take: 30 }),
   ]) : [[], []];
@@ -47,7 +47,7 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
     id: party.id, version: party.version, cancelled: party.status === "CANCELLED", programme: projectProgramme(party),
     entries: orderedItems.map(item => overrides.find(row => row.itemId === item.id) ?? { itemId: item.id, from: null, to: null }),
     adultIds: party.programmeAdultIds, childIds: party.programmeChildIds, inPlan: Boolean(party.planItemId),
-    adults: members.map(row => ({ id: row.userId, label: row.user.displayName || "Взрослый участник" })),
+    adults: members.map(row => ({ id: row.userId, label: (row.user.displayName || "Взрослый участник") + (row.userId === user.id ? " (я)" : "") })),
     children: children.map(row => ({ id: row.id, label: row.name || "Профиль ребёнка" })),
     publicPath: party.status !== "CANCELLED" && party.publicPlanToken && party.publicPlanExpiresAt && party.publicPlanExpiresAt > new Date() ? `/p/${party.publicPlanToken}` : null,
     expiresAt: party.publicPlanExpiresAt?.toISOString() ?? null,

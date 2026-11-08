@@ -81,7 +81,7 @@ const DATED = { date: { not: null } } as const;
 
 export type PlanItemWithActivity = {
   id: string;
-  partyOrder?: { id: string } | null;
+  partyOrder?: { id: string; programmeAdultIds?: string[]; programmeChildIds?: string[] } | null;
   userId: string;
   activityId: string | null;
   offerId?: string | null;
@@ -584,7 +584,7 @@ export async function listPlanItemsByWeek(
   return (await prisma.planItem.findMany({
     where: { ...(await activePlanScopeFor(userId)), date: { gte: weekStartDate, lte: endDateStr } },
     include: {
-      partyOrder: { select: { id: true } },
+      partyOrder: { select: { id: true, programmeAdultIds: true, programmeChildIds: true } },
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
@@ -600,7 +600,7 @@ export async function listAllPlanItems(userId: string): Promise<PlanItemWithActi
   return (await prisma.planItem.findMany({
     where: { ...(await activePlanScopeFor(userId)), ...DATED },
     include: {
-      partyOrder: { select: { id: true } },
+      partyOrder: { select: { id: true, programmeAdultIds: true, programmeChildIds: true } },
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
@@ -625,7 +625,7 @@ export async function listUpcomingPlanItems(
   return (await prisma.planItem.findMany({
     where: { ...(await activePlanScopeFor(userId)), date: { gte: from, lte: toDateStr } },
     include: {
-      partyOrder: { select: { id: true } },
+      partyOrder: { select: { id: true, programmeAdultIds: true, programmeChildIds: true } },
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
@@ -646,7 +646,7 @@ export async function listPlanItemsInRange(
   return (await prisma.planItem.findMany({
     where: { ...(await activePlanScopeFor(userId)), date: { gte: from, lte: to } },
     include: {
-      partyOrder: { select: { id: true } },
+      partyOrder: { select: { id: true, programmeAdultIds: true, programmeChildIds: true } },
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },
@@ -665,7 +665,7 @@ export async function listPlanItemsByDate(
   return (await prisma.planItem.findMany({
     where: { ...(await activePlanScopeFor(userId)), date },
     include: {
-      partyOrder: { select: { id: true } },
+      partyOrder: { select: { id: true, programmeAdultIds: true, programmeChildIds: true } },
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
       offer: { select: planOfferSelect },

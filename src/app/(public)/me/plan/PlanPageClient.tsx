@@ -40,7 +40,7 @@ import { toast } from "@/lib/toast";
 import { PLAN_SELF_LABEL, planAudienceLabel } from "@/features/my-plan/lib/planAudienceLabel";
 
 export type SerializedPlanItem = {
-  partyOrder?: { id: string } | null;
+  partyOrder?: { id: string; programmeAdultIds?: string[]; programmeChildIds?: string[] } | null;
   id: string;
   source: "CATALOG" | "TELEGRAM_FORWARD" | "MANUAL";
   entryType: "EVENT" | "ACTIVITY" | "TASK" | null;

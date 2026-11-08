@@ -29,7 +29,7 @@ export async function createPartyPlan(tx: Prisma.TransactionClient, party: {
     throw new PartyApiError(422, "Сначала укажите дату и время праздника");
   const familyId = party.familyId ?? await findActiveFamilyId(tx, party.ownerUserId);
   const data = { userId: party.ownerUserId, familyId,
-    visibility: party.programmeAdultIds.length ? "FAMILY" as const : "PRIVATE" as const,
+    visibility: party.programmeAdultIds.some(id => id !== party.ownerUserId) ? "FAMILY" as const : "PRIVATE" as const,
     source: "MANUAL" as const, entryType: "EVENT" as const,
     date: party.eventDate.toISOString().slice(0, 10), startsAt: partyStartAt(party.eventDate, party.timeFrom),
     endsAt: partyStartAt(party.eventDate, party.timeTo), title: "День рождения",
@@ -67,7 +67,7 @@ export async function changePartyProgramme(ownerUserId: string, partyId: string,
       if (!membership) throw new PartyApiError(422, "Семья не найдена");
       await tx.$queryRaw`SELECT "id" FROM "Family" WHERE "id" = ${membership.familyId} FOR UPDATE`;
       const members = await tx.familyMembership.findMany({ where: { familyId: membership.familyId, leftAt: null }, select: { userId: true } });
-      const adults = [...new Set(input.adultIds)].filter(id => id !== ownerUserId);
+      const adults = [...new Set(input.adultIds)];
       if (!members.some(row => row.userId === ownerUserId) || adults.some(id => !members.some(row => row.userId === id)))
         throw new PartyApiError(422, "Можно выбрать только действующих участников семьи");
       const children = [...new Set(input.childIds)];
@@ -86,7 +86,7 @@ export async function changePartyProgramme(ownerUserId: string, partyId: string,
     if (input.action === "saveToPlan" || (input.action === "participants" && party.planItemId)) {
       await createPartyPlan(tx, { ...party,
         familyId: typeof data.familyId === "string" ? data.familyId : party.familyId,
-        programmeAdultIds: input.action === "participants" ? [...new Set(input.adultIds)].filter(id => id !== ownerUserId) : party.programmeAdultIds,
+        programmeAdultIds: input.action === "participants" ? [...new Set(input.adultIds)] : party.programmeAdultIds,
         programmeChildIds: input.action === "participants" ? [...new Set(input.childIds)] : party.programmeChildIds,
       });
     }
