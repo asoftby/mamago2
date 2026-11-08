@@ -265,6 +265,35 @@ export function minutesBetween(fromIso: string, toIso: string): number {
   return Math.max(0, Math.round((Date.parse(toIso) - Date.parse(fromIso)) / MINUTE_MS));
 }
 
+/**
+ * "С кем идём?" starts from the page's "Для кого?" choice: the people chosen there that are in this
+ * family. Nobody chosen (or everybody) is the "Все" chip, which is the empty selection.
+ */
+export function initialPersonSelection(peopleIds: readonly string[], pageSelectedIds: readonly string[]): string[] {
+  const chosen = pageSelectedIds.filter((id, index, all) => peopleIds.includes(id) && all.indexOf(id) === index);
+  return chosen.length === peopleIds.length ? [] : chosen;
+}
+
+/**
+ * Public page of a point of the draft. It lives under the city the item is published in
+ * (`card.citySlug`): the pool also holds items of cities below the listing city, and a slug can exist in
+ * both. An event whose city is unknown opens by id (globally unique) under the listing city; a place
+ * falls back to the listing city. null when no safe path can be made (the card is then not a link).
+ */
+export function itemHref(item: Pick<DraftItem, "kind" | "activityId" | "card">, listingCity: string | undefined): string | null {
+  const safeCity = (value: string | null | undefined) => (value && /^[a-z-]+$/i.test(value) ? value : null);
+  const slug = (item.card.slug ?? "").trim();
+  if (slug.includes("/")) return null;
+  const own = safeCity(item.card.citySlug);
+  if (item.kind === "event") {
+    if (own && slug) return `/${own}/events/${encodeURIComponent(slug)}`;
+    const city = own ?? safeCity(listingCity);
+    return city ? `/${city}/events/${encodeURIComponent(item.activityId)}` : null;
+  }
+  const city = own ?? safeCity(listingCity);
+  return city && slug ? `/${city}/places/${encodeURIComponent(slug)}` : null;
+}
+
 /** Entry label of the widget button: a day with something in it is "extended", an empty one "built". */
 export function entryLabel(hasPlanItems: boolean): "Собрать день" | "Дополнить день" {
   return hasPlanItems ? "Дополнить день" : "Собрать день";

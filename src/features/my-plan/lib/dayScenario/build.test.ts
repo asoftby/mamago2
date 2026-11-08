@@ -378,4 +378,17 @@ const UNKNOWN = { kind: "unknown" } as const;
   assert.equal(new Set([...chain, ...first.items.map((i) => i.activityId)]).size, 5, "the chain walks through all five events before saying it is done");
 }
 
+{
+  // a seen event that outscores every filler must not hide the unseen places (matrix finding: wed-walk)
+  const events = [ev("anchor", A.lat, A.lng, [17], 10), place("f1", A.lat + 0.0004, A.lng, ALWAYS), place("f2", A.lat + 0.0008, A.lng, ALWAYS)];
+  const first = buildDayScenario(events, baseInput({ targetCount: 1 }), deps());
+  assert.deepEqual(first.items.map((i) => i.activityId), ["anchor"], "the event wins the day");
+  const cur = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const next = buildAnotherVariant(events, baseInput({ variant: 1, targetCount: 1 }), cur, new Set(["anchor"]), deps());
+  assert.equal(next.exhausted, false, "unseen places exist: not «показали всё»");
+  assert.ok(next.result.items.length > 0 && next.result.items.every((i) => i.activityId !== "anchor"), "a day of unseen places");
+  const all = buildAnotherVariant(events, baseInput({ variant: 2, targetCount: 1 }), next.result.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs })), new Set(["anchor", "f1", "f2"]), deps());
+  assert.equal(all.exhausted, true, "everything seen: now it is exhaustion");
+}
+
 console.log("dayScenario build tests passed");
