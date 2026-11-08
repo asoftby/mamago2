@@ -1,3 +1,4 @@
+import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { readPartyOrder } from "@/server/birthday/partyDraft.service";
@@ -40,11 +41,11 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
         id: item.id, title: item.offer?.title ?? item.category,
         role: item.role, status: item.status,
         request: request ? {
-          id: request.id, partyStage: request.partyStage,
+          id: request.id, partyStage: request.partyStage, packageScope: readPackageChangeScope(request.bookingPriceSnapshot),
           quote: quote ? {
             id: quote.id, version: quote.version, status: quote.status,
             priceByn: quote.priceByn?.toString() ?? null,
-            includes: quote.includes, prepaymentTerms: quote.prepaymentTerms,
+            declineReason: quote.declineReason, declineComment: quote.declineComment, changeReason: quote.changeReason, includes: quote.includes, prepaymentTerms: quote.prepaymentTerms,
             cancellationTerms: quote.cancellationTerms,
             validUntil: quote.validUntil?.toISOString() ?? null,
             canAccept: request.partyStage === "QUOTED" && quote.status === "ACTIVE" &&

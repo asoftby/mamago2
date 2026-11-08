@@ -139,3 +139,20 @@ test("definitive submit validation failure leaves the existing draft editable", 
   assert.equal(updated.id, "order");
   assert.equal(updated.version, 2);
 });
+
+
+test("modified package submits details without replacing server component snapshots", async () => {
+  const state = fresh(); state.draft = { id: "saved", version: 12 };
+  const bodies: object[] = [];
+  const request: PartyRequest = async <T>(_url: string, method: string, body?: object) => {
+    if (method === "PATCH") bodies.push(body!);
+    return { id: "saved", version: 13, status: "DRAFT" } as T;
+  };
+  await submitBirthdayParty(state, { ...input, preservePackageComposition: true }, request);
+  assert.equal(bodies.length, 1);
+  assert.equal("anchorOfferId" in bodies[0], false);
+  assert.equal("addonOfferIds" in bodies[0], false);
+  assert.equal("addonCategories" in bodies[0], false);
+  assert.equal("preservePackageComposition" in bodies[0], false);
+  assert.equal(state.submitted, true);
+});

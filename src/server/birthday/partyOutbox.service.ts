@@ -1,6 +1,7 @@
+import { partyOutboxActionUrl } from "./partyOutbox.logic";
 import "server-only";
 
-import { PartyOutboxStatus } from "@prisma/client";
+import { PartyOutboxStatus, type Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { dispatchDelivery } from "@/server/services/notificationDelivery.service";
 import {
@@ -12,6 +13,7 @@ const MAX_ATTEMPTS = 5;
 const LEASE_MS = 5 * 60_000;
 
 type PartyOutboxRow = {
+  payload: Prisma.JsonValue;
   id: string; eventType: string; aggregateId: string;
   attempts: number; nextAttemptAt: Date; status: PartyOutboxStatus;
 };
@@ -43,7 +45,7 @@ async function processOne(row: PartyOutboxRow): Promise<"sent" | "skipped" | "fa
       select: {
         id: true, businessId: true, offer: { select: { title: true } },
         partyOrderItem: {
-          select: { partyOrder: { select: { ownerUserId: true, eventDate: true } } },
+          select: { partyOrder: { select: { id: true, ownerUserId: true, eventDate: true } } },
         },
       },
     });
@@ -75,10 +77,12 @@ async function processOne(row: PartyOutboxRow): Promise<"sent" | "skipped" | "fa
 
     const copy = partyOutboxCopy({
       type: row.eventType,
+      packageChange: Boolean(row.payload && typeof row.payload === "object" && !Array.isArray(row.payload) && row.payload.packageChange === true),
       offerTitle: request.offer?.title ?? "Праздничная услуга",
       dateLabel: order.eventDate?.toISOString().slice(0, 10) ?? "указанную дату",
     });
 
+    const actionUrl = partyOutboxActionUrl(row.eventType, request.id, order.id);
     // Deterministic IDs make in-app notifications idempotent even after a
     // worker crash. External channel attempts are tracked in NotificationDelivery.
     const ids = users.map((user) => partyNotificationId(row.id, user.id));
@@ -93,9 +97,9 @@ async function processOne(row: PartyOutboxRow): Promise<"sent" | "skipped" | "fa
         entityType: "BOOKING",
         entityId: request.id,
         actionMode: "PAGE",
-        actionUrl: copy.actionUrl,
+        actionUrl,
         ctaLabel: "Открыть",
-        ctaAction: copy.actionUrl,
+        ctaAction: actionUrl,
         metadata: {
           source: "PARTY_OUTBOX", outboxId: row.id,
           templatePayload: {
@@ -167,7 +171,7 @@ export async function dispatchPartyOutbox(batchSize = 20) {
     orderBy: { createdAt: "asc" },
     take: Math.min(50, Math.max(1, batchSize)),
     select: {
-      id: true, eventType: true, aggregateId: true,
+      id: true, eventType: true, aggregateId: true, payload: true,
       attempts: true, nextAttemptAt: true, status: true,
     },
   });

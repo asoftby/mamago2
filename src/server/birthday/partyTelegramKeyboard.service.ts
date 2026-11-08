@@ -104,7 +104,7 @@ export async function buildPartyConfirmationTelegramKeyboard(
   if (baseUrl.startsWith("https://")) {
     keyboard.push([{
       text: "Открыть в кабинете",
-      url: new URL("/business/bookings?tab=action&kind=party", baseUrl).toString(),
+      url: new URL("/business/bookings?tab=action&kind=party&request=" + encodeURIComponent(notification.entityId), baseUrl).toString(),
     }]);
   }
   return keyboard.length ? { inline_keyboard: keyboard } : undefined;

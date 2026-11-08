@@ -1,5 +1,6 @@
 "use client";
 
+import { PartyPackageBrief } from "@/components/birthday/PartyPackageBrief";
 import React from "react";
 import { PackageComponentsEditor } from "@/components/business/wizard/offer/components/PackageComponentsEditor";
 import type { PackageComponentFormRow } from "@/components/business/wizard/offer/types";
@@ -112,6 +113,15 @@ export function UiPrimitivesSection() {
       <InventoryGrid>
         <RenderSafe title="Правила компонентов пакета" file="src/components/business/wizard/offer/components/PackageComponentsEditor.tsx">
           <PackageRulesPreview />
+          <PartyPackageBrief scope={{ kind: "PARTY_PACKAGE_CHANGE", orderId: "preview", draftVersion: 1,
+            packageId: "package", packageTitle: "Пакет праздника", originalPrice: { mode: "EXACT", amountByn: "500.00" },
+            requestedPrice: { mode: "ON_REQUEST", amountByn: null },
+            components: [
+              { itemId: "kept", snapshot: { title: "Зал", category: "VENUE" }, action: "KEPT", creditByn: "0.00", requiresQuote: false, replacementItemId: null },
+              { itemId: "removed", snapshot: { title: "Декор", category: "DECOR" }, action: "REMOVED", creditByn: "50.00", requiresQuote: false, replacementItemId: null },
+              { itemId: "replaced", snapshot: { title: "Шоу", category: "SHOW" }, action: "REPLACED", creditByn: "0.00", requiresQuote: true, replacementItemId: "other" },
+            ], standalone: [{ itemId: "other", offerId: "other", businessId: "other", title: "Другой исполнитель", price: { mode: "FROM", amountByn: "180.00" } }],
+          }} />
         </RenderSafe>
         <RenderSafe title="Button" file="src/components/ui/button.tsx">
           <div className="flex gap-2 flex-wrap">
