@@ -12,6 +12,7 @@ function makeDb(seed: { activities?: Row[]; places?: Row[]; planItems?: Row[] } 
   const matches = (row: Row, where: Row): boolean =>
     Object.entries(where).every(([key, cond]) => {
       if (key === "OR") return (cond as Row[]).some((sub) => matches(row, sub));
+      if (key === "AND") return (cond as Row[]).every((sub) => matches(row, sub));
       if (cond && typeof cond === "object" && "in" in cond) return (cond as { in: unknown[] }).in.includes(row[key]);
       if (cond && typeof cond === "object" && !(cond instanceof Date)) return matches(row[key] ?? {}, cond as Row);
       return row[key] === cond;
@@ -30,7 +31,7 @@ function makeDb(seed: { activities?: Row[]; places?: Row[]; planItems?: Row[] } 
       findMany: async ({ where }: Row) => state.dayScenarios.filter((r) => matches(r, where)).sort((a, b) => a.date.localeCompare(b.date)),
       update: async ({ where, data }: Row) => Object.assign(state.dayScenarios.find((r) => r.id === where.id)!, data),
     },
-    activity: { findMany: async ({ where }: Row) => state.activities.filter((a) => where.id.in.includes(a.id) && a.status === where.status) },
+    activity: { findMany: async ({ where }: Row) => state.activities.filter((a) => where.id.in.includes(a.id) && a.status === where.status).map((a) => ({ ...a, _count: { sessions: a.allSessions ?? a.sessions.length } })) },
     place: { findMany: async ({ where }: Row) => state.places.filter((p) => where.id.in.includes(p.id)) },
     planItem: {
       findMany: async ({ where }: Row) => state.planItems.filter((r) => matches(r, where)),
@@ -68,13 +69,18 @@ const eventItem = (id: string, date: string, utc: string, endUtc: string) => ({ 
 const placeItem = (id: string, date: string, utc: string, endUtc: string, travel: SaveRequest["days"][number]["items"][number]["travel"] = null) => ({ kind: "place" as const, activityId: id, startsAt: at(date, utc), endsAt: at(date, endUtc), pinned: false, travel });
 const deps = (db: NonNullable<SaveDeps["db"]>): SaveDeps => ({ db, scopeFor: async (userId) => ({ userId }), familyIdFor: async () => "fam1", today: "2026-11-08" });
 
-const concert = { id: "ev-session", title: "Концерт", coverImageUrl: "c.jpg", status: "PUBLISHED", scheduleMode: "ONE_TIME", sessions: [{ startsAt: new Date(at(SAT, "08:00")) }] };
-const weekly = { id: "ev-weekly", title: "Еженедельное занятие", coverImageUrl: null, status: "PUBLISHED", scheduleMode: "RECURRING", sessions: [] };
-const oneTimeNoSession = { id: "ev-nosession", title: "Разовое без сеанса", coverImageUrl: null, status: "PUBLISHED", scheduleMode: "ONE_TIME", sessions: [] };
-const draftEvent = { id: "ev-draft", title: "Черновик", coverImageUrl: null, status: "DRAFT", scheduleMode: "RECURRING", sessions: [] };
+const WEEKLY_RULE = { scheduleItems: [{ date: "2026-11-07", startTime: "11:00", recurringEnabled: true, recurrenceInterval: 1, recurrenceUnit: "week", recurrenceUntil: "2027-02-01" }] };
+const session = (iso: string, withdrawn = false) => ({ startsAt: new Date(iso), withdrawnAt: withdrawn ? new Date("2026-11-01T00:00:00Z") : null });
+const concert = { id: "ev-session", title: "Концерт", coverImageUrl: "c.jpg", status: "PUBLISHED", scheduleJson: null, sessions: [session(at(SAT, "08:00"))] };
+const weekly = { id: "ev-weekly", title: "Еженедельное занятие", coverImageUrl: null, status: "PUBLISHED", scheduleJson: WEEKLY_RULE, sessions: [] };
+// ONE_TIME / MULTI_DATE events have rules too: the pool expands them when no session row exists
+const multiNoSession = { id: "ev-multi", title: "Многодатное без сеансов", coverImageUrl: null, status: "PUBLISHED", scheduleJson: { dates: [SAT], startTime: "11:00", scheduleItems: [{ date: SAT, startTime: "11:00" }] }, sessions: [] };
+const withdrawn = { id: "ev-withdrawn", title: "Сеанс отозван", coverImageUrl: null, status: "PUBLISHED", scheduleJson: { dates: [SAT], startTime: "11:00", scheduleItems: [{ date: SAT, startTime: "11:00" }] }, sessions: [session(at(SAT, "08:00"), true)] };
+const oneTimeNoSession = { id: "ev-nosession", title: "Без сеансов и правил", coverImageUrl: null, status: "PUBLISHED", scheduleJson: null, sessions: [] };
+const draftEvent = { id: "ev-draft", title: "Черновик", coverImageUrl: null, status: "DRAFT", scheduleJson: WEEKLY_RULE, sessions: [] };
 const park = { id: "pl-park", slug: "park", title: "Парк", images: [{ url: "p.jpg" }] };
 const cafe = { id: "pl-cafe", slug: "cafe", title: "Кафе", images: [] };
-const seedCatalog = () => ({ activities: [concert, weekly, oneTimeNoSession, draftEvent], places: [park, cafe] });
+const seedCatalog = () => ({ activities: [concert, weekly, multiNoSession, withdrawn, oneTimeNoSession, draftEvent], places: [park, cafe] });
 
 async function run() {
   // ---- request validation without a database
@@ -94,12 +100,18 @@ async function run() {
   assert.equal(requestHashOf(a), requestHashOf(b), "the hash does not depend on the order of days and points");
   assert.notEqual(requestHashOf(a), requestHashOf(parse([{ date: SAT, items: [eventItem("a", SAT, "08:00", "09:30")] }])));
 
-  // ---- time type
-  const t = (kind: "event" | "place", iso: string, event: Parameters<typeof timeTypeFor>[2]) => timeTypeFor(kind, new Date(iso).getTime(), event);
-  assert.equal(t("event", at(SAT, "08:00"), concert), "CONFIRMED", "a real session at exactly this start");
-  assert.equal(t("event", at(SAT, "09:00"), weekly), "SUGGESTED", "schedule rules, no session");
+  // ---- time type: judged like the draft pool judged it
+  const asEvent = (e: { sessions: { startsAt: Date; withdrawnAt: Date | null }[]; scheduleJson: unknown }) => ({ ...e, _count: { sessions: e.sessions.length } });
+  const t = (kind: "event" | "place", iso: string, event: ReturnType<typeof asEvent> | null) => timeTypeFor(kind, new Date(iso).getTime(), event, SAT);
+  const refused = (fn: () => unknown) => assert.throws(fn, (e: unknown) => e instanceof DaySaveError && e.code === "INVALID_OCCURRENCE");
+  assert.equal(t("event", at(SAT, "08:00"), asEvent(concert)), "CONFIRMED", "an active session at exactly this start");
+  assert.equal(t("event", at(SAT, "08:00"), asEvent(weekly)), "SUGGESTED", "a weekly rule, no session row");
+  assert.equal(t("event", at(SAT, "08:00"), asEvent(multiNoSession)), "SUGGESTED", "a ONE_TIME / MULTI_DATE event with rules and no session is saved too");
   assert.equal(t("place", at(SAT, "09:00"), null), "SUGGESTED", "a place: the time is the engine's");
-  assert.throws(() => t("event", at(SAT, "09:00"), oneTimeNoSession), (e: unknown) => e instanceof DaySaveError && e.code === "INVALID_OCCURRENCE");
+  refused(() => t("event", at(SAT, "09:00"), asEvent(weekly))); // a start the rule does not have
+  refused(() => t("event", at(SAT, "08:00"), asEvent(withdrawn))); // a withdrawn session is not resurrected, nor replaced by its rule
+  refused(() => t("event", at(SAT, "08:00"), asEvent(oneTimeNoSession))); // nothing puts an occurrence there
+  refused(() => t("event", at(SAT, "10:00"), asEvent(concert))); // a session exists, just not at this start (and the event has sessions: no rule fallback)
 
   // ---- one day: entries created, scenario marked, legs and fingerprint stored, manual entries untouched
   {
@@ -171,6 +183,21 @@ async function run() {
     assert.deepEqual(second.get().planItems, [placeClash]);
   }
 
+  // ---- the family scope keeps its own OR: an entry the user cannot see is no clash (and its id is not disclosed)
+  {
+    const hidden = { id: "h1", userId: "other", visibility: "PRIVATE", date: "2026-12-03", activityId: "ev-session", placeId: null, scenarioId: null };
+    const visible = { id: "h2", userId: "other", visibility: "FAMILY", date: "2026-12-03", activityId: "ev-weekly", placeId: null, scenarioId: null };
+    const scoped = (db: NonNullable<SaveDeps["db"]>): SaveDeps => ({ ...deps(db), scopeFor: async (userId) => ({ OR: [{ userId }, { visibility: "FAMILY" }] }) });
+    const first = makeDb({ ...seedCatalog(), planItems: [hidden] });
+    await saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30")] }]), "key-acl-00001", scoped(first.db));
+    const second = makeDb({ ...seedCatalog(), planItems: [hidden, visible] });
+    await assert.rejects(
+      saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30"), eventItem("ev-weekly", SAT, "08:00", "09:30")] }]), "key-acl-00002", scoped(second.db)),
+      (e: unknown) => e instanceof DaySaveError && e.code === "DUPLICATE_ACTIVITY" && JSON.stringify(e.details) === JSON.stringify({ ids: ["ev-weekly"] }),
+      "only the entry the user can see is reported",
+    );
+  }
+
   // ---- someone else's entry (not in the user's scope) is not a clash; unpublished or unknown points are refused
   {
     const { db } = makeDb({ ...seedCatalog(), planItems: [{ id: "x1", userId: "other", date: SAT, activityId: "ev-session", placeId: null, scenarioId: null }] });
@@ -179,6 +206,10 @@ async function run() {
     await assert.rejects(saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-draft", SAT, "08:00", "09:30")] }]), "key-draft-001", deps(refused.db)), (e: unknown) => e instanceof DaySaveError && e.code === "INVALID_POINT");
     await assert.rejects(saveDayScenarios("u1", parse([{ date: SAT, items: [placeItem("pl-missing", SAT, "08:00", "09:30")] }]), "key-miss-0001", deps(refused.db)), (e: unknown) => e instanceof DaySaveError && e.code === "INVALID_POINT");
     await assert.rejects(saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-nosession", SAT, "08:00", "09:30")] }]), "key-occur-001", deps(refused.db)), (e: unknown) => e instanceof DaySaveError && e.code === "INVALID_OCCURRENCE");
+    await assert.rejects(saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-withdrawn", SAT, "08:00", "09:30")] }]), "key-wdrwn-001", deps(refused.db)), (e: unknown) => e instanceof DaySaveError && e.code === "INVALID_OCCURRENCE");
+    const multi = makeDb(seedCatalog());
+    const savedMulti = await saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-multi", SAT, "08:00", "09:30")] }]), "key-multi-001", deps(multi.db));
+    assert.equal(savedMulti.days[0]!.items[0]!.timeType, "SUGGESTED", "a generated virtual occurrence of a MULTI_DATE event can be saved");
     assert.equal(refused.get().planItems.length, 0);
   }
 
@@ -190,6 +221,7 @@ async function run() {
     assert.match(route, /IDEMPOTENCY_KEY_REQUIRED/);
     assert.match(route, /checkRateLimit\(`day-scenario-save:\$\{user\.id\}`, 10, 60_000\)/);
     const service = readFileSync("src/server/services/dayScenarioEngine/save.service.ts", "utf8");
+    assert.match(service, /where: \{ AND: \[scope, \{ OR: /, "the scope is combined with AND: a spread would replace the scope's own OR");
     assert.ok(!/plan\.service|\baddPlanItem\(|\baddPlacePlanItem\(/.test(service), "never the helpers that re-date an existing entry");
     assert.ok(/planItem\.deleteMany\(\{ where: \{ id: \{ in: [^}]*\} , scenarioId: row\.id \} \}\)|planItem\.deleteMany\(\{ where: \{ id: \{ in: [^}]*\}, scenarioId: row\.id \} \}\)/.test(service), "a delete is always scoped by the scenario's own id");
     const migration = readFileSync("prisma/migrations/20261108190000_day_scenario_save_fields/migration.sql", "utf8");

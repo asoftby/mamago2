@@ -6,6 +6,8 @@ import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { calendarDaySchema } from "@/lib/decision/planRequestSchemas";
 import { activePlanScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { computePlanFingerprint } from "@/server/services/dayScenario.service";
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+import { virtualSessionStarts } from "./poolMapping";
 
 /**
  * Saving a day-scenario draft (BACKLOG-230, PR 3a). One call saves one day or the two days of a weekend in ONE
@@ -78,22 +80,32 @@ export function validateSaveRequest(request: SaveRequest, today: string, tz?: st
 
 type Tx = Prisma.TransactionClient;
 
-type EventRow = { id: string; title: string; coverImageUrl: string | null; scheduleMode: string; sessions: { startsAt: Date }[] };
+type EventRow = {
+  id: string;
+  title: string;
+  coverImageUrl: string | null;
+  scheduleJson: unknown;
+  sessions: { startsAt: Date; withdrawnAt: Date | null }[];
+  /** All ActivitySession rows of the event (the loaded `sessions` are only those near the saved days). */
+  _count: { sessions: number };
+};
 type PlaceRow = { id: string; slug: string | null; title: string; images: { url: string }[] };
 
 /**
- * Time type of a point: a real session of the event at exactly this start is CONFIRMED; an event of a
- * schedule-rule kind (no session on this start) and every place (time picked inside its opening hours)
- * are SUGGESTED. An event that needs a session and has none at this start cannot be saved.
+ * Time type of a point, judged exactly like the draft pool judged it:
+ * - an active (not withdrawn) session starting at exactly this moment: CONFIRMED;
+ * - an event with NO ActivitySession row at all whose schedule rules put a start at this moment: SUGGESTED
+ *   (any schedule mode: the pool expands rules for all of them);
+ * - a place: SUGGESTED (the time is the engine's, inside the opening hours);
+ * - anything else (a withdrawn session, a start no session or rule has) cannot be saved.
  */
-export function timeTypeFor(kind: "event" | "place", startsAtMs: number, event: Pick<EventRow, "scheduleMode" | "sessions"> | null): PlanItemTimeType {
+export function timeTypeFor(kind: "event" | "place", startsAtMs: number, event: Pick<EventRow, "sessions" | "scheduleJson" | "_count"> | null, date: string): PlanItemTimeType {
   if (kind === "place") return PlanItemTimeType.SUGGESTED;
-  if (event?.sessions.some((session) => session.startsAt.getTime() === startsAtMs)) return PlanItemTimeType.CONFIRMED;
-  if (event && ["ALWAYS", "ON_DEMAND", "RECURRING"].includes(event.scheduleMode)) return PlanItemTimeType.SUGGESTED;
+  if (event?.sessions.some((session) => session.withdrawnAt === null && session.startsAt.getTime() === startsAtMs)) return PlanItemTimeType.CONFIRMED;
+  if (event && event._count.sessions === 0 && virtualSessionStarts(event.scheduleJson, date, DEFAULT_TZ, 0).includes(startsAtMs)) return PlanItemTimeType.SUGGESTED;
   throw new DaySaveError(422, "INVALID_OCCURRENCE", null);
 }
 
-/** Seams for tests: the database handle, the family scope/id lookups and "today". */
 export type SaveDeps = {
   db?: Pick<typeof prisma, "$transaction">;
   scopeFor?: (userId: string) => Promise<Prisma.PlanItemWhereInput>;
@@ -130,14 +142,23 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
 
       const [events, places, taken] = await Promise.all([
         eventIds.length
-          ? tx.activity.findMany({ where: { id: { in: eventIds }, status: "PUBLISHED" }, select: { id: true, title: true, coverImageUrl: true, scheduleMode: true, sessions: { select: { startsAt: true } } } })
+          ? tx.activity.findMany({
+              where: { id: { in: eventIds }, status: "PUBLISHED" },
+              select: {
+                id: true, title: true, coverImageUrl: true, scheduleJson: true,
+                // Only the sessions near the saved days (a long-running event has many); _count answers "has any session at all".
+                sessions: { where: { startsAt: { gte: new Date(Date.parse(`${dates[0]}T00:00:00Z`) - 36 * 3_600_000), lt: new Date(Date.parse(`${dates[dates.length - 1]}T00:00:00Z`) + 60 * 3_600_000) } }, select: { startsAt: true, withdrawnAt: true } },
+                _count: { select: { sessions: true } },
+              },
+            })
           : Promise.resolve([] as EventRow[]),
         placeIds.length
           ? tx.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, slug: true, title: true, images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } } } })
           : Promise.resolve([] as PlaceRow[]),
         // What the user already has of these points. Entries this very scenario created are ours to rewrite; anything else is not touched.
         tx.planItem.findMany({
-          where: { ...scope, OR: [...(eventIds.length ? [{ activityId: { in: eventIds } }] : []), ...(placeIds.length ? [{ placeId: { in: placeIds } }] : [])] },
+          // AND, never a spread: the family scope has its own top-level OR (shared entries or the user's own) that a second OR would replace.
+          where: { AND: [scope, { OR: [...(eventIds.length ? [{ activityId: { in: eventIds } }] : []), ...(placeIds.length ? [{ placeId: { in: placeIds } }] : [])] }] },
           select: { id: true, activityId: true, placeId: true, scenarioId: true },
         }),
       ]);
@@ -168,7 +189,7 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
           const event = item.kind === "event" ? eventById.get(item.activityId)! : null;
           const place = item.kind === "place" ? placeById.get(item.activityId)! : null;
           const startsAt = new Date(item.startsAt);
-          const timeType = timeTypeFor(item.kind, startsAt.getTime(), event);
+          const timeType = timeTypeFor(item.kind, startsAt.getTime(), event, day.date);
           const data = {
             date: day.date,
             startsAt,
