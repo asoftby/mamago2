@@ -63,7 +63,7 @@ function StopCard({
       </span>
       <div className="relative flex flex-wrap items-start gap-3 rounded-[24px] border border-[var(--mp-line)] bg-[var(--surface)] p-3 shadow-[0_8px_18px_-14px_rgba(20,18,16,.3)]">
         <span className="mp-font-ui w-[52px] shrink-0 pt-0.5 text-[19px] font-bold tabular-nums text-[var(--mp-tx)]">{formatTime(item.startsAt)}</span>
-        <button type="button" onClick={onOpen} tabIndex={-1} aria-hidden className="shrink-0 rounded-2xl">
+        <button type="button" onClick={onOpen} disabled={busy} tabIndex={-1} aria-hidden className="shrink-0 rounded-2xl">
           <Cover item={item} index={index} />
         </button>
         <div className="min-w-0 flex-1">
@@ -75,8 +75,9 @@ function StopCard({
           <button
             type="button"
             onClick={onOpen}
+            disabled={busy}
             aria-label={`Подробнее о «${item.card.title}»`}
-            className={`mp-font-ui mt-1.5 inline-flex min-h-8 items-center gap-0.5 rounded-full text-[14px] font-semibold text-[var(--mp-ac-dark)] underline-offset-2 hover:underline ${PLAN_FOCUS}`}
+            className={`mp-font-ui mt-1.5 inline-flex min-h-8 items-center gap-0.5 rounded-full text-[14px] font-semibold text-[var(--mp-ac-dark)] underline-offset-2 hover:underline disabled:opacity-40 ${PLAN_FOCUS}`}
           >
             Подробнее
             <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />

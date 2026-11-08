@@ -55,6 +55,8 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   const html = renderToStaticMarkup(<ScenarioTimeline items={[museum]} busy={false} onOpen={() => {}} onRemove={() => {}} onReplace={() => {}} />);
   assert.ok(html.includes('aria-label="Подробнее о «Интерактивный музей»"') && html.includes(">Подробнее<"), "«Подробнее» is a button that opens the preview");
   assert.ok(!html.includes("<a ") && !html.includes("target="), "no links out of the draft");
+  const busy = renderToStaticMarkup(<ScenarioTimeline items={[museum]} busy onOpen={() => {}} onRemove={() => {}} onReplace={() => {}} />);
+  assert.match(busy, /<button[^>]*disabled[^>]*aria-label="Подробнее о «Интерактивный музей»"|<button[^>]*aria-label="Подробнее о «Интерактивный музей»"[^>]*disabled/, "a preview is not opened while the draft is being rebuilt");
 }
 {
   const html = renderToStaticMarkup(<ReplaceOptionsList options={[{ fresh: puppets, items: [puppets] }]} onOpen={() => {}} onPick={() => {}} />);
@@ -172,6 +174,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(screen, /exhausted \? <AllShown/, "the «Мы показали всё» state is shown");
   assert.match(screen, /inert=\{views\.length > 0\}/, "the draft is inert under the stack");
   assert.match(screen, /<ScenarioReplaceScreen/, "«Чем заменить?» is a stack screen");
+  assert.match(screen, /if \(staleStack\) closeStack\(\)/, "the stack closes when its point left the draft");
   assert.ok(!screen.includes("SaveFlowContainer") && !screen.includes("ScenarioReplaceSheet"), "no modal on top of the widget");
   assert.match(main, /<DayScenarioScreen[\s\S]*?city=\{city\}/, "the member screen gets the page's city");
   assert.match(main, /<DayScenarioScreen[\s\S]*?initialPersonaIds=\{selectedPersonaIds\}/, "«С кем идём?» starts from the page's «Для кого?»");

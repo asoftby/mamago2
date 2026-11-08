@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlanScreenHeader } from "../v3/PlanScreenHeader";
@@ -153,6 +153,15 @@ export function DayScenarioScreen({
     closeReplace();
     setViews([]);
   };
+  // A screen of the stack is about a point of the draft. If the draft changes under it and that point is
+  // gone (another variant, removed elsewhere), the stack closes: its buttons would act on an obsolete id.
+  const stackTargets = views.flatMap((view) => (view.kind === "preview" ? [view.item.activityId] : []));
+  const staleStack = stackTargets.some((id) => !items.some((it) => it.activityId === id)) || (replacing !== null && views.length > 0 && !items.some((it) => it.activityId === replacing.activityId));
+  useEffect(() => {
+    if (staleStack) closeStack();
+    // closeStack only resets local state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staleStack]);
   const pickOption = (option: ReplaceOption) => {
     if (activeDate) api.chooseAlternative(activeDate, option.items);
     closeStack();
