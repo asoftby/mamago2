@@ -349,8 +349,9 @@ const ANOTHER_MAX_TRIES = 6;
  * filler place the user has already seen never does. A candidate day is new when it differs from the
  * current one and contains at least one point never shown before (a shorter day built from the last
  * unseen places is still new). A single deterministic variant can coincide with the current day while
- * the next ones differ, so a few variants are tried before concluding there is nothing left; only then
- * `exhausted` is true and the caller says so instead of repeating silently.
+ * the next ones differ, so a few variants are tried before concluding there is nothing left. If every
+ * try is a day of seen events, the search repeats without any seen point, so unseen places that fit are
+ * still offered. Only when even that finds nothing is `exhausted` true and the caller says so.
  */
 export function buildAnotherVariant(
   events: PoolEvent[],
@@ -366,13 +367,18 @@ export function buildAnotherVariant(
   const currentSignature = signatureOf(current);
   const maxTries = options.maxTries ?? ANOTHER_MAX_TRIES;
   let first: BuildResult | null = null;
-  for (let tryNo = 0; tryNo < maxTries; tryNo += 1) {
-    const variant = input.variant + tryNo;
-    const result = buildDayScenario(events, { ...input, excludeActivityIds, variant }, deps);
-    first ??= result;
-    const hasUnseen = result.items.some((item) => !seen.has(item.activityId));
-    const sameAsCurrent = current.length > 0 && signatureOf(result.items) === currentSignature;
-    if (hasUnseen && !sameAsCurrent) return { result, exhausted: false, variant };
+  // Stage 1: anchors (events) may come back; stage 2: every point already seen is left out, so unseen
+  // places can still make a day when seen events outscore them (an event always beats a filler).
+  const stages = [excludeActivityIds, [...input.excludeActivityIds, ...seen]];
+  for (const exclude of stages) {
+    for (let tryNo = 0; tryNo < maxTries; tryNo += 1) {
+      const variant = input.variant + tryNo;
+      const result = buildDayScenario(events, { ...input, excludeActivityIds: exclude, variant }, deps);
+      first ??= result;
+      const hasUnseen = result.items.some((item) => !seen.has(item.activityId));
+      const sameAsCurrent = current.length > 0 && signatureOf(result.items) === currentSignature;
+      if (hasUnseen && !sameAsCurrent) return { result, exhausted: false, variant };
+    }
   }
   return { result: first as BuildResult, exhausted: true, variant: input.variant };
 }
