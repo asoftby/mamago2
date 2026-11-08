@@ -31,7 +31,7 @@ export function FewNearbyBanner({ onSwitchToCar }: { onSwitchToCar: () => void }
         <p className="mp-font-ui m-0 text-[14px] text-[var(--mp-tx2)]">Подобрать на машине?</p>
       </div>
       <button type="button" onClick={onSwitchToCar} className={`${PRIMARY} min-h-11 shrink-0 px-4`}>
-        На машину
+        На машине
       </button>
     </div>
   );

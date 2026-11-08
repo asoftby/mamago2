@@ -1,9 +1,9 @@
 "use client";
 
 import { Fragment } from "react";
-import { ArrowLeftRight, Car, Footprints, Lock, X } from "lucide-react";
+import { ArrowLeftRight, Car, ExternalLink, Footprints, Lock, X } from "lucide-react";
 import { PLAN_FOCUS } from "../v3/planChipStyles";
-import { formatTime, itemNotes, legLabel, metaLine, type DraftItem } from "../../lib/dayScenarioUi/model";
+import { formatTime, itemHref, itemNotes, legLabel, metaLine, type DraftItem } from "../../lib/dayScenarioUi/model";
 
 /** Entries the user already has on the day (notes, tickets): shown in place, never touched. */
 export type OwnPlanEntry = { startsAt: string | null; title: string };
@@ -41,12 +41,15 @@ function Cover({ item, index }: { item: DraftItem; index: number }) {
 function StopCard({
   item,
   index,
+  href,
   busy,
   onRemove,
   onReplace,
 }: {
   item: DraftItem;
   index: number;
+  /** Public page of the point; opens in a new tab so the draft stays on screen. */
+  href: string | null;
   busy: boolean;
   onRemove: () => void;
   onReplace: () => void;
@@ -60,12 +63,30 @@ function StopCard({
       </span>
       <div className="relative flex flex-wrap items-start gap-3 rounded-[24px] border border-[var(--mp-line)] bg-[var(--surface)] p-3 shadow-[0_8px_18px_-14px_rgba(20,18,16,.3)]">
         <span className="mp-font-ui w-[52px] shrink-0 pt-0.5 text-[19px] font-bold tabular-nums text-[var(--mp-tx)]">{formatTime(item.startsAt)}</span>
-        <Cover item={item} index={index} />
+        {href ? (
+          <a href={href} target="_blank" rel="noopener" tabIndex={-1} aria-hidden className="shrink-0">
+            <Cover item={item} index={index} />
+          </a>
+        ) : (
+          <Cover item={item} index={index} />
+        )}
         <div className="min-w-0 flex-1">
           <p className="mp-font-ui m-0 pr-9 text-[17px] font-semibold leading-[1.25] text-[var(--mp-tx)] [overflow-wrap:anywhere]">{item.card.title}</p>
           {meta ? <p className="mp-font-ui m-0 mt-[3px] text-[14.5px] text-[var(--mp-tx2)]">{meta}</p> : null}
           {notes.length > 0 ? (
             <p className="mp-font-ui m-0 mt-1 text-[13px] font-medium text-[var(--mp-ac-dark)]">{notes.join(" · ")}</p>
+          ) : null}
+          {href ? (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener"
+              aria-label={`Подробнее о «${item.card.title}» (откроется в новой вкладке)`}
+              className={`mp-font-ui mt-1.5 inline-flex min-h-8 items-center gap-1 rounded-full text-[14px] font-semibold text-[var(--mp-ac-dark)] underline-offset-2 hover:underline ${PLAN_FOCUS}`}
+            >
+              Подробнее
+              <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            </a>
           ) : null}
         </div>
         <button
@@ -127,12 +148,15 @@ function OwnRow({ entry }: { entry: OwnPlanEntry }) {
  */
 export function ScenarioTimeline({
   items,
+  city,
   ownEntries = [],
   busy,
   onRemove,
   onReplace,
 }: {
   items: readonly DraftItem[];
+  /** City slug of the page; without it the cards are not links. */
+  city?: string;
   ownEntries?: readonly OwnPlanEntry[];
   busy: boolean;
   onRemove: (item: DraftItem) => void;
@@ -150,7 +174,7 @@ export function ScenarioTimeline({
         ) : (
           <Fragment key={row.item.activityId}>
             <TravelLeg travel={row.item.travel} />
-            <StopCard item={row.item} index={row.index} busy={busy} onRemove={() => onRemove(row.item)} onReplace={() => onReplace(row.item)} />
+            <StopCard item={row.item} index={row.index} href={itemHref(row.item, city)} busy={busy} onRemove={() => onRemove(row.item)} onReplace={() => onReplace(row.item)} />
           </Fragment>
         ),
       )}

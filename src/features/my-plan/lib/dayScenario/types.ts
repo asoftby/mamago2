@@ -28,6 +28,11 @@ export type ScenarioCard = {
   priceText: string | null;
   currency: string | null;
   address: string | null;
+  /**
+   * Slug of the city the item is published in (the scenario's pool also holds items of cities below the
+   * listing one). The public page lives under that city, so links are built from it.
+   */
+  citySlug?: string | null;
 };
 
 /** Open ranges of a filler place on the target day, in epoch ms. */

@@ -3,7 +3,8 @@
 import { SaveFlowContainer } from "@/components/activity/SaveFlowContainer";
 import { MY_PLAN_V3_TOKENS } from "../v3/myPlanV3Tokens";
 import { PLAN_FOCUS } from "../v3/planChipStyles";
-import { formatTime, metaLine, type DraftItem } from "../../lib/dayScenarioUi/model";
+import { ExternalLink } from "lucide-react";
+import { formatTime, itemHref, metaLine, type DraftItem } from "../../lib/dayScenarioUi/model";
 
 export type ReplaceOption = {
   /** The point that would take the place. */
@@ -11,6 +12,47 @@ export type ReplaceOption = {
   /** The whole day as the engine computed it with that point in. */
   items: DraftItem[];
 };
+
+/** The alternatives: look at one ("Подробнее", new tab) or take it ("Выбрать"). */
+export function ReplaceOptionsList({ options, city, onPick }: { options: ReplaceOption[]; city?: string; onPick: (option: ReplaceOption) => void }) {
+  return (
+    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      {options.map((option) => {
+        const meta = metaLine(option.fresh.card);
+        const href = itemHref(option.fresh, city);
+        return (
+          <li key={option.fresh.activityId} className="flex items-center gap-3 rounded-[22px] border border-[var(--mp-line)] bg-[var(--surface)] p-3">
+            <span className="mp-font-ui w-[52px] shrink-0 text-[17px] font-bold tabular-nums text-[var(--mp-tx)]">{formatTime(option.fresh.startsAt)}</span>
+            <span className="min-w-0 flex-1">
+              <span className="mp-font-ui block text-[16px] font-semibold leading-[1.25] text-[var(--mp-tx)] [overflow-wrap:anywhere]">{option.fresh.card.title}</span>
+              {meta ? <span className="mp-font-ui mt-0.5 block text-[14px] text-[var(--mp-tx2)]">{meta}</span> : null}
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener"
+                  aria-label={`Подробнее о «${option.fresh.card.title}» (откроется в новой вкладке)`}
+                  className={`mp-font-ui mt-1 inline-flex min-h-8 items-center gap-1 rounded-full text-[14px] font-semibold text-[var(--mp-ac-dark)] underline-offset-2 hover:underline ${PLAN_FOCUS}`}
+                >
+                  Подробнее
+                  <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                </a>
+              ) : null}
+            </span>
+            <button
+              type="button"
+              onClick={() => onPick(option)}
+              aria-label={`Выбрать «${option.fresh.card.title}»`}
+              className={`mp-font-ui flex min-h-11 shrink-0 items-center rounded-full bg-[var(--mp-tx)] px-4 text-[15px] font-semibold text-[var(--surface)] transition-opacity hover:opacity-90 ${PLAN_FOCUS}`}
+            >
+              Выбрать
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 /**
  * «Чем заменить?»: up to three alternatives for one point, in the same time slot. A bottom
@@ -20,6 +62,7 @@ export function ScenarioReplaceSheet({
   open,
   onOpenChange,
   target,
+  city,
   options,
   loading,
   onPick,
@@ -27,6 +70,8 @@ export function ScenarioReplaceSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   target: DraftItem | null;
+  /** City slug of the page; without it the options have no "Подробнее" link. */
+  city?: string;
   options: ReplaceOption[] | null;
   loading: boolean;
   onPick: (option: ReplaceOption) => void;
@@ -50,27 +95,7 @@ export function ScenarioReplaceSheet({
             ))}
           </div>
         ) : options && options.length > 0 ? (
-          <ul className="m-0 flex list-none flex-col gap-2 p-0">
-            {options.map((option) => {
-              const meta = metaLine(option.fresh.card);
-              return (
-                <li key={option.fresh.activityId}>
-                  <button
-                    type="button"
-                    onClick={() => onPick(option)}
-                    className={`flex w-full items-center gap-3 rounded-[22px] border border-[var(--mp-line)] bg-[var(--surface)] p-3 text-left transition-colors hover:border-[var(--mp-tx)] ${PLAN_FOCUS}`}
-                  >
-                    <span className="mp-font-ui w-[52px] shrink-0 text-[17px] font-bold tabular-nums text-[var(--mp-tx)]">{formatTime(option.fresh.startsAt)}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="mp-font-ui block text-[16px] font-semibold leading-[1.25] text-[var(--mp-tx)] [overflow-wrap:anywhere]">{option.fresh.card.title}</span>
-                      {meta ? <span className="mp-font-ui mt-0.5 block text-[14px] text-[var(--mp-tx2)]">{meta}</span> : null}
-                    </span>
-                    <span className="mp-font-ui flex min-h-11 shrink-0 items-center rounded-full bg-[var(--mp-tx)] px-4 text-[15px] font-semibold text-[var(--surface)]">Выбрать</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <ReplaceOptionsList options={options} city={city} onPick={onPick} />
         ) : (
           <p role="status" className="mp-font-ui m-0 rounded-[22px] bg-[var(--mp-card)] p-4 text-[15px] leading-[1.45] text-[var(--mp-tx2)]">
             Подходящих замен на это время нет. Оставьте как есть или нажмите «Другой вариант».
