@@ -2,7 +2,7 @@ name: Birthday confirmation DB integration
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "feat/birthday-package-business-rules-*"]
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
@@ -20,7 +20,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
   push:
-    branches: [dev]
+    branches: [dev, "feat/birthday-package-business-rules-*"]
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
@@ -160,7 +160,11 @@ jobs:
         run: pnpm exec tsx scripts/it/seedPartyIT.ts
       - name: Verify package business rules and moderation
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/offers/packageComponents.integration.test.ts
+      - name: Verify changed-package quote and booking flow
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyPackageChange.integration.test.ts
       - name: Verify full party flow
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyFullFlow.integration.test.ts
       - name: Verify competing durable queue dispatch and replay
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyInviteDispatch.postgres.integration.test.ts
+      - name: Verify package-change notification failure and recovery with fake transport
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyPackageNotifications.integration.test.ts

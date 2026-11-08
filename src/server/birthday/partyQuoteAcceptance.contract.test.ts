@@ -8,13 +8,13 @@ const service = readFileSync(new URL("./partyQuoteAcceptance.service.ts", import
 const route = readFileSync(new URL("../../app/api/parent/parties/[id]/quotes/[quoteId]/accept/route.ts", import.meta.url), "utf8");
 const dispatcher = readFileSync(new URL("./partyOutbox.service.ts", import.meta.url), "utf8");
 
-assert.match(service, /FOR UPDATE/);
+assert.match(service, /lockPartyRequestGroup\(tx, requestId\)/);
 assert.match(service, /partyOrder: \{ ownerUserId: userId \}/);
 assert.match(service, /lastActivityAt: request.lastActivityAt/);
 assert.match(service, /status: "ACTIVE", validUntil: \{ gt: now \}/);
-assert.match(service, /partyStage: "AWAITING_RECONFIRM"/);
+assert.match(service, /partyStage: rejecting \? "NOT_ACCEPTED" : "AWAITING_RECONFIRM"/);
 assert.match(service, /confirmed: false/);
-assert.match(service, /dedupeKey: "party:" \+ requestId \+ ":accepted:" \+ quoteId/);
+assert.match(service, /dedupeKey: "party:" \+ requestId \+ \(rejecting \? ":rejected:" : ":accepted:"\) \+ quoteId/);
 assert.match(route, /getCurrentUser\(\)/);
 assert.match(route, /checkRateLimit/);
 assert.match(route, /requestId: body.requestId/);

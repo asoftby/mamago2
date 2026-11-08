@@ -1,5 +1,6 @@
 "use client";
 
+import { PartyPackageBrief } from "@/components/birthday/PartyPackageBrief";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,8 +50,8 @@ export function PartyReplyOverlay({ item, onClose, onDone }: OverlayProps) {
 }
 
 function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: () => void; onDone: () => void }) {
-  const [type, setType] = useState<ReplyType>("AS_REQUESTED");
-  const [price, setPrice] = useState("");
+  const [type, setType] = useState<ReplyType>(item.packageScope?.requestedPrice.mode === "ON_REQUEST" || item.packageScope?.requestedPrice.mode === "FROM" ? "MODIFIED" : "AS_REQUESTED");
+  const [price, setPrice] = useState(item.packageScope?.requestedPrice.amountByn ?? "");
   const [includes, setIncludes] = useState("");
   const [duration, setDuration] = useState("");
   const [changeReason, setChangeReason] = useState("");
@@ -79,7 +80,7 @@ function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: (
       };
     } else {
       const priceByn = Number(price.replace(",", "."));
-      if (!Number.isFinite(priceByn) || priceByn <= 0) {
+      if (!price.trim() || !Number.isFinite(priceByn) || priceByn < 0 || !/^\d+(?:[.,]\d{1,2})?$/.test(price.trim())) {
         setError("Укажите стоимость в BYN");
         return;
       }
@@ -122,6 +123,7 @@ function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: (
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+        {item.packageScope ? <PartyPackageBrief scope={item.packageScope} /> : null}
         <div role="radiogroup" aria-label="Тип ответа" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {REPLY_OPTIONS.map((opt) => (
             <button
@@ -156,7 +158,7 @@ function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: (
         ) : (
           <>
             <div>
-              <label className={labelClass} htmlFor="reply-price">Стоимость, BYN</label>
+              <label className={labelClass} htmlFor="reply-price">{item.packageScope ? "Стоимость вашего пакета, BYN" : "Стоимость, BYN"}</label>
               <Input id="reply-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Например, 450" />
             </div>
             <div>
@@ -169,10 +171,12 @@ function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: (
                 <textarea id="reply-change" className={fieldClass} rows={2} maxLength={2000} value={changeReason} onChange={(e) => setChangeReason(e.target.value)} />
               </div>
             ) : null}
+            {item.packageScope ? <p className="text-sm text-muted-foreground">{"Изменение пакета согласуется в выбранном окне праздника. Для другого времени нужна новая заявка."}</p> : (
             <div>
               <label className={labelClass} htmlFor="reply-duration">Длительность, минут (необязательно)</label>
               <Input id="reply-duration" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />
             </div>
+            )}
             <div>
               <label className={labelClass} htmlFor="reply-prepay">Условия предоплаты (необязательно)</label>
               <textarea id="reply-prepay" className={fieldClass} rows={2} maxLength={2000} value={prepayment} onChange={(e) => setPrepayment(e.target.value)} />

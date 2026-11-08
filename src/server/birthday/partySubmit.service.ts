@@ -1,3 +1,5 @@
+import { isPartyConfirmationEnabled } from "./partyConfirmationFlag";
+import { packageChangeScope } from "./partyPackageChange";
 import { PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt, validateSubmissionWindow } from "./partyDraft.validation";
@@ -18,7 +20,7 @@ export async function submitPartyAnchor(
   const submitKey = partyId + ":" + idempotencyKey;
   const party = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
-    include: { items: { where: { OR: [{ role: "ANCHOR" }, { packageComponentChange: { not: Prisma.DbNull } }] } } },
+    include: { items: { orderBy: { position: "asc" }, include: { offer: { select: { title: true } } } } },
   });
   if (!party) throw new PartyApiError(404, "Праздник не найден");
   if (party.status !== PartyOrderStatus.DRAFT) {
@@ -35,11 +37,13 @@ export async function submitPartyAnchor(
     throw new PartyApiError(409, "Черновик изменился. Обновите страницу");
   }
 
-  if (party.items.some(item => item.packageComponentChange !== null)) {
-    throw new PartyApiError(422, "Изменения пакета сохранены в черновике. Отправка изменённого пакета пока недоступна");
+  const scope = packageChangeScope(party);
+  if (scope && !isPartyConfirmationEnabled()) {
+    throw new PartyApiError(422, "Согласование изменений пакета временно недоступно. Изменения сохранены в черновике");
   }
-  const anchor = party.items[0];
-  if (party.items.length !== 1 || !anchor || !anchor.offerId || !anchor.businessId) {
+  const anchors = party.items.filter(item => item.role === "ANCHOR");
+  const anchor = anchors[0];
+  if (anchors.length !== 1 || !anchor || !anchor.offerId || !anchor.businessId) {
     throw new PartyApiError(422, "Выберите основное предложение праздника");
   }
   if (!party.eventDate || !party.timeFrom || !party.timeTo ||
@@ -138,6 +142,7 @@ export async function submitPartyAnchor(
         childrenCount: childrenCount,
         childAge: party.childAge,
         customerComment: anchor.note,
+        ...(scope ? { bookingPriceSnapshot: scope as unknown as Prisma.InputJsonValue } : {}),
         responseDueAt,
       },
       select: { id: true, partyStage: true, responseDueAt: true },
@@ -161,6 +166,7 @@ export async function submitPartyAnchor(
         dedupeKey: "party:" + request.id + ":sent",
         payload: {
           requestId: request.id,
+          packageChange: scope !== null,
           businessId: anchorBusinessId,
           partyOrderId: partyId,
           category: anchor.category,

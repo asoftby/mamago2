@@ -1,3 +1,4 @@
+import { lockPartyRequestGroup } from "./partyRequestLock";
 import "server-only";
 import {
   BookingKind, BookingStatus, PartyItemRole, PartyItemStatus,
@@ -34,8 +35,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
   const dedupeKey = `party:${requestId}:confirmed:${idempotencyKey}`;
   try {
     return await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "BookingRequest"
-        WHERE "id" = ${requestId} FOR UPDATE`;
+      await lockPartyRequestGroup(tx, requestId);
       const now = new Date();
       const req = await tx.bookingRequest.findFirst({
         where: { id: requestId, businessId, kind: BookingKind.PARTY },
