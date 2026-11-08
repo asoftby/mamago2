@@ -5,6 +5,8 @@ import {
   HISTORY_LIMIT,
   applyAlternative,
   buildDraftBody,
+  markExhausted,
+  restartVariants,
   canGoBack,
   datesForChoice,
   dayTabLabel,
@@ -131,6 +133,31 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.deepEqual(travelOf(removeItem(base, "a")), [["b", null], ["c", 20]], "the new first point has no leg; B -> C is still B -> C");
   assert.deepEqual(travelOf(removeItem(base, "c")), [["a", null], ["b", 15]], "removing the last point keeps the others' legs");
   assert.equal(popDraft(removeItem(base, "b")).current?.items[2]?.travel?.minutes, 20, "undo brings the original legs back");
+}
+
+// ---- "Другой вариант" remembers what was shown; "nothing new" is a state, not a silent repeat
+{
+  let h = pushDraft(emptyHistory(), draft("a", "b"), 0);
+  assert.deepEqual(h.shown, ["a", "b"]);
+  h = pushDraft(h, draft("b", "c"), 1);
+  assert.deepEqual(h.shown, ["a", "b", "c"], "the union of every shown point, no duplicates");
+  assert.equal(h.exhausted, false);
+  const ex = markExhausted(h);
+  assert.equal(ex.exhausted, true);
+  assert.equal(ex.current, h.current, "the draft stays on screen");
+  assert.equal(markExhausted(ex), ex, "marking twice is a no-op");
+  assert.equal(popDraft(ex).exhausted, false, "going back is a new state");
+  assert.deepEqual(popDraft(ex).shown, ["a", "b", "c"], "what was shown stays shown after going back");
+  assert.equal(pushDraft(ex, draft("d"), 2).exhausted, false, "a new draft clears it");
+  const again = restartVariants(ex);
+  assert.deepEqual([again.exhausted, again.variant, again.shown], [false, 0, ["b", "c"]], "«Показать заново»: only the current day counts as shown");
+  assert.equal(restartVariants(emptyHistory()).current, null);
+  // the request carries what was shown
+  const body = draftRequestSchema.parse(buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "another", { variant: 2, items: draft("b", "c").items, shown: h.shown }));
+  assert.deepEqual([body.action, body.shownActivityIds, body.variant], ["another", ["a", "b", "c"], 2]);
+  const many = draftRequestSchema.parse(buildDraftBody({ city: "minsk", date: "2026-11-14", mode: "car", ageRanges: [], personaIds: [] }, "another", { shown: Array.from({ length: 150 }, (_, i) => `x${i}`) }));
+  assert.equal(many.shownActivityIds.length, 100, "bounded to what the API accepts (newest kept)");
+  assert.equal(many.shownActivityIds.at(-1), "x149");
 }
 
 // ---- alternatives

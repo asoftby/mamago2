@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { geoCellsFor } from "@/lib/geo/geoCell";
-import { buildDayScenario, listReplacementAlternatives, replaceScenarioItem, type BuildDeps } from "./build";
+import { buildAnotherVariant, buildDayScenario, listReplacementAlternatives, replaceScenarioItem, type BuildDeps } from "./build";
 import { TravelEstimator, travelLeg } from "./travel";
 import type { BuildInput, PoolEvent } from "./types";
 
@@ -295,6 +295,49 @@ const UNKNOWN = { kind: "unknown" } as const;
     for (const c of current.filter((c) => c.activityId !== target)) assert.ok(v.some((i) => i.activityId === c.activityId), "the other points stay");
   }
   assert.deepEqual(listReplacementAlternatives([ev("only", A.lat, A.lng, [10])], baseInput({ targetCount: 1 }), [{ activityId: "only", startsAtMs: at(10) }], "only", deps()), [], "nothing else in the pool: no alternatives");
+}
+
+// F10. «Другой вариант»: anchors may repeat, a filler already seen never does, and "nothing left" is explicit
+{
+  const events = [
+    ev("anchor", A.lat, A.lng, [10], 10),
+    place("f1", A.lat + 0.0004, A.lng, ALWAYS),
+    place("f2", A.lat + 0.0008, A.lng, ALWAYS),
+    place("f3", A.lat + 0.0012, A.lng, ALWAYS),
+    place("f4", A.lat + 0.0016, A.lng, ALWAYS),
+  ];
+  const run = (variant: number, shown: Set<string>, current: { activityId: string; startsAtMs: number }[]) =>
+    buildAnotherVariant(events, baseInput({ variant }), current, shown, deps());
+  const first = buildDayScenario(events, baseInput(), deps());
+  const cur1 = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const fillers = (ids: string[]) => ids.filter((id) => id.startsWith("f"));
+  assert.equal(first.items.length, 3);
+  const shown1 = new Set(first.items.map((i) => i.activityId));
+  const second = run(1, shown1, cur1);
+  assert.equal(second.exhausted, false, "unseen fillers exist: a new variant");
+  const secondFillers = fillers(second.result.items.map((i) => i.activityId));
+  assert.ok(secondFillers.every((id) => !shown1.has(id)), "a seen filler is never offered again");
+  assert.ok(secondFillers.length >= 1, "the day still has fillers");
+  const cur2 = second.result.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const shown2 = new Set([...shown1, ...second.result.items.map((i) => i.activityId)]);
+  // every filler (f1-f4) has now been seen: nothing new can be shown
+  const third = run(2, shown2, cur2);
+  assert.equal(["f1", "f2", "f3", "f4"].every((id) => shown2.has(id)), true);
+  assert.equal(third.exhausted, true, "unseen fillers are used up: say so instead of repeating");
+}
+{
+  // a day made of anchors only: a "new" variant would be the same day
+  const events = [ev("e1", A.lat, A.lng, [10]), ev("e2", B.lat, B.lng, [13]), ev("e3", C.lat, C.lng, [16])];
+  const first = buildDayScenario(events, baseInput(), deps());
+  const cur = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const another = buildAnotherVariant(events, baseInput({ variant: 1 }), cur, new Set(cur.map((c) => c.activityId)), deps());
+  assert.equal(another.exhausted, true, "nothing to vary: exhausted, not a silent repeat");
+}
+{
+  // the same call with nothing shown and a different outcome is not exhausted
+  const events = [ev("e1", A.lat, A.lng, [10]), place("f1", A.lat + 0.0004, A.lng, ALWAYS), place("f2", A.lat + 0.0008, A.lng, ALWAYS)];
+  const none = buildAnotherVariant(events, baseInput({ variant: 1, targetCount: 2 }), [], new Set(), deps());
+  assert.equal(none.exhausted, false, "no draft yet: nothing to repeat");
 }
 
 console.log("dayScenario build tests passed");

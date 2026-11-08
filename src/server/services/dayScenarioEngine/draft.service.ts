@@ -7,7 +7,7 @@ import { buildSelectedProfileContext } from "@/lib/decision/subjects";
 import { CanonicalAgeRangeSchema } from "@/lib/decision/decisionContext";
 import { CANONICAL_EVENT_INTEREST_SLUGS } from "@/lib/event/eventSystemInterests";
 import { planSuggestionScore, zonedDayRange } from "@/server/services/planSuggestions.service";
-import { buildDayScenario, listReplacementAlternatives, replaceScenarioItem } from "@/features/my-plan/lib/dayScenario/build";
+import { buildAnotherVariant, buildDayScenario, listReplacementAlternatives, replaceScenarioItem } from "@/features/my-plan/lib/dayScenario/build";
 import type {
   BuildInput,
   BuildResult,
@@ -35,12 +35,14 @@ const TODDLER_RANGES = new Set(["0-1", "1-3"]);
 export const draftRequestSchema = z.object({
   city: z.string().min(1).max(64).optional().default("minsk"),
   date: calendarDaySchema,
-  action: z.enum(["build", "rebuild", "replace", "alternatives"]).default("build"),
+  action: z.enum(["build", "rebuild", "replace", "alternatives", "another"]).default("build"),
   /** The UI exposes walk/car; transit stays in the model but is not offered yet. */
   mode: z.enum(["walk", "car", "transit"]).optional().default("car"),
   ageRanges: z.array(CanonicalAgeRangeSchema).max(12).optional().default([]),
   personaIds: z.array(z.string().min(1).max(64)).max(12).optional().default([]),
   excludeActivityIds: z.array(z.string().min(1).max(64)).max(100).optional().default([]),
+  /** "another": every point of this day the user has already seen; seen filler places are not offered again. */
+  shownActivityIds: z.array(z.string().min(1).max(64)).max(100).optional().default([]),
   /** Current draft; items listed in `pinnedActivityIds` are kept by "rebuild". */
   current: z
     .array(z.object({ activityId: z.string().min(1).max(64), startsAt: z.string().datetime() }))
@@ -88,6 +90,8 @@ export type DraftResponse = {
    * `items` is empty for that action; every other action returns [].
    */
   alternatives: DraftItem[][];
+  /** action "another" only: no new variant exists ("Мы показали всё, что подходит"); `items` is empty. */
+  exhausted: boolean;
   meta: { poolCache: "hit" | "miss"; poolSize: number; poolPlaces: number; poolVirtual: number; staleGeoCells: number; candidateCount: number; buildMs: number };
 };
 
@@ -193,6 +197,7 @@ export async function runDayScenarioDraft(
   }));
   let result: BuildResult;
   let alternatives: DraftItem[][] = [];
+  let exhausted = false;
   if (request.action === "alternatives" && request.replaceActivityId) {
     // Every variant is a pure in-memory build on the already cached pool (microseconds), so the
     // whole sheet is one request instead of three.
@@ -201,6 +206,10 @@ export async function runDayScenarioDraft(
       limit: ALTERNATIVES_SHOWN,
     }).map(toDraftItemsFrom);
     result = { status: alternatives.length > 0 ? "ok" : "empty", items: [], mode: input.mode, suggestMode: null, candidateCount: alternatives.length };
+  } else if (request.action === "another") {
+    const another = buildAnotherVariant(pool.events, input, current, new Set(request.shownActivityIds), deps);
+    exhausted = another.exhausted;
+    result = exhausted ? { ...another.result, items: [] } : another.result;
   } else if (request.action === "replace" && request.replaceActivityId) {
     result = replaceScenarioItem(pool.events, input, current, request.replaceActivityId, deps);
   } else if (request.action === "rebuild") {
@@ -217,6 +226,7 @@ export async function runDayScenarioDraft(
     variant: request.variant,
     items: toDraftItems(result),
     alternatives,
+    exhausted,
     meta: {
       poolCache: hit ? "hit" : "miss",
       poolSize: pool.events.length,

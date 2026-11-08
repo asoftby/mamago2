@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { MOCK_EVENTS } from "../ops/day-scenario-mocks/events.data";
 import { MOCK_PLACES } from "../ops/day-scenario-mocks/places.data";
 import { resolveSlotDates, sessionInstant } from "../ops/seed-day-scenario-mocks";
-import { checkResult, oracleAgeRanges, PLAN_FIXTURE_TITLE, renderReport, seededAvailability, specFor, totalsOf, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
+import { checkResult, oracleAgeRanges, PLAN_FIXTURE_TITLE, renderReport, repeatsOf, seededAvailability, specFor, totalsOf, unseenSeedFillers, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
 import { hoursPlanFor } from "../ops/seed-day-scenario-mocks";
 
 const dates = resolveSlotDates("2026-11-07");
@@ -70,8 +70,32 @@ assert.ok(rules(run(), [item(park.title, "09:30", "11:00")]).includes("Точк�
 assert.ok(rules(run(), [item(park.title, "10:00", "11:30"), item(park2.title, "11:00", "12:30")]).includes("Пересечение точек"));
 assert.ok(rules(run({ ageRanges: ["0-1", "1-3"] }), [item(MOCK_PLACES.find((x) => x.adultOnly)!.title, "12:00", "13:30")]).includes("Возраст: место 18+ в детском сценарии"));
 assert.ok(rules(run({ ageRanges: ["0-1"] }), [item(MOCK_PLACES.find((x) => x.ages.includes("12-14"))!.title, "12:00", "13:30")]).includes("Возраст: нет пересечения диапазонов"));
-const one = [item(park.title, "12:30", "14:00")];
-assert.ok(rules(run(), one, [one.map((i) => `${i.activityId}@${i.startsAt}`).join("|")]).includes("Повтор варианта"));
+// ---- repeats between variants: anchors may come back, a shown filler may not, "nothing new" must be explicit
+{
+  const filler = item(park.title, "12:30", "14:00", null, { kind: "place" });
+  const anchorTitle = MOCK_EVENTS[0]!.title;
+  const anchor = item(anchorTitle, "10:00", "11:30", null, { kind: "event", activityId: "ev-1" });
+  const another = (items: ApiItem[], shown: string[], prior: string[], exhausted = false, currentItems: ApiItem[] = []) =>
+    checkResult(run(), "Другой вариант 1", { ...result(items), exhausted }, { dates, stepKind: "another", shownIds: new Set(shown), shownTitles: new Set(shown), priorSignatures: prior, currentItems }).map((v) => v.rule);
+  assert.ok(another([filler], [filler.activityId], []).includes("Повтор заполнителя"), "a filler the UI already showed is a violation");
+  assert.deepEqual(another([anchor], ["ev-1"], []), [], "an anchor coming back is normal (counted, not a violation)");
+  assert.deepEqual(another([anchor, filler], ["ev-1"], []), [], "the anchor repeats, the filler is new: fine");
+  assert.ok(another([anchor], ["ev-1"], [`ev-1@${anchor.startsAt}`]).includes("Повтор якорей без «показали всё»"), "the identical anchors-only day, silently");
+  assert.ok(!another([anchor, filler], [], []).includes("Повтор заполнителя"), "nothing shown yet: nothing repeated");
+  assert.deepEqual(rules(run(), [filler]), [], "a plain build is not judged for repeats");
+  // split metric: what came back, anchors vs fillers
+  const split = repeatsOf([anchor, filler], new Set(["ev-1", filler.activityId]));
+  assert.deepEqual([split.anchors.length, split.fillers.length], [1, 1]);
+  assert.deepEqual(repeatsOf([anchor, filler], new Set(["ev-1"])), { anchors: [anchorTitle], fillers: [] });
+  // an exhausted answer: premature when the seed still has an unseen eligible filler within reach
+  const reachable = unseenSeedFillers(run(), { dates, shownTitles: new Set([park.title]), currentItems: [filler] });
+  assert.ok(reachable.length > 0 && !reachable.includes(park.title), `seed has unseen fillers near ${park.title}: ${reachable.length}`);
+  assert.ok(another([], [], [], true, [filler]).includes("Преждевременное «показали всё»"), "«показали всё» while the seed has unseen places nearby");
+  const allSeen = new Set(MOCK_PLACES.map((x) => x.title));
+  assert.deepEqual(another([], [], [], true, [filler]).length > 0, true);
+  const none = checkResult(run(), "Другой вариант 3", { ...result([]), exhausted: true }, { dates, stepKind: "another", shownIds: new Set(), shownTitles: allSeen, priorSignatures: [], currentItems: [filler] }).map((v) => v.rule);
+  assert.ok(!none.includes("Преждевременное «показали всё»"), "everything seeded was shown: «показали всё» is right");
+}
 assert.ok(rules(run(), [item(park.title, "10:00", "11:30"), { ...item(park.title, "13:00", "14:30") }]).includes("Повтор точки внутри сценария"));
 
 // ---- report renders, escapes and lists violations

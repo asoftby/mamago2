@@ -330,3 +330,33 @@ export function listReplacementAlternatives(
   }
   return variants;
 }
+
+export type AnotherVariant = {
+  result: BuildResult;
+  /** No new variant exists: every unseen filler is used up, or nothing at all would change. */
+  exhausted: boolean;
+};
+
+const signatureOf = (items: readonly { activityId: string; startsAtMs: number }[]) =>
+  items.map((item) => `${item.activityId}@${item.startsAtMs}`).sort().join("|");
+
+/**
+ * «Другой вариант»: a new variant of the whole day. Events are anchors with a fixed time, so they may
+ * come back; a filler place the user has already seen (`shownIds`) never does. When excluding the
+ * seen fillers makes the day smaller than it would otherwise be, or leaves it exactly as it is, there
+ * is nothing new to show: `exhausted` is true and the caller says so instead of repeating silently.
+ */
+export function buildAnotherVariant(
+  events: PoolEvent[],
+  input: BuildInput,
+  current: { activityId: string; startsAtMs: number }[],
+  shownIds: ReadonlySet<string>,
+  deps: BuildDeps,
+): AnotherVariant {
+  const shownFillers = events.filter((event) => event.kind === "place" && shownIds.has(event.activityId)).map((event) => event.activityId);
+  const fresh = buildDayScenario(events, { ...input, excludeActivityIds: [...input.excludeActivityIds, ...shownFillers] }, deps);
+  const baseline = shownFillers.length > 0 ? buildDayScenario(events, input, deps) : fresh;
+  const shrank = fresh.items.length < baseline.items.length;
+  const unchanged = current.length > 0 && signatureOf(fresh.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }))) === signatureOf(current);
+  return { result: fresh, exhausted: shrank || unchanged };
+}
