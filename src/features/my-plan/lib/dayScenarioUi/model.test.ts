@@ -9,7 +9,11 @@ import {
   restartVariants,
   canGoBack,
   initialPersonSelection,
+  isEdgeSwipeBack,
+  isoDateOf,
   itemHref,
+  priceLabel,
+  timeRange,
   datesForChoice,
   dayTabLabel,
   dayTitle,
@@ -219,6 +223,26 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.equal(itemHref({ kind: "event", activityId: "ev1", card: card("kids-show") }, undefined), null, "no city at all: no link");
   assert.equal(itemHref({ kind: "event", activityId: "ev1", card: card("kids-show") }, "../x"), null);
   assert.equal(itemHref({ kind: "event", activityId: "ev1", card: inCity("kids-show", "../x") }, undefined), null, "an unsafe city is never put into a path");
+}
+
+// ---- preview helpers
+{
+  assert.equal(isoDateOf("2026-11-14T21:30:00Z"), "2026-11-15", "the Minsk calendar day, not the UTC one");
+  assert.equal(isoDateOf("2026-11-14T07:30:00Z"), "2026-11-14");
+  assert.equal(timeRange("2026-11-14T07:30:00Z", "2026-11-14T09:00:00Z"), "10:30–12:00");
+  const c = (over: Partial<DraftItem["card"]>) => ({ ...item("x", "2026-11-14T07:00:00Z", "2026-11-14T08:00:00Z").card, ...over });
+  assert.equal(priceLabel(c({})), null);
+  assert.equal(priceLabel(c({ priceText: " бесплатно " })), "бесплатно");
+  assert.equal(priceLabel(c({ priceFrom: 12, priceTo: 20, currency: "BYN" })), "от 12 BYN");
+  assert.equal(priceLabel(c({ priceFrom: 12, priceTo: 12 })), "12 BYN");
+}
+{
+  const at = (x: number, y: number) => ({ x, y });
+  assert.equal(isEdgeSwipeBack(at(10, 300), at(120, 310)), true, "from the left edge, to the right");
+  assert.equal(isEdgeSwipeBack(at(60, 300), at(200, 300)), false, "not from the edge: it is a normal drag");
+  assert.equal(isEdgeSwipeBack(at(10, 300), at(50, 300)), false, "too short");
+  assert.equal(isEdgeSwipeBack(at(10, 300), at(120, 420)), false, "a diagonal / vertical scroll is not back");
+  assert.equal(isEdgeSwipeBack(at(10, 300), at(-40, 300)), false, "leftwards is not back");
 }
 
 console.log("dayScenarioUi model tests passed");
