@@ -1,0 +1,240 @@
+/**
+ * Pure model of the day-scenario draft screen (BACKLOG-230, PR 2): dates, windows, labels,
+ * history and request building. No React, no I/O, so every rule here is unit-tested.
+ */
+import type { DraftItem, DraftRequest, DraftResponse } from "@/server/services/dayScenarioEngine/draft.service";
+
+export type { DraftItem, DraftResponse };
+export type ScenarioMode = "walk" | "car";
+export type WhenChoice = "today" | "tomorrow" | "weekend" | "other";
+
+const TZ = "Europe/Minsk";
+const MINUTE_MS = 60_000;
+
+// ---------- dates ----------
+
+export function addDaysIso(iso: string, days: number): string {
+  return new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** 0 = Sunday ... 6 = Saturday, from a calendar date. */
+export function weekdayOf(iso: string): number {
+  return new Date(`${iso}T12:00:00Z`).getUTCDay();
+}
+
+export const isWeekendIso = (iso: string): boolean => weekdayOf(iso) === 0 || weekdayOf(iso) === 6;
+
+/**
+ * "Выходные": Saturday and Sunday of the weekend that is still ahead. On Saturday that is
+ * today and tomorrow; on Sunday the day is mostly gone, so the next weekend.
+ */
+export function weekendDates(todayIso: string): [string, string] {
+  const dow = weekdayOf(todayIso);
+  const saturday = dow === 6 ? todayIso : addDaysIso(todayIso, (6 - dow + 7) % 7 || 7);
+  return [saturday, addDaysIso(saturday, 1)];
+}
+
+/** The dates a "when" answer stands for (one day, or the two weekend days). */
+export function datesForChoice(choice: WhenChoice, todayIso: string, otherIso: string | null): string[] {
+  if (choice === "today") return [todayIso];
+  if (choice === "tomorrow") return [addDaysIso(todayIso, 1)];
+  if (choice === "weekend") return weekendDates(todayIso);
+  return otherIso ? [otherIso] : [];
+}
+
+/** Fixed day window from the "просто" mockup: weekdays 16-20, weekends 10-20. */
+export function windowFor(iso: string): { dayStart: string; dayEnd: string } {
+  return isWeekendIso(iso) ? { dayStart: "10:00", dayEnd: "20:00" } : { dayStart: "16:00", dayEnd: "20:00" };
+}
+
+const MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+const WEEKDAYS = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+const WEEKDAYS_SHORT = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+/** "Суббота, 14 ноября". */
+export function dayTitle(iso: string): string {
+  const month = Number(iso.slice(5, 7)) - 1;
+  return `${WEEKDAYS[weekdayOf(iso)]}, ${Number(iso.slice(8, 10))} ${MONTHS_GEN[month]}`;
+}
+
+/** "Сб · 14 ноября" for the weekend tabs. */
+export function dayTabLabel(iso: string): string {
+  const month = Number(iso.slice(5, 7)) - 1;
+  return `${WEEKDAYS_SHORT[weekdayOf(iso)]} · ${Number(iso.slice(8, 10))} ${MONTHS_GEN[month]}`;
+}
+
+/** Next `count` days from today (inclusive), for the "другой день" picker. */
+export function upcomingDays(todayIso: string, count = 21): string[] {
+  return Array.from({ length: count }, (_, i) => addDaysIso(todayIso, i));
+}
+
+// ---------- ages ----------
+
+/** The four age answers of the guest form, mapped to the canonical ranges the engine filters by. */
+export const AGE_ANSWERS: { key: string; label: string; ranges: string[] }[] = [
+  { key: "u3", label: "до 3", ranges: ["0-1", "1-3"] },
+  { key: "3-6", label: "3–6", ranges: ["3-5", "5-7"] },
+  { key: "7-10", label: "7–10", ranges: ["7-9", "9-12"] },
+  { key: "11p", label: "11+", ranges: ["12-14", "14-16", "16-18"] },
+];
+
+export function rangesForAnswers(keys: readonly string[]): string[] {
+  return [...new Set(AGE_ANSWERS.filter((a) => keys.includes(a.key)).flatMap((a) => a.ranges))];
+}
+
+// ---------- labels ----------
+
+export function formatTime(iso: string): string {
+  return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ }).format(new Date(iso));
+}
+
+/** "на машине · 15 мин" / "пешком · 10 мин"; null without a leg. */
+export function legLabel(travel: DraftItem["travel"]): string | null {
+  if (!travel) return null;
+  const minutes = Math.max(1, Math.round(travel.minutes));
+  return `${travel.mode === "walk" ? "пешком" : "на машине"} · ${minutes} мин`;
+}
+
+/** Small notes under a point: what the parent should double-check. */
+export function itemNotes(item: DraftItem): string[] {
+  const notes: string[] = [];
+  if (item.hoursUnconfirmed) notes.push("уточните часы работы");
+  if (item.scheduleUnconfirmed) notes.push("время по расписанию, уточните");
+  if (item.approximatePlace) notes.push("примерное место");
+  if (item.far) notes.push("далеко — заменить?");
+  return notes;
+}
+
+const PLACES = ["место", "места", "мест"];
+export function pluralPlaces(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  const word = mod10 === 1 && mod100 !== 11 ? PLACES[0]! : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? PLACES[1]! : PLACES[2]!;
+  return `${n} ${word}`;
+}
+
+/** "3 места · с 10:30 до 17:40". */
+export function summaryLine(items: readonly DraftItem[]): string {
+  if (items.length === 0) return "";
+  const sorted = [...items].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  return `${pluralPlaces(items.length)} · с ${formatTime(sorted[0]!.startsAt)} до ${formatTime(sorted[sorted.length - 1]!.endsAt)}`;
+}
+
+/** "Музей · 3+ · от 12 BYN" from whatever the card carries. */
+export function metaLine(card: DraftItem["card"]): string {
+  const price = card.priceText?.trim()
+    ? card.priceText.trim()
+    : card.priceFrom != null
+      ? `${card.priceTo != null && card.priceTo !== card.priceFrom ? "от " : ""}${card.priceFrom} ${card.currency ?? "BYN"}`
+      : null;
+  return [card.categoryName, card.ageLabel, price].filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+// ---------- draft state ----------
+
+export type Draft = {
+  items: DraftItem[];
+  status: DraftResponse["status"];
+  suggestMode: DraftResponse["suggestMode"];
+  mode: ScenarioMode;
+};
+
+export const HISTORY_LIMIT = 5;
+
+export type DraftHistory = {
+  current: Draft | null;
+  /** Newest first. "Вернуть прошлый" pops the head. */
+  past: Draft[];
+  /** Counter for "Другой вариант": variant k asks the engine for the k-th deterministic alternative. */
+  variant: number;
+};
+
+export const emptyHistory = (): DraftHistory => ({ current: null, past: [], variant: 0 });
+
+/** A freshly computed draft becomes current; the previous one is kept for "Вернуть прошлый". */
+export function pushDraft(history: DraftHistory, next: Draft, variant = history.variant): DraftHistory {
+  const past = history.current && history.current.items.length > 0 ? [history.current, ...history.past].slice(0, HISTORY_LIMIT) : history.past;
+  return { current: next, past, variant };
+}
+
+export const canGoBack = (history: DraftHistory): boolean => history.past.length > 0;
+
+/** "Вернуть прошлый": no request, the previous draft simply comes back. */
+export function popDraft(history: DraftHistory): DraftHistory {
+  const [previous, ...rest] = history.past;
+  if (!previous) return history;
+  return { current: previous, past: rest, variant: history.variant };
+}
+
+/** "Убрать": drops one point locally (the engine is not asked); the old draft stays undoable. */
+export function removeItem(history: DraftHistory, activityId: string): DraftHistory {
+  if (!history.current) return history;
+  const items = history.current.items.filter((item) => item.activityId !== activityId);
+  if (items.length === history.current.items.length) return history;
+  return pushDraft(history, { ...history.current, items, status: items.length > 0 ? history.current.status : "empty" });
+}
+
+/** A chosen alternative replaces the draft by the whole variant the engine computed for it. */
+export function applyAlternative(history: DraftHistory, items: DraftItem[]): DraftHistory {
+  if (!history.current) return history;
+  return pushDraft(history, { ...history.current, items, status: items.length > 0 ? "ok" : "empty" });
+}
+
+/** The alternative a variant offers: the point that is not in the current draft. */
+export function freshItemOf(variantItems: readonly DraftItem[], currentIds: ReadonlySet<string>, replacedId: string): DraftItem | null {
+  return variantItems.find((item) => !currentIds.has(item.activityId) && item.activityId !== replacedId) ?? null;
+}
+
+// ---------- requests ----------
+
+export type ScenarioQuery = {
+  date: string;
+  mode: ScenarioMode;
+  /** Guest answers; ignored for a signed-in user, who sends `personaIds`. */
+  ageRanges: string[];
+  personaIds: string[];
+};
+
+type DraftRequestInput = Pick<DraftRequest, "date" | "action" | "mode" | "ageRanges" | "personaIds" | "variant" | "targetCount" | "dayStart" | "dayEnd"> &
+  Partial<Pick<DraftRequest, "current" | "pinnedActivityIds" | "replaceActivityId" | "city">>;
+
+export const DEFAULT_TARGET_COUNT = 3;
+export const MAX_TARGET_COUNT = 4;
+
+/** Request body for the draft API. Guests send age ranges, members send persona ids. */
+export function buildDraftBody(
+  query: ScenarioQuery,
+  action: DraftRequest["action"],
+  options: { variant?: number; items?: readonly DraftItem[]; pinAll?: boolean; targetCount?: number; replaceActivityId?: string } = {},
+): DraftRequestInput {
+  const { dayStart, dayEnd } = windowFor(query.date);
+  const items = options.items ?? [];
+  return {
+    date: query.date,
+    action,
+    mode: query.mode,
+    ageRanges: query.personaIds.length > 0 ? [] : query.ageRanges,
+    personaIds: query.personaIds,
+    variant: options.variant ?? 0,
+    targetCount: Math.min(MAX_TARGET_COUNT, Math.max(1, options.targetCount ?? DEFAULT_TARGET_COUNT)),
+    dayStart,
+    dayEnd,
+    current: items.map((item) => ({ activityId: item.activityId, startsAt: item.startsAt })),
+    pinnedActivityIds: options.pinAll ? items.map((item) => item.activityId) : [],
+    ...(options.replaceActivityId ? { replaceActivityId: options.replaceActivityId } : {}),
+  };
+}
+
+export function toDraft(response: DraftResponse): Draft {
+  return { items: response.items, status: response.status, suggestMode: response.suggestMode, mode: response.mode === "walk" ? "walk" : "car" };
+}
+
+/** Wall-clock minutes between two ISO instants (non-negative). */
+export function minutesBetween(fromIso: string, toIso: string): number {
+  return Math.max(0, Math.round((Date.parse(toIso) - Date.parse(fromIso)) / MINUTE_MS));
+}
+
+/** Entry label of the widget button: a day with something in it is "extended", an empty one "built". */
+export function entryLabel(hasPlanItems: boolean): "Собрать день" | "Дополнить день" {
+  return hasPlanItems ? "Дополнить день" : "Собрать день";
+}

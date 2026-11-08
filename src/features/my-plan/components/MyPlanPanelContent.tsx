@@ -7,6 +7,8 @@ import { useMyPlan } from "../hooks/useMyPlan";
 import type { PlanItemWithActivity } from "../types/event";
 import { PlanMainContent } from "./PlanMainContent";
 import { GuestMyPlanPanel } from "./GuestMyPlanPanel";
+import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
+import { useDayScenarioEnabled } from "../hooks/useDayScenarioEnabled";
 
 interface MyPlanPanelContentProps {
   open: boolean;
@@ -37,6 +39,8 @@ export function MyPlanPanelContent({
   layout = "default",
   onRequestClose,
 }: MyPlanPanelContentProps) {
+  /** DAY_SCENARIO_ENGINE_ENABLED: off, the guest panel below is exactly as before. */
+  const dayScenarioEnabled = useDayScenarioEnabled();
   const {
     isLoading,
     accessPhase,
@@ -156,6 +160,14 @@ export function MyPlanPanelContent({
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-primary" />
           <p className="text-gray-600">Загружаем ваш план...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && dayScenarioEnabled) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <DayScenarioScreen audience="guest" todayIso={todayIso} initialDate={todayIso} onBack={onRequestClose} onClose={onRequestClose} />
       </div>
     );
   }

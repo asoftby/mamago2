@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { geoCellsFor } from "@/lib/geo/geoCell";
-import { buildDayScenario, replaceScenarioItem, type BuildDeps } from "./build";
+import { buildDayScenario, listReplacementAlternatives, replaceScenarioItem, type BuildDeps } from "./build";
 import { TravelEstimator, travelLeg } from "./travel";
 import type { BuildInput, PoolEvent } from "./types";
 
@@ -278,6 +278,23 @@ const UNKNOWN = { kind: "unknown" } as const;
   assert.equal(alone.items[0]!.hoursUnconfirmed, false);
   const a = buildDayScenario([ev("c1", A.lat, A.lng, [10], 10), virtual], baseInput({ variant: 0 }), deps());
   assert.ok(a.items.every((i) => i.startsAtMs >= at(9) && i.endsAtMs <= at(20)), "a virtual start obeys the same window and overlap rules");
+}
+
+// F9. "Чем заменить?": distinct alternatives, each swapping only the chosen point
+{
+  const events = [ev("a", A.lat, A.lng, [10]), ev("b", B.lat, B.lng, [13]), ev("c", C.lat, C.lng, [16]), ev("x", A.lat + 0.001, A.lng, [14], 9), ev("y", B.lat + 0.001, B.lng, [14], 8), ev("z", C.lat + 0.001, C.lng, [14], 7)];
+  const first = buildDayScenario(events, baseInput(), deps());
+  const current = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const target = first.items[1]!.activityId;
+  const variants = listReplacementAlternatives(events, baseInput(), current, target, deps());
+  assert.ok(variants.length >= 1 && variants.length <= 3, "one to three alternatives");
+  const offered = variants.map((v) => v.find((i) => !current.some((c) => c.activityId === i.activityId))!.activityId);
+  assert.equal(new Set(offered).size, offered.length, "a point is never offered twice");
+  assert.ok(offered.every((id) => id !== target), "the replaced point is not offered back");
+  for (const v of variants) {
+    for (const c of current.filter((c) => c.activityId !== target)) assert.ok(v.some((i) => i.activityId === c.activityId), "the other points stay");
+  }
+  assert.deepEqual(listReplacementAlternatives([ev("only", A.lat, A.lng, [10])], baseInput({ targetCount: 1 }), [{ activityId: "only", startsAtMs: at(10) }], "only", deps()), [], "nothing else in the pool: no alternatives");
 }
 
 console.log("dayScenario build tests passed");
