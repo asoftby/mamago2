@@ -20,8 +20,8 @@ export function PartyProgrammeEditor({ data }: { data: ProgrammeEditorData }) {
   useEffect(() => { setReady(true); }, []);
   const titles = new Map(data.entries.map((entry, index) => [entry.itemId, data.programme.rows[index]?.title]));
   const [entries, setEntries] = useState(data.entries);
-  const [adults, setAdults] = useState(data.adultIds);
-  const [children, setChildren] = useState(data.childIds);
+  const [adults, setAdults] = useState(() => data.adultIds.filter(id => data.adults.some(row => row.id === id)));
+  const [children, setChildren] = useState(() => data.childIds.filter(id => data.children.some(row => row.id === id)));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);

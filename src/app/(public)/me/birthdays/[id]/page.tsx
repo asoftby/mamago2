@@ -84,5 +84,5 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
       };
     }),
   };
-  return <PartyOrderStatusScreen party={normalized}><PartyProgrammeEditor key={`${party.id}:${party.version}`} data={editor} /></PartyOrderStatusScreen>;
+  return <PartyOrderStatusScreen party={normalized}><PartyProgrammeEditor key={`${party.id}:${party.version}:${members.map(row => row.userId).join(",")}:${children.map(row => row.id).join(",")}`} data={editor} /></PartyOrderStatusScreen>;
 }
