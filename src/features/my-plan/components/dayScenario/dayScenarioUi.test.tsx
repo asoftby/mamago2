@@ -4,7 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ScenarioTimeline, mergeTimeline } from "./ScenarioTimeline";
 import { ScenarioParams } from "./ScenarioParams";
-import { DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
+import { AllShown, DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
 import { useDayScenarioEnabled } from "../../hooks/useDayScenarioEnabled";
 import { KudaDayScenarioEntry } from "@/components/discovery/KudaDayScenarioEntry";
 import type { DraftItem } from "../../lib/dayScenarioUi/model";
@@ -72,6 +72,8 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(renderToStaticMarkup(<DraftError kind="rate_limited" onRetry={() => {}} />).includes("Подождите минуту"));
   assert.ok(!renderToStaticMarkup(<DraftError kind="unavailable" onRetry={() => {}} />).includes("Повторить"), "nothing to retry when the feature is off");
   assert.ok(renderToStaticMarkup(<DraftSkeleton />).includes('aria-busy="true"'));
+  const allShown = renderToStaticMarkup(<AllShown onRestart={() => {}} />);
+  assert.ok(allShown.includes("Мы показали всё, что подходит") && allShown.includes("Показать заново"), "the explicit «nothing new» state");
 }
 
 // ---- flag off (and until answered): the entries draw nothing
@@ -118,6 +120,8 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "saving the day is inactive until PR 3");
   assert.match(screen, /\{current \? \(\s*<div aria-busy/, "the action row is shown for any draft, also an emptied one (undo stays reachable)");
   assert.match(screen, /api\.goBack\(activeDate\)/);
+  assert.match(screen, /disabled=\{loading \|\| exhausted\}[^>]*onClick=\{\(\) => activeDate && api\.another\(activeDate\)\}/, "«Другой вариант» is off while nothing new is left");
+  assert.match(screen, /exhausted \? <AllShown/, "the «Мы показали всё» state is shown");
   assert.match(main, /<DayScenarioScreen[\s\S]*?city=\{city\}/, "the member screen gets the page's city");
   assert.match(panel, /<DayScenarioScreen audience="guest" city=\{city\}/, "the guest screen gets the page's city");
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AlertTriangle, Car, SearchX } from "lucide-react";
+import { AlertTriangle, Car, CheckCheck, SearchX } from "lucide-react";
 import { PLAN_FOCUS } from "../v3/planChipStyles";
 import type { DraftErrorKind } from "../../hooks/useDayScenarioDraft";
 
@@ -68,6 +68,23 @@ export function EmptyResult({
       }
     >
       Попробуйте другой день{walking ? " или поездку на машине" : ""}.
+    </Panel>
+  );
+}
+
+/** "Другой вариант" has nothing new left: say it, instead of showing the same day again. */
+export function AllShown({ onRestart }: { onRestart: () => void }) {
+  return (
+    <Panel
+      icon={<CheckCheck className="h-5 w-5" strokeWidth={1.8} aria-hidden />}
+      title="Мы показали всё, что подходит"
+      actions={
+        <button type="button" onClick={onRestart} className={QUIET}>
+          Показать заново
+        </button>
+      }
+    >
+      Других вариантов на этот день нет. Можно заменить отдельные места или показать варианты заново.
     </Panel>
   );
 }

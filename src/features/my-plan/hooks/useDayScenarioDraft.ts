@@ -6,9 +6,11 @@ import {
   buildDraftBody,
   canGoBack,
   emptyHistory,
+  markExhausted,
   popDraft,
   pushDraft,
   removeItem,
+  restartVariants,
   toDraft,
   MAX_TARGET_COUNT,
   type DraftHistory,
@@ -68,8 +70,10 @@ async function postDraft(body: unknown, signal: AbortSignal): Promise<DraftRespo
 
 export type DayScenarioDraftApi = {
   byDate: Record<string, DateDraftState>;
-  /** "Другой вариант": the next deterministic alternative of the whole day. */
+  /** "Другой вариант": a new variant that does not repeat a filler place already shown; may answer "exhausted". */
   another: (date: string) => void;
+  /** "Показать заново" after "Мы показали всё, что подходит". */
+  restart: (date: string) => void;
   /** "Вернуть прошлый": restore the previous draft, no request. */
   goBack: (date: string) => void;
   /** "Убрать": drop one point locally. */
@@ -154,11 +158,21 @@ export function useDayScenarioDraft(input: {
       const history = stateRef.current[date]?.history;
       if (!history?.current) return;
       const variant = history.variant + 1;
-      const response = await request(date, buildDraftBody(queryRef.current(date), "rebuild", { variant, items: history.current.items }));
-      if (response) dispatch({ type: "history", date, history: pushDraft(stateRef.current[date]?.history ?? history, toDraft(response), variant) });
+      const response = await request(
+        date,
+        buildDraftBody(queryRef.current(date), "another", { variant, items: history.current.items, shown: history.shown }),
+      );
+      if (!response) return;
+      const latest = stateRef.current[date]?.history ?? history;
+      dispatch({ type: "history", date, history: response.exhausted ? markExhausted(latest) : pushDraft(latest, toDraft(response), response.variant) });
     },
     [request],
   );
+
+  const restart = useCallback((date: string) => {
+    const history = stateRef.current[date]?.history;
+    if (history) dispatch({ type: "history", date, history: restartVariants(history) });
+  }, []);
 
   const goBack = useCallback((date: string) => {
     const history = stateRef.current[date]?.history;
@@ -218,6 +232,7 @@ export function useDayScenarioDraft(input: {
     () => ({
       byDate,
       another: (date: string) => void another(date),
+      restart,
       goBack,
       remove,
       addMore: (date: string) => void addMore(date),
@@ -225,6 +240,6 @@ export function useDayScenarioDraft(input: {
       chooseAlternative,
       retry,
     }),
-    [byDate, another, goBack, remove, addMore, loadAlternatives, chooseAlternative, retry],
+    [byDate, another, restart, goBack, remove, addMore, loadAlternatives, chooseAlternative, retry],
   );
 }
