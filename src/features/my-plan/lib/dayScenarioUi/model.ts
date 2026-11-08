@@ -147,23 +147,40 @@ export type DraftHistory = {
   past: Draft[];
   /** Counter for "Другой вариант": variant k asks the engine for the k-th deterministic alternative. */
   variant: number;
+  /** Every point this day has shown so far (any variant): seen filler places are not offered again. */
+  shown: string[];
+  /** The engine has no new variant: "Мы показали всё, что подходит". */
+  exhausted: boolean;
 };
 
-export const emptyHistory = (): DraftHistory => ({ current: null, past: [], variant: 0 });
+export const emptyHistory = (): DraftHistory => ({ current: null, past: [], variant: 0, shown: [], exhausted: false });
+
+const unionIds = (a: readonly string[], b: readonly string[]) => [...new Set([...a, ...b])];
 
 /** A freshly computed draft becomes current; the previous one is kept for "Вернуть прошлый". */
 export function pushDraft(history: DraftHistory, next: Draft, variant = history.variant): DraftHistory {
   const past = history.current && history.current.items.length > 0 ? [history.current, ...history.past].slice(0, HISTORY_LIMIT) : history.past;
-  return { current: next, past, variant };
+  return { current: next, past, variant, shown: unionIds(history.shown, next.items.map((i) => i.activityId)), exhausted: false };
 }
 
 export const canGoBack = (history: DraftHistory): boolean => history.past.length > 0;
 
-/** "Вернуть прошлый": no request, the previous draft simply comes back. */
+/** "Вернуть прошлый": no request, the previous draft simply comes back (what was shown stays shown). */
 export function popDraft(history: DraftHistory): DraftHistory {
   const [previous, ...rest] = history.past;
   if (!previous) return history;
-  return { current: previous, past: rest, variant: history.variant };
+  return { ...history, current: previous, past: rest, exhausted: false };
+}
+
+/** The engine answered "nothing new": keep the draft on screen and say so. */
+export function markExhausted(history: DraftHistory): DraftHistory {
+  return history.exhausted ? history : { ...history, exhausted: true };
+}
+
+/** "Показать заново": forget what was shown, keep the draft, so «Другой вариант» can cycle again. */
+export function restartVariants(history: DraftHistory): DraftHistory {
+  if (!history.current) return history;
+  return { ...history, variant: 0, shown: history.current.items.map((i) => i.activityId), exhausted: false };
 }
 
 /**
@@ -208,7 +225,7 @@ export type ScenarioQuery = {
 };
 
 type DraftRequestInput = Pick<DraftRequest, "date" | "action" | "mode" | "ageRanges" | "personaIds" | "variant" | "targetCount" | "dayStart" | "dayEnd"> &
-  Partial<Pick<DraftRequest, "current" | "pinnedActivityIds" | "replaceActivityId" | "city">>;
+  Partial<Pick<DraftRequest, "current" | "pinnedActivityIds" | "replaceActivityId" | "city" | "shownActivityIds">>;
 
 export const DEFAULT_TARGET_COUNT = 3;
 export const MAX_TARGET_COUNT = 4;
@@ -217,7 +234,7 @@ export const MAX_TARGET_COUNT = 4;
 export function buildDraftBody(
   query: ScenarioQuery,
   action: DraftRequest["action"],
-  options: { variant?: number; items?: readonly DraftItem[]; pinAll?: boolean; targetCount?: number; replaceActivityId?: string } = {},
+  options: { variant?: number; items?: readonly DraftItem[]; pinAll?: boolean; targetCount?: number; replaceActivityId?: string; shown?: readonly string[] } = {},
 ): DraftRequestInput {
   const { dayStart, dayEnd } = windowFor(query.date);
   const items = options.items ?? [];
@@ -235,6 +252,7 @@ export function buildDraftBody(
     current: items.map((item) => ({ activityId: item.activityId, startsAt: item.startsAt })),
     pinnedActivityIds: options.pinAll ? items.map((item) => item.activityId) : [],
     ...(options.replaceActivityId ? { replaceActivityId: options.replaceActivityId } : {}),
+    ...(options.shown ? { shownActivityIds: [...options.shown].slice(-100) } : {}),
   };
 }
 

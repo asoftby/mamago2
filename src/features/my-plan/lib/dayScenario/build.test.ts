@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { geoCellsFor } from "@/lib/geo/geoCell";
-import { buildDayScenario, listReplacementAlternatives, replaceScenarioItem, type BuildDeps } from "./build";
+import { buildAnotherVariant, buildDayScenario, listReplacementAlternatives, replaceScenarioItem, type BuildDeps } from "./build";
 import { TravelEstimator, travelLeg } from "./travel";
 import type { BuildInput, PoolEvent } from "./types";
 
@@ -295,6 +295,87 @@ const UNKNOWN = { kind: "unknown" } as const;
     for (const c of current.filter((c) => c.activityId !== target)) assert.ok(v.some((i) => i.activityId === c.activityId), "the other points stay");
   }
   assert.deepEqual(listReplacementAlternatives([ev("only", A.lat, A.lng, [10])], baseInput({ targetCount: 1 }), [{ activityId: "only", startsAtMs: at(10) }], "only", deps()), [], "nothing else in the pool: no alternatives");
+}
+
+// F10. «Другой вариант»: anchors may repeat, a filler already seen never does, and "nothing left" is explicit
+{
+  const events = [
+    ev("anchor", A.lat, A.lng, [10], 10),
+    place("f1", A.lat + 0.0004, A.lng, ALWAYS),
+    place("f2", A.lat + 0.0008, A.lng, ALWAYS),
+    place("f3", A.lat + 0.0012, A.lng, ALWAYS),
+    place("f4", A.lat + 0.0016, A.lng, ALWAYS),
+  ];
+  const run = (variant: number, shown: Set<string>, current: { activityId: string; startsAtMs: number }[]) =>
+    buildAnotherVariant(events, baseInput({ variant }), current, shown, deps());
+  const first = buildDayScenario(events, baseInput(), deps());
+  const cur1 = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const fillers = (ids: string[]) => ids.filter((id) => id.startsWith("f"));
+  assert.equal(first.items.length, 3);
+  const shown1 = new Set(first.items.map((i) => i.activityId));
+  const second = run(1, shown1, cur1);
+  assert.equal(second.exhausted, false, "unseen fillers exist: a new variant");
+  const secondFillers = fillers(second.result.items.map((i) => i.activityId));
+  assert.ok(secondFillers.every((id) => !shown1.has(id)), "a seen filler is never offered again");
+  assert.ok(secondFillers.length >= 1, "the day still has fillers");
+  const cur2 = second.result.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const shown2 = new Set([...shown1, ...second.result.items.map((i) => i.activityId)]);
+  // every filler (f1-f4) has now been seen: nothing new can be shown
+  const third = run(2, shown2, cur2);
+  assert.equal(["f1", "f2", "f3", "f4"].every((id) => shown2.has(id)), true);
+  assert.equal(third.exhausted, true, "unseen fillers are used up: say so instead of repeating");
+}
+{
+  // a day made of anchors only: a "new" variant would be the same day
+  const events = [ev("e1", A.lat, A.lng, [10]), ev("e2", B.lat, B.lng, [13]), ev("e3", C.lat, C.lng, [16])];
+  const first = buildDayScenario(events, baseInput(), deps());
+  const cur = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const another = buildAnotherVariant(events, baseInput({ variant: 1 }), cur, new Set(cur.map((c) => c.activityId)), deps());
+  assert.equal(another.exhausted, true, "nothing to vary: exhausted, not a silent repeat");
+}
+{
+  // the same call with nothing shown and a different outcome is not exhausted
+  const events = [ev("e1", A.lat, A.lng, [10]), place("f1", A.lat + 0.0004, A.lng, ALWAYS), place("f2", A.lat + 0.0008, A.lng, ALWAYS)];
+  const none = buildAnotherVariant(events, baseInput({ variant: 1, targetCount: 2 }), [], new Set(), deps());
+  assert.equal(none.exhausted, false, "no draft yet: nothing to repeat");
+}
+
+{
+  // fewer unseen places than a normal day holds: a shorter new day is a new variant, not exhaustion
+  const events = [
+    place("f1", A.lat + 0.0004, A.lng, ALWAYS),
+    place("f2", A.lat + 0.0008, A.lng, ALWAYS),
+    place("f3", A.lat + 0.0012, A.lng, ALWAYS),
+    place("f4", A.lat + 0.0016, A.lng, ALWAYS),
+  ];
+  const first = buildDayScenario(events, baseInput(), deps());
+  assert.equal(first.items.length, 3);
+  const cur = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const another = buildAnotherVariant(events, baseInput({ variant: 1 }), cur, new Set(cur.map((c) => c.activityId)), deps());
+  assert.equal(another.exhausted, false, "the fourth place was never shown: a (shorter) new variant");
+  assert.deepEqual(another.result.items.map((i) => i.activityId), events.map((e) => e.activityId).filter((id) => !cur.some((c) => c.activityId === id)));
+  const cur2 = another.result.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const done = buildAnotherVariant(events, baseInput({ variant: another.variant + 1 }), cur2, new Set(events.map((e) => e.activityId)), deps());
+  assert.equal(done.exhausted, true, "all four were shown: now it is exhaustion");
+}
+{
+  // equally scored colocated events at one time: one variant may coincide with the current day, later ones differ
+  const events = ["a", "b", "c", "d", "e"].map((id) => ev(id, A.lat, A.lng, [10]));
+  const first = buildDayScenario(events, baseInput({ targetCount: 1 }), deps());
+  const cur = first.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs }));
+  const seen = new Set(cur.map((c) => c.activityId));
+  const chain: string[] = [];
+  let variant = 1;
+  for (let step = 0; step < 8; step += 1) {
+    const next = buildAnotherVariant(events, baseInput({ variant, targetCount: 1 }), cur, seen, deps());
+    if (next.exhausted) break;
+    assert.ok(next.result.items.every((i) => !seen.has(i.activityId)), "a new variant brings an unseen point");
+    next.result.items.forEach((i) => seen.add(i.activityId));
+    cur.splice(0, cur.length, ...next.result.items.map((i) => ({ activityId: i.activityId, startsAtMs: i.startsAtMs })));
+    chain.push(...next.result.items.map((i) => i.activityId));
+    variant = next.variant + 1;
+  }
+  assert.equal(new Set([...chain, ...first.items.map((i) => i.activityId)]).size, 5, "the chain walks through all five events before saying it is done");
 }
 
 console.log("dayScenario build tests passed");

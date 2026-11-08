@@ -30,7 +30,7 @@ import {
 } from "../../lib/dayScenarioUi/model";
 import { ScenarioParams } from "./ScenarioParams";
 import { ScenarioReplaceSheet, type ReplaceOption } from "./ScenarioReplaceSheet";
-import { DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
+import { AllShown, DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
 import { ScenarioTimeline, type OwnPlanEntry } from "./ScenarioTimeline";
 
 export type ScenarioPerson = { id: string; label: string; kind: "adult" | "child" };
@@ -147,6 +147,7 @@ export function DayScenarioScreen({
   const walking = mode === "walk";
   const showFewNearby = current?.status === "few_nearby" && (current.suggestMode === "car" || walking) && items.length > 0;
   const showEmpty = Boolean(current) && !loading && items.length === 0;
+  const exhausted = state?.history.exhausted ?? false;
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
@@ -229,6 +230,7 @@ export function DayScenarioScreen({
                     />
                   </>
                 ) : null}
+                {exhausted ? <AllShown onRestart={() => activeDate && api.restart(activeDate)} /> : null}
                 {items.length < MAX_TARGET_COUNT ? (
                   <button type="button" disabled={loading} onClick={() => activeDate && api.addMore(activeDate)} className={cn(QUIET_BTN, "mt-4 w-full border-dashed")}>
                     <Plus className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
@@ -237,7 +239,7 @@ export function DayScenarioScreen({
                 ) : null}
                 {/* Also when the day was emptied by hand: the previous draft must stay one tap away. */}
                 <div className="mb-10 mt-4 grid grid-cols-2 gap-2">
-                  <button type="button" disabled={loading} onClick={() => activeDate && api.another(activeDate)} className={QUIET_BTN}>
+                  <button type="button" disabled={loading || exhausted} onClick={() => activeDate && api.another(activeDate)} className={QUIET_BTN}>
                     <RefreshCw className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden />
                     Другой вариант
                   </button>
