@@ -99,7 +99,7 @@ export function legLabel(travel: DraftItem["travel"]): string | null {
 export function itemNotes(item: DraftItem): string[] {
   const notes: string[] = [];
   if (item.hoursUnconfirmed) notes.push("уточните часы работы");
-  if (item.scheduleUnconfirmed) notes.push("время по расписанию, уточните");
+  if (item.scheduleUnconfirmed) notes.push("время по расписанию — уточните у организатора");
   if (item.approximatePlace) notes.push("примерное место");
   if (item.far) notes.push("далеко — заменить?");
   return notes;
