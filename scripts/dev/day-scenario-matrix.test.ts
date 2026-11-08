@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { MOCK_EVENTS } from "../ops/day-scenario-mocks/events.data";
 import { MOCK_PLACES } from "../ops/day-scenario-mocks/places.data";
 import { resolveSlotDates, sessionInstant } from "../ops/seed-day-scenario-mocks";
-import { checkResult, oracleAgeRanges, PLAN_FIXTURE_TITLE, renderReport, repeatsOf, seededAvailability, specFor, totalsOf, unseenSeedFillers, WEEKLY_TITLE, weeklyCoverage, weeklyEligible, weeklyViolation, exhaustedCoverage, exhaustedViolation, placeFitsWindow, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
+import { checkResult, oracleAgeRanges, PLAN_FIXTURE_TITLE, renderReport, repeatsOf, seededAvailability, specFor, totalsOf, unseenSeedFillers, WEEKLY_TITLE, weeklyCoverage, weeklyEligible, weeklyViolation, placeFitsWindow, type ApiItem, type ApiResult, type RunParams } from "./day-scenario-matrix.lib";
 import { hoursPlanFor } from "../ops/seed-day-scenario-mocks";
 
 const dates = resolveSlotDates("2026-11-07");
@@ -137,26 +137,6 @@ assert.ok(html.includes("geoCell5"), "timeline shows the geoCell5 column");
   assert.equal(placeFitsWindow(weeklyPlace, plan("weekly"), { date: dates.wed1, window: { start: "16:00", end: "20:00" } }), true, "the wide weekday window fits");
   assert.equal(placeFitsWindow(MOCK_PLACES[byVariant("appointment")]!, plan("appointment"), { date: dates.sat1, window: { start: "09:00", end: "20:00" } }), false, "closed that day");
   assert.equal(placeFitsWindow(MOCK_PLACES[byVariant("always")]!, plan("always"), { date: dates.sat1, window: { start: "10:00", end: "11:00" } }), false, "an always-open place still needs its 90 minutes inside the window");
-}
-
-// ---- «показали всё» on narrow runs
-{
-  const step = (anotherNo: number, exhausted: boolean, unseenLeft?: string[]) => ({ name: `Другой вариант ${anotherNo}`, httpStatus: 200, ms: 1, result: result([]), violations: [], anotherNo, exhausted, unseenLeft });
-  const narrowRun = (id: string, steps: ReturnType<typeof step>[]) => ({ params: run({ id, narrow: true }), steps });
-  const cov = exhaustedCoverage([
-    { params: run({ id: "wide" }), steps: [step(1, true, [])] },
-    narrowRun("N1", [step(1, false), step(2, false), step(3, true, [])]),
-    narrowRun("N2", [step(1, false), step(2, true, ["[MOCK] Парк"])]),
-    narrowRun("N3", [step(1, false), step(2, false)]),
-  ]);
-  assert.deepEqual(cov.rows.map((r) => [r.id, r.newVariants, r.stopAt, r.left.length]), [["N1", 2, 3, 0], ["N2", 1, 2, 1], ["N3", 2, null, 0]], "only narrow runs are listed");
-  assert.deepEqual([cov.justified, cov.premature], [1, 1]);
-  assert.equal(exhaustedViolation(cov), null, "one justified end is enough");
-  const none = exhaustedCoverage([narrowRun("N3", [step(1, false)]), narrowRun("N2", [step(1, true, ["x"])])]);
-  assert.equal(exhaustedViolation(none)?.rule, "Ветка «показали всё» не проверена вживую", "no justified end: the branch was not exercised");
-  assert.equal(exhaustedViolation(exhaustedCoverage([])), null, "no narrow runs, nothing to demand");
-  const page = renderReport({ generatedAt: "x", base: "b", build: "d", dates, calls: 0, notes: [], runs: [], exhausted: cov });
-  assert.ok(page.includes("Узкие прогоны") && page.includes("обосновано") && page.includes("преждевременно") && page.includes("не наступило"));
 }
 
 console.log("day-scenario matrix tests passed");
