@@ -185,3 +185,29 @@ jobs:
           BIRTHDAY_DEMO_LOCAL: "1"
           PRISMA_QUERY_EVENTS: "1"
         run: pnpm test:birthday-programme:integration
+
+      - name: Real Chrome birthday journeys (isolated local application)
+        env:
+          APP_ENV: local
+          BIRTHDAY_DEMO_LOCAL: "1"
+        run: |
+          set -eu
+          export BIRTHDAY_CHROME_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$BIRTHDAY_CHROME_PATH"
+          mkdir -p artifacts/birthday-journey
+          pnpm birthday:demo:start > artifacts/birthday-journey/server.log 2>&1 &
+          demo_pid=$!
+          trap 'kill "$demo_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 90); do
+            if curl -sf http://127.0.0.1:34357/login > /dev/null; then break; fi
+            kill -0 "$demo_pid"
+            sleep 2
+          done
+          pnpm test:birthday-journey:browser
+      - name: Birthday journey evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: birthday-journey-${{ github.sha }}
+          path: artifacts/birthday-journey/
+          retention-days: 7

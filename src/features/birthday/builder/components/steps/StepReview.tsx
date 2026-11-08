@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { supportsPackageChanges } from "@/lib/birthday/packageChangeScope";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem, PartyCategoryKey } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
@@ -61,7 +62,7 @@ export function StepReview({
   const [updatedName, setUpdatedName] = useState("");
   const packageItems = review?.items.filter(item => item.role === "INCLUDED") ?? [];
   const hasPackageChanges = packageItems.some(item => item.packageComponentChange);
-  const unsupportedPackageChanges = hasPackageChanges && venueMode !== "PACKAGE";
+  const unsupportedPackageChanges = hasPackageChanges && !supportsPackageChanges(venueMode);
   const originalPackagePrice = review?.items.find(item => item.role === "ANCHOR")?.offerPriceSnapshot;
   const pendingReplacementIds = new Set(packageItems.flatMap(item => {
     const change = item.packageComponentChange;
@@ -94,6 +95,9 @@ export function StepReview({
     ? { minimumByn: estimate.minimumByn, hasUnknownPrices: estimate.unknownCount > 0 }
     : catalogPriceSummary(offers);
   const budgetWarning = partyBudgetWarning(total, maxBudget);
+  const restoredFormRef = useRef<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
   const [date, setDate] = useState(dateIso ?? calendarDateKeyToIso(quizDateKey) ?? "");
   const [timeFrom, setTimeFrom] = useState(timeStart ?? "15:00");
   const [timeTo, setTimeTo] = useState(timeEnd ?? "18:00");
@@ -147,7 +151,18 @@ export function StepReview({
           const hasAnchor = draft.items.some(item => item.role === "ANCHOR");
           setReview(hasAnchor ? draft : null);
           onCompositionSaved(hasAnchor);
-          if (hasAnchor && draft.eventDate) setDate(draft.eventDate.slice(0, 10));
+          // Restore server-owned details once; retrying composition must not erase unsaved inputs.
+          const formKey = JSON.stringify([scope, draft.id]);
+          if (hasAnchor && restoredFormRef.current !== formKey) {
+            if (draft.eventDate) setDate(draft.eventDate.slice(0, 10));
+            if (draft.timeFrom) setTimeFrom(draft.timeFrom);
+            if (draft.timeTo) setTimeTo(draft.timeTo);
+            if (draft.childrenCount != null) setChildren(String(draft.childrenCount));
+            if (draft.adultsCount != null) setAdults(String(draft.adultsCount));
+            if (draft.contactName) setName(draft.contactName);
+            if (draft.contactPhone) setPhone(draft.contactPhone);
+            restoredFormRef.current = formKey;
+          }
           setRestoreState("ready");
         }
       } catch (cause) {
@@ -498,7 +513,7 @@ export function StepReview({
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <h3 className="font-semibold">Данные для заявки</h3>
-        <fieldset disabled={busy || Boolean(scope && restoreState !== "ready")} className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        <fieldset disabled={!hydrated || busy || Boolean(scope && restoreState !== "ready")} className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm">Дата праздника<input required type="date" value={date} onChange={e => { setDate(e.target.value); setUpdatedAge(""); }} className="block w-full rounded-lg border p-3" /></label>
           {needsNameInput && <label className="text-sm">
             Имя ребёнка
@@ -511,8 +526,8 @@ export function StepReview({
               onChange={event => setUpdatedAge(event.target.value)} className="block w-full rounded-lg border p-3 text-base" />
           </label>}
           <label className="text-sm">Количество детей<input required type="number" min="1" max="500" value={children} onChange={e => setChildren(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
-          <label className="text-sm">Начало<input required type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
-          <label className="text-sm">Окончание<input required type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
+          <label className="text-sm">Начало<input required type="time" value={timeFrom} onInput={e => setTimeFrom(e.currentTarget.value)} className="block w-full rounded-lg border p-3" /></label>
+          <label className="text-sm">Окончание<input required type="time" value={timeTo} onInput={e => setTimeTo(e.currentTarget.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Количество взрослых<input required type="number" min="0" max="500" value={adults} onChange={e => setAdults(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Ваше имя<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm sm:col-span-2">Телефон<input required type="tel" maxLength={40} value={phone} onChange={e => setPhone(e.target.value)} className="block w-full rounded-lg border p-3" /></label>

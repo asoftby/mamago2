@@ -48,3 +48,22 @@ export function childAgeYearsOnDate(
   const years = Math.floor(months / 12);
   return years <= 20 ? years : null;
 }
+
+/** Catalogue context contains no child name, ID or date of birth. Bound to one party date. */
+export type PartyRecipientContext = {
+  name: boolean; age: boolean; ageMonths?: number | null; dateKey?: string | null;
+};
+export function catalogueAgeMonths(person: {
+  recipientType?: string; statedAgeYears?: number | null; birthDateIso?: string | null;
+} | null, dateKey: string | null, restored?: PartyRecipientContext | null): number | null {
+  if (person) {
+    if (person.recipientType === "adult") return null;
+    if (person.recipientType === "guest" && person.statedAgeYears != null) {
+      return person.statedAgeYears >= 0 && person.statedAgeYears < 18 ? person.statedAgeYears * 12 : null;
+    }
+    return ageMonthsOnDate(person.birthDateIso, calendarDateKeyToIso(dateKey));
+  }
+  const months = restored?.ageMonths;
+  return dateKey && restored?.dateKey === dateKey && typeof months === "number" &&
+    Number.isInteger(months) && months >= 0 && months <= 251 ? months : null;
+}

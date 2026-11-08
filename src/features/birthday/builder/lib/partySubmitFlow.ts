@@ -2,6 +2,12 @@ export type PartyDraft = { id: string; version: number };
 export type PartyReviewDraft = PartyDraft & {
   status: string;
   eventDate: string | null;
+  timeFrom?: string | null;
+  timeTo?: string | null;
+  childrenCount?: number | null;
+  adultsCount?: number | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
   childAge: number | null;
   childName: string | null;
   items: Array<{
