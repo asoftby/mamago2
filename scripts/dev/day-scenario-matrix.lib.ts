@@ -238,6 +238,48 @@ export function checkResult(
   return out;
 }
 
+// ------------------------------------------------------------ recurring event (c-weekly) coverage
+
+const WEEKLY_SPEC = MOCK_EVENTS.find((e) => e.key === "c-weekly")!;
+export const WEEKLY_TITLE = WEEKLY_SPEC.title;
+/** The mock rule: every week at 11:00 from the first Saturday, 90 days; the event lasts the default 90 min. */
+const WEEKLY_START = "11:00";
+const WEEKLY_END = "12:30";
+
+/**
+ * Could the seed's recurring event (no ActivitySession, weekly rule on Saturday 11:00, ages 5-7 / 7-9) be offered
+ * in this run? Date on the rule, an age in common, the 11:00-12:30 slot inside the day window and free of the
+ * plan fixture (12:00-13:30). The engine does not pick it by a fixed radius (anchors are chosen city-wide, the
+ * walking radius is around the anchor), so every other mode is eligible too.
+ */
+export function weeklyEligible(run: RunParams, dates: Pick<Record<DaySlot, string>, "sat1">): boolean {
+  const start = Date.parse(`${dates.sat1}T12:00:00Z`);
+  const day = Date.parse(`${run.date}T12:00:00Z`);
+  const onRule = dayOfWeek(run.date) === 6 && day >= start && day <= start + 90 * 86_400_000;
+  const agesFit = run.ageRanges.some((a) => WEEKLY_SPEC.ages.includes(a));
+  const winStart = sessionInstant(run.date, run.window.start).getTime();
+  const winEnd = sessionInstant(run.date, run.window.end).getTime();
+  const slotStart = sessionInstant(run.date, WEEKLY_START).getTime();
+  const slotEnd = sessionInstant(run.date, WEEKLY_END).getTime();
+  const overlapsPlan = run.planItem && slotStart < sessionInstant(run.date, "13:30").getTime() && slotEnd > sessionInstant(run.date, "12:00").getTime();
+  return onRule && agesFit && slotStart >= winStart && slotEnd <= winEnd && !overlapsPlan;
+}
+
+export type WeeklyCoverage = { eligible: string[]; seenIn: string[] };
+
+/** Runs where the recurring event could be offered, and those where any step (build, another, replace) offered it. */
+export function weeklyCoverage(runs: readonly { params: RunParams; steps: readonly { result: ApiResult | null }[] }[], dates: Pick<Record<DaySlot, string>, "sat1">): WeeklyCoverage {
+  const eligible = runs.filter((r) => weeklyEligible(r.params, dates));
+  const seenIn = eligible.filter((r) => r.steps.some((st) => st.result?.items.some((i) => i.card.title === WEEKLY_TITLE)));
+  return { eligible: eligible.map((r) => r.params.id), seenIn: seenIn.map((r) => r.params.id) };
+}
+
+/** The violation to attach when the event fits somewhere yet never got into any scenario. */
+export function weeklyViolation(cov: WeeklyCoverage): Violation | null {
+  if (cov.eligible.length === 0 || cov.seenIn.length > 0) return null;
+  return { run: cov.eligible[0]!, step: "Все шаги подходящих прогонов", rule: "Повторяющееся событие без сеансов ни разу не попало в сценарий", detail: `подходит по дате, возрасту и окну в ${cov.eligible.length} прогонах (${cov.eligible.join(", ")}), в сценарии не было ни разу` };
+}
+
 // ------------------------------------------------------------ report
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -262,7 +304,7 @@ function timeline(result: ApiResult): string {
   if (items.length === 0) return `<p class="muted">нет точек</p>`;
   const rows = items.map((i) => {
     const spec = specFor(i.card.title);
-    const notes = [i.hoursUnconfirmed ? "уточните часы работы" : "", i.scheduleUnconfirmed ? "время по расписанию, уточните" : "", i.approximatePlace ? "примерное место" : "", i.far ? "далеко — заменить?" : "", i.pinned ? "закреплено" : ""].filter(Boolean).join(", ");
+    const notes = [i.hoursUnconfirmed ? "уточните часы работы" : "", i.scheduleUnconfirmed ? "время по расписанию — уточните у организатора" : "", i.approximatePlace ? "примерное место" : "", i.far ? "далеко — заменить?" : "", i.pinned ? "закреплено" : ""].filter(Boolean).join(", ");
     const travel = i.travel ? `${i.travel.minutes} мин · ${(i.travel.distanceM / 1000).toFixed(2)} км · ${i.travel.mode === "walk" ? "пешком" : i.travel.mode === "car" ? "машина" : i.travel.mode}` : "—";
     return `<tr><td>${hm(i.startsAt)}–${hm(i.endsAt)}</td><td>${esc(i.card.title)}</td><td>${esc(spec?.clusterLabel ?? "?")}</td><td>${esc(spec?.geoCell5 ?? "—")}</td><td>${(i.kind ?? spec?.kind) === "place" ? "место" : "событие"}</td><td>${esc(notes)}</td><td>${esc(travel)}</td></tr>`;
   });
@@ -276,7 +318,7 @@ function stepHtml(step: StepRecord): string {
   return `<div class="step"><h4>${esc(step.name)} <span class="muted">· HTTP ${step.httpStatus} · ${Math.round(step.ms)} мс${r?.meta ? ` · пул ${r.meta.poolCache}, ${r.meta.poolSize} (мест ${r.meta.poolPlaces ?? 0}), сборка ${r.meta.buildMs} мс` : ""}</span></h4>${r ? timeline(r) : "<p class='bad'>нет ответа</p>"}${t ? `<p>Итого: <b>${t.points}</b> точек · <b>${t.km.toFixed(2)} км</b> · <b>${t.travelMin} мин</b> в пути · переходов между geoCell5: <b>${t.cell5Transitions}</b></p>` : ""}${warn.length ? `<p class="warn">Предупреждения: ${esc(warn.join("; "))}</p>` : ""}${step.diffNote ? `<p class="muted">${esc(step.diffNote)}</p>` : ""}${step.exhausted ? `<p class="warn">Движок ответил «Мы показали всё, что подходит» (нового варианта нет, на экране остаётся прежний).</p>` : ""}${step.repeats && step.repeats.anchors.length ? `<p class="muted">Повтор якорей (норма): ${esc(step.repeats.anchors.join("; "))}</p>` : ""}${step.repeats && step.repeats.fillers.length ? `<p class="bad">Повтор заполнителей: ${esc(step.repeats.fillers.join("; "))}</p>` : ""}${step.alternatives ? `<p>Альтернативы: ${step.alternatives.map((a) => `<span class="chip">${esc(a)}</span>`).join(" ")}</p>` : ""}${step.violations.length ? `<p class="bad">Нарушения: ${step.violations.map((v) => esc(v.rule)).join("; ")}</p>` : ""}</div>`;
 }
 
-export function renderReport(input: { generatedAt: string; base: string; build: string; dates: Record<string, string>; runs: RunRecord[]; calls: number; notes: string[] }): string {
+export function renderReport(input: { generatedAt: string; base: string; build: string; dates: Record<string, string>; runs: RunRecord[]; calls: number; notes: string[]; weekly?: WeeklyCoverage }): string {
   const all = input.runs.flatMap((r) => r.steps.flatMap((s) => s.violations));
   const byRule = new Map<string, number>();
   for (const v of all) byRule.set(v.rule, (byRule.get(v.rule) ?? 0) + 1);
@@ -314,6 +356,8 @@ ${input.notes.map((n) => `<p class="muted">${esc(n)}</p>`).join("")}
 <h2>Цепочки «Другой вариант»: когда пришло «показали всё»</h2>
 <p class="muted">Столбец «Остаток» — сколько ещё непоказанных мест из сида подходят по возрасту и часам работы в тот день и лежат в радиусе режима (пешком: своя и соседняя ячейка ~1 км; машина: ячейка ~5 км) от прежнего черновика. Оракул знает только места мок-каталога, но не весь пул DEV, поэтому «0» подтверждает «обоснованно» только по сиду.</p>
 <table><thead><tr><th>Прогон</th><th>Новых вариантов до конца</th><th>«Показали всё» на</th><th>Остаток</th><th>Какие</th><th>Вывод</th></tr></thead><tbody>${chainRows.join("")}</tbody></table>
+<h2>Повторяющееся событие без сеансов (c-weekly)</h2>
+${input.weekly ? `<p class="muted">Событие из сида: еженедельно по субботам 11:00, возраст 5–7 / 7–9, без ActivitySession (время по расписанию). Должно попасть в сценарий хотя бы в одном из прогонов, где подходят дата, возраст и окно дня.</p><p>Подходящих прогонов: <b>${input.weekly.eligible.length}</b>${input.weekly.eligible.length ? ` (${input.weekly.eligible.map(esc).join(", ")})` : ""}. Попало в сценарий в: <b class="${input.weekly.eligible.length && input.weekly.seenIn.length === 0 ? "bad" : "ok"}">${input.weekly.seenIn.length ? input.weekly.seenIn.map(esc).join(", ") : "—"}</b>.</p>` : `<p class="muted">Проверка не выполнялась.</p>`}
 <h2>Нарушения (${all.length})</h2>
 ${all.length ? `<table><thead><tr><th>Прогон</th><th>Шаг</th><th>Правило</th><th>Детали</th></tr></thead><tbody>${violationRows.join("")}</tbody></table><p>По правилам: ${[...byRule].map(([k, n]) => `${esc(k)} — ${n}`).join("; ")}</p>` : `<p class="ok">Нарушений не найдено.</p>`}
 <h2>Прогоны</h2>

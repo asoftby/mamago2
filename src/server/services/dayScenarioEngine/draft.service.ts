@@ -66,7 +66,7 @@ export type DraftItem = {
   kind: "event" | "place";
   /** Filler place without a hours record: show "уточните часы работы". */
   hoursUnconfirmed: boolean;
-  /** Event time comes from the schedule rules (no ActivitySession): show "время по расписанию, уточните". */
+  /** Event time comes from the schedule rules (no ActivitySession): show "время по расписанию — уточните у организатора". */
   scheduleUnconfirmed: boolean;
   activityId: string;
   card: PoolEvent["card"];

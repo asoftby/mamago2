@@ -33,7 +33,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(html.includes("на машине · 15 мин") && html.includes("пешком · 9 мин"), "a travel leg above the point it leads to");
   assert.equal((html.match(/на машине · 15 мин/g) ?? []).length, 1, "a leg is printed once");
   assert.ok(html.includes("уточните часы работы") && html.includes("примерное место"));
-  assert.ok(html.includes("время по расписанию, уточните") && html.includes("далеко — заменить?"));
+  assert.ok(html.includes("время по расписанию — уточните у организатора") && html.includes("далеко — заменить?"));
   assert.equal((html.match(/>Заменить</g) ?? []).length, 3, "«Заменить» on every point");
   assert.ok(html.includes('aria-label="Убрать «Интерактивный музей»"'), "remove is labelled per point");
   assert.ok(html.includes('aria-label="План дня"'));
