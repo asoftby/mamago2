@@ -2,7 +2,7 @@ name: Google Sans Cyrillic glyph coverage
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "test/birthday-complete-demo-catalog-*", "feat/birthday-final-scenario-family-*"]
   workflow_dispatch:
 
 permissions:

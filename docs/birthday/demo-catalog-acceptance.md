@@ -20,3 +20,5 @@
 | A13 | Изменение HOME/OUTDOOR пакетов | Сохранить защитную блокировку | Полный изменённый mobile flow пока не реализован | BLOCKED | Не обходить guards; полная приёмка H фиксируется в PR C |
 
 Для C сценарии A–H не помечены PASS этой таблицей: здесь подтверждена пригодность seed, а не завершение финального семейного продукта. Скриншоты тестовой сессии и результаты exact-HEAD gate/CI прикладываются к PR/отчёту. Не отправлять реальные уведомления; local runner не наследует transport credentials.
+
+Stacked follow-up: dev advanced to `3d7f6c1eaf3f2e40f0839b2927129f85d29c7c4f` (#1176), without overlapping fixture files. The parent branch is normally merged with that base so PR B contains only its own changes. Existing read-only CI workflows now accept the two explicit birthday parent branch patterns; no push/deploy triggers or check requirements are weakened. A new final-SHA full gate is necessary for this actual base/CI change; the prior e367 gate and six successful checks remain historical evidence, not proof for the new SHA.
