@@ -86,7 +86,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(view.includes("Музей науки") && view.includes("6+") && view.includes("https://img.example/c.jpg"), "title, age, cover");
   assert.ok(view.includes("Суббота, 14 ноября · 10:30–12:00"), "day and time range in Minsk time");
   assert.ok(view.includes("ул. Мястровская 8") && view.includes("Музей · 12 BYN"), "address, category and price");
-  assert.ok(view.includes("время по расписанию, уточните"), "what to double-check");
+  assert.ok(view.includes("время по расписанию — уточните у организатора"), "what to double-check");
   assert.ok(view.includes('href="/minsk/events/muzej-nauki"') && view.includes('target="_blank"') && view.includes("откроется в новой вкладке"), "the public page is a new tab, the draft stays");
   assert.ok(view.includes(">Заменить<") && view.includes('aria-label="Убрать из дня"') && !view.includes("Выбрать это"), "view actions");
   const pick = renderToStaticMarkup(<ScenarioItemPreview item={detailed} city="minsk" back="Замена" onBack={() => {}} onPick={() => {}} />);
@@ -165,7 +165,10 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   const shell = readFileSync("src/components/city/CityDiscoveryShell.tsx", "utf8");
   assert.doesNotMatch(shell, /KudaDayScenarioEntry/, "«Куда пойти» does not duplicate the day scenario entry");
   const screen = readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8");
-  assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "saving the day is inactive until PR 3");
+  assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "a guest cannot save until PR 3c");
+  assert.match(screen, /useDayScenarioSave\(\)/);
+  assert.match(screen, /const canSave = !isGuest && Boolean\(activeDate\) && items\.length > 0 && !loading && !saving;/, "a member saves a shown, non-empty, settled draft");
+  assert.match(screen, /requestPlanRefetchForDate\(activeDate\);[\s\S]{0,120}onBack\(\)/, "after a save the plan refetches the day and the widget goes back to it");
   assert.match(screen, /\{current \? \(\s*<div aria-busy/, "the action row is shown for any draft, also an emptied one (undo stays reachable)");
   assert.match(screen, /api\.goBack\(activeDate\)/);
   assert.match(screen, /disabled=\{loading \|\| exhausted\}[^>]*onClick=\{\(\) => activeDate && api\.another\(activeDate\)\}/, "«Другой вариант» is off while nothing new is left");

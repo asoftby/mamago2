@@ -15,6 +15,9 @@ import {
   PLAN_SEG_ON,
 } from "../v3/planChipStyles";
 import { useDayScenarioDraft } from "../../hooks/useDayScenarioDraft";
+import { useDayScenarioSave } from "../../hooks/useDayScenarioSave";
+import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { toast } from "@/lib/toast";
 import {
   MAX_TARGET_COUNT,
   canGoBack,
@@ -24,6 +27,8 @@ import {
   freshItemOf,
   initialPersonSelection,
   rangesForAnswers,
+  SAVE_FAILURE_TEXT,
+  saveLabel,
   summaryLine,
   type DraftItem,
   type ScenarioMode,
@@ -105,6 +110,7 @@ export function DayScenarioScreen({
     ageRanges: isGuest ? rangesForAnswers(ageKeys) : [],
     personaIds,
   });
+  const saver = useDayScenarioSave();
   const state = activeDate ? api.byDate[activeDate] : undefined;
   const current = state?.history.current ?? null;
   const loading = phase === "draft" && (state?.loading ?? !state);
@@ -182,6 +188,19 @@ export function DayScenarioScreen({
     if (isGuest && phase === "draft") setPhase("params");
     else onBack();
   };
+
+  // Members save the open day. A guest has no plan to save into until the sign-in flow of PR 3c.
+  const saving = saver.state.status === "saving";
+  const canSave = !isGuest && Boolean(activeDate) && items.length > 0 && !loading && !saving;
+  const saveDay = async () => {
+    if (!activeDate || !canSave) return;
+    const ok = await saver.save([{ date: activeDate, items }]);
+    if (!ok) return;
+    requestPlanRefetchForDate(activeDate);
+    toast.success("День сохранён в план");
+    onBack();
+  };
+  const saveError = saver.state.status === "error" ? SAVE_FAILURE_TEXT[saver.state.failure] : null;
 
   const title = phase === "params" ? "Куда сходить?" : dates.length > 1 ? "Выходные" : activeDate ? dayTitle(activeDate) : "Куда сходить?";
   const kicker = phase === "params" ? "Собрать день" : "Собрали за вас";
@@ -305,11 +324,24 @@ export function DayScenarioScreen({
           </button>
         ) : (
           <>
-            {/* Saving the day is PR 3: shown so the layout is final, but inactive. */}
-            <button type="button" disabled aria-describedby="scenario-save-hint" className={PRIMARY_BTN}>
-              Сохранить в план
-            </button>
-            <p id="scenario-save-hint" className="mp-font-ui m-0 mt-2 text-center text-[13px] text-[var(--mp-tx2)]">Сохранение дня появится в следующем обновлении</p>
+            {isGuest ? (
+              <>
+                {/* A guest cannot save yet: the sign-in flow that keeps the draft is PR 3c. */}
+                <button type="button" disabled aria-describedby="scenario-save-hint" className={PRIMARY_BTN}>
+                  {saveLabel(dates.length)}
+                </button>
+                <p id="scenario-save-hint" className="mp-font-ui m-0 mt-2 text-center text-[13px] text-[var(--mp-tx2)]">Сохранение для гостей появится в следующем обновлении</p>
+              </>
+            ) : (
+              <>
+                <button type="button" disabled={!canSave} aria-busy={saving} aria-describedby={saveError ? "scenario-save-hint" : undefined} onClick={() => void saveDay()} className={PRIMARY_BTN}>
+                  {saving ? "Сохраняем…" : saveLabel(dates.length)}
+                </button>
+                {saveError ? (
+                  <p id="scenario-save-hint" role="alert" className="mp-font-ui m-0 mt-2 text-center text-[13px] text-[var(--mp-ac-dark)]">{saveError}</p>
+                ) : null}
+              </>
+            )}
           </>
         )}
       </div>

@@ -10,6 +10,10 @@ import {
   canGoBack,
   initialPersonSelection,
   isEdgeSwipeBack,
+  buildSaveBody,
+  saveFailureOf,
+  saveLabel,
+  SAVE_FAILURE_TEXT,
   isoDateOf,
   itemHref,
   priceLabel,
@@ -243,6 +247,27 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.equal(isEdgeSwipeBack(at(10, 300), at(50, 300)), false, "too short");
   assert.equal(isEdgeSwipeBack(at(10, 300), at(120, 420)), false, "a diagonal / vertical scroll is not back");
   assert.equal(isEdgeSwipeBack(at(10, 300), at(-40, 300)), false, "leftwards is not back");
+}
+
+// ---- saving
+{
+  const a = item("a", "2026-11-14T09:00:00Z", "2026-11-14T10:30:00Z", { pinned: true, travel: { mode: "car", minutes: 12, distanceM: 4000 } });
+  const b = item("b", "2026-11-14T07:00:00Z", "2026-11-14T08:30:00Z", { kind: "place" });
+  const body = buildSaveBody([{ date: "2026-11-14", items: [a, b] }]);
+  assert.deepEqual(body.days[0]!.items.map((i) => i.activityId), ["b", "a"], "in time order");
+  assert.deepEqual(Object.keys(body.days[0]!.items[0]!).sort(), ["activityId", "endsAt", "kind", "pinned", "startsAt", "travel"], "only what the server needs: no card, no notes");
+  assert.equal(body.days[0]!.items[1]!.pinned, true);
+  assert.equal(saveFailureOf(401, "UNAUTHENTICATED"), "sign_in");
+  assert.equal(saveFailureOf(429, "RATE_LIMITED"), "rate_limited");
+  assert.equal(saveFailureOf(409, "DUPLICATE_ACTIVITY"), "duplicate");
+  assert.equal(saveFailureOf(409, "DUPLICATE_PLACE"), "duplicate");
+  assert.equal(saveFailureOf(422, "PAST_DAY"), "past_day");
+  assert.equal(saveFailureOf(422, "INVALID_OCCURRENCE"), "stale");
+  assert.equal(saveFailureOf(500, "INTERNAL_ERROR"), "failed");
+  assert.equal(saveFailureOf(409, "IDEMPOTENCY_KEY_REUSED"), "failed");
+  assert.ok(Object.values(SAVE_FAILURE_TEXT).every((text) => text.length > 10));
+  assert.equal(saveLabel(1), "Сохранить в план");
+  assert.equal(saveLabel(2), "Сохранить выходные");
 }
 
 console.log("dayScenarioUi model tests passed");
