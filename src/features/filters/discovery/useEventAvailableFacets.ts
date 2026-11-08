@@ -10,6 +10,7 @@ export type EventAvailableFacets = {
   formats: string[];
   ages: string[];
   occasions: string[];
+  occasionOptions: Array<{ slug: string; name: string }>;
   freeAvailable: boolean;
 };
 

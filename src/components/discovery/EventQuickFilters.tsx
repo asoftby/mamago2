@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { X } from "lucide-react";
 import { ChipsRow } from "@/components/ui/chips-row";
 import { EventDateRangePicker } from "./EventDateRangePicker";
-import { HalloweenChip } from "./HalloweenChip";
+import { Chip } from "@/components/ui/Chip";
 import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
 import { useDiscoveryFilters, type WhenPreset } from "@/features/filters/discovery/filters.store";
 
@@ -14,7 +14,9 @@ const PRESETS: Array<{ value: Exclude<WhenPreset, null>; label: string }> = [
   { value: "WEEKEND", label: "Выходные" },
 ];
 
-export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabled?: boolean }) {
+export function EventQuickFilters({ activeOccasions = [] }: {
+  activeOccasions?: Array<{ slug: string; name: string }>;
+}) {
   const { applied, actions } = useDiscoveryFilters();
 
   // Nearby has no executable proximity semantics yet. Clean old/shared URLs as
@@ -24,19 +26,24 @@ export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabl
   }, [actions, applied.nearby]);
 
   useEffect(() => {
-    if (!halloweenEnabled && applied.occasionSlug) {
+    if (applied.occasionSlug && !activeOccasions.some((occasion) => occasion.slug === applied.occasionSlug)) {
       actions.setDraft({ occasionSlug: null });
     }
-  }, [halloweenEnabled, applied.occasionSlug, actions]);
+  }, [activeOccasions, applied.occasionSlug, actions]);
 
   return (
     <div className="!mt-0 flex items-center gap-3 overflow-x-auto scroll-smooth pb-0 pt-0 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
-      {halloweenEnabled && (
-        <HalloweenChip
-          active={applied.occasionSlug === "halloween"}
-          onClick={() => actions.setDraft({ occasionSlug: applied.occasionSlug === "halloween" ? null : "halloween" })}
-        />
-      )}
+      {activeOccasions.map((occasion) => (
+        <Chip
+          key={occasion.slug}
+          active={applied.occasionSlug === occasion.slug}
+          onClick={() => actions.setDraft({
+            occasionSlug: applied.occasionSlug === occasion.slug ? null : occasion.slug,
+          })}
+        >
+          {occasion.name}
+        </Chip>
+      ))}
       <DiscoveryWhoFilter />
       <ChipsRow
         className="contents [&>div]:contents"

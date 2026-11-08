@@ -9,13 +9,14 @@ import {
 
 const file = (name: string) => readFileSync(new URL(name, import.meta.url), "utf8");
 
-test("Halloween is first, then who/age, then quick dates and interval", () => {
+test("active occasion chips are first, then who/age, quick dates and interval", () => {
   const source = file("./EventQuickFilters.tsx");
-  const halloween = source.indexOf("{halloweenEnabled && (");
+  const occasions = source.indexOf("activeOccasions.map");
   const who = source.indexOf("<DiscoveryWhoFilter />");
   const presets = source.indexOf("<ChipsRow");
   const interval = source.indexOf("<EventDateRangePicker");
-  assert.ok(halloween >= 0 && halloween < who && who < presets && presets < interval);
+  assert.ok(occasions >= 0 && occasions < who && who < presets && presets < interval);
+  assert.match(source, /occasionSlug: applied\.occasionSlug === occasion\.slug \? null : occasion\.slug/);
 });
 
 test("selected age chip has its own clear button and resets family and URL together", () => {
@@ -37,18 +38,18 @@ test("desktop custom-date chip clears without opening its picker", () => {
   assert.match(clearable, /\{children\}[\s\S]*<button/);
 });
 
-test("all active quick date presets and Halloween show a remove icon", () => {
+test("quick date presets preserve their clear action and occasion selection is reversible", () => {
   const quick = file("./EventQuickFilters.tsx");
-  const halloween = file("./HalloweenChip.tsx");
   assert.match(quick, /\{active && <X /);
   assert.match(quick, /whenPreset: active \? null : preset\.value, dateFrom: null, dateTo: null/);
-  assert.match(halloween, /\{active && <X /);
+  assert.match(quick, /active=\{applied\.occasionSlug === occasion\.slug\}/);
+  assert.match(quick, /occasionSlug: applied\.occasionSlug === occasion\.slug \? null : occasion\.slug/);
 });
 
 test("clearing age or custom date preserves other selected facets in shareable URL", () => {
   const filters = {
     ...defaultFilters,
-    occasionSlug: "halloween",
+    occasionSlug: "new-year",
     age: ["3-5"],
     profile: "child-123",
     dateFrom: "2026-10-29",
@@ -59,7 +60,7 @@ test("clearing age or custom date preserves other selected facets in shareable U
   const whoParams = serializeAppliedToSearchParams(new URLSearchParams(), withoutWho);
   assert.equal(whoParams.get("age"), null);
   assert.equal(whoParams.get("profile"), null);
-  assert.equal(whoParams.get("occasion"), "halloween");
+  assert.equal(whoParams.get("occasion"), "new-year");
   assert.equal(whoParams.get("from"), "2026-10-29");
   assert.deepEqual(parseAppliedFromUrl(whoParams as never), withoutWho);
 
@@ -68,7 +69,7 @@ test("clearing age or custom date preserves other selected facets in shareable U
   assert.equal(dateParams.get("from"), null);
   assert.equal(dateParams.get("to"), null);
   assert.equal(dateParams.get("profile"), null);
-  assert.equal(dateParams.get("occasion"), "halloween");
+  assert.equal(dateParams.get("occasion"), "new-year");
   assert.deepEqual(parseAppliedFromUrl(dateParams as never), { ...withoutDate, profile: null });
 });
 
@@ -90,11 +91,10 @@ test("mobile selected quick chips keep full-size pills without close X", () => {
   const clear = file("./ClearableQuickFilterChip.tsx");
   const who = file("./DiscoveryWhoFilter.tsx");
   const quick = file("./EventQuickFilters.tsx");
-  const halloween = file("./HalloweenChip.tsx");
   const date = file("./EventDateRangePicker.tsx");
   assert.match(clear, /md:inline-flex/);
   assert.match(quick, /hidden h-3\.5 w-3\.5 md:block/);
-  assert.match(halloween, /hidden h-4 w-4 shrink-0 md:block/);
+  assert.match(quick, /<Chip[\s\S]*?active=\{applied\.occasionSlug === occasion\.slug\}/);
   assert.match(date, /md:rounded-r-none md:pr-3/);
   const mobile = who.slice(who.indexOf("if (mobile)"), who.indexOf("return (\n    <Popover"));
   assert.ok(!mobile.includes("ClearableQuickFilterChip"), "mobile age trigger must not include a clear-action button");

@@ -13,6 +13,7 @@ import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
+import { activeOccasionWhere } from "@/lib/discovery/occasionUtils";
 import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
 import {
   getWeatherRankingBoost,
@@ -169,7 +170,7 @@ export async function getKudaDiscoveryFeed(
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
       occasionLinks: {
-        where: { occasion: { isActive: true, type: { in: [OccasionType.HOLIDAY, OccasionType.SEASON] } } },
+        where: { occasion: { ...activeOccasionWhere(now), type: { in: [OccasionType.HOLIDAY, OccasionType.SEASON] } } },
         select: { occasionId: true },
       },
       boosts: {

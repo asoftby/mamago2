@@ -8,7 +8,6 @@ import { ReplaceOptionsList, ScenarioReplaceScreen } from "./ScenarioReplaceScre
 import { ScenarioItemPreview } from "./ScenarioItemPreview";
 import { AllShown, DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
 import { useDayScenarioEnabled } from "../../hooks/useDayScenarioEnabled";
-import { KudaDayScenarioEntry } from "@/components/discovery/KudaDayScenarioEntry";
 import type { DraftItem } from "../../lib/dayScenarioUi/model";
 import { landingFromOpenEvent } from "@/lib/my-plan/myPlanOpenIntent";
 import { planOverlayReducer, type PlanOverlayAction, type PlanOverlayState } from "@/lib/my-plan/usePlanOverlay";
@@ -132,7 +131,6 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
     return <span>{useDayScenarioEnabled() ? "on" : "off"}</span>;
   }
   assert.equal(renderToStaticMarkup(<Probe />), "<span>off</span>", "off until the config answers");
-  assert.equal(renderToStaticMarkup(<KudaDayScenarioEntry />), "", "«Куда пойти» entry is absent with the flag off");
 }
 
 // ---- open My Plan on the day scenario: the overlay state carries the landing screen
@@ -165,7 +163,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(panel, /if \(!isAuthenticated && dayScenarioEnabled\)/, "guests get the new screen only with the flag on");
   assert.match(panel, /<GuestMyPlanPanel/, "the guest panel is still rendered");
   const shell = readFileSync("src/components/city/CityDiscoveryShell.tsx", "utf8");
-  assert.match(shell, /intent === "kuda" \? <KudaDayScenarioEntry \/> : null/);
+  assert.doesNotMatch(shell, /KudaDayScenarioEntry/, "«Куда пойти» does not duplicate the day scenario entry");
   const screen = readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8");
   assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "saving the day is inactive until PR 3");
   assert.match(screen, /\{current \? \(\s*<div aria-busy/, "the action row is shown for any draft, also an emptied one (undo stays reachable)");

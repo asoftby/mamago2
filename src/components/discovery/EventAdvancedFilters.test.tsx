@@ -27,15 +27,15 @@ test("price range keeps two accessible thumbs and shared URL writes", () => {
   assert.match(source, /params\.delete\("priceMax"\)/);
 });
 
-test("event modal shares the URL who filter, including Halloween occasion", () => {
+test("event modal shares the URL who filter and renders administrator-managed occasion options", () => {
   const source = readFileSync(new URL("./EventAdvancedFilters.tsx", import.meta.url), "utf8");
   assert.match(source, /DiscoveryWhoFilter inline/);
   assert.match(source, /Повод/);
-  assert.match(source, /draft\.occasionSlug === "halloween"/);
+  assert.match(source, /facets\.occasionOptions\.map/);
   assert.match(source, /useEventAvailableFacets/);
 });
 
-test("resetting all Kuda filters clears who, when, Halloween and refinements", () => {
+test("resetting all Kuda filters clears who, when, occasion and refinements", () => {
   const current = {
     ...defaultFilters,
     whenPreset: "WEEKEND" as const,
