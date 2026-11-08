@@ -55,7 +55,7 @@ async function login(account: string) {
   await p.getByRole('textbox', { name: 'Email', exact: true }).fill(account + '@birthday-demo.test');
   await p.locator('input[type="password"]').fill(DEMO_PASSWORD);
   await p.getByRole('button', { name: 'Войти', exact: true }).last().click();
-  await p.waitForURL('**/minsk/birthday/make');
+  await p.waitForURL((url) => url.pathname === '/minsk/birthday/make');
   await p.waitForLoadState('networkidle');
   return p;
 }
