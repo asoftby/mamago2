@@ -120,14 +120,36 @@ export function summaryLine(items: readonly DraftItem[]): string {
   return `${pluralPlaces(items.length)} · с ${formatTime(sorted[0]!.startsAt)} до ${formatTime(sorted[sorted.length - 1]!.endsAt)}`;
 }
 
+/** "от 12 BYN" / the free-text price of the card; null when the card carries none. */
+export function priceLabel(card: DraftItem["card"]): string | null {
+  if (card.priceText?.trim()) return card.priceText.trim();
+  if (card.priceFrom == null) return null;
+  return `${card.priceTo != null && card.priceTo !== card.priceFrom ? "от " : ""}${card.priceFrom} ${card.currency ?? "BYN"}`;
+}
+
 /** "Музей · 3+ · от 12 BYN" from whatever the card carries. */
 export function metaLine(card: DraftItem["card"]): string {
-  const price = card.priceText?.trim()
-    ? card.priceText.trim()
-    : card.priceFrom != null
-      ? `${card.priceTo != null && card.priceTo !== card.priceFrom ? "от " : ""}${card.priceFrom} ${card.currency ?? "BYN"}`
-      : null;
-  return [card.categoryName, card.ageLabel, price].filter((part): part is string => Boolean(part)).join(" · ");
+  return [card.categoryName, card.ageLabel, priceLabel(card)].filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+/** Calendar date (YYYY-MM-DD) of an instant in the Minsk time zone. */
+export function isoDateOf(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ }).format(new Date(iso));
+}
+
+/** "18:00–19:30". */
+export function timeRange(startsAt: string, endsAt: string): string {
+  return `${formatTime(startsAt)}–${formatTime(endsAt)}`;
+}
+
+/**
+ * A swipe that goes "back" like on a phone: it starts at the left edge, travels right far enough and
+ * stays mostly horizontal (a vertical scroll that starts near the edge must not count).
+ */
+export function isEdgeSwipeBack(start: { x: number; y: number }, end: { x: number; y: number }): boolean {
+  const dx = end.x - start.x;
+  const dy = Math.abs(end.y - start.y);
+  return start.x <= 28 && dx >= 64 && dy <= 48 && dx >= dy * 1.5;
 }
 
 // ---------- draft state ----------
