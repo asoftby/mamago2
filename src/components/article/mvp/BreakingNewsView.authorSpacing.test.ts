@@ -10,7 +10,7 @@ assert.ok(news.includes('className="!border-t-0 !pt-[30px] !pb-[30px] md:!pt-[45
 assert.ok(news.includes('excerpt ? "mb-4" : "mb-0"'));
 assert.ok(news.includes('<section style={{ padding: "0 0 12px" }}>'));
 // Topic links now follow the story body rather than the author row.
-assert.match(news, /\\{tags\\.length > 0 && \\(/);
+assert.ok(news.includes("{tags.length > 0 && ("));
 assert.ok(news.indexOf("<ArticleBody blocks={blocks} />") < news.indexOf("<PublicationTagLinks tags={tags}"));
 assert.ok(news.indexOf("<PublicationTagLinks tags={tags}") < news.indexOf("<ContentEmojiRating"));
 console.log("Breaking News author/actions spacing contracts: OK");
