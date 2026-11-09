@@ -236,6 +236,8 @@ export function MediaUploadField({
   const libraryScrollRef = useRef<HTMLDivElement | null>(null);
   const librarySentinelRef = useRef<HTMLDivElement | null>(null);
   const libraryOpenRef = useRef(libraryOpen);
+  // A modal session must not refresh away selected items from later pages.
+  const authorTabLoadedForOwnerRef = useRef<string | null>(null);
   const hasArticleLibrary = Boolean(articleLibrary);
   const [activeSourceTab, setActiveSourceTab] = useState<"article" | "author">("article");
 
@@ -338,6 +340,8 @@ export function MediaUploadField({
     setLibraryOpen(true);
     setLibrarySelection(new Set());
     setActiveSourceTab("article");
+    // Allow a TTL refresh only on the first visit in this new dialog session.
+    authorTabLoadedForOwnerRef.current = null;
 
     // The author tab is not visible on open when an article-specific source is
     // present. Do not fetch two independent libraries for one interaction.
@@ -359,7 +363,16 @@ export function MediaUploadField({
 
   const openAuthorLibrary = () => {
     setActiveSourceTab("author");
+    const owner = libraryOwnerKey?.trim() || "__current-user__";
+    // Refreshing on every tab switch can replace already paginated items,
+    // including images selected on page 2+. Preserve the snapshot while the
+    // current dialog is open; reopening still respects the pager's TTL.
+    if (authorTabLoadedForOwnerRef.current === owner) return;
+    authorTabLoadedForOwnerRef.current = owner;
     void loadLibraryInitial().catch((error) => {
+      if (authorTabLoadedForOwnerRef.current === owner) {
+        authorTabLoadedForOwnerRef.current = null;
+      }
       toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
     });
   };
@@ -435,8 +448,16 @@ export function MediaUploadField({
 
   useEffect(() => {
     setLibrarySelection(new Set());
+    authorTabLoadedForOwnerRef.current = null;
     if (libraryOpenRef.current && (!hasArticleLibrary || activeSourceTab === "author")) {
+      // An author change invalidates the previous author's selection and page
+      // snapshot. Mark the new owner as loaded for this dialog once requested.
+      const owner = libraryOwnerKey?.trim() || "__current-user__";
+      authorTabLoadedForOwnerRef.current = owner;
       void loadLibraryInitial().catch((error) => {
+        if (authorTabLoadedForOwnerRef.current === owner) {
+          authorTabLoadedForOwnerRef.current = null;
+        }
         toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
       });
     }
