@@ -421,6 +421,8 @@ model Family {
   updatedAt   DateTime           @updatedAt
   /// Закрытая семья (когда взрослых не осталось, B3/A2).
   archivedAt  DateTime?
+  /// «Сценарий дня»: предпочитаемый способ передвижения ('walk' | 'car'); null = не выбирали, читается как 'car'.
+  travelMode  String?
   memberships FamilyMembership[]
   children    Child[]
   planItems   PlanItem[]
