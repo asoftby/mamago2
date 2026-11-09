@@ -368,7 +368,7 @@ export function ArticleMvpView({
                 }
                 if (block.type === "gallery") return <ArticleGallery images={block.images} presentation={block.presentation} caption={block.caption} />;
                 if (block.type === "embed") return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
-                if (block.type === "dynamicAfisha") return <ArticleDynamicAfishaBlock citySlug={citySlug} occasionSlug={block.occasionSlug} />;
+                if (block.type === "dynamicAfisha") return <ArticleDynamicAfishaBlock citySlug={citySlug} occasionSlug={block.occasionSlug} period={block.period} />;
                 if (block.type === "info") {
                   const descriptor = structuredBlockRenders(block) ? [structuredDescriptor(block)] : [];
                   return <ArticlePerformanceScope blocks={descriptor} mode="info"><ArticleInfoCard data={block.data} /></ArticlePerformanceScope>;
