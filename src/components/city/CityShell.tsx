@@ -88,7 +88,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
   let classesPagination: { page: number; totalPages: number; total: number } | undefined;
   let birthdayPagination: { page: number; totalPages: number; total: number } | undefined;
   let classChips = undefined;
-  let activeClassChipSlug = undefined;
+  let activeClassChipSlug: string | undefined;
   let budgetConfig: BudgetConfig = null;
   let alternativeEventFilters: EventRuntimeFilters | null = null;
   const activeOccasions = intent === "kuda" ? await getActivePublicOccasions() : [];
