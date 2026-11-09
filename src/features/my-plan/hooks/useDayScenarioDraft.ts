@@ -100,7 +100,8 @@ export function useDayScenarioDraft(input: {
   enabled: boolean;
   city: string;
   dates: string[];
-  mode: ScenarioMode;
+  /** undefined until the user picks: the first build then uses the family's saved mode and every later request the mode it reported. */
+  mode?: ScenarioMode;
   ageRanges: string[];
   personaIds: string[];
   /** A guest's anonymous id: the server counts the first build of each date against the guest quota. Undefined for a member. */
@@ -131,6 +132,11 @@ export function useDayScenarioDraft(input: {
   );
   const queryRef = useRef(query);
   queryRef.current = query;
+  /** The query of a later action: the user's pick, else the mode the day's first answer reported (never silently the car). */
+  const queryFor = useCallback((date: string) => {
+    const q = queryRef.current(date);
+    return { ...q, mode: q.mode ?? stateRef.current[date]?.history.current?.mode };
+  }, []);
 
   const request = useCallback(async (date: string, body: unknown): Promise<DraftResponse | null> => {
     controllers.current[date]?.abort();
@@ -190,13 +196,13 @@ export function useDayScenarioDraft(input: {
       const variant = history.variant + 1;
       const response = await request(
         date,
-        buildDraftBody(queryRef.current(date), "another", { variant, items: history.current.items, shown: history.shown }),
+        buildDraftBody(queryFor(date), "another", { variant, items: history.current.items, shown: history.shown }),
       );
       if (!response) return;
       const latest = stateRef.current[date]?.history ?? history;
       dispatch({ type: "history", date, history: response.exhausted ? markExhausted(latest) : pushDraft(latest, toDraft(response), response.variant) });
     },
-    [request],
+    [request, queryFor],
   );
 
   const restart = useCallback((date: string) => {
@@ -221,11 +227,11 @@ export function useDayScenarioDraft(input: {
       const items = history.current.items;
       const response = await request(
         date,
-        buildDraftBody(queryRef.current(date), "rebuild", { variant: history.variant, items, pinAll: true, targetCount: items.length + 1 }),
+        buildDraftBody(queryFor(date), "rebuild", { variant: history.variant, items, pinAll: true, targetCount: items.length + 1 }),
       );
       if (response) dispatch({ type: "history", date, history: pushDraft(stateRef.current[date]?.history ?? history, toDraft(response), history.variant) });
     },
-    [request],
+    [request, queryFor],
   );
 
   const loadAlternatives = useCallback(async (date: string, activityId: string): Promise<DraftItem[][] | null> => {
@@ -235,14 +241,14 @@ export function useDayScenarioDraft(input: {
       // Not routed through `request`: opening the sheet must not blank the draft behind it.
       const controller = new AbortController();
       const response = await postDraft(
-        buildDraftBody(queryRef.current(date), "alternatives", { items: history.current.items, replaceActivityId: activityId }),
+        buildDraftBody(queryFor(date), "alternatives", { items: history.current.items, replaceActivityId: activityId }),
         controller.signal,
       );
       return response.alternatives;
     } catch {
       return null;
     }
-  }, []);
+  }, [queryFor]);
 
   const chooseAlternative = useCallback((date: string, items: DraftItem[]) => {
     const history = stateRef.current[date]?.history;

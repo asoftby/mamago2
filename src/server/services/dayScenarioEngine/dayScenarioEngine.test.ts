@@ -112,7 +112,7 @@ async function main() {
 
   // --- request schema ---
   const ok = draftRequestSchema.parse({ date: "2026-11-08" });
-  assert.deepEqual([ok.city, ok.mode, ok.action, ok.targetCount, ok.variant], ["minsk", "car", "build", 3, 0]);
+  assert.deepEqual([ok.city, ok.mode, ok.action, ok.targetCount, ok.variant], ["minsk", undefined, "build", 3, 0], "no mode in the request: the server picks the family's saved one, else the car");
   assert.equal(draftRequestSchema.safeParse({ date: "2026-13-40" }).success, false, "calendar-valid dates only");
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", mode: "bike" }).success, false);
   assert.equal(draftRequestSchema.safeParse({ date: "2026-11-08", targetCount: 9 }).success, false);
