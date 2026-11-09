@@ -21,11 +21,14 @@ export function SavedDayBanner({
   count,
   pair,
   onOpenDate,
+  onEdit,
 }: {
   date: string;
   count: number;
   pair: PairDay | null;
   onOpenDate: (date: string) => void;
+  /** «Изменить день»: opens the draft with the saved points. */
+  onEdit?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmWeekend, setConfirmWeekend] = useState(false);
@@ -68,6 +71,18 @@ export function SavedDayBanner({
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-[230px] rounded-2xl border border-[var(--mp-line)] bg-[var(--surface)] p-1.5 shadow-lg">
+          {onEdit ? (
+            <button
+              type="button"
+              className={MENU_ITEM}
+              onClick={() => {
+                setMenuOpen(false);
+                onEdit();
+              }}
+            >
+              Изменить день
+            </button>
+          ) : null}
           <button type="button" className={MENU_ITEM} onClick={() => void remove("day")}>Удалить этот день</button>
           {pair ? (
             <button

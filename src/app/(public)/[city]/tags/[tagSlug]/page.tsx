@@ -9,7 +9,8 @@ import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
+import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
+import { JournalTaggedFeed } from "@/components/journal/JournalFeedCards";
 import { queryCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { BlogPagination } from "../../../blog/BlogPagination";
@@ -42,7 +43,7 @@ async function resolveCity(citySlug: string) {
   });
 }
 
-function indexableTaggedArticleWhere(city: CityRef, tagId: string): Prisma.ArticleWhereInput {
+function indexableTaggedArticleWhere(tagId: string): Prisma.ArticleWhereInput {
   return {
     ...getPublicPublishedArticleWhere(),
     noindex: false,
@@ -53,7 +54,22 @@ function indexableTaggedArticleWhere(city: CityRef, tagId: string): Prisma.Artic
       { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
     ],
     tags: { some: { id: tagId } },
-    // Geography is a ranking signal, not a filter. Tagged articles from other cities are welcome.
+  };
+}
+
+/** Only local or broadly applicable articles count towards the city's SEO threshold. */
+function cityRelevantArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
+  const targets: Prisma.ArticleGeographyTargetWhereInput[] = [
+    { type: "CITY", cityId: city.id },
+    ...(city.regionId ? [{ type: "REGION" as const, regionId: city.regionId }] : []),
+  ];
+  return {
+    OR: [
+      { geoScope: "COUNTRY" },
+      { geoScope: "CITY", cityId: city.id },
+      ...(city.regionId ? [{ geoScope: "REGION" as const, regionId: city.regionId }] : []),
+      { additionalGeographyTargets: { some: { OR: targets } } },
+    ],
   };
 }
 
@@ -62,7 +78,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
   if (!city) return null;
 
   const tag = await prisma.discoveryTag.findFirst({
-    where: { slug: tagSlug, isActive: true },
+    where: { slug: tagSlug, isActive: true, reviewStatus: "APPROVED" },
     select: {
       id: true,
       slug: true,
@@ -70,12 +86,16 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
       description: true,
       seoTitle: true,
       seoDescription: true,
+      indexingMode: true,
     },
   });
   if (!tag) return null;
 
-  const where = indexableTaggedArticleWhere(city, tag.id);
-  const total = await prisma.article.count({ where });
+  const where = indexableTaggedArticleWhere(tag.id);
+  const [total, eligibleCityCount] = await Promise.all([
+    prisma.article.count({ where }),
+    prisma.article.count({ where: { AND: [where, cityRelevantArticleWhere(city)] } }),
+  ]);
   if (total === 0) return null;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -94,20 +114,8 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
     page: safePage,
     total,
     totalPages,
-    articles: articles.map(article => ({
-      id: article.id,
-      title: article.title,
-      slug: article.slug,
-      subtitle: article.subtitle,
-      excerpt: article.excerpt ?? null,
-      publishedAt: article.publishedAt,
-      heroUrl: article.coverImageUrl,
-      categoryLabel: article.contentType === "NEWS"
-        ? "Breaking news"
-        : article.category?.name ?? "Журнал",
-      href: article.href,
-      geographyLabel: article.geographyLabel,
-    })),
+    canIndex: shouldIndexTagPage(tag.indexingMode, eligibleCityCount),
+    articles,
   };
 }
 
@@ -145,7 +153,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
       title,
       description,
       url: canonical,
-      robots: { index: true, follow: true },
+      robots: { index: data.canIndex, follow: true },
     }),
     title,
     description,
@@ -167,7 +175,7 @@ export default async function CityTagPage({ params, searchParams }: PageProps) {
   });
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 md:py-14">
+    <main className="site-wrap w-full px-4 pb-16 pt-6 sm:px-7 sm:pt-10">
       <div className="mb-8">
         <p className="mb-2 text-sm font-medium text-primary">
           <Link href={`/${data.city.slug}`} className="hover:underline">
@@ -184,53 +192,11 @@ export default async function CityTagPage({ params, searchParams }: PageProps) {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {data.articles.map((article) => (
-          <Link
-            key={article.id}
-            href={article.href}
-            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition-colors hover:border-primary/30 hover:bg-slate-50"
-          >
-            {article.heroUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={article.heroUrl}
-                alt={article.title}
-                loading="lazy"
-                className="h-52 w-full object-cover"
-              />
-            ) : (
-              <div className="h-52 w-full bg-slate-100" />
-            )}
-            <div className="space-y-3 p-5">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary">
-                <span>{article.categoryLabel}</span>
-                <span className="text-muted-foreground normal-case tracking-normal">{article.geographyLabel}</span>
-                {article.publishedAt ? (
-                  <>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-muted-foreground normal-case tracking-normal">
-                      {new Intl.DateTimeFormat("ru-RU", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      }).format(article.publishedAt)}
-                    </span>
-                  </>
-                ) : null}
-              </div>
-              <h2 className="text-xl font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
-                {article.title}
-              </h2>
-              <p className="text-sm leading-6 text-muted-foreground">
-                {article.subtitle && article.subtitle !== BREAKING_NEWS_SUBTITLE
-                  ? article.subtitle
-                  : article.excerpt || "Открыть публикацию"}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+      <JournalTaggedFeed
+        articles={data.articles}
+        citySlug={data.city.slug}
+        blogHref={`/${data.city.slug}/blog`}
+      />
 
       <div className="-mx-4 mt-10 sm:-mx-6">
         <BlogPagination basePath={basePath} page={data.page} totalPages={data.totalPages} />

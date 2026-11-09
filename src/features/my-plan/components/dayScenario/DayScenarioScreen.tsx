@@ -71,6 +71,7 @@ export function DayScenarioScreen({
   initialPersonaIds = [],
   ownEntries = [],
   hasPlanItems = false,
+  seed = null,
   onBack,
   onClose,
 }: {
@@ -85,6 +86,8 @@ export function DayScenarioScreen({
   initialPersonaIds?: string[];
   ownEntries?: OwnPlanEntry[];
   hasPlanItems?: boolean;
+  /** «Изменить день»: the saved points of the open day; the draft starts from them (all pinned). */
+  seed?: { kind: "event" | "place"; activityId: string; startsAt: string }[] | null;
   onBack: () => void;
   onClose?: () => void;
 }) {
@@ -110,6 +113,7 @@ export function DayScenarioScreen({
     mode,
     ageRanges: isGuest ? rangesForAnswers(ageKeys) : [],
     personaIds,
+    seed,
   });
   const saver = useDayScenarioSave();
   const state = activeDate ? api.byDate[activeDate] : undefined;
@@ -195,11 +199,11 @@ export function DayScenarioScreen({
   const canSave = !isGuest && Boolean(activeDate) && items.length > 0 && !loading && !saving;
   const saveDay = async () => {
     if (!activeDate || !canSave) return;
-    const ok = await saver.save([{ date: activeDate, items }]);
+    const ok = await saver.save([{ date: activeDate, items, keep: api.kept }]);
     if (!ok) return;
     invalidatePlanDayMarkers();
     requestPlanRefetchForDate(activeDate);
-    toast.success("День сохранён в план");
+    toast.success(seed ? "День обновлён" : "День сохранён в план");
     onBack();
   };
   const saveError = saver.state.status === "error" ? SAVE_FAILURE_TEXT[saver.state.failure] : null;
@@ -284,6 +288,11 @@ export function DayScenarioScreen({
                       {summaryLine(items)}
                       {hasPlanItems ? <span className="block text-[14px] text-[var(--mp-tx2)]">Подобрали к тому, что уже в плане</span> : null}
                     </p>
+                    {seed && api.kept.length > 0 ? (
+                      <p className="mp-font-ui m-0 mt-2 rounded-2xl bg-[var(--mp-card)] p-3 text-[13.5px] leading-[1.4] text-[var(--mp-tx2)]">
+                        {api.kept.length === 1 ? "Одно сохранённое место" : `${api.kept.length} сохранённых мест`} в этом дне уже нельзя пересобрать (событие началось или место закрылось). Они останутся в плане как есть.
+                      </p>
+                    ) : null}
                     {showFewNearby ? <FewNearbyBanner onSwitchToCar={() => setMode("car")} /> : null}
                     <ScenarioTimeline
                       items={items}
@@ -337,7 +346,7 @@ export function DayScenarioScreen({
             ) : (
               <>
                 <button type="button" disabled={!canSave} aria-busy={saving} aria-describedby={saveError ? "scenario-save-hint" : undefined} onClick={() => void saveDay()} className={PRIMARY_BTN}>
-                  {saving ? "Сохраняем…" : saveLabel(dates.length)}
+                  {saving ? "Сохраняем…" : seed ? "Сохранить изменения" : saveLabel(dates.length)}
                 </button>
                 {saveError ? (
                   <p id="scenario-save-hint" role="alert" className="mp-font-ui m-0 mt-2 text-center text-[13px] text-[var(--mp-ac-dark)]">{saveError}</p>

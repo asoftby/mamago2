@@ -445,6 +445,8 @@ export function PlanMainContent({
   /** Счётчик идей, пересчитанный на экране «Мои идеи» (удаления там не обновляют useMyPlan). */
   const [ideasCountOverride, setIdeasCountOverride] = useState<number | null>(null);
   const shownIdeasCount = ideasCountOverride ?? ideasCount;
+  // «Изменить день»: the saved points the draft screen starts from (null = a fresh build).
+  const [editSeed, setEditSeed] = useState<{ kind: "event" | "place"; activityId: string; startsAt: string }[] | null>(null);
   const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
@@ -453,6 +455,7 @@ export function PlanMainContent({
   const clearLanding = planOverlay?.clearLanding;
   const closeNestedScreen = useCallback(() => {
     clearLanding?.();
+    setEditSeed(null);
     setScreen("plan");
   }, [clearLanding]);
 
@@ -1167,7 +1170,19 @@ export function PlanMainContent({
   // «День от mamaGo»: the day and its neighbours (a weekend's pair is the adjacent day), from the ribbon's cached chunks.
   const savedDays = usePlanScenarioDays(dayScenarioEnabled ? { from: addDaysIso(selectedDate, -1), to: addDaysIso(selectedDate, 1) } : null, { enabled: dayScenarioEnabled });
   const savedDay = dayScenarioEnabled ? savedDays[selectedDate] : undefined;
-  const savedDayBanner = savedDay ? <SavedDayBanner date={selectedDate} count={savedDay.count} pair={pairOf(selectedDate, savedDays)} onOpenDate={(date) => onChangeDate?.(date)} /> : null;
+  const startEditDay = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/plan/day-scenario/saved?date=${encodeURIComponent(selectedDate)}`, { credentials: "include" });
+      if (!response.ok) throw new Error(String(response.status));
+      const { points } = (await response.json()) as { points: { kind: "event" | "place"; activityId: string; startsAt: string }[] };
+      if (points.length === 0) throw new Error("empty");
+      setEditSeed(points.map((point) => ({ kind: point.kind, activityId: point.activityId, startsAt: point.startsAt })));
+      openNestedScreen("dayScenario");
+    } catch {
+      toast.error("Не удалось открыть день для изменения. Попробуйте ещё раз.");
+    }
+  }, [selectedDate, openNestedScreen]);
+  const savedDayBanner = savedDay ? <SavedDayBanner date={selectedDate} count={savedDay.count} pair={pairOf(selectedDate, savedDays)} onOpenDate={(date) => onChangeDate?.(date)} onEdit={() => void startEditDay()} /> : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
   const filteredAudience = includedPeople.length > 0 || excludedPeople.length > 0 || planVisibilityFilter !== "ALL";
@@ -1807,7 +1822,8 @@ export function PlanMainContent({
                 label: persona.kind === "adult" ? "Я" : persona.displayName?.trim() || "Ребёнок",
                 kind: persona.kind === "adult" ? ("adult" as const) : ("child" as const),
               }))}
-              ownEntries={dayItemsSorted.map((item) => ({
+              seed={editSeed}
+              ownEntries={dayItemsSorted.filter((item) => !editSeed || !editSeed.some((point) => point.activityId === item.activityId || point.activityId === item.placeId)).map((item) => ({
                 startsAt: item.startsAt ? new Date(item.startsAt).toISOString() : null,
                 title: item.title?.trim() || item.activity?.title || "Запись",
               }))}

@@ -30,7 +30,7 @@ import {
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
-import { PublicationTagChips } from "@/components/article/PublicationTagChips";
+import { PublicationTagLinks } from "@/components/article/PublicationTagLinks";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleInfoCard } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
@@ -270,8 +270,6 @@ export function ArticleMvpView({
           className="py-2 md:py-3"
         />
 
-        <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
-
         <ArticlePerformanceProvider articleId={articleId}>
           <ArticlePerformanceArticleTracker />
           <ArticleContent>
@@ -411,6 +409,8 @@ export function ArticleMvpView({
             })}
           </ArticleContent>
         </ArticlePerformanceProvider>
+
+        <PublicationTagLinks tags={tags} citySlug={citySlug} className="mt-8 md:mt-10" />
 
         {showJournalFooter ? (
           <footer className="mt-14 md:mt-16 pt-8 border-t border-border/60 text-sm text-muted-foreground">
