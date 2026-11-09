@@ -203,8 +203,31 @@ function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPrev
   });
 }
 
-/** Поля события для карточки подборки: одна выборка и для одиночного, и для пакетного запроса (без N+1). */
+/** Same place projection for the linked Activity.place and the actual EventVenue.place. */
+const EVENT_CARD_PLACE_SELECT = {
+  id: true,
+  slug: true,
+  title: true,
+  customAddress: true,
+  formattedAddr: true,
+  districtManual: { select: { name: true } },
+  districtAuto: { select: { name: true } },
+  metroManual: { select: { name: true } },
+  metroAuto: { select: { name: true } },
+  city: { select: { slug: true } },
+} satisfies Prisma.PlaceSelect;
+
+/** One projection for single and batched event collection cards; no N+1 queries. */
 const EVENT_CARD_SELECT = {
+  format: true,
+  venue: {
+    select: {
+      kind: true,
+      title: true,
+      addressLine: true,
+      place: { select: EVENT_CARD_PLACE_SELECT },
+    },
+  },
   nextOccurrenceAt: true,
   ageMinMonths: true,
   ageMaxMonths: true,
@@ -219,20 +242,7 @@ const EVENT_CARD_SELECT = {
   images: { orderBy: { sortOrder: "asc" }, select: { id: true, url: true, mediaAssetId: true } },
   description: true,
   eventCategory: { select: { nameRu: true } },
-  place: {
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      customAddress: true,
-      formattedAddr: true,
-      districtManual: { select: { name: true } },
-      districtAuto: { select: { name: true } },
-      metroManual: { select: { name: true } },
-      metroAuto: { select: { name: true } },
-      city: { select: { slug: true } },
-    },
-  },
+  place: { select: EVENT_CARD_PLACE_SELECT },
 } satisfies Prisma.ActivitySelect;
 
 async function resolveActivityCard(
@@ -255,7 +265,7 @@ async function resolveActivityCard(
       },
     });
     if (!a) return null;
-    const citySlug = a.place?.city?.slug;
+    const citySlug = a.place?.city?.slug ?? a.venue?.place?.city?.slug;
     const cs = citySlug ?? "minsk";
     const href = `/${cs}/events/${a.slug ?? b.entityId}`;
     return { kind: "basic", href, title: a.title, event: buildEventCardData(a) };
@@ -481,7 +491,7 @@ async function loadBasicActivityCards(
 
   const cards = new Map<string, ResolvedActivityCard>();
   for (const event of events) {
-    const citySlug = event.place?.city?.slug ?? "minsk";
+    const citySlug = event.place?.city?.slug ?? event.venue?.place?.city?.slug ?? "minsk";
     cards.set(`EVENT:${event.id}`, { kind: "basic", href: `/${citySlug}/events/${event.slug ?? event.id}`, title: event.title, event: buildEventCardData(event) });
   }
   for (const route of routes) {

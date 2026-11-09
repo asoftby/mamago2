@@ -12,7 +12,7 @@ import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
-import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose, shouldFetchEventPlanDates } from "@/features/save/saveStatusFetchGuard";
 
 type SaveHeartProps = {
   activityId: string;
@@ -126,6 +126,9 @@ export function SaveHeart({
   }, [flowOpen, checkSaveStatus]);
 
   useEffect(() => {
+    // Offers are not Activities: this endpoint only handles event session dates.
+    // Avoid a useless API/DB request for every offer card (including guests).
+    if (!shouldFetchEventPlanDates(offerId)) return;
     let cancelled = false;
     const loadPlanDates = async () => {
       try {
@@ -144,7 +147,7 @@ export function SaveHeart({
     return () => {
       cancelled = true;
     };
-  }, [activityId]);
+  }, [activityId, offerId]);
 
   const handlePersist = useCallback(
     async (result: SaveToPlanResult) => {
