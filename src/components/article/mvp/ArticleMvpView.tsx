@@ -10,6 +10,7 @@ import { CollectionOfferCard } from "@/components/article/collection/CollectionO
 import { CollectionPersonalList } from "@/components/article/collection/CollectionPersonalList";
 import { CollectionEventCard } from "@/components/article/collection/CollectionEventCard";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
+import { ArticleDynamicAfishaBlock } from "@/components/article/blocks/ArticleDynamicAfishaBlock";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleCalloutBlock } from "@/components/article/blocks/ArticleCalloutBlock";
 import {
@@ -367,6 +368,7 @@ export function ArticleMvpView({
                 }
                 if (block.type === "gallery") return <ArticleGallery images={block.images} presentation={block.presentation} caption={block.caption} />;
                 if (block.type === "embed") return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
+                if (block.type === "dynamicAfisha") return <ArticleDynamicAfishaBlock citySlug={citySlug} occasionSlug={block.occasionSlug} />;
                 if (block.type === "info") {
                   const descriptor = structuredBlockRenders(block) ? [structuredDescriptor(block)] : [];
                   return <ArticlePerformanceScope blocks={descriptor} mode="info"><ArticleInfoCard data={block.data} /></ArticlePerformanceScope>;
