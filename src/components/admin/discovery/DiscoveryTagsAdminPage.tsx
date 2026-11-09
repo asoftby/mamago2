@@ -283,7 +283,7 @@ function EditableTagRow({
         <Input value={draft.title} onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))} />
       </td>
       <td className={discoveryTd("min-w-[160px]")}>
-        <Input value={draft.slug} onChange={(e) => setDraft((prev) => ({ ...prev, slug: e.target.value }))} />
+        <Input value={draft.slug} disabled title="Slug неизменяем: сохраняем действующие URL" />
       </td>
       <td className={discoveryTd("min-w-[150px]")}>
         <select

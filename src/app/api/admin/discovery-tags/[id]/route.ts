@@ -76,9 +76,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     select: { id: true },
   });
   if (duplicate) return NextResponse.json({ error: "Такой тег уже существует" }, { status: 409 });
-  if (existing.slug !== slug && existing.isActive) {
-    // Existing public URLs require a separate reviewed redirect migration.
-    return NextResponse.json({ error: "Slug опубликованного тега нельзя менять без настройки редиректа" }, { status: 400 });
+  if (existing.slug !== slug) {
+    // A tag URL remains stable even while temporarily inactive or pending.
+    return NextResponse.json({ error: "Slug тега нельзя менять после создания без отдельного редиректа" }, { status: 400 });
   }
 
   const data = {

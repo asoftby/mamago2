@@ -2,7 +2,11 @@
  * pnpm exec tsx scripts/ops/seed-journal-taxonomy.ts           # inspection only
  * pnpm exec tsx scripts/ops/seed-journal-taxonomy.ts --apply   # after reviewed migration
  */
-import "dotenv/config";
+import { existsSync } from "node:fs";
+import { loadEnvFile } from "node:process";
+
+// Node 22 built-in env loader; do not override DATABASE_URL supplied by deployment.
+if (!process.env.DATABASE_URL && existsSync(".env")) loadEnvFile(".env");
 import { PrismaClient } from "@prisma/client";
 import { JOURNAL_DISCOVERY_TAGS, seedDiscoveryTags } from "../../prisma/seed/discovery-tags";
 import { JOURNAL_EXTRA_CATEGORIES, seedJournalCategories } from "../../prisma/seed/journal-categories";
