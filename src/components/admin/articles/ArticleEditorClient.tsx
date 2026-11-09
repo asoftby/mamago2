@@ -88,6 +88,9 @@ function applySnapshot(setters: {
   setAuthorLabel: (v: string) => void;
   setCityContext: (v: string) => void;
   setCategoryId: (v: string | null) => void;
+  setOccasionId: (v: string | null) => void;
+  setReviewedSeasonStart: (v: string | null) => void;
+  setSeasonReviewRequested: (v: boolean) => void;
   setAdditionalCategoryIds: (v: string[]) => void;
   setAdditionalGeographyTargets: (v: ArticleGeographyTargetInput[]) => void;
   setTagIds: (v: string[]) => void;
@@ -116,6 +119,9 @@ function applySnapshot(setters: {
   setters.setAuthorLabel(snap.authorLabel ?? "");
   setters.setCityContext(snap.cityContext ?? "");
   setters.setCategoryId(snap.categoryId ?? null);
+  setters.setOccasionId(snap.occasionId ?? null);
+  setters.setReviewedSeasonStart(snap.seasonReviewedForStart ?? null);
+  setters.setSeasonReviewRequested(false);
   setters.setAdditionalCategoryIds(snap.additionalCategoryIds ?? []);
   setters.setAdditionalGeographyTargets(snap.additionalGeographyTargets ?? []);
   setters.setTagIds(snap.tagIds);
@@ -182,6 +188,9 @@ export function ArticleEditorClient({
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial.categoryId ?? null);
+  const [occasionId, setOccasionId] = useState<string | null>(initial.occasionId ?? null);
+  const [reviewedSeasonStart, setReviewedSeasonStart] = useState<string | null>(initial.seasonReviewedForStart ?? null);
+  const [seasonReviewRequested, setSeasonReviewRequested] = useState(false);
   const [additionalCategoryIds, setAdditionalCategoryIds] = useState<string[]>(initial.additionalCategoryIds ?? []);
   const [additionalGeographyTargets, setAdditionalGeographyTargets] = useState<ArticleGeographyTargetInput[]>(initial.additionalGeographyTargets ?? []);
   const [tagIds, setTagIds] = useState<string[]>(initial.tagIds);
@@ -191,6 +200,9 @@ export function ArticleEditorClient({
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [regions, setRegions] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; label: string; slug: string }[]>([]);
+  const [occasions, setOccasions] = useState<Array<{
+    id: string; label: string; isActive: boolean; startsAt: string | null; endsAt: string | null;
+  }>>([]);
   const [discoveryTags, setDiscoveryTags] = useState<
     { id: string; title: string; description: string | null; isActive: boolean; reviewStatus?: "APPROVED" | "PENDING" }[]
   >([]);
@@ -245,6 +257,8 @@ export function ArticleEditorClient({
         authorLabel,
         cityContext,
         categoryId,
+        occasionId,
+        seasonReviewRequested,
         additionalCategoryIds,
         additionalGeographyTargets,
         tagIds,
@@ -273,6 +287,8 @@ export function ArticleEditorClient({
       authorLabel,
       cityContext,
       categoryId,
+      occasionId,
+      seasonReviewRequested,
       additionalCategoryIds,
       additionalGeographyTargets,
       tagIds,
@@ -322,18 +338,20 @@ export function ArticleEditorClient({
       const selectedCategoryIds = [initial.categoryId, ...(initial.additionalCategoryIds ?? [])].filter(Boolean).join(",");
       const selectedCityIds = [initial.cityId, ...(initial.additionalGeographyTargets ?? []).filter((target) => target.type === "CITY").map((target) => target.cityId)].filter(Boolean).join(",");
       const selectedRegionIds = (initial.additionalGeographyTargets ?? []).filter((target) => target.type === "REGION").map((target) => target.regionId).join(",");
-      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}&selectedCityIds=${encodeURIComponent(selectedCityIds)}&selectedRegionIds=${encodeURIComponent(selectedRegionIds)}`);
+      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}&selectedCityIds=${encodeURIComponent(selectedCityIds)}&selectedRegionIds=${encodeURIComponent(selectedRegionIds)}&selectedOccasionId=${encodeURIComponent(initial.occasionId ?? "")}`);
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
         regions?: { id: string; name: string; slug: string }[];
         authors?: { id: string; label: string; email: string }[];
         categories?: { id: string; label: string; slug: string }[];
+        occasions?: { id: string; label: string; isActive: boolean; startsAt: string | null; endsAt: string | null }[];
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
       setRegions(data.regions ?? []);
       setCategories(data.categories ?? []);
+      setOccasions(data.occasions ?? []);
 
       const selectedIds = initial.tagIds.join(",");
       const tagsUrl = selectedIds
@@ -350,7 +368,7 @@ export function ArticleEditorClient({
     return () => {
       cancelled = true;
     };
-  }, [initial.categoryId, initial.additionalCategoryIds, initial.additionalGeographyTargets, initial.cityId, initial.tagIds]);
+  }, [initial.categoryId, initial.additionalCategoryIds, initial.additionalGeographyTargets, initial.cityId, initial.tagIds, initial.occasionId]);
 
   const {
     previewSlug,
@@ -434,6 +452,9 @@ export function ArticleEditorClient({
       setAuthorLabel,
       setCityContext,
       setCategoryId,
+      setOccasionId,
+      setReviewedSeasonStart,
+      setSeasonReviewRequested,
       setAdditionalCategoryIds,
       setAdditionalGeographyTargets,
       setTagIds,
@@ -522,6 +543,9 @@ export function ArticleEditorClient({
       authorUserId: authorUserId || null,
       cityContext: cityContext.trim() || null,
       categoryId,
+      occasionId,
+      seasonReviewRequested,
+      seasonReviewStartsAt: occasions.find((occasion) => occasion.id === occasionId)?.startsAt ?? null,
       additionalCategoryIds,
       additionalGeographyTargets,
       tagIds,
@@ -554,6 +578,9 @@ export function ArticleEditorClient({
       authorUserId,
       cityContext,
       categoryId,
+      occasionId,
+      seasonReviewRequested,
+      occasions,
       additionalCategoryIds,
       additionalGeographyTargets,
       tagIds,
@@ -1067,6 +1094,59 @@ export function ArticleEditorClient({
                 allowClear
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="article-occasion">Повод (необязательно)</Label>
+            <p className="text-xs text-muted-foreground">
+              Сезонные статьи используют даты повода из админки. После окончания сезона
+              они остаются доступны по URL, но опускаются ниже актуальных материалов.
+            </p>
+            {hydrated ? (
+              <Select
+                value={occasionId ?? "__none__"}
+                onValueChange={(value) => {
+                  setOccasionId(value === "__none__" ? null : value);
+                  setSeasonReviewRequested(false);
+                }}
+              >
+                <SelectTrigger id="article-occasion" className="w-full">
+                  <SelectValue placeholder="Постоянная статья (без повода)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Без повода — постоянная статья</SelectItem>
+                  {occasions.map((occasion) => (
+                    <SelectItem key={occasion.id} value={occasion.id}>
+                      {occasion.label}{!occasion.isActive ? " (неактивен)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : <div className="h-9 w-full animate-pulse rounded-md bg-muted/40" aria-hidden />}
+            {(() => {
+              const selected = occasions.find((occasion) => occasion.id === occasionId);
+              if (!selected) return null;
+              const needsReview = occasionId === initial.occasionId
+                && selected.startsAt !== null && selected.startsAt !== reviewedSeasonStart;
+              return (
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <p>Период: {selected.startsAt?.slice(0, 10) ?? "—"} — {selected.endsAt?.slice(0, 10) ?? "—"}</p>
+                  {needsReview ? (
+                    <div className="space-y-2">
+                      <p>Для текущего периода требуется редакционная проверка.</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={seasonReviewRequested ? "secondary" : "outline"}
+                        disabled={!selected.isActive}
+                        onClick={() => setSeasonReviewRequested(true)}
+                      >
+                        {seasonReviewRequested ? "Актуальность подтверждена (сохраните)" : "Подтвердить актуальность для сезона"}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
           <div className="space-y-2">
             <Label htmlFor="article-discovery-tags">Теги</Label>

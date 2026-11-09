@@ -40,7 +40,7 @@ assert.match(journalCategoriesSource, /SEO_ISOLATED_TEST_DB === "true"/);
 assert.match(journalCategoriesSource, /Promise\.all\(\[prisma\.article\.findFirst/);
 assert.match(listSource, /PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG/);
 assert.match(listSource, /PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS/);
-assert.match(cacheSource, /PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS = 60 \* 60/);
+assert.match(cacheSource, /PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS = 300/);
 assert.match(
   cacheSource,
   /PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG = "event-step1-categories"/,
