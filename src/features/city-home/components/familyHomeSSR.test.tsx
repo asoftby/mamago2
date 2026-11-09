@@ -121,14 +121,14 @@ for (const count of [0, 1, 2, 7, 8, 10, 11]) {
     else { assert.match(html, /3–14 лет · 3 ноя./); assert.match(html, /Бесплатно/); assert.doesNotMatch(html, /Подходит Ане/);
       assert.match(html, /aspect-ratio:2\/3/); }
     if (count > 1) { assert.doesNotMatch(html, /Подходит Ане/); assert.match(html, /от 10/); }
-    if (count === 3) {
+    if (count === 7) {
       const htmlWithAlternatives = renderToStaticMarkup(
         <AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
           <FamilyHomeResults data={data} context={context} citySlug="minsk" impressed={new Set()} onImpression={() => {}}
             audienceSections={{ primary: data.items.slice(0, 1), alternatives: data.items.slice(1), active: true }} />
         </AuthProvider></AppRouterContext.Provider>,
       );
-      assert.equal((htmlWithAlternatives.match(/data-masonry-media=/g) ?? []).length, 3);
+      assert.equal((htmlWithAlternatives.match(/data-masonry-media=/g) ?? []).length, 7);
       assert.doesNotMatch(htmlWithAlternatives, /Больше под ваш запрос|Справа — другие|По выбранным параметрам/);
       assert.equal((htmlWithAlternatives.match(/Ещё варианты</g) ?? []).length, 1);
     }
