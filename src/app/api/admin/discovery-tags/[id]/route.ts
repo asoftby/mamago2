@@ -71,6 +71,11 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   if (reviewStatus === "PENDING" && isActive) {
     return NextResponse.json({ error: "Сначала одобрите предложенный тег" }, { status: 400 });
   }
+  const duplicate = await prisma.discoveryTag.findFirst({
+    where: { id: { not: id }, OR: [{ slug }, { title: { equals: title, mode: "insensitive" } }] },
+    select: { id: true },
+  });
+  if (duplicate) return NextResponse.json({ error: "Такой тег уже существует" }, { status: 409 });
   if (existing.slug !== slug && existing.isActive) {
     // Existing public URLs require a separate reviewed redirect migration.
     return NextResponse.json({ error: "Slug опубликованного тега нельзя менять без настройки редиректа" }, { status: 400 });
@@ -94,8 +99,8 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         data: {
           actorId: user.id, actorRole: user.role,
           action: "DISCOVERY_TAG_UPDATE", entityType: "DiscoveryTag", entityId: id,
-          before: { title: existing.title, slug: existing.slug, isActive: existing.isActive, indexingMode: existing.indexingMode, reviewStatus: existing.reviewStatus },
-          after: { title: tag.title, slug: tag.slug, isActive: tag.isActive, indexingMode: tag.indexingMode, reviewStatus: tag.reviewStatus },
+          before: { title: existing.title, slug: existing.slug, group: existing.group, description: existing.description, seoTitle: existing.seoTitle, seoDescription: existing.seoDescription, isActive: existing.isActive, indexingMode: existing.indexingMode, reviewStatus: existing.reviewStatus },
+          after: { title: tag.title, slug: tag.slug, group: tag.group, description: tag.description, seoTitle: tag.seoTitle, seoDescription: tag.seoDescription, isActive: tag.isActive, indexingMode: tag.indexingMode, reviewStatus: tag.reviewStatus },
         },
       });
       return tag;

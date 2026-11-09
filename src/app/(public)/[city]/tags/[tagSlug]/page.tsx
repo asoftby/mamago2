@@ -10,7 +10,7 @@ import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
-import { JournalFeedGridCard, JournalFeedRow, JournalMobileCard } from "@/components/journal/JournalCards";
+import { JournalTagCardList } from "@/components/journal/JournalTagCardList";
 import { queryCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { BlogPagination } from "../../../blog/BlogPagination";
@@ -192,21 +192,7 @@ export default async function CityTagPage({ params, searchParams }: PageProps) {
         </p>
       </div>
 
-      <div className="flex flex-col gap-10 md:hidden">
-        {data.articles.map((article, index) => (
-          <JournalMobileCard key={article.id} article={article} index={index + 1} />
-        ))}
-      </div>
-      <div className="hidden border-b border-border md:block lg:hidden">
-        {data.articles.map((article, index) => (
-          <JournalFeedRow key={article.id} article={article} index={index + 1} />
-        ))}
-      </div>
-      <div className="hidden grid-cols-4 gap-x-6 gap-y-12 lg:grid">
-        {data.articles.map((article, index) => (
-          <JournalFeedGridCard key={article.id} article={article} index={index + 1} />
-        ))}
-      </div>
+      <JournalTagCardList articles={data.articles} citySlug={data.city.slug} />
 
       <div className="-mx-4 mt-10 sm:-mx-6">
         <BlogPagination basePath={basePath} page={data.page} totalPages={data.totalPages} />
