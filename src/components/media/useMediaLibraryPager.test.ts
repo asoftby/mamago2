@@ -4,6 +4,7 @@
  * Run: npx tsx src/components/media/useMediaLibraryPager.test.ts
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   MEDIA_LIBRARY_CLIENT_CACHE_TTL_MS,
   mergeMediaLibraryItems,
@@ -107,5 +108,25 @@ assert.equal(
   }),
   true,
 );
+
+// Article cover/gallery must use explicit, user-initiated pagination. The
+// general media picker keeps its existing infinite-scroll contract.
+const mediaUploadField = readFileSync(new URL("./MediaUploadField.tsx", import.meta.url), "utf8");
+const coverField = readFileSync(new URL("../admin/articles/ArticleEditorCoverField.tsx", import.meta.url), "utf8");
+const galleryField = readFileSync(new URL("../admin/articles/ArticleEditorGalleryField.tsx", import.meta.url), "utf8");
+assert.match(coverField, /libraryPageMode="manual"/);
+assert.match(galleryField, /libraryPageMode="manual"/);
+assert.match(mediaUploadField, /libraryPageMode === "manual" && libraryHasMore && !libraryLoading/);
+assert.match(mediaUploadField, /Подгрузить ещё/);
+assert.match(mediaUploadField, /onClick=\{handleLoadMore\} disabled=\{libraryLoadingMore \|\| uploading\}/);
+assert.match(mediaUploadField, /libraryPageMode === "automatic" && libraryOpen/);
+// The first open loads only article-specific media. The author's first page
+// is fetched on tab activation, avoiding an unnecessary request.
+const openLibrarySource = mediaUploadField.slice(
+  mediaUploadField.indexOf("  const openLibrary = async"),
+  mediaUploadField.indexOf("  const handleLoadMore = useCallback"),
+);
+assert.match(openLibrarySource, /if \(articleLibrary\) \{[\s\S]*?await articleLibrary\.load\(\);[\s\S]*?return;[\s\S]*?await loadLibraryInitial\(\);/);
+assert.match(openLibrarySource, /const openAuthorLibrary = \(\) => \{[\s\S]*?void loadLibraryInitial\(\)/);
 
 console.log("useMediaLibraryPager.test.ts: OK");
