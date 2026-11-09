@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { ArticleDynamicAfishaData } from "@/components/article/blocks/ArticleDynamicAfishaBlock";
 import { articleDynamicAfishaParams, type ArticleAfishaPeriod } from "@/lib/article/articleDynamicAfishaFilters";
 import { getActivePublicOccasions } from "@/lib/discovery/occasions";
