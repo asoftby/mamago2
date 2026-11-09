@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Heart, Share2 } from "lucide-react";
+import { Heart } from "lucide-react";
+import { PublicationActionButtons, PUBLICATION_SAVE_ACTION_CLASS } from "./PublicationActionButtons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -61,6 +62,7 @@ export function PublicationSaveShare({
   }, [publicationKind, publicationId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh fetches asynchronously from the remote summary API
     void refresh();
     const onUpdated = (event: Event) => {
       const detail = (event as CustomEvent<{ kind?: string; id?: string }>).detail;
@@ -79,37 +81,26 @@ export function PublicationSaveShare({
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={isSaving}
-          aria-pressed={isSaved}
-          aria-label={isSaved ? "Сохранено" : "Сохранить публикацию"}
-          className={cn(
-            "inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-semibold transition-colors",
-            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E86A3A]",
-            isSaved
-              ? "border-[#E86A3A]/25 bg-[#FFE9DF] text-[#C2522A]"
-              : "border-[#E86A3A]/30 bg-[#FFF0E8] text-[#D4562B] hover:bg-[#FFE2D3]",
-            isSaving && "cursor-wait opacity-60",
-          )}
-        >
-          <Heart aria-hidden="true" className={cn("h-5 w-5 shrink-0", isSaved && "fill-current")} />
-          <span>{isSaved ? "Сохранено" : "Сохранить"}</span>
-        </button>
-        <button
-          type="button"
-          onClick={onShare}
-          className={cn(
-            "inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#141210]/15 px-3 text-sm font-semibold text-[#141210]",
-            "transition-colors hover:bg-[#141210]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E86A3A]",
-          )}
-        >
-          <Share2 aria-hidden="true" className="h-5 w-5 shrink-0" />
-          <span>Поделиться</span>
-        </button>
-      </div>
+      <PublicationActionButtons
+        onShare={onShare}
+        saveControl={
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving}
+            aria-pressed={isSaved}
+            aria-label={isSaved ? "Сохранено" : "Сохранить публикацию"}
+            className={cn(
+              PUBLICATION_SAVE_ACTION_CLASS,
+              isSaved && "border-[#E86A3A]/25 bg-[#FFE9DF] text-[#C2522A]",
+              isSaving && "cursor-wait opacity-60",
+            )}
+          >
+            <Heart aria-hidden="true" className={cn("h-5 w-5 shrink-0", isSaved && "fill-current")} />
+            <span>{isSaved ? "Сохранено" : "Сохранить"}</span>
+          </button>
+        }
+      />
       {total !== null && total >= 3 && (
         <div className="mt-3 flex min-h-9 items-center gap-3">
           {avatars.length > 0 && (

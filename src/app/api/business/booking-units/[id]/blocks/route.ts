@@ -1,3 +1,4 @@
+import { lockBookingUnits } from "@/server/services/booking/resourceAllocation";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
@@ -76,14 +77,12 @@ export async function POST(request: NextRequest, { params }: Context) {
     if (start <= now || end <= start || end.getTime() - start.getTime() > 31 * 86400000)
       throw new ApiError(422, "Интервал должен быть в будущем, не длиннее 31 дня");
     const block = await prisma.$transaction(async tx => {
-      const locked = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT "id" FROM "BookingUnit"
-        WHERE "id" = ${id} AND "businessId" = ${owner} FOR UPDATE
-      `;
-      if (locked.length !== 1) throw new ApiError(404, "Ресурс не найден");
+      if (!await lockBookingUnits(tx, owner, [id])) throw new ApiError(404, "Ресурс не найден");
+      const checkedAt = new Date();
+      if (start <= checkedAt) throw new ApiError(422, "Интервал должен быть в будущем");
       const occupied = await tx.bookingAllocation.findFirst({
         where: { bookingUnitId: id, blockStart: { lt: end }, blockEnd: { gt: start },
-          OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: now } }] },
+          OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: checkedAt } }] },
         select: { id: true },
       });
       const blocked = await tx.calendarBlock.findFirst({

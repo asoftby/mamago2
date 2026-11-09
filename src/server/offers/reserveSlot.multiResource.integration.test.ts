@@ -98,6 +98,27 @@ test("a room and equipment are held atomically with individual prep/cleanup wind
   assert.equal(await db.bookingRequest.count({ where: { id: bookingId, status: "NEW" } }), 1);
 });
 
+test("a new reservation releases an expired hold before inserting its allocation", async () => {
+  const room = await unit("Expired hold room");
+  const offerId = await offer([room]);
+  const input = { offerId, startsAt: start, endsAt: end, unitId: room, ...contact };
+  const previous = await reserveSlot(input);
+  await db.bookingAllocation.updateMany({
+    where: { bookingRequestId: previous.bookingId },
+    data: { expiresAt: new Date(Date.now() - 1_000) },
+  });
+
+  const replacement = await reserveSlot(input);
+  assert.notEqual(previous.bookingId, replacement.bookingId);
+  const rows = await db.bookingAllocation.findMany({
+    where: { bookingUnitId: room }, select: { bookingRequestId: true, status: true },
+  });
+  assert.deepEqual(new Map(rows.map((row) => [row.bookingRequestId, row.status])), new Map([
+    [previous.bookingId, "EXPIRED"],
+    [replacement.bookingId, "HELD"],
+  ]));
+});
+
 test("server-calculated options and price snapshot persist atomically with additional unit", async () => {
   const room = await unit("Priced room");
   const projector = await unit("Priced projector");
