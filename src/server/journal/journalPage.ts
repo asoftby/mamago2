@@ -11,6 +11,7 @@ import {
 } from "@/server/article/publicArticleCache";
 import type { JournalTypeFilter } from "@/lib/journal/journalCardMeta";
 import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
+import { getSeasonallyCurrentJournalWhere } from "@/lib/journal/seasonalJournal";
 import {
   JOURNAL_COLLECTIONS_LIMIT,
   JOURNAL_NEWS_LIMIT,
@@ -50,10 +51,11 @@ export async function loadJournalPage(input: {
   const page = Math.max(1, Math.trunc(input.page));
   const load = async (): Promise<JournalPageData> => {
     const top = showJournalTopBlocks(page, input.typeFilter);
+    const current = await getSeasonallyCurrentJournalWhere();
     const base = journalBlockWheres({ scopeWhere: input.scopeWhere, typeFilter: input.typeFilter, mainId: null });
     const [mainRows, news] = top
       ? await Promise.all([
-          queryJournalArticles(null, { additionalWhere: base.main, take: 1 }),
+          queryJournalArticles(null, { additionalWhere: { AND: [base.main, current] }, seasonalPriority: false, take: 1 }),
           queryJournalArticles(input.city, { additionalWhere: base.news, take: JOURNAL_NEWS_LIMIT }),
         ])
       : [[], []];
@@ -62,7 +64,7 @@ export async function loadJournalPage(input: {
     const { feed: feedWhere } = journalBlockWheres({
       scopeWhere: input.scopeWhere,
       typeFilter: input.typeFilter,
-      mainId: input.typeFilter ? null : await resolveMainId(main, input.scopeWhere, top),
+      mainId: input.typeFilter ? null : await resolveMainId(main, input.scopeWhere, top, current),
     });
     const newsFeedWhere: Prisma.ArticleWhereInput = input.typeFilter === "BREAKING_NEWS"
       ? { AND: [feedWhere, input.newsArchive
@@ -74,7 +76,7 @@ export async function loadJournalPage(input: {
     // Страница типа (?type=news|collection) — все материалы типа, включая истёкшие
     // новости, строго по дате публикации. Основная лента — закреплённые, затем город.
     const feed = page > totalPages ? [] : input.typeFilter === "BREAKING_NEWS"
-      ? await queryJournalArticles(null, { additionalWhere: newsFeedWhere, skip: (page - 1) * pageSize, take: pageSize })
+      ? await queryJournalArticles(null, { additionalWhere: newsFeedWhere, seasonalPriority: false, skip: (page - 1) * pageSize, take: pageSize })
       : await queryJournalArticles(input.typeFilter ? null : input.city, {
       additionalWhere: feedWhere,
       pinnedFirst: !input.typeFilter,
@@ -95,10 +97,11 @@ async function resolveMainId(
   main: CityHomeJournalArticle | null,
   scopeWhere: Prisma.ArticleWhereInput | null,
   topLoaded: boolean,
+  current: Prisma.ArticleWhereInput,
 ): Promise<string | null> {
   if (topLoaded) return main?.id ?? null;
   const { main: mainWhere } = journalBlockWheres({ scopeWhere, typeFilter: null, mainId: null });
-  const rows = await queryJournalArticles(null, { additionalWhere: mainWhere, take: 1 });
+  const rows = await queryJournalArticles(null, { additionalWhere: { AND: [mainWhere, current] }, seasonalPriority: false, take: 1 });
   return rows[0]?.id ?? null;
 }
 
@@ -112,8 +115,10 @@ export async function listJournalCollections(input: {
   limit?: number;
 }): Promise<CityHomeJournalArticle[]> {
   const { collections } = journalBlockWheres({ scopeWhere: input.scopeWhere ?? null, typeFilter: null, mainId: null });
+  const current = await getSeasonallyCurrentJournalWhere();
   return queryJournalArticles(input.city, {
-    additionalWhere: collections,
+    additionalWhere: { AND: [collections, current] },
+    seasonalPriority: false,
     take: Math.max(1, Math.min(24, input.limit ?? JOURNAL_COLLECTIONS_LIMIT)),
   });
 }

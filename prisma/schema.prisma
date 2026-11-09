@@ -1072,6 +1072,7 @@ model Occasion {
   updatedAt   DateTime     @updatedAt
 
   activityLinks ActivityOccasion[]
+  articles Article[] @relation("ArticleOccasion")
 
   @@index([sortOrder])
   @@index([type, sortOrder])
@@ -3697,6 +3698,11 @@ model Article {
   relatedPlace       Place?               @relation("ArticleRelatedPlace", fields: [relatedPlaceId], references: [id], onDelete: SetNull)
   /// EventCategory с publicationType=ARTICLE (корневая категория журнала).
   categoryId         String?
+  /// Null means evergreen. The calendar owns the occasion's active window.
+  occasionId         String?
+  occasion           Occasion? @relation("ArticleOccasion", fields: [occasionId], references: [id], onDelete: SetNull)
+  /// Start of the season explicitly approved by an editor.
+  seasonReviewedForStart DateTime?
   category           EventCategory?       @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
   additionalCategoryLinks ArticleCategoryLink[]
   additionalGeographyTargets ArticleGeographyTarget[]
@@ -3723,6 +3729,7 @@ model Article {
   @@index([geoScope])
   @@index([relatedPlaceId])
   @@index([categoryId])
+  @@index([occasionId])
   @@index([territoryId])
   @@index([regionTerritoryId])
   @@index([publicationType, status, publishedAt])
