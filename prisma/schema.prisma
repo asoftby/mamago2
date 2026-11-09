@@ -1591,6 +1591,7 @@ model ActivitySession {
   title           String?          @db.VarChar(120)
   activity        Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
   bookingRequests BookingRequest[]
+  allocations BookingAllocation[]
 
   @@unique([source, externalId])
   @@index([activityId])
@@ -2885,6 +2886,7 @@ model OfferSession {
   title String?
   isCancelled Boolean @default(false)
   bookingRequests BookingRequest[]
+  allocations BookingAllocation[]
   /// Числовая цена (для бюджет-фильтра)
   price    Decimal? @db.Decimal(10, 2)
 
@@ -6213,7 +6215,9 @@ model CalendarBlock {
 model BookingAllocation {
   id String @id @default(cuid())
   bookingUnitId String
-  bookingRequestId String
+  bookingRequestId String?
+  offerSessionId String?
+  activitySessionId String?
   partyQuoteId String? @unique
   blockStart DateTime
   blockEnd DateTime
@@ -6223,11 +6227,15 @@ model BookingAllocation {
   updatedAt DateTime @updatedAt
 
   bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
-  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  bookingRequest BookingRequest? @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  offerSession OfferSession? @relation(fields: [offerSessionId], references: [id], onDelete: Restrict)
+  activitySession ActivitySession? @relation(fields: [activitySessionId], references: [id], onDelete: Restrict)
   quote PartyQuote? @relation(fields: [partyQuoteId], references: [id], onDelete: SetNull)
 
   @@index([bookingUnitId, status, blockStart, blockEnd])
   @@index([bookingRequestId])
+  @@index([offerSessionId])
+  @@index([activitySessionId])
 }
 
 /// Статус заявки на запись

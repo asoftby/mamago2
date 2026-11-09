@@ -74,3 +74,70 @@ test("past NOT_HELD outcome releases all exclusive resource allocations atomical
   assert.equal(result.status, BookingStatus.CANCELLED);
   assert.equal((await prisma.bookingAllocation.findUniqueOrThrow({ where: { id: allocation.id } })).status, "RELEASED");
 });
+
+test("offer sessions, event sessions and request holds share the same PostgreSQL exclusion", async () => {
+  await fixture();
+  const place = await prisma.place.create({ data: {
+    title: "Session venue " + suffix, shortDesc: "Test", ownerBusinessId: businessId,
+    createdByUserId: ownerId, activityTypes: [], ageTags: [], visitFormats: [],
+  } });
+  const offer = await prisma.offer.create({ data: {
+    kind: "SERVICE", productType: "REGULAR_ACTIVITY", title: "Group " + suffix, placeId: place.id,
+  } });
+  const activity = await prisma.activity.create({ data: {
+    ownerUserId: ownerId, businessId, title: "Event " + suffix, shortDesc: "Test",
+    type: "EVENT", scheduleMode: "ONE_TIME",
+  } });
+  const room = await prisma.bookingUnit.create({ data: { businessId, name: "Shared room " + suffix } });
+  const blockStart = new Date(Date.now() + 86_400_000);
+  const blockEnd = new Date(blockStart.getTime() + 3_600_000);
+  try {
+    const classSession = await prisma.offerSession.create({ data: {
+      offerId: offer.id, startAt: blockStart, endAt: blockEnd, capacity: 2,
+    } });
+    const eventSession = await prisma.activitySession.create({ data: {
+      activityId: activity.id, startsAt: blockStart,
+    } });
+    const booking = await prisma.bookingRequest.create({ data: {
+      businessId, publicationType: PublicationType.OFFER, offerId: offer.id,
+      offerSessionId: classSession.id, status: "CONFIRMED", ...contact,
+    } });
+    const allocation = { bookingUnitId: room.id, blockStart, blockEnd, status: "CONFIRMED" as const };
+    const ownerError = /BookingAllocation_exactly_one_owner/;
+
+    await assert.rejects(prisma.bookingAllocation.create({ data: allocation }), ownerError);
+    await assert.rejects(prisma.bookingAllocation.create({ data: {
+      ...allocation, bookingRequestId: booking.id, offerSessionId: classSession.id,
+    } }), ownerError);
+    await assert.rejects(prisma.bookingAllocation.create({ data: {
+      ...allocation, activitySessionId: "missing-session-" + suffix,
+    } }), /BookingAllocation_activitySessionId_fkey/);
+
+    const attempts = await Promise.allSettled([
+      prisma.bookingAllocation.create({ data: { ...allocation, offerSessionId: classSession.id } }),
+      prisma.bookingAllocation.create({ data: { ...allocation, activitySessionId: eventSession.id } }),
+      prisma.bookingAllocation.create({ data: {
+        ...allocation, bookingRequestId: booking.id, status: "HELD", expiresAt: blockStart,
+      } }),
+    ]);
+    const winner = attempts.find((result) => result.status === "fulfilled");
+    assert.ok(winner);
+    const rejected = attempts.filter((result) => result.status === "rejected");
+    assert.equal(rejected.length, 2);
+    for (const result of rejected) assert.match(String(result.reason), /BookingAllocation_no_active_overlap/);
+
+    await prisma.bookingAllocation.update({ where: { id: winner.value.id }, data: { status: "RELEASED" } });
+    const fixed = await prisma.bookingAllocation.create({
+      data: { ...allocation, offerSessionId: classSession.id },
+    });
+    await prisma.bookingRequest.delete({ where: { id: booking.id } });
+    assert.equal((await prisma.bookingAllocation.findUniqueOrThrow({ where: { id: fixed.id } })).status, "CONFIRMED");
+    await assert.rejects(prisma.offerSession.delete({ where: { id: classSession.id } }), /BookingAllocation_offerSessionId_fkey/);
+  } finally {
+    await prisma.bookingUnit.delete({ where: { id: room.id } });
+    await prisma.bookingRequest.deleteMany({ where: { offerId: offer.id } });
+    await prisma.offer.delete({ where: { id: offer.id } });
+    await prisma.activity.delete({ where: { id: activity.id } });
+    await prisma.place.delete({ where: { id: place.id } });
+  }
+});
