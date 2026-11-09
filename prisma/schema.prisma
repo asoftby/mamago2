@@ -6749,6 +6749,8 @@ model GuestUsage {
   /// Минутное окно (unix-минута) для rate limit
   rateMinuteBucket  Int?
   rateCountInMinute Int      @default(0)
+  /// «Сценарий дня» гостя: даты, для которых уже была первая сборка (только она тратит квоту).
+  scenarioDates     String[] @default([])
 
   @@index([generationsCount])
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
+import { applyGuestDayScenarioAndAnnounce } from "@/lib/my-plan/applyGuestDayScenario";
 import { useMyPlan } from "../hooks/useMyPlan";
 import type { PlanItemWithActivity } from "../types/event";
 import { PlanMainContent } from "./PlanMainContent";
@@ -107,6 +108,15 @@ export function MyPlanPanelContent({
    * this retry covers interrupted navigation/auth-cookie races. The local draft
    * is cleared only after every explicitly committed card is saved by the API.
    */
+  // A day a guest built with «Собрать день» and saved before the FULL-PAGE sign-in (/login never runs the post-auth
+  // pipeline): saved here, once, as soon as the widget opens for a signed-in user.
+  useEffect(() => {
+    if (!open || !isAuthenticated || authMeLoading || !dayScenarioEnabled) return;
+    void applyGuestDayScenarioAndAnnounce().catch((error) => {
+      console.error("[my-plan] guest day scenario recovery failed", error);
+    });
+  }, [open, isAuthenticated, authMeLoading, dayScenarioEnabled]);
+
   useEffect(() => {
     if (!open || !isAuthenticated || authMeLoading) return;
     let cancelled = false;

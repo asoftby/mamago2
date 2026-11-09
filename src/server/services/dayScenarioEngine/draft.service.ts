@@ -42,6 +42,8 @@ export const draftRequestSchema = z.object({
   /** Omitted: the family's saved choice (signed in), else the car. The answer says which mode was used. */
   mode: z.enum(["walk", "car", "transit"]).optional(),
   ageRanges: z.array(CanonicalAgeRangeSchema).max(12).optional().default([]),
+  /** A guest's anonymous id (uuid): the quota counts the first build of each date per guest. Ignored for a signed-in user. */
+  anonymousId: z.string().uuid().optional(),
   personaIds: z.array(z.string().min(1).max(64)).max(12).optional().default([]),
   excludeActivityIds: z.array(z.string().min(1).max(64)).max(100).optional().default([]),
   /** "another": every point of this day the user has already seen; seen filler places are not offered again. */
