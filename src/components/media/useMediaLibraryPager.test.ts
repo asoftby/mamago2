@@ -128,5 +128,9 @@ const openLibrarySource = mediaUploadField.slice(
 );
 assert.match(openLibrarySource, /if \(articleLibrary\) \{[\s\S]*?await articleLibrary\.load\(\);[\s\S]*?return;[\s\S]*?await loadLibraryInitial\(\);/);
 assert.match(openLibrarySource, /const openAuthorLibrary = \(\) => \{[\s\S]*?void loadLibraryInitial\(\)/);
+assert.match(mediaUploadField, /const authorTabLoadedForOwnerRef = useRef<string \| null>\(null\)/);
+assert.match(openLibrarySource, /authorTabLoadedForOwnerRef\.current = null/);
+assert.match(openLibrarySource, /if \(authorTabLoadedForOwnerRef\.current === owner\) return/);
+assert.match(mediaUploadField, /if \(libraryOpenRef\.current && \(!hasArticleLibrary \|\| activeSourceTab === "author"\)\)/);
 
 console.log("useMediaLibraryPager.test.ts: OK");
