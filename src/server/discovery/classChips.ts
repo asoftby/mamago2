@@ -58,8 +58,9 @@ export async function listDiscoveryClassChips(options?: {
 export async function listPopulatedDiscoveryClassChips(
   cityId: string,
   citySlug: string,
+  configuredChips?: DiscoveryClassChipRecord[],
 ): Promise<DiscoveryClassChipRecord[]> {
-  const chips = await listDiscoveryClassChips();
+  const chips = configuredChips ?? await listDiscoveryClassChips();
   if (chips.length === 0) return [];
 
   const inventory = await unstable_cache(async () => {
