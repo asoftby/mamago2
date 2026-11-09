@@ -9,14 +9,22 @@ import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
+import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
+import { JournalTaggedFeed } from "@/components/journal/JournalFeedCards";
 import { queryCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { BlogPagination } from "../../../blog/BlogPagination";
-import { JournalTaggedFeed } from "@/components/journal/JournalFeedCards";
 
 type PageProps = {
   params: Promise<{ city: string; tagSlug: string }>;
   searchParams: Promise<{ page?: string | string[] }>;
+};
+
+type CityRef = {
+  id: string;
+  slug: string;
+  name: string;
+  regionId: string | null;
 };
 
 const PAGE_SIZE = 24;
@@ -46,7 +54,22 @@ function indexableTaggedArticleWhere(tagId: string): Prisma.ArticleWhereInput {
       { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
     ],
     tags: { some: { id: tagId } },
-    // Geography is a ranking signal, not a filter. Tagged articles from other cities are welcome.
+  };
+}
+
+/** Only local or broadly applicable articles count towards the city's SEO threshold. */
+function cityRelevantArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
+  const targets: Prisma.ArticleGeographyTargetWhereInput[] = [
+    { type: "CITY", cityId: city.id },
+    ...(city.regionId ? [{ type: "REGION" as const, regionId: city.regionId }] : []),
+  ];
+  return {
+    OR: [
+      { geoScope: "COUNTRY" },
+      { geoScope: "CITY", cityId: city.id },
+      ...(city.regionId ? [{ geoScope: "REGION" as const, regionId: city.regionId }] : []),
+      { additionalGeographyTargets: { some: { OR: targets } } },
+    ],
   };
 }
 
@@ -55,7 +78,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
   if (!city) return null;
 
   const tag = await prisma.discoveryTag.findFirst({
-    where: { slug: tagSlug, isActive: true },
+    where: { slug: tagSlug, isActive: true, reviewStatus: "APPROVED" },
     select: {
       id: true,
       slug: true,
@@ -63,12 +86,16 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
       description: true,
       seoTitle: true,
       seoDescription: true,
+      indexingMode: true,
     },
   });
   if (!tag) return null;
 
   const where = indexableTaggedArticleWhere(tag.id);
-  const total = await prisma.article.count({ where });
+  const [total, eligibleCityCount] = await Promise.all([
+    prisma.article.count({ where }),
+    prisma.article.count({ where: { AND: [where, cityRelevantArticleWhere(city)] } }),
+  ]);
   if (total === 0) return null;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -87,6 +114,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
     page: safePage,
     total,
     totalPages,
+    canIndex: shouldIndexTagPage(tag.indexingMode, eligibleCityCount),
     articles,
   };
 }
@@ -125,7 +153,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
       title,
       description,
       url: canonical,
-      robots: { index: true, follow: true },
+      robots: { index: data.canIndex, follow: true },
     }),
     title,
     description,
@@ -169,7 +197,6 @@ export default async function CityTagPage({ params, searchParams }: PageProps) {
         citySlug={data.city.slug}
         blogHref={`/${data.city.slug}/blog`}
       />
-
 
       <div className="-mx-4 mt-10 sm:-mx-6">
         <BlogPagination basePath={basePath} page={data.page} totalPages={data.totalPages} />
