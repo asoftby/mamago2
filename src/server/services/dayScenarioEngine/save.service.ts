@@ -33,9 +33,12 @@ export const saveItemSchema = z.object({
     .default(null),
 });
 
+/** A saved point the draft could not hold (the pool no longer has it): it stays in the day exactly as it is. */
+export const keepPointSchema = z.object({ kind: z.enum(["event", "place"]), activityId: ID });
+
 export const saveRequestSchema = z.object({
   days: z
-    .array(z.object({ date: calendarDaySchema, items: z.array(saveItemSchema).min(1).max(MAX_ITEMS_PER_DAY) }))
+    .array(z.object({ date: calendarDaySchema, items: z.array(saveItemSchema).min(1).max(MAX_ITEMS_PER_DAY), keep: z.array(keepPointSchema).max(MAX_ITEMS_PER_DAY).optional().default([]) }))
     .min(1)
     .max(MAX_DAYS),
 });
@@ -54,7 +57,11 @@ export type SaveResponse = { groupId: string | null; days: SavedDay[] };
 /** Stable hash of what the client asked for (order of days/items does not matter). */
 export function requestHashOf(request: SaveRequest): string {
   const days = [...request.days]
-    .map((day) => ({ date: day.date, items: [...day.items].sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.activityId.localeCompare(b.activityId)) }))
+    .map((day) => ({
+      date: day.date,
+      items: [...day.items].sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.activityId.localeCompare(b.activityId)),
+      keep: [...day.keep].map((point) => `${point.kind}:${point.activityId}`).sort(),
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
   return createHash("sha256").update(JSON.stringify(days)).digest("hex");
 }
@@ -178,7 +185,8 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
         const row = rows.find((r) => r.date === day.date)!;
         // Re-saving a day: its own earlier entries are replaced; manual and foreign entries stay.
         const mine = await tx.planItem.findMany({ where: { scenarioId: row.id }, select: { id: true, activityId: true, placeId: true } });
-        const wanted = new Set(day.items.map((item) => `${item.kind}:${item.activityId}`));
+        // Points the draft could not hold (keep) are not touched: neither rewritten nor treated as dropped.
+        const wanted = new Set([...day.items.map((item) => `${item.kind}:${item.activityId}`), ...day.keep.map((point) => `${point.kind}:${point.activityId}`)]);
         const stale = mine.filter((item) => !wanted.has(item.activityId ? `event:${item.activityId}` : `place:${item.placeId}`));
         if (stale.length > 0) await tx.planItem.deleteMany({ where: { id: { in: stale.map((item) => item.id) }, scenarioId: row.id } });
         const keep = new Map(mine.filter((item) => !stale.includes(item)).map((item) => [item.activityId ? `event:${item.activityId}` : `place:${item.placeId}`, item.id]));
