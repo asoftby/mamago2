@@ -35,6 +35,49 @@ export function SavedDayMenu({
   const [confirmWeekend, setConfirmWeekend] = useState(false);
   const [busy, setBusy] = useState(false);
   const label = savedDayMenuLabel(count);
+  const scope = pair ? "group" : "day";
+
+  // «Поделиться»: the link to the day (to the weekend when it is one) goes to the system share sheet or the clipboard.
+  const share = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/plan/day-scenario/share?date=${encodeURIComponent(date)}&scope=${scope}`, { method: "POST", credentials: "include" });
+      if (!response.ok) throw new Error(String(response.status));
+      const { path } = (await response.json()) as { path: string };
+      const url = `${window.location.origin}${path}`;
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title: pair ? "Выходные от mamaGo" : "День от mamaGo", url });
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return; // the user closed the sheet
+        }
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success("Ссылка скопирована");
+    } catch {
+      toast.error("Не удалось получить ссылку. Попробуйте ещё раз.");
+    } finally {
+      setBusy(false);
+      setMenuOpen(false);
+    }
+  };
+
+  const unshare = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/plan/day-scenario/share?date=${encodeURIComponent(date)}&scope=${scope}`, { method: "DELETE", credentials: "include" });
+      if (!response.ok) throw new Error(String(response.status));
+      toast.success("Ссылка закрыта");
+    } catch {
+      toast.error("Не удалось закрыть ссылку. Попробуйте ещё раз.");
+    } finally {
+      setBusy(false);
+      setMenuOpen(false);
+    }
+  };
 
   const remove = async (scope: "day" | "group") => {
     if (busy) return;
@@ -89,6 +132,8 @@ export function SavedDayMenu({
               Изменить день
             </button>
           ) : null}
+          <button type="button" className={MENU_ITEM} onClick={() => void share()}>{pair ? "Поделиться выходными" : "Поделиться"}</button>
+          <button type="button" className={MENU_ITEM} onClick={() => void unshare()}>Закрыть ссылку</button>
           <button type="button" className={MENU_ITEM} onClick={() => void remove("day")}>Удалить день от mamaGo</button>
           {pair ? (
             <button

@@ -85,6 +85,8 @@ export async function deleteSavedDays(userId: string, date: string, scope: Delet
     } else {
       await tx.$queryRaw`SELECT id FROM "DayScenario" WHERE id = ${rows[0]!.id} FOR UPDATE`;
     }
+    // The links to those days die with them: a day saved again on the same date must not revive an old link.
+    await tx.dayScenarioShare.updateMany({ where: { userId, revokedAt: null, date: { in: rows.map((row) => row.date) } }, data: { revokedAt: new Date() } });
     // Only the points still on their day: one the user moved elsewhere is theirs now.
     await tx.planItem.deleteMany({ where: { OR: rows.map((row) => ({ scenarioId: row.id, date: row.date })), userId } });
     for (const row of rows) {
