@@ -164,7 +164,8 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
         // What the user already has of these points. Entries this very scenario created are ours to rewrite; anything else is not touched.
         tx.planItem.findMany({
           // AND, never a spread: the family scope has its own top-level OR (shared entries or the user's own) that a second OR would replace.
-          where: { AND: [scope, { OR: [...(eventIds.length ? [{ activityId: { in: eventIds } }] : []), ...(placeIds.length ? [{ placeId: { in: placeIds } }] : [])] }] },
+          // From today on only (what the draft excludes): a place visited last month does not block it forever.
+          where: { AND: [scope, { date: { gte: deps.today ?? getLocalDateKey() } }, { OR: [...(eventIds.length ? [{ activityId: { in: eventIds } }] : []), ...(placeIds.length ? [{ placeId: { in: placeIds } }] : [])] }] },
           select: { id: true, activityId: true, placeId: true, scenarioId: true, date: true },
         }),
       ]);

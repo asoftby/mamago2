@@ -14,6 +14,7 @@ function makeDb(seed: { activities?: Row[]; places?: Row[]; planItems?: Row[] } 
       if (key === "OR") return (cond as Row[]).some((sub) => matches(row, sub));
       if (key === "AND") return (cond as Row[]).every((sub) => matches(row, sub));
       if (cond && typeof cond === "object" && "in" in cond) return (cond as { in: unknown[] }).in.includes(row[key]);
+      if (cond && typeof cond === "object" && "gte" in cond) return String(row[key]) >= String((cond as { gte: unknown }).gte);
       if (cond && typeof cond === "object" && !(cond instanceof Date)) return matches(row[key] ?? {}, cond as Row);
       return row[key] === cond;
     });
@@ -185,6 +186,14 @@ async function run() {
     assert.ok(get().planItems.some((r) => r.id === parkId), "re-saving the day without the point does not delete the moved one");
   }
 
+  // ---- an entry of the same point on a day that has already passed does not block a save
+  {
+    const past = { id: "old1", userId: "u1", date: "2026-10-01", activityId: null, placeId: "pl-park", title: "Парк", startsAt: null, scenarioId: null };
+    const { db, get } = makeDb({ ...seedCatalog(), planItems: [past] });
+    await saveDayScenarios("u1", parse([{ date: SAT, items: [placeItem("pl-park", SAT, "10:30", "12:00")] }]), "key-past-0001", deps(db));
+    assert.equal(get().planItems.length, 2, "saved, and the old entry is untouched");
+  }
+
   // ---- a weekend: one transaction, one group, both scenarios
   {
     const { db, get } = makeDb(seedCatalog());
@@ -248,7 +257,7 @@ async function run() {
     assert.match(route, /IDEMPOTENCY_KEY_REQUIRED/);
     assert.match(route, /checkRateLimit\(`day-scenario-save:\$\{user\.id\}`, 10, 60_000\)/);
     const draftSrc = readFileSync("src/server/services/dayScenarioEngine/draft.service.ts", "utf8");
-    assert.match(draftSrc, /\{ OR: \[\{ scenarioId: null \}, \{ scenarioId: \{ not: editedScenario\.id \} \}\] \}/, "editing excludes only the edited scenario, not every scenario's entries");
+    assert.match(draftSrc, /\{ OR: \[\{ scenarioId: null \}, \{ scenarioId: \{ not: editedScenario\.id \} \}, \{ date: \{ not: date \} \}\] \}/, "editing excludes only the edited scenario, not every scenario's entries");
     assert.match(draftSrc, /AND: \[\s*await activePlanScopeFor\(userId\)/, "the family scope's own OR stays intact");
     assert.match(draftSrc, /unpooledPinnedIds = request\.action === "rebuild"/, "pinned points the pool does not hold are reported");
     const service = readFileSync("src/server/services/dayScenarioEngine/save.service.ts", "utf8");

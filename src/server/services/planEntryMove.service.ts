@@ -48,28 +48,32 @@ export function isMovableLinkedEntry(item: { activityId: string | null; articleI
 }
 
 export type MoveDeps = {
-  db?: Pick<typeof prisma, "planItem">;
+  db?: Pick<typeof prisma, "$transaction">;
   scopeFor?: (userId: string) => Promise<Prisma.PlanItemWhereInput>;
   today?: string;
 };
 
 export async function moveLinkedPlanEntry(userId: string, itemId: string, request: { date: string; expectedUpdatedAt: Date }, deps: MoveDeps = {}): Promise<{ id: string; date: string; startsAt: string | null; updatedAt: string }> {
-  const db = deps.db ?? prisma;
   if (request.date < (deps.today ?? getLocalDateKey())) throw new PlanEntryMoveError(422, "PAST_DAY");
   const scope = await (deps.scopeFor ?? activePlanScopeFor)(userId);
-  const current = await db.planItem.findFirst({
-    where: { AND: [scope, { id: itemId }] },
-    select: { id: true, date: true, startsAt: true, endsAt: true, updatedAt: true, activityId: true, articleId: true, placeId: true, planPlaceSlug: true, offerId: true, routeId: true, planRouteSlug: true },
+  const select = { id: true, date: true, startsAt: true, endsAt: true, updatedAt: true, scenarioId: true, activityId: true, articleId: true, placeId: true, planPlaceSlug: true, offerId: true, routeId: true, planRouteSlug: true } as const;
+  return (deps.db ?? prisma).$transaction(async (tx) => {
+    // A scenario point is also written by the scenario's save, which holds the DayScenario row lock for its whole
+    // transaction. The move takes the same lock and reads the entry again under it, so the two never interleave: a
+    // successful move cannot be undone or deleted by a save that read the point before it.
+    const first = await tx.planItem.findFirst({ where: { AND: [scope, { id: itemId }] }, select: { scenarioId: true } });
+    if (first?.scenarioId) await tx.$queryRaw`SELECT id FROM "DayScenario" WHERE id = ${first.scenarioId} FOR UPDATE`;
+    const current = await tx.planItem.findFirst({ where: { AND: [scope, { id: itemId }] }, select });
+    if (!current) throw new PlanEntryMoveError(404, "NOT_FOUND");
+    if (!isMovableLinkedEntry(current)) throw new PlanEntryMoveError(422, "NOT_MOVABLE");
+    if (current.updatedAt.getTime() !== request.expectedUpdatedAt.getTime()) throw new PlanEntryMoveError(409, "CONFLICT");
+    const times = movedTimes(current.startsAt, current.endsAt, request.date);
+    const updatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
+    const result = await tx.planItem.updateMany({
+      where: { AND: [scope, { id: itemId, updatedAt: request.expectedUpdatedAt }] },
+      data: { date: request.date, startsAt: times.startsAt, endsAt: times.endsAt, updatedAt },
+    });
+    if (result.count !== 1) throw new PlanEntryMoveError(409, "CONFLICT");
+    return { id: itemId, date: request.date, startsAt: times.startsAt?.toISOString() ?? null, updatedAt: updatedAt.toISOString() };
   });
-  if (!current) throw new PlanEntryMoveError(404, "NOT_FOUND");
-  if (!isMovableLinkedEntry(current)) throw new PlanEntryMoveError(422, "NOT_MOVABLE");
-  if (current.updatedAt.getTime() !== request.expectedUpdatedAt.getTime()) throw new PlanEntryMoveError(409, "CONFLICT");
-  const times = movedTimes(current.startsAt, current.endsAt, request.date);
-  const updatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
-  const result = await db.planItem.updateMany({
-    where: { AND: [scope, { id: itemId, updatedAt: request.expectedUpdatedAt }] },
-    data: { date: request.date, startsAt: times.startsAt, endsAt: times.endsAt, updatedAt },
-  });
-  if (result.count !== 1) throw new PlanEntryMoveError(409, "CONFLICT");
-  return { id: itemId, date: request.date, startsAt: times.startsAt?.toISOString() ?? null, updatedAt: updatedAt.toISOString() };
 }

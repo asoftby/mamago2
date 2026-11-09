@@ -41,7 +41,12 @@ function makeDb(rows: Row[]) {
       if (cond instanceof Date) return (row[key] as Date | undefined)?.getTime() === cond.getTime();
       return row[key] === cond;
     });
-  const db = {
+  const locks: unknown[][] = [];
+  const tx = {
+    $queryRaw: async (...args: unknown[]) => {
+      locks.push(args);
+      return [];
+    },
     planItem: {
       findFirst: async ({ where }: { where: Record<string, unknown> }) => rows.find((r) => matchesOne(r, where)) ?? null,
       updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
@@ -50,8 +55,9 @@ function makeDb(rows: Row[]) {
         return { count: hit.length };
       },
     },
-  } as unknown as NonNullable<MoveDeps["db"]>;
-  return { db, rows };
+  };
+  const db = { $transaction: async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx) } as unknown as NonNullable<MoveDeps["db"]>;
+  return { db, rows, tx, locks };
 }
 const UPDATED = new Date("2026-11-09T10:00:00.000Z");
 const place = (): Row => ({ id: "e1", userId: "u1", date: "2026-11-14", startsAt: new Date("2026-11-14T08:00:00Z"), endsAt: new Date("2026-11-14T09:30:00Z"), updatedAt: UPDATED, activityId: null, articleId: null, placeId: "p1", planPlaceSlug: "park", offerId: null, routeId: null, planRouteSlug: null, scenarioId: "s1" });
@@ -76,8 +82,19 @@ async function run() {
   await fails(async () => moveLinkedPlanEntry("u1", "e1", req("2026-11-21"), deps(makeDb([{ ...place(), placeId: null, planPlaceSlug: null, activityId: "a1" }]).db)), 422, "NOT_MOVABLE");
   {
     const stale = makeDb([place()]);
-    (stale.db.planItem as unknown as { updateMany: () => Promise<{ count: number }> }).updateMany = async () => ({ count: 0 }); // someone else saved between the read and the write
+    (stale.tx.planItem as unknown as { updateMany: () => Promise<{ count: number }> }).updateMany = async () => ({ count: 0 }); // someone else saved between the read and the write
     await fails(async () => moveLinkedPlanEntry("u1", "e1", req("2026-11-21"), deps(stale.db)), 409, "CONFLICT");
+  }
+
+  // ---- a scenario point: the move takes the scenario row lock the save holds; an ordinary entry takes none
+  {
+    const scenario = makeDb([place()]);
+    await moveLinkedPlanEntry("u1", "e1", req("2026-11-21"), deps(scenario.db));
+    assert.equal(scenario.locks.length, 1, "one FOR UPDATE on the scenario row");
+    assert.ok(String((scenario.locks[0]![0] as string[]).join("?")).includes('FROM "DayScenario" WHERE id =') && scenario.locks[0]!.includes("s1"), "of the scenario that created the point");
+    const plain = makeDb([{ ...place(), scenarioId: null }]);
+    await moveLinkedPlanEntry("u1", "e1", req("2026-11-21"), deps(plain.db));
+    assert.equal(plain.locks.length, 0, "an entry of no scenario needs no lock");
   }
 
   // ---- contracts
@@ -88,6 +105,7 @@ async function run() {
   assert.match(sheet, /\/api\/plan\/items\/\$\{item\.id\}\/date/, "the move sheet uses the date endpoint for place / offer / route entries");
   const service = readFileSync("src/server/services/planEntryMove.service.ts", "utf8");
   assert.match(service, /where: \{ AND: \[scope, \{ id: itemId, updatedAt: request\.expectedUpdatedAt \}\] \}/, "the write is scoped and guarded by updatedAt");
+  assert.match(service, /FROM "DayScenario" WHERE id = \$\{first\.scenarioId\} FOR UPDATE/, "the same lock the scenario save holds");
 
   console.log("plan entry move tests passed");
 }

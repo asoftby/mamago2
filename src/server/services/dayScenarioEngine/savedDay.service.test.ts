@@ -158,6 +158,12 @@ async function run() {
 
   // ---- contracts
   {
+    const draft = readFileSync("src/server/services/dayScenarioEngine/draft.service.ts", "utf8");
+    assert.match(draft, /\{ OR: \[\{ date \}, \{ date: \{ gte: today \} \}\] \}/, "the draft reads the plan from today on, so it does not offer what the save rejects");
+    assert.match(draft, /item\.date === date && item\.startsAt/, "another day's entry is planned, not busy time");
+    assert.match(draft, /\{ date: \{ not: date \} \}/, "a point of the edited scenario moved to another day stays planned");
+  }
+  {
     const route = readFileSync("src/app/api/plan/day-scenario/saved/route.ts", "utf8");
     assert.match(route, /if \(!isDayScenarioEngineEnabled\(\)\) return NextResponse\.json\(\{ error: "Not found" \}, \{ status: 404 \}\);\s*try \{\s*const user = await getCurrentUser\(\);/, "404 before any work");
     assert.match(route, /UNAUTHENTICATED[\s\S]*401/);
