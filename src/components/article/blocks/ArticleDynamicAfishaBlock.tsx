@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArticleDynamicAfishaCards } from "@/components/article/blocks/ArticleDynamicAfishaCards";
 import { getActivePublicOccasions } from "@/lib/discovery/occasions";
+import { articleDynamicAfishaParams, type ArticleAfishaPeriod } from "@/lib/article/articleDynamicAfishaFilters";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { loadKudaListingPage } from "@/server/discovery/kudaListingPage";
 
@@ -12,9 +13,11 @@ import { loadKudaListingPage } from "@/server/discovery/kudaListingPage";
 export async function ArticleDynamicAfishaBlock({
   citySlug,
   occasionSlug,
+  period = "ALL",
 }: {
   citySlug?: string | null;
   occasionSlug?: string | null;
+  period?: ArticleAfishaPeriod;
 }) {
   // A country-wide article has no unambiguous city selection. Never silently
   // substitute Minsk events for a national article.
@@ -31,8 +34,7 @@ export async function ArticleDynamicAfishaBlock({
   // The catalog ignores expired occasion filters. In an editorial placement that
   // would silently show unrelated events, so keep the block empty instead.
   const active = !occasion || activeSlugs.has(occasion);
-  const filters = new URLSearchParams();
-  if (occasion) filters.set("occasion", occasion);
+  const filters = articleDynamicAfishaParams({ occasionSlug: occasion, period });
   const listing = active
     ? await loadKudaListingPage({
         cityId: city.id,
@@ -44,7 +46,8 @@ export async function ArticleDynamicAfishaBlock({
         activeOccasionSlugs: activeSlugs,
       })
     : null;
-  const href = `/${city.slug}/events${occasion && active ? `?occasion=${encodeURIComponent(occasion)}` : ""}`;
+  const effectiveFilters = active ? filters : articleDynamicAfishaParams({ period });
+  const href = `/${city.slug}/events${effectiveFilters.size ? `?${effectiveFilters.toString()}` : ""}`;
 
   return (
     <section className="not-prose my-8 space-y-4 font-sans" aria-label="Динамическая афиша">
@@ -52,7 +55,7 @@ export async function ArticleDynamicAfishaBlock({
         <ArticleDynamicAfishaCards
           items={listing.items}
           citySlug={city.slug}
-          filterSummary={occasion ? `occasion:${occasion}` : "all"}
+          filterSummary={filters.toString() || "all"}
         />
       ) : (
         <p className="rounded-xl bg-muted/30 px-4 py-5 text-sm text-muted-foreground">
