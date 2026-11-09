@@ -12,6 +12,7 @@ import { planEntryDisplay } from "../lib/planEntryDisplay";
 import type { PlanItemWithActivity } from "../types/event";
 import { resolvePlanItemCategory, type PlanItemCategoryKey } from "../lib/planItemCategory";
 import { PlanItemCategoryPicker, PlanItemCategoryTile } from "./PlanItemCategoryIcon";
+import { isEditableNote, planItemLinkKind } from "../lib/planItemLink";
 
 interface PlanItemRowProps {
   item: PlanItemWithActivity;
@@ -29,12 +30,11 @@ interface PlanItemRowProps {
 
 export type PlanItemVisualKind = "event" | "note";
 
+/** A catalog card or a note: by the link to a catalog entity, not by the entry's source. */
 export function planItemVisualKind(
-  item: Pick<PlanItemWithActivity, "source">,
+  item: Parameters<typeof planItemLinkKind>[0],
 ): PlanItemVisualKind {
-  return item.source === "MANUAL" || item.source === "TELEGRAM_FORWARD"
-    ? "note"
-    : "event";
+  return planItemLinkKind(item) === null ? "note" : "event";
 }
 
 const twoLineTitleStyle = {
@@ -52,6 +52,8 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
     : null;
   const { title, poster, time } = planEntryDisplay(item);
   const isManual = item.source === "MANUAL";
+  const linked = planItemLinkKind(item) !== null;
+  const editable = isEditableNote(item);
   // Тап по карточке: событие mamaGo → его страница; свой пункт → страница плана на этот день.
   const openHref = activityDetailHref ?? (isManual ? `/me/plan?date=${item.date}` : null);
 
@@ -100,14 +102,14 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
           />
         ) : isCatalogEvent ? (
           <PlanItemCategoryTile category={category} round />
-        ) : !isManual ? (
+        ) : !isManual || linked ? (
           <PlanItemCategoryTile category={category} round />
         ) : (
           <PlanItemCategoryPicker round value={category} onChange={(next) => void changeCategory(next)} className="relative z-10" />
         )}
 
         <div className="min-w-0 flex-1">
-          {onOpen && (item.activity || item.articleId || isManual) ? (
+          {onOpen && (linked || editable) ? (
             <button
               type="button"
               onClick={onOpen}
@@ -136,6 +138,13 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
             <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
             {authorLabel ? (
               <span className="min-w-0 truncate">· Добавил(а) {authorLabel}</span>
+            ) : null}
+            {item.scenarioId ? (
+              <span className="inline-flex shrink-0 items-center gap-1 text-[var(--mp-ac-dark)]">
+                <span aria-hidden>·</span>
+                <span aria-hidden>✦</span>
+                <span>от mamaGo</span>
+              </span>
             ) : null}
             {showReminder ? (
               <span className="inline-flex shrink-0 items-center gap-1">
