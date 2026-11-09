@@ -129,10 +129,11 @@ export function ArticleEditorCoverField({
       onUploadFiles={uploadFiles}
       loadMediaLibraryPage={loadMediaLibraryPage}
       libraryOwnerKey={authorUserId ?? null}
+      libraryPageMode="manual"
       uploadButtonLabel={uploadButtonLabel}
       uploadSuccessMessage={successUploadMessage}
       librarySelectSuccessMessage={successPickMessage}
-      mediaLibraryDescription="Недавно загруженные изображения. Полный список — в разделе «Медиатека»."
+      mediaLibraryDescription="Выберите обложку из медиатеки автора или загрузите новое изображение."
       singleEmptyHint="Выберите главное изображение из медиатеки или загрузите файл"
       usedIds={articleMediaSource?.usedIds}
       usageLabel="Используется"
