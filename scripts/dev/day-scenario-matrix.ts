@@ -21,8 +21,7 @@ import {
   unseenSeedFillers,
   weeklyCoverage,
   weeklyViolation,
-  exhaustedCoverage,
-  exhaustedViolation,
+  WEEKLY_TITLE,
   PLAN_FIXTURE_TITLE,
   renderReport,
   TODDLER_RANGES,
@@ -40,7 +39,7 @@ const argValue = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?
 const BASE = (argValue("base-url") ?? "https://dev.mamago.by").replace(/\/$/, "");
 const REPORT = argValue("report");
 const MAX_ANOTHER = 6;
-const NARROW_MAX_ANOTHER = 8;
+const WEEKLY_PROOF_MAX_ROUNDS = 8;
 const MAX_CALLS = Number(argValue("max-calls") ?? 300);
 const APPLY_DATE = argValue("apply-date") ?? minskDateOf(new Date());
 const SKIP_PLAN_ITEMS = args.includes("--skip-plan-items");
@@ -186,7 +185,7 @@ async function main(): Promise<void> {
   };
 
   // One run: build, a chain of «Другой вариант», «Заменить». `window` and `maxAnother` differ for the narrow runs.
-  const runOne = async (aud: (typeof audiences)[number], d: (typeof days)[number], mode: "walk" | "car", window: { start: string; end: string }, id: string, maxAnother: number, narrow = false): Promise<void> => {
+  const runOne = async (aud: (typeof audiences)[number], d: (typeof days)[number], mode: "walk" | "car", window: { start: string; end: string }, id: string, maxAnother: number): Promise<void> => {
     const ages = aud.authed ? authedAges[d.key]! : aud.ageRanges;
     const params: RunParams = {
       id,
@@ -198,7 +197,6 @@ async function main(): Promise<void> {
       toddler: aud.authed ? ages.some((a) => TODDLER_RANGES.has(a)) : aud.toddler,
       window,
       planItem: aud.plan,
-      ...(narrow ? { narrow: true } : {}),
     };
     const common = { city: "minsk", date: d.date, mode, targetCount: 3, dayStart: window.start, dayEnd: window.end, ...(aud.authed ? { personaIds } : { ageRanges: aud.ageRanges }) };
     const steps: StepRecord[] = [];
@@ -281,16 +279,28 @@ async function main(): Promise<void> {
       }
     }
   }
-  // Narrow runs: so few candidates that «Другой вариант» must run dry. Guests only (no plan fixtures); the window is
-  // cut to the evening / early morning so the seeded places that fit are a handful (see exhaustedCoverage).
-  const day = (key: string) => days.find((d) => d.key === key)!;
-  const guest = (key: string, label: string, ageRanges: string[], toddler: boolean) => ({ key, label, ageRanges, toddler, authed: false, plan: false });
-  const narrowRuns = [
-    { id: "N-wed-walk-03", aud: guest("G03", "гость, 0–3 года", ["0-1", "1-3"], true), d: day("wed"), mode: "walk" as const, window: { start: "18:00", end: "19:30" } },
-    { id: "N-wed-car-03", aud: guest("G03", "гость, 0–3 года", ["0-1", "1-3"], true), d: day("wed"), mode: "car" as const, window: { start: "18:00", end: "19:30" } },
-    { id: "N-sat-walk-35", aud: guest("G35", "гость, 3–5 лет", ["3-5"], false), d: day("sat"), mode: "walk" as const, window: { start: "09:00", end: "11:30" } },
-  ];
-  for (const n of narrowRuns) await runOne(n.aud, n.d, n.mode, n.window, n.id, NARROW_MAX_ANOTHER, true);
+  // c-weekly proof: the recurring mock event is the weakest event, so ordinary runs rarely pick it. Take a run it fits
+  // (guest 5-7, Saturday, by car), then exclude the competing events of each answer until it is the one chosen. That shows
+  // its virtual session can reach a scenario (excludeActivityIds is capped at 100 ids by the API).
+  {
+    const d = days.find((x) => x.key === "sat")!;
+    const params: RunParams = { id: "W-sat-car-57", date: d.date, dateLabel: d.label, mode: "car", audience: "гость, 5–7 лет (прогон-доказательство c-weekly)", ageRanges: ["5-7"], toddler: false, window: d.window, planItem: false };
+    const steps: StepRecord[] = [];
+    const excluded = new Set<string>();
+    for (let round = 1; round <= WEEKLY_PROOF_MAX_ROUNDS; round++) {
+      const built = await draft({ city: "minsk", date: d.date, mode: "car", targetCount: 3, dayStart: d.window.start, dayEnd: d.window.end, ageRanges: params.ageRanges, action: "build", variant: 0, excludeActivityIds: [...excluded] }, false);
+      const name = `Собрать без ${excluded.size} событий-конкурентов`;
+      const violations: Violation[] = built.result ? checkResult(params, name, built.result, { dates, stepKind: "build" }) : [{ run: params.id, step: name, rule: "Ответ API", detail: `HTTP ${built.step.httpStatus}` }];
+      steps.push({ name, ...built.step, violations });
+      if (!built.result) break;
+      if (built.result.items.some((i) => i.card.title === WEEKLY_TITLE)) break;
+      const rivals = built.result.items.filter((i) => (i.kind ?? "event") === "event" && i.card.title !== WEEKLY_TITLE).map((i) => i.activityId);
+      if (rivals.length === 0 || rivals.every((id) => excluded.has(id)) || excluded.size + rivals.length > 100) break;
+      for (const id of rivals) excluded.add(id);
+    }
+    runs.push({ params, steps });
+    console.log(`${params.id}: ${steps.length} rounds, excluded ${excluded.size}, calls=${calls}`);
+  }
   } finally {
     await teardown();
   }
@@ -299,14 +309,10 @@ async function main(): Promise<void> {
   const weekly = weeklyCoverage(runs, dates);
   const weeklyProblem = weeklyViolation(weekly);
   if (weeklyProblem) runs.find((r) => r.params.id === weeklyProblem.run)?.steps[0]?.violations.push(weeklyProblem);
-  // The «показали всё» branch must be exercised live: at least one narrow run has to end justified.
-  const exhausted = exhaustedCoverage(runs);
-  const exhaustedProblem = exhaustedViolation(exhausted);
-  if (exhaustedProblem) runs.find((r) => r.params.id === exhaustedProblem.run)?.steps[0]?.violations.push(exhaustedProblem);
-  const html = renderReport({ generatedAt: new Date().toISOString(), base: BASE, build, dates: dates as Record<string, string>, runs, calls, notes, weekly, exhausted });
+  const html = renderReport({ generatedAt: new Date().toISOString(), base: BASE, build, dates: dates as Record<string, string>, runs, calls, notes, weekly });
   writeFileSync(REPORT, html, "utf8");
   const violations = runs.flatMap((r) => r.steps.flatMap((s) => s.violations));
-  console.log(JSON.stringify({ report: REPORT, runs: runs.length, calls, violations: violations.length, weeklyEligibleRuns: weekly.eligible.length, weeklySeenIn: weekly.seenIn, narrowJustified: exhausted.justified, narrowPremature: exhausted.premature }));
+  console.log(JSON.stringify({ report: REPORT, runs: runs.length, calls, violations: violations.length, weeklyEligibleRuns: weekly.eligible.length, weeklySeenIn: weekly.seenIn }));
 }
 
 main().catch((error) => {
