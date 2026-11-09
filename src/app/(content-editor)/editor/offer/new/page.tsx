@@ -11,6 +11,7 @@ import {
 } from "@/lib/content-editor/types";
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { canBusinessCreateOffer } from "@/lib/business/publicationAvailability";
 import {
   getPartnerCabinetBusiness,
   isPlatformContentStaff,
@@ -34,6 +35,16 @@ export default async function EditorNewOfferPage({
       buildSurfaceRedirectDestination({
         targetSurface: "public",
         targetPath: "/login",
+        ...routing,
+      }),
+    );
+  }
+
+  if (!canBusinessCreateOffer(user.role)) {
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/publications/events",
         ...routing,
       }),
     );

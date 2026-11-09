@@ -2,6 +2,7 @@ import { z } from "zod";
 import { calendarDaySchema } from "@/lib/decision/planRequestSchemas";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
 import { buildSelectedProfileContext } from "@/lib/decision/subjects";
 import { CanonicalAgeRangeSchema } from "@/lib/decision/decisionContext";
@@ -133,16 +134,21 @@ async function loadUserContext(userId: string, date: string, personaIds: string[
   // Editing: only THIS user's saved scenario of the day stops being busy time / "already planned". Other visible
   // scenarios (a family member's) and every other entry stay. AND keeps the family scope's own OR intact.
   const editedScenario = editScenario ? await prisma.dayScenario.findUnique({ where: { userId_date: { userId, date } }, select: { id: true } }) : null;
+  // The save refuses a point that is already in the plan on any day from today on, so the draft must not offer one:
+  // entries of that day are busy time AND planned; entries of later days are planned only (one query for both).
+  const today = getLocalDateKey();
   const [plan, profile] = await Promise.all([
     prisma.planItem.findMany({
       where: {
         AND: [
           await activePlanScopeFor(userId),
-          { date },
-          ...(editedScenario ? [{ OR: [{ scenarioId: null }, { scenarioId: { not: editedScenario.id } }] }] : []),
+          { OR: [{ date }, { date: { gte: today } }] },
+          // Editing: the edited scenario's own entries ON THAT DAY are the draft itself; the same scenario's points the
+          // user moved to another day stay planned.
+          ...(editedScenario ? [{ OR: [{ scenarioId: null }, { scenarioId: { not: editedScenario.id } }, { date: { not: date } }] }] : []),
         ],
       },
-      select: { activityId: true, placeId: true, startsAt: true, endsAt: true },
+      select: { activityId: true, placeId: true, startsAt: true, endsAt: true, date: true },
     }),
     personaIds.length > 0
       ? buildSelectedProfileContext({ userId, personaIds, targetDate: date })
@@ -154,7 +160,8 @@ async function loadUserContext(userId: string, date: string, personaIds: string[
     if (item.activityId) planned.push(item.activityId);
     // A place already in the plan that day is not offered again as a filler.
     if (item.placeId) planned.push(item.placeId);
-    if (item.startsAt) {
+    // Another day's entry is not busy time on this one.
+    if (item.date === date && item.startsAt) {
       const end = item.endsAt ?? new Date(item.startsAt.getTime() + DEFAULT_EVENT_DURATION_MIN * 60_000);
       busy.push({ startMs: item.startsAt.getTime(), endMs: end.getTime() });
     }

@@ -31,9 +31,12 @@ function makeDb(seed: { scenarios: Row[]; items: Row[] }) {
     },
     planItem: {
       groupBy: async ({ where }: Row) => {
-        const counts = new Map<string, number>();
-        for (const item of state.items.filter((r) => matches(r, where))) counts.set(item.scenarioId, (counts.get(item.scenarioId) ?? 0) + 1);
-        return [...counts].map(([scenarioId, n]) => ({ scenarioId, _count: { _all: n } }));
+        const counts = new Map<string, { scenarioId: string; date: string; n: number }>();
+        for (const item of state.items.filter((r) => matches(r, where))) {
+          const key = `${item.scenarioId}|${item.date}`;
+          counts.set(key, { scenarioId: item.scenarioId, date: item.date, n: (counts.get(key)?.n ?? 0) + 1 });
+        }
+        return [...counts.values()].map((c) => ({ scenarioId: c.scenarioId, date: c.date, _count: { _all: c.n } }));
       },
       findMany: async ({ where, orderBy }: Row) => state.items.filter((r) => matches(r, where)).sort((a, b) => (orderBy ? String(a.startsAt).localeCompare(String(b.startsAt)) : 0)),
       deleteMany: async ({ where }: Row) => {
@@ -142,7 +145,24 @@ async function run() {
     assert.deepEqual(await listSavedDayPoints("u3", SAT, tx), [], "another user's day");
   }
 
+  // ---- a point the user moved to another day is theirs: not counted, not listed, not deleted with the day
+  {
+    const moved = [...items(), { ...item("moved", "2026-11-20", "s-sat") }];
+    const { db, tx, get } = makeDb({ scenarios: scenarios(), items: moved });
+    const listed = await listSavedDays("u1", "2026-11-01", "2026-11-30", tx);
+    assert.equal(listed[SAT]!.count, 2, "the moved point is not counted on the scenario's day");
+    await deleteSavedDays("u1", SAT, "day", deps(db));
+    assert.ok(get().items.some((i) => i.id === "moved"), "deleting the day leaves the point the user moved elsewhere");
+    assert.ok(!get().items.some((i) => i.id === "p1"), "while the day's own points go");
+  }
+
   // ---- contracts
+  {
+    const draft = readFileSync("src/server/services/dayScenarioEngine/draft.service.ts", "utf8");
+    assert.match(draft, /\{ OR: \[\{ date \}, \{ date: \{ gte: today \} \}\] \}/, "the draft reads the plan from today on, so it does not offer what the save rejects");
+    assert.match(draft, /item\.date === date && item\.startsAt/, "another day's entry is planned, not busy time");
+    assert.match(draft, /\{ date: \{ not: date \} \}/, "a point of the edited scenario moved to another day stays planned");
+  }
   {
     const route = readFileSync("src/app/api/plan/day-scenario/saved/route.ts", "utf8");
     assert.match(route, /if \(!isDayScenarioEngineEnabled\(\)\) return NextResponse\.json\(\{ error: "Not found" \}, \{ status: 404 \}\);\s*try \{\s*const user = await getCurrentUser\(\);/, "404 before any work");
@@ -154,7 +174,7 @@ async function run() {
     const draft = readFileSync("src/server/services/dayScenarioEngine/draft.service.ts", "utf8");
     assert.match(draft, /editScenario: z\.boolean\(\)\.optional\(\)\.default\(false\)/);
     const service = readFileSync("src/server/services/dayScenarioEngine/savedDay.service.ts", "utf8");
-    assert.match(service, /planItem\.deleteMany\(\{ where: \{ scenarioId: \{ in: rows\.map\(\(row\) => row\.id\) \}, userId \} \}\)/, "only entries of the scenario, only the user's own");
+    assert.match(service, /planItem\.deleteMany\(\{ where: \{ OR: rows\.map\(\(row\) => \(\{ scenarioId: row\.id, date: row\.date \}\)\), userId \} \}\)/, "only entries of the scenario still on its day, only the user's own");
   }
 
   console.log("day-scenario saved-day tests passed");
