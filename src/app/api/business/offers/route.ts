@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AgePolicy, Prisma } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
+import { canBusinessCreateOffer } from "@/lib/business/publicationAvailability";
 import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
@@ -182,6 +183,12 @@ export async function POST(request: NextRequest) {
     
     if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!canBusinessCreateOffer(user.role)) {
+      return NextResponse.json(
+        { error: "Создание предложений для бизнеса временно недоступно", code: "BUSINESS_OFFER_CREATION_PAUSED" },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();
