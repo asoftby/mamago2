@@ -126,6 +126,7 @@ export function ArticleEditorGalleryField({
       onUploadFiles={uploadFiles}
       loadMediaLibraryPage={loadMediaLibraryPage}
       libraryOwnerKey={authorUserId ?? null}
+      libraryPageMode="manual"
       uploadButtonLabel="Загрузить изображения"
       uploadSuccessMessage="Изображение добавлено в галерею"
       librarySelectSuccessMessage="Добавлено в галерею"

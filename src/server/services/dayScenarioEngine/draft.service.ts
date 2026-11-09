@@ -18,6 +18,7 @@ import type {
 } from "@/features/my-plan/lib/dayScenario/types";
 import { DEFAULT_EVENT_DURATION_MIN } from "./poolMapping";
 import { getDayScenarioPool } from "./pool";
+import { getFamilyTravelMode, resolveTravelMode } from "./travelMode.service";
 
 const MINUTE_MS = 60_000;
 /** Default planning window (local time) when the request does not narrow it. */
@@ -38,7 +39,8 @@ export const draftRequestSchema = z.object({
   date: calendarDaySchema,
   action: z.enum(["build", "rebuild", "replace", "alternatives", "another"]).default("build"),
   /** The UI exposes walk/car; transit stays in the model but is not offered yet. */
-  mode: z.enum(["walk", "car", "transit"]).optional().default("car"),
+  /** Omitted: the family's saved choice (signed in), else the car. The answer says which mode was used. */
+  mode: z.enum(["walk", "car", "transit"]).optional(),
   ageRanges: z.array(CanonicalAgeRangeSchema).max(12).optional().default([]),
   personaIds: z.array(z.string().min(1).max(64)).max(12).optional().default([]),
   excludeActivityIds: z.array(z.string().min(1).max(64)).max(100).optional().default([]),
@@ -188,6 +190,8 @@ export async function runDayScenarioDraft(
     ? await loadUserContext(user.id, request.date, request.personaIds, request.editScenario)
     : { busy: [], planned: [], childRanges: [] as string[], interests: [] as string[] };
 
+  // No mode asked for: the family's saved choice (one read, only when the request left it out), else the car.
+  const mode = resolveTravelMode(request.mode, user && request.mode === undefined ? await getFamilyTravelMode(user.id) : null);
   const ageRanges = [...new Set([...request.ageRanges, ...ctx.childRanges])];
   const profileInterestSlugs = ctx.interests.filter((slug) => CANONICAL_EVENT_INTEREST_SLUGS.has(slug));
   const day = zonedDayRange(request.date, DEFAULT_TZ);
@@ -196,7 +200,7 @@ export async function runDayScenarioDraft(
   const input: BuildInput = {
     windowStartMs,
     windowEndMs: day.start.getTime() + minutesOfDay(request.dayEnd) * MINUTE_MS,
-    mode: request.mode,
+    mode,
     audience: { ageRanges, profileInterestSlugs, hasToddler: ageRanges.some((range) => TODDLER_RANGES.has(range)) },
     busy: ctx.busy,
     excludeActivityIds: [...new Set([...request.excludeActivityIds, ...ctx.planned])],
