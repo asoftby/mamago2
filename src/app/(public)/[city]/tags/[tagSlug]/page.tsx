@@ -10,7 +10,7 @@ import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
-import { JournalTagCardList } from "@/components/journal/JournalTagCardList";
+import { JournalTaggedFeed } from "@/components/journal/JournalFeedCards";
 import { queryCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { BlogPagination } from "../../../blog/BlogPagination";
@@ -175,7 +175,7 @@ export default async function CityTagPage({ params, searchParams }: PageProps) {
   });
 
   return (
-    <main className="site-wrap px-4 py-10 sm:px-7 md:py-14">
+    <main className="site-wrap w-full px-4 pb-16 pt-6 sm:px-7 sm:pt-10">
       <div className="mb-8">
         <p className="mb-2 text-sm font-medium text-primary">
           <Link href={`/${data.city.slug}`} className="hover:underline">
@@ -192,7 +192,11 @@ export default async function CityTagPage({ params, searchParams }: PageProps) {
         </p>
       </div>
 
-      <JournalTagCardList articles={data.articles} citySlug={data.city.slug} />
+      <JournalTaggedFeed
+        articles={data.articles}
+        citySlug={data.city.slug}
+        blogHref={`/${data.city.slug}/blog`}
+      />
 
       <div className="-mx-4 mt-10 sm:-mx-6">
         <BlogPagination basePath={basePath} page={data.page} totalPages={data.totalPages} />
