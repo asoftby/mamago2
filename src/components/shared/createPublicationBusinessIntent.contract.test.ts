@@ -8,8 +8,8 @@ const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.ts
 
 test("business creation distinguishes the place profile from its visit offer", () => {
   for (const label of [
-    "Мероприятие",
-    "Добавить место",
+    "Событие",
+    "Место",
     "Предложение о посещении",
     "Занятия и кружки",
     "Дни рождения и услуги",
@@ -20,7 +20,8 @@ test("business creation distinguishes the place profile from its visit offer", (
   assert.match(menu, /id: "visit-place",[\s\S]*?href: "\/editor\/place\/new"/);
   assert.match(menu, /id: "place-offer",[\s\S]*?href: "\/editor\/offer\/new\?creationIntent=place"/);
   assert.ok(menu.includes('publicationMode === "full"'));
-  assert.ok(menu.includes(": BUSINESS_INTENTS"));
+  assert.ok(menu.includes("? BUSINESS_INTENTS"));
+  assert.match(menu, /BUSINESS_INTENTS\.filter\(\(item\) => item\.id === "dated-event" \|\| item\.id === "visit-place"\)/);
   assert.ok(menu.includes("currentSurfaceReturnTo"));
 });
 
@@ -30,8 +31,8 @@ test("place creation stays available but is visually separated after offer inten
   assert.ok(businessStart >= 0 && businessEnd > businessStart);
   const intents = menu.slice(businessStart, businessEnd);
   assert.ok(intents.indexOf('id: "visit-place"') > intents.indexOf('id: "camps"'));
-  assert.match(intents, /id: "visit-place",[\s\S]*?label: "Добавить место"/);
-  assert.match(menu, /item\.id === "visit-place" &&/);
+  assert.match(intents, /id: "visit-place",[\s\S]*?label: "Место"/);
+  assert.match(menu, /item\.id === "visit-place" && publicationMode === "full" &&/);
   assert.match(menu, /role="separator"/);
   assert.match(menu, /aria-label=\{publicationMode === "business" \? "Добавить"/);
 });
