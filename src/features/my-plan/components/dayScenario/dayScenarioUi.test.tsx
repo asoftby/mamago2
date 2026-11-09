@@ -188,6 +188,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   for (const gone of ["src/app/api/plan/generate/route.ts", "src/app/api/plan/guest-draft/route.ts", "src/features/my-plan/components/GuestMyPlanPanel.tsx", "src/lib/my-plan/guestMyPlanDraftStorage.ts", "src/lib/my-plan/migrateGuestMyPlanAfterAuth.ts", "src/server/services/guestPlanAvailability.ts"]) {
     assert.equal(existsSync(gone), false, `${gone} is removed: one implementation of day picking is left`);
   }
+  assert.match(panel, /redirectTo: appendMyPlanOpenToHref\(pathname \|\| "\/"\)/, "the fallback sign-in returns to the page the guest was on");
   assert.match(panel, /Подбор дня сейчас недоступен/, "with the flag off a guest gets a plain way on, not an old picker");
   const shell = readFileSync("src/components/city/CityDiscoveryShell.tsx", "utf8");
   assert.doesNotMatch(shell, /KudaDayScenarioEntry/, "«Куда пойти» does not duplicate the day scenario entry");

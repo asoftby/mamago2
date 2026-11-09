@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { applyGuestDayScenarioAndAnnounce } from "@/lib/my-plan/applyGuestDayScenario";
 import { buildAuthUrl } from "@/lib/auth/redirectTo";
@@ -44,6 +45,8 @@ export function MyPlanPanelContent({
   /** DAY_SCENARIO_ENGINE_ENABLED: off, the guest panel below is exactly as before. */
   const dayScenarioEnabled = useDayScenarioEnabled();
   const city = useOptionalCity()?.citySlug ?? "minsk";
+  // Where a guest's sign-in comes back to: the page they were on, with My Plan open (not a hard-coded home page).
+  const pathname = usePathname();
   const {
     isLoading,
     accessPhase,
@@ -153,7 +156,7 @@ export function MyPlanPanelContent({
         <div className="max-w-sm">
           <p className="m-0 text-[18px] font-semibold">Подбор дня сейчас недоступен</p>
           <p className="mb-4 mt-2 text-[15px] text-gray-600">Войдите, чтобы вести свой план, мы сохраним его для вас.</p>
-          <a href={buildAuthUrl({ redirectTo: appendMyPlanOpenToHref("/") })} className="inline-flex min-h-11 items-center rounded-full bg-neutral-900 px-5 font-semibold text-white no-underline">
+          <a href={buildAuthUrl({ redirectTo: appendMyPlanOpenToHref(pathname || "/") })} className="inline-flex min-h-11 items-center rounded-full bg-neutral-900 px-5 font-semibold text-white no-underline">
             Войти или зарегистрироваться
           </a>
         </div>
