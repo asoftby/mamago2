@@ -108,6 +108,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   for (const text of ["Изменить день", "Удалить день от mamaGo", "Удалить выходные", "pairLinkLabel(pair)"]) assert.ok(src.includes(text), text);
   assert.ok(/\{pair \? \(\s*<button[^>]*\n[^]*?Удалить выходные/.test(src), "«Удалить выходные» only for a weekend pair");
   assert.ok(!readFileSync("src/features/my-plan/components/PlanMainContent.tsx", "utf8").includes("SavedDayBanner"), "the banner is gone");
+  assert.match(readFileSync("src/features/my-plan/components/PlanMainContent.tsx", "utf8"), /\{savedDayMenu \? renderDayHeading\(compact\) : null\}\s*<p\s+role="status"/, "a past day emptied by a person filter still shows the heading with its menu");
 }
 
 // ---- guest params: two questions, pressed state, a day picker only for «Другой день»

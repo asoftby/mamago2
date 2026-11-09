@@ -1335,12 +1335,16 @@ export function PlanMainContent({
         {dayPartSections.length > 0 ? (
           renderDayPlanSection(compact)
         ) : (
-          <p
-            role="status"
-            className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
-          >
-            В этот день записей не было
-          </p>
+          <>
+            {/* A saved day whose entries a person filter hides keeps its ⋯ menu (it lives in the heading). */}
+            {savedDayMenu ? renderDayHeading(compact) : null}
+            <p
+              role="status"
+              className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
+            >
+              В этот день записей не было
+            </p>
+          </>
         )}
       </div>
     );
