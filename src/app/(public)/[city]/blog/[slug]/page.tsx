@@ -74,7 +74,7 @@ export async function generateMetadata({ params }: PageProps) {
     await resolveCityArticlePublicRoute(slug, city),
   );
 
-  const mvp = await loadArticleMvpBySlugPublic(route.canonicalSlug, city.id);
+  const mvp = await loadArticleMvpBySlugPublic(route.canonicalSlug, city.id, { hydrateDynamicAfisha: false });
   if (!mvp) notFound();
 
   const article = await prisma.article.findFirst({

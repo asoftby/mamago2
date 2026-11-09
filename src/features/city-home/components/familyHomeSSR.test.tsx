@@ -24,8 +24,8 @@ test("guest afisha has no age chips or extra registration flow", () => {
   assert.match(html, /Куда пойти с ребёнком в Минске/);
   assert.doesNotMatch(html, /На этой неделе|На ближайшие 7 дней/);
   assert.doesNotMatch(html, /Выберите возраст|Возраст ребёнка|3–5 лет|Для кого:|Добавить ребёнка/);
-  assert.match(html, /Пока нет опубликованных событий/);
-  assert.match(html, /По вашему запросу мы ничего не нашли/);
+  assert.match(html, /Событий пока нет/);
+  assert.doesNotMatch(html, /По вашему запросу мы ничего не нашли|Больше под ваш запрос/);
   assert.match(html, /Куда пойти/);
   assert.doesNotMatch(html, /Для вашей семьи|child_000|Зарегистрируйтесь/);
 });
@@ -114,12 +114,23 @@ for (const count of [0, 1, 2, 7, 8, 10, 11]) {
     assert.doesNotMatch(html, /В мой план|Не подходит/);
     assert.equal((html.match(/Сохранить в план или в идеи/g) ?? []).length, visible);
     assert.equal((html.match(/data-masonry-media=/g) ?? []).length, visible);
-    assert.equal((html.match(count ? /Ещё варианты</g : /По вашему запросу мы ничего не нашли</g) ?? []).length, 1);
+    assert.equal((html.match(/Ещё варианты</g) ?? []).length, count ? 1 : 0);
     if (count) assert.ok(html.lastIndexOf("Ещё варианты") > html.lastIndexOf("Тестовое событие"));
     assert.doesNotMatch(html, /child_0001|profile=|kids=/);
-    if (!count) assert.match(html, /По вашему запросу мы ничего не нашли/);
+    if (!count) assert.match(html, /Пока нет опубликованных событий/);
     else { assert.match(html, /3–14 лет · 3 ноя./); assert.match(html, /Бесплатно/); assert.doesNotMatch(html, /Подходит Ане/);
       assert.match(html, /aspect-ratio:2\/3/); }
     if (count > 1) { assert.doesNotMatch(html, /Подходит Ане/); assert.match(html, /от 10/); }
+    if (count === 7) {
+      const htmlWithAlternatives = renderToStaticMarkup(
+        <AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
+          <FamilyHomeResults data={data} context={context} citySlug="minsk" impressed={new Set()} onImpression={() => {}}
+            audienceSections={{ primary: data.items.slice(0, 1), alternatives: data.items.slice(1), active: true }} />
+        </AuthProvider></AppRouterContext.Provider>,
+      );
+      assert.equal((htmlWithAlternatives.match(/data-masonry-media=/g) ?? []).length, 7);
+      assert.doesNotMatch(htmlWithAlternatives, /Больше под ваш запрос|Справа — другие|По выбранным параметрам/);
+      assert.equal((htmlWithAlternatives.match(/Ещё варианты</g) ?? []).length, 1);
+    }
   });
 }

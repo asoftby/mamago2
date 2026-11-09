@@ -3,19 +3,13 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 
-test("one poster-height end card, only links when catalog has available events", () => {
-  const empty = renderToStaticMarkup(<HomeMoreEventsCard href="/minsk/events" hasEvents={false} />);
-  assert.match(empty, /По вашему запросу мы ничего не нашли/);
-  assert.match(empty, /Попробуйте другие варианты/);
-  assert.doesNotMatch(empty, /href=|Ещё варианты/);
-  const more = renderToStaticMarkup(<HomeMoreEventsCard href="/minsk/events" hasEvents />);
-  assert.match(more, /Ещё варианты/);
-  assert.match(more, /Куда пойти/);
-  assert.match(more, /href="\/minsk\/events"/);
-  assert.doesNotMatch(more, /По вашему запросу мы ничего не нашли/);
-  assert.match(empty, /aspect-\[2\/3\]/);
-  assert.match(more, /aspect-\[2\/3\]/);
-  assert.match(empty, /bg-card/);
-  assert.match(more, /bg-card/);
-  assert.doesNotMatch(empty + more, /border-dashed|bg-image|background-image/);
+test("one poster-height catalog link without a false empty-state card", () => {
+  const html = renderToStaticMarkup(<HomeMoreEventsCard href="/minsk/events" />);
+  assert.match(html, /Ещё варианты/);
+  assert.match(html, /Куда пойти/);
+  assert.ok(html.includes('href="/minsk/events"'));
+  assert.ok(html.includes("aspect-[2/3]"));
+  assert.match(html, /bg-card/);
+  assert.doesNotMatch(html, /По вашему запросу мы ничего не нашли|Попробуйте другие варианты/);
+  assert.doesNotMatch(html, /border-dashed|bg-image|background-image/);
 });

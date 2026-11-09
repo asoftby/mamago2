@@ -41,7 +41,7 @@ import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMonthScreen } from "./v3/PlanMonthScreen";
 import { PlanPicksScreen } from "./v3/PlanPicksScreen";
 import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
-import { SavedDayBanner } from "./dayScenario/SavedDayBanner";
+import { SavedDayMenu } from "./dayScenario/SavedDayMenu";
 import { pairOf } from "../lib/dayScenarioUi/model";
 import { usePlanScenarioDays } from "@/features/plan-calendar/usePlanDayCounts";
 import { entryLabel } from "../lib/dayScenarioUi/model";
@@ -1184,7 +1184,7 @@ export function PlanMainContent({
       toast.error("Не удалось открыть день для изменения. Попробуйте ещё раз.");
     }
   }, [selectedDate, openNestedScreen]);
-  const savedDayBanner = savedDay ? <SavedDayBanner date={selectedDate} count={savedDay.count} pair={pairOf(selectedDate, savedDays)} onOpenDate={(date) => onChangeDate?.(date)} onEdit={() => void startEditDay()} /> : null;
+  const savedDayMenu = savedDay ? <SavedDayMenu date={selectedDate} count={savedDay.count} pair={pairOf(selectedDate, savedDays)} onOpenDate={(date) => onChangeDate?.(date)} onEdit={() => void startEditDay()} /> : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
   const filteredAudience = includedPeople.length > 0 || excludedPeople.length > 0 || planVisibilityFilter !== "ALL";
@@ -1228,11 +1228,14 @@ export function PlanMainContent({
     return (
       <div className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 flex items-baseline justify-between gap-3"}>
         <h3 className="m-0 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]">{dayContextLabel}</h3>
-        <span
-          style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
-          className="min-w-0 truncate text-right text-[12px] text-[var(--mp-tx2)]"
-        >
-          {audienceLabel}
+        <span className="flex min-w-0 items-center gap-1">
+          <span
+            style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+            className="min-w-0 truncate text-right text-[12px] text-[var(--mp-tx2)]"
+          >
+            {audienceLabel}
+          </span>
+          {savedDayMenu}
         </span>
       </div>
     );
@@ -1336,12 +1339,16 @@ export function PlanMainContent({
         {dayPartSections.length > 0 ? (
           renderDayPlanSection(compact)
         ) : (
-          <p
-            role="status"
-            className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
-          >
-            В этот день записей не было
-          </p>
+          <>
+            {/* A saved day whose entries a person filter hides keeps its ⋯ menu (it lives in the heading). */}
+            {savedDayMenu ? renderDayHeading(compact) : null}
+            <p
+              role="status"
+              className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
+            >
+              В этот день записей не было
+            </p>
+          </>
         )}
       </div>
     );
@@ -1606,8 +1613,6 @@ export function PlanMainContent({
 
           {renderPersonFilter(false)}
 
-          {savedDayBanner}
-
           {isPastDay ? (
             renderPastDay(false)
           ) : (
@@ -1671,8 +1676,6 @@ export function PlanMainContent({
         {planCalendar}
 
         {renderPersonFilter(true)}
-
-        {savedDayBanner}
 
         {isPastDay ? (
           renderPastDay(true)

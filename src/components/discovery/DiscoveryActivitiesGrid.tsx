@@ -32,7 +32,6 @@ import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatCardAge } from "@/lib/discovery/formatCardAge";
-import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
 // NOTE: formatRuShortDayMonthRange, getActivityFormatLabel, publicActivityPath
 // are still used by the OfferCard branch below — do not remove.
 
@@ -284,14 +283,11 @@ export function DiscoveryActivitiesGrid({
         <div className="space-y-4">
           <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">{secondaryHeading}</h2>
           <OrderedMasonryGrid
-            items={[
-              ...(primary.length === 0 ? [{ key: "__audience-alternatives__", ratio: 1.5, content: <SoftAudienceNotice inGrid label="варианты" /> }] : []),
-              ...secondary.map((activity, index) => ({
+            items={secondary.map((activity, index) => ({
               key: activity.id,
               ratio: activity.analyticsEntityType === "OFFER" ? 5 / 4 : ratio === "1/1" ? 1 : 5 / 4,
               content: renderCard(activity, primary.length + index + 1, "secondary"),
-            })),
-            ]}
+            }))}
           />
         </div>
       )}

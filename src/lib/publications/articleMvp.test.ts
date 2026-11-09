@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { ArticleContentPayloadSchema, DEFAULT_ARTICLE_PLACE_SECTIONS, articleContentValidationMessage, extractArticleMediaIds, extractArticleMediaUsage, newBlock, prepareArticleContentForSave, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
 
-const allBlockTypes = ["intro", "text", "quote", "heading", "image", "gallery", "activityCard", "embed", "contacts", "price", "openingHours", "info"] as const;
+const allBlockTypes = ["intro", "text", "quote", "heading", "image", "gallery", "activityCard", "dynamicAfisha", "embed", "contacts", "price", "openingHours", "info"] as const;
 
 // Every newly inserted empty block must remain saveable. In particular, the
 // blank PLACE reference is an intentional schema-valid editor draft, not a
@@ -234,4 +234,24 @@ console.log("articleMvp.test.ts (extractArticleMediaUsage/extractArticleMediaIds
   assert.equal(parsed.version, 1, "additive union does not rewrite existing content version");
   assert.equal(ArticleContentPayloadSchema.safeParse({ ...payload, blocks: [{ id: "bad", type: "contacts", data: { phones: [], socials: [], email: "bad" } }] }).success, false);
   assert.equal(ArticleContentPayloadSchema.safeParse({ ...payload, blocks: [{ id: "bad", type: "openingHours", data: { mode: "WEEKLY", timezone: "Mars/Olympus", rules: [], exceptions: [] } }] }).success, false);
+}
+
+
+// Dynamic afisha is an additive v1 content block. Persisting a configured
+// period and occasion must not change existing article serialization.
+{
+  const block = { ...newBlock("dynamicAfisha", () => "afisha-one"), period: "WEEKEND" as const, occasionSlug: "new-year" };
+  const payload = { version: 1 as const, blocks: [block] };
+  const parsed = ArticleContentPayloadSchema.parse(prepareArticleContentForSave(payload));
+  assert.deepEqual(parsed.blocks[0], block);
+  assert.deepEqual(ArticleContentPayloadSchema.parse(serializeArticleContent(parsed)), parsed);
+  assert.equal(ArticleContentPayloadSchema.safeParse({
+    version: 1, blocks: [{ id: "bad-period", type: "dynamicAfisha", period: "LAST_YEAR" }],
+  }).success, false);
+  assert.equal(ArticleContentPayloadSchema.safeParse({
+    version: 1, blocks: [{ id: "bad-occasion", type: "dynamicAfisha", occasionSlug: "<script>" }],
+  }).success, false);
+  assert.equal(ArticleContentPayloadSchema.safeParse({
+    version: 1, blocks: [{ id: "legacy-afisha", type: "dynamicAfisha" }],
+  }).success, true);
 }
