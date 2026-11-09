@@ -5,7 +5,7 @@
 import { Prisma, type GeoScope } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
-  buildArticleMvpResolvedBlocks,
+  resolvePublicArticleBlocks,
   type ArticleMvpResolvedBlock,
 } from "@/lib/article/articleMvpRenderData";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
@@ -49,7 +49,7 @@ export type PublicContinuousArticleDto = {
   blocks: ArticleMvpResolvedBlock[];
   geoScope: GeoScope;
   cityId: string | null;
-  /** Только у первой статьи ленты (seed): подгружаемые статьи тип не несут. */
+  /** Same publication type in the first and subsequent articles. */
   publicationType?: "ARTICLE" | "COLLECTION" | "BREAKING_NEWS";
 };
 
@@ -82,6 +82,7 @@ const nextArticleSelect = {
   geoScope: true,
   cityId: true,
   categoryId: true,
+  publicationType: true,
   authorLabel: true,
   authorUser: {
     select: {
@@ -153,6 +154,7 @@ export async function mapRowToPublicContinuousArticleDto(
     geoScope: GeoScope | null;
     cityId: string | null;
     categoryId: string | null;
+    publicationType: "ARTICLE" | "COLLECTION" | "BREAKING_NEWS";
     authorLabel: string | null;
     authorUser: { displayName: string | null; avatarUrl: string | null } | null;
     category: { id: string; slug: string; nameRu: string } | null;
@@ -162,10 +164,10 @@ export async function mapRowToPublicContinuousArticleDto(
 ): Promise<PublicContinuousArticleDto | null> {
   if (!row.slug || !row.geoScope) return null;
   const content = parseArticleContentJson(row.contentJson);
-  if (content.blocks.length === 0) return null;
-  const blocks = await buildArticleMvpResolvedBlocks(content.blocks, {
+  const blocks = await resolvePublicArticleBlocks(row.id, content.blocks, {
     citySlug: row.geoScope === "CITY" ? row.city?.slug ?? null : null,
   });
+  if (blocks.length === 0) return null;
   const cover = await fetchCoverPublicUrl(row.id);
   const heroUrl = cover?.publicUrl ?? row.heroImage ?? row.seoOgImage ?? null;
   const href = buildArticlePublicPath({
@@ -203,6 +205,7 @@ export async function mapRowToPublicContinuousArticleDto(
     section,
     tags: row.tags,
     blocks,
+    publicationType: row.publicationType,
     geoScope: row.geoScope,
     cityId: row.cityId,
   };
