@@ -193,6 +193,12 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(main, /const savedDay = dayScenarioEnabled \? savedDays\[selectedDate\] : undefined;/, "the banner exists only with the flag on");
   assert.match(main, /\{renderPersonFilter\(false\)\}\s*\{savedDayBanner\}/, "the banner sits in the desktop layout");
   assert.match(main, /\{renderPersonFilter\(true\)\}\s*\{savedDayBanner\}/, "and in the mobile one");
+  assert.match(readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8"), /saver\.save\(\[\{ date: activeDate, items, keep: api\.kept \}\]\)/, "a save carries the saved points the draft could not hold");
+  assert.match(main, /seed=\{editSeed\}/, "«Изменить день» opens the screen with the saved points");
+  assert.match(main, /setEditSeed\(null\);\s*setScreen\("plan"\);/, "the seed is dropped when the screen closes, so a normal open is a fresh build");
+  assert.match(main, /!editSeed \|\| !editSeed\.some\(/, "the day's own saved entries are not shown twice as «уже в плане»");
+  const bannerSrc = readFileSync("src/features/my-plan/components/dayScenario/SavedDayBanner.tsx", "utf8");
+  assert.match(bannerSrc, /Изменить день/, "the menu has «Изменить день»");
   const ribbon = readFileSync("src/features/my-plan/components/v3/PlanDayRibbon.tsx", "utf8");
   assert.match(ribbon, /usePlanScenarioDays\(\{ from, to \}\)/, "the ribbon reads saved days from the cached chunks");
   assert.match(ribbon, /✦/, "a ✦ on days saved as «от mamaGo»");

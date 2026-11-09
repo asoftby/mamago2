@@ -261,6 +261,9 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.deepEqual(body.days[0]!.items.map((i) => i.activityId), ["b", "a"], "in time order");
   assert.deepEqual(Object.keys(body.days[0]!.items[0]!).sort(), ["activityId", "endsAt", "kind", "pinned", "startsAt", "travel"], "only what the server needs: no card, no notes");
   assert.equal(body.days[0]!.items[1]!.pinned, true);
+  const withKeep = buildSaveBody([{ date: "2026-11-14", items: [b], keep: [{ kind: "event", activityId: "gone" }] }]);
+  assert.deepEqual(withKeep.days[0]!.keep, [{ kind: "event", activityId: "gone" }], "saved points the draft could not hold travel with the save");
+  assert.equal("keep" in buildSaveBody([{ date: "2026-11-14", items: [b], keep: [] }]).days[0]!, false, "no keep when nothing was lost");
   assert.equal(saveFailureOf(401, "UNAUTHENTICATED"), "sign_in");
   assert.equal(saveFailureOf(429, "RATE_LIMITED"), "rate_limited");
   assert.equal(saveFailureOf(409, "DUPLICATE_ACTIVITY"), "duplicate");
@@ -290,6 +293,15 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.equal(pairOf("2026-11-20", weekend), null, "a day without a scenario");
   assert.equal(pairLinkLabel({ date: "2026-11-15", count: 3, direction: "next" }), "Воскресенье: 3 места →");
   assert.equal(pairLinkLabel({ date: "2026-11-14", count: 3, direction: "prev" }), "← Суббота");
+}
+
+// ---- «Изменить день»: the session's requests carry editScenario
+{
+  const base = { city: "minsk", date: "2026-11-14", mode: "car" as const, ageRanges: [], personaIds: ["p1"] };
+  assert.equal("editScenario" in buildDraftBody(base, "build"), false, "a normal build does not send it");
+  assert.equal(buildDraftBody({ ...base, editScenario: true }, "another").editScenario, true, "an edit session sends it on every action");
+  const rebuilt = buildDraftBody({ ...base, editScenario: true }, "rebuild", { items: [{ activityId: "a", startsAt: "2026-11-14T10:00:00Z" } as DraftItem], pinAll: true, targetCount: 1 });
+  assert.deepEqual([rebuilt.pinnedActivityIds, rebuilt.targetCount, rebuilt.editScenario], [["a"], 1, true], "the seed is rebuilt with every saved point pinned");
 }
 
 console.log("dayScenarioUi model tests passed");

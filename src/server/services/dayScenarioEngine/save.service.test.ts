@@ -158,6 +158,20 @@ async function run() {
     assert.equal(rows.length, 3);
   }
 
+  // ---- «Изменить день»: a saved point the draft could not hold (keep) survives the re-save untouched
+  {
+    const { db, get } = makeDb(seedCatalog());
+    const first = await saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30"), placeItem("pl-park", SAT, "10:30", "12:00")] }]), "key-keep-0001", deps(db));
+    const parkId = first.days[0]!.items.find((i) => i.activityId === "pl-park")!.planItemId;
+    const keepRequest = saveRequestSchema.parse({ days: [{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30")], keep: [{ kind: "place", activityId: "pl-park" }] }] });
+    await saveDayScenarios("u1", keepRequest, "key-keep-0002", deps(db));
+    assert.ok(get().planItems.some((r) => r.id === parkId && r.placeId === "pl-park"), "the kept point is still in the plan, same entry");
+    assert.equal(get().planItems.length, 2);
+    assert.notEqual(requestHashOf(keepRequest), requestHashOf(parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30")] }])), "keep is part of the idempotency hash");
+    await saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30")] }]), "key-keep-0003", deps(db));
+    assert.ok(!get().planItems.some((r) => r.id === parkId), "without keep the dropped point is removed, as before");
+  }
+
   // ---- a weekend: one transaction, one group, both scenarios
   {
     const { db, get } = makeDb(seedCatalog());
@@ -220,6 +234,10 @@ async function run() {
     assert.match(route, /UNAUTHENTICATED[\s\S]*401/);
     assert.match(route, /IDEMPOTENCY_KEY_REQUIRED/);
     assert.match(route, /checkRateLimit\(`day-scenario-save:\$\{user\.id\}`, 10, 60_000\)/);
+    const draftSrc = readFileSync("src/server/services/dayScenarioEngine/draft.service.ts", "utf8");
+    assert.match(draftSrc, /\{ OR: \[\{ scenarioId: null \}, \{ scenarioId: \{ not: editedScenario\.id \} \}\] \}/, "editing excludes only the edited scenario, not every scenario's entries");
+    assert.match(draftSrc, /AND: \[\s*await activePlanScopeFor\(userId\)/, "the family scope's own OR stays intact");
+    assert.match(draftSrc, /unpooledPinnedIds = request\.action === "rebuild"/, "pinned points the pool does not hold are reported");
     const service = readFileSync("src/server/services/dayScenarioEngine/save.service.ts", "utf8");
     assert.match(service, /where: \{ AND: \[scope, \{ OR: /, "the scope is combined with AND: a spread would replace the scope's own OR");
     assert.ok(!/plan\.service|\baddPlanItem\(|\baddPlacePlanItem\(/.test(service), "never the helpers that re-date an existing entry");

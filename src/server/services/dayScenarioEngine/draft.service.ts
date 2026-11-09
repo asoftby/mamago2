@@ -52,6 +52,11 @@ export const draftRequestSchema = z.object({
   pinnedActivityIds: z.array(z.string().min(1).max(64)).max(8).optional().default([]),
   replaceActivityId: z.string().min(1).max(64).optional(),
   variant: z.number().int().min(0).max(1000).optional().default(0),
+  /**
+   * «Изменить день»: the entries a saved scenario created on this day are the draft itself, so they are neither busy time
+   * nor "already planned" (otherwise the day would be rebuilt around, and without, its own points).
+   */
+  editScenario: z.boolean().optional().default(false),
   targetCount: z.number().int().min(1).max(4).optional().default(3),
   /** Planning window inside the day, local "HH:MM" (default 09:00-20:00), e.g. 16:00-20:00 on a weekday. */
   dayStart: hhmm.optional().default(DEFAULT_DAY_START),
@@ -92,6 +97,11 @@ export type DraftResponse = {
   alternatives: DraftItem[][];
   /** action "another" only: no new variant exists ("Мы показали всё, что подходит"); `items` is empty. */
   exhausted: boolean;
+  /**
+   * action "rebuild": pinned points the pool does not hold (an event whose last session already started, a place that
+   * closed): the draft cannot show them, but they are still the user's saved points. The client keeps them in a save.
+   */
+  unpooledPinnedIds: string[];
   meta: { poolCache: "hit" | "miss"; poolSize: number; poolPlaces: number; poolVirtual: number; staleGeoCells: number; candidateCount: number; buildMs: number };
 };
 
@@ -119,10 +129,19 @@ function toDraftItemsFrom(items: BuildResult["items"]): DraftItem[] {
   }));
 }
 
-async function loadUserContext(userId: string, date: string, personaIds: string[]) {
+async function loadUserContext(userId: string, date: string, personaIds: string[], editScenario = false) {
+  // Editing: only THIS user's saved scenario of the day stops being busy time / "already planned". Other visible
+  // scenarios (a family member's) and every other entry stay. AND keeps the family scope's own OR intact.
+  const editedScenario = editScenario ? await prisma.dayScenario.findUnique({ where: { userId_date: { userId, date } }, select: { id: true } }) : null;
   const [plan, profile] = await Promise.all([
     prisma.planItem.findMany({
-      where: { ...(await activePlanScopeFor(userId)), date },
+      where: {
+        AND: [
+          await activePlanScopeFor(userId),
+          { date },
+          ...(editedScenario ? [{ OR: [{ scenarioId: null }, { scenarioId: { not: editedScenario.id } }] }] : []),
+        ],
+      },
       select: { activityId: true, placeId: true, startsAt: true, endsAt: true },
     }),
     personaIds.length > 0
@@ -159,7 +178,7 @@ export async function runDayScenarioDraft(
   const { value: pool, hit } = await getDayScenarioPool(request.city, request.date);
 
   const ctx = user
-    ? await loadUserContext(user.id, request.date, request.personaIds)
+    ? await loadUserContext(user.id, request.date, request.personaIds, request.editScenario)
     : { busy: [], planned: [], childRanges: [] as string[], interests: [] as string[] };
 
   const ageRanges = [...new Set([...request.ageRanges, ...ctx.childRanges])];
@@ -221,6 +240,8 @@ export async function runDayScenarioDraft(
     result = buildDayScenario(pool.events, input, deps);
   }
 
+  const pooled = new Set(pool.events.map((event) => event.activityId));
+  const unpooledPinnedIds = request.action === "rebuild" ? request.pinnedActivityIds.filter((id) => !pooled.has(id)) : [];
   return {
     status: result.status,
     mode: result.mode,
@@ -229,6 +250,7 @@ export async function runDayScenarioDraft(
     items: toDraftItems(result),
     alternatives,
     exhausted,
+    unpooledPinnedIds,
     meta: {
       poolCache: hit ? "hit" : "miss",
       poolSize: pool.events.length,

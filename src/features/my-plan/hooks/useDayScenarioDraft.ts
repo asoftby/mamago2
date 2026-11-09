@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   applyAlternative,
   buildDraftBody,
@@ -85,6 +85,8 @@ export type DayScenarioDraftApi = {
   /** The chosen alternative replaces the draft. */
   chooseAlternative: (date: string, items: DraftItem[]) => void;
   retry: (date: string) => void;
+  /** «Изменить день»: saved points the draft cannot show (no longer in the pool); a save keeps them as they are. */
+  kept: { kind: "event" | "place"; activityId: string }[];
 };
 
 /**
@@ -99,8 +101,18 @@ export function useDayScenarioDraft(input: {
   mode: ScenarioMode;
   ageRanges: string[];
   personaIds: string[];
+  /**
+   * «Изменить день»: the saved points of the first day. The first draft of that day is a rebuild around them (all
+   * pinned, as many points as were saved) instead of a fresh build, so the day opens as it is in the plan.
+   */
+  seed?: { kind: "event" | "place"; activityId: string; startsAt: string }[] | null;
 }): DayScenarioDraftApi {
-  const { enabled, city, dates, mode, ageRanges, personaIds } = input;
+  const { enabled, city, dates, mode, ageRanges, personaIds, seed } = input;
+  const [kept, setKept] = useState<{ kind: "event" | "place"; activityId: string }[]>([]);
+  const seedRef = useRef(seed);
+  seedRef.current = seed;
+  const firstDateRef = useRef(dates[0]);
+  firstDateRef.current = dates[0];
   const [byDate, dispatch] = useReducer(reducer, {} as Record<string, DateDraftState>);
   const stateRef = useRef(byDate);
   stateRef.current = byDate;
@@ -109,7 +121,7 @@ export function useDayScenarioDraft(input: {
 
   const queryKey = JSON.stringify([enabled, city, dates, mode, ageRanges, personaIds]);
   const query = useMemo(
-    () => (date: string) => ({ city, date, mode, ageRanges, personaIds }),
+    () => (date: string) => ({ city, date, mode, ageRanges, personaIds, editScenario: Boolean(seedRef.current?.length) }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- queryKey is the serialized identity of these inputs
     [queryKey],
   );
@@ -135,8 +147,22 @@ export function useDayScenarioDraft(input: {
 
   const build = useCallback(
     async (date: string) => {
-      const response = await request(date, buildDraftBody(queryRef.current(date), "build"));
-      if (response) dispatch({ type: "history", date, history: pushDraft(emptyHistory(), toDraft(response), 0) });
+      const saved = seedRef.current;
+      const seeded = saved && saved.length > 0 && date === firstDateRef.current;
+      const response = await request(
+        date,
+        seeded
+          ? buildDraftBody(queryRef.current(date), "rebuild", { items: saved as unknown as DraftItem[], pinAll: true, targetCount: saved.length })
+          : buildDraftBody(queryRef.current(date), "build"),
+      );
+      if (response) {
+        dispatch({ type: "history", date, history: pushDraft(emptyHistory(), toDraft(response), 0) });
+        // Saved points the pool no longer holds cannot be drawn, but they stay in the day: remembered for the save.
+        if (seeded) {
+          const missing = new Set(response.unpooledPinnedIds ?? []);
+          setKept(saved.filter((point) => missing.has(point.activityId)).map((point) => ({ kind: point.kind, activityId: point.activityId })));
+        }
+      }
     },
     [request],
   );
@@ -239,7 +265,8 @@ export function useDayScenarioDraft(input: {
       loadAlternatives,
       chooseAlternative,
       retry,
+      kept,
     }),
-    [byDate, another, restart, goBack, remove, addMore, loadAlternatives, chooseAlternative, retry],
+    [byDate, another, restart, goBack, remove, addMore, loadAlternatives, chooseAlternative, retry, kept],
   );
 }

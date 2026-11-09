@@ -94,3 +94,25 @@ export async function deleteSavedDays(userId: string, date: string, scope: Delet
     return { dates: rows.map((row) => row.date) };
   });
 }
+
+export type SavedDayPoint = { kind: "event" | "place"; activityId: string; startsAt: string; pinned: boolean };
+
+/**
+ * The points of a saved day, for «Изменить день»: what the scenario created (PlanItem.scenarioId), in time order.
+ * The draft is rebuilt around them (all pinned), so only ids and starts are needed; their cards come from the pool.
+ * Empty for a day that is not a saved scenario of this user.
+ */
+export async function listSavedDayPoints(userId: string, date: string, db: Pick<typeof prisma, "dayScenario" | "planItem"> = prisma): Promise<SavedDayPoint[]> {
+  const scenario = await db.dayScenario.findUnique({ where: { userId_date: { userId, date } }, select: { id: true, source: true } });
+  if (!scenario || scenario.source !== "ENGINE") return [];
+  const rows = await db.planItem.findMany({
+    where: { scenarioId: scenario.id, userId, cancelledAt: null, startsAt: { not: null } },
+    select: { activityId: true, placeId: true, startsAt: true, pinned: true },
+    orderBy: { startsAt: "asc" },
+  });
+  return rows.flatMap((row) =>
+    row.startsAt && (row.activityId || row.placeId)
+      ? [{ kind: row.activityId ? ("event" as const) : ("place" as const), activityId: (row.activityId ?? row.placeId)!, startsAt: row.startsAt.toISOString(), pinned: row.pinned }]
+      : [],
+  );
+}
