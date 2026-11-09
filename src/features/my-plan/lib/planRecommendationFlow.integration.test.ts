@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  GUEST_MY_PLAN_DRAFT_STORAGE_KEY,
-} from "@/lib/my-plan/guestMyPlanDraftStorage";
-import {
   loadPersistedPlanDate,
   loadRecommendationDraft,
   parseRecommendationDrafts,
@@ -108,11 +105,9 @@ test("another batch persists its batch number and all displayed IDs", () => {
 test("change choice clears only the current recommendation snapshot, not another date or plan storage", () => {
   persistRecommendationDraft(keyFor(dateA), draft("a1"), dateA);
   persistRecommendationDraft(keyFor(dateB), draft("b1"), dateB);
-  memoryStorage.setItem(GUEST_MY_PLAN_DRAFT_STORAGE_KEY, "real-plan-sentinel");
   persistRecommendationDraft(keyFor(dateA), null, dateA);
   assert.equal(mount(dateA).screen, "start");
   assert.equal(mount(dateB).screen, "results");
-  assert.equal(memoryStorage.getItem(GUEST_MY_PLAN_DRAFT_STORAGE_KEY), "real-plan-sentinel");
 });
 
 test("server plan reconciles optimistic added IDs only after a confirmed response", () => {
@@ -143,7 +138,6 @@ test("results focus and live-region contract are stable", () => {
   assert.deepEqual(PLAN_RECOMMENDATION_RESULTS_A11Y, { tabIndex: -1, "aria-live": "polite" });
 });
 
-test("storage namespace is stable and separate from the guest draft", () => {
+test("storage namespace is stable", () => {
   assert.equal(PLAN_RECOMMENDATION_DRAFT_STORAGE_KEY, "mamago:planRecommendationDrafts:v1");
-  assert.notEqual(PLAN_RECOMMENDATION_DRAFT_STORAGE_KEY, GUEST_MY_PLAN_DRAFT_STORAGE_KEY);
 });

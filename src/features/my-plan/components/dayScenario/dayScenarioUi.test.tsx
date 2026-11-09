@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ScenarioTimeline, mergeTimeline } from "./ScenarioTimeline";
@@ -184,7 +184,11 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(main, /<PlanPicksScreen/, "the old picks screen is still rendered");
   const panel = readFileSync("src/features/my-plan/components/MyPlanPanelContent.tsx", "utf8");
   assert.match(panel, /if \(!isAuthenticated && dayScenarioEnabled\)/, "guests get the new screen only with the flag on");
-  assert.match(panel, /<GuestMyPlanPanel/, "the guest panel is still rendered");
+  assert.ok(!panel.includes("GuestMyPlanPanel") && !panel.includes("migrateGuestMyPlanAfterAuth"), "the old guest panel and its migration are gone");
+  for (const gone of ["src/app/api/plan/generate/route.ts", "src/app/api/plan/guest-draft/route.ts", "src/features/my-plan/components/GuestMyPlanPanel.tsx", "src/lib/my-plan/guestMyPlanDraftStorage.ts", "src/lib/my-plan/migrateGuestMyPlanAfterAuth.ts", "src/server/services/guestPlanAvailability.ts"]) {
+    assert.equal(existsSync(gone), false, `${gone} is removed: one implementation of day picking is left`);
+  }
+  assert.match(panel, /Подбор дня сейчас недоступен/, "with the flag off a guest gets a plain way on, not an old picker");
   const shell = readFileSync("src/components/city/CityDiscoveryShell.tsx", "utf8");
   assert.doesNotMatch(shell, /KudaDayScenarioEntry/, "«Куда пойти» does not duplicate the day scenario entry");
   const screen = readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8");

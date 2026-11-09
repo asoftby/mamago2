@@ -19,7 +19,7 @@ export interface MyPlanOverlayProps {
  * Единая оболочка «Мой план».
  * Desktop → Dialog (max-w ~572px — на ~10% шире 520px, закрытие по backdrop / Esc / X)
  * Mobile  → Bottom Sheet (swipe down, drag handle)
- * Контент: MyPlanPanelContent → PlanMainContent (авторизованные) или GuestMyPlanPanel (гость).
+ * Контент: MyPlanPanelContent → PlanMainContent (авторизованные) или экран «Собрать день» (гость; без флага — приглашение войти).
  */
 export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
