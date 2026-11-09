@@ -4,6 +4,7 @@ import { BusinessContentList } from "@/components/business/shared/BusinessConten
 import { OfferCardHorizontal } from "@/components/business/offers/OfferCardHorizontal";
 import { Tag } from "lucide-react";
 import { OfferStatus, OfferKind } from "@prisma/client";
+import { BUSINESS_OFFERS_ENABLED } from "@/lib/business/publicationAvailability";
 
 interface Offer {
   id: string;
@@ -88,6 +89,7 @@ export function OffersList({ offers, currentView }: OffersListProps) {
       emptyDescription="Добавьте первое предложение, чтобы семьи могли быстрее понять выгоду и оставить заявку или перейти к записи."
       addButtonText="Добавить предложение"
       addButtonHref="/business/offers/new"
+      allowCreate={BUSINESS_OFFERS_ENABLED}
       renderItem={(offer, handlers) => (
         <OfferCardHorizontal
           key={offer.id}
