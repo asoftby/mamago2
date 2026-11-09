@@ -39,60 +39,68 @@ export async function GET(_req: Request, { params }: RouteParams) {
 
 export async function PATCH(req: Request, { params }: RouteParams) {
   const user = await requireManager();
-  if (!user) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   const body = await req.json().catch(() => null);
-
   const existing = await prisma.discoveryTag.findUnique({ where: { id } });
-  if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const title = body?.title !== undefined ? String(body.title).trim() : existing.title;
   const slug = body?.slug !== undefined || body?.title !== undefined
     ? normalizeSlug(body?.slug, body?.title ?? title)
     : existing.slug;
-
-  if (!title) {
-    return NextResponse.json({ error: "title is required" }, { status: 400 });
+  if (!title || title.length > 80 || !slug) {
+    return NextResponse.json({ error: "Название тега обязательно (не более 80 символов)" }, { status: 400 });
   }
-  if (!slug) {
-    return NextResponse.json({ error: "slug is required" }, { status: 400 });
+  const indexingMode = body?.indexingMode ?? existing.indexingMode;
+  const reviewStatus = body?.reviewStatus ?? existing.reviewStatus;
+  const isActive = body?.isActive === undefined ? existing.isActive : body.isActive === true;
+  if (!["AUTO", "INDEX", "NOINDEX"].includes(indexingMode) ||
+      !["APPROVED", "PENDING"].includes(reviewStatus)) {
+    return NextResponse.json({ error: "Недопустимый статус тега" }, { status: 400 });
+  }
+  if (user.role !== "ADMIN" &&
+      (indexingMode !== existing.indexingMode || reviewStatus !== existing.reviewStatus || isActive !== existing.isActive)) {
+    return NextResponse.json({ error: "Управление публикацией и индексацией доступно только администратору" }, { status: 403 });
+  }
+  if (reviewStatus === "PENDING" && isActive) {
+    return NextResponse.json({ error: "Сначала одобрите предложенный тег" }, { status: 400 });
+  }
+  if (existing.slug !== slug && existing.isActive) {
+    // Existing public URLs require a separate reviewed redirect migration.
+    return NextResponse.json({ error: "Slug опубликованного тега нельзя менять без настройки редиректа" }, { status: 400 });
   }
 
   const data = {
-    title,
-    slug,
-    description:
-      body?.description === undefined ? existing.description : String(body.description ?? "").trim() || null,
-    seoTitle:
-      body?.seoTitle === undefined ? existing.seoTitle : String(body.seoTitle ?? "").trim() || null,
-    seoDescription:
-      body?.seoDescription === undefined
-        ? existing.seoDescription
-        : String(body.seoDescription ?? "").trim() || null,
-    sortOrder:
-      body?.sortOrder === undefined
-        ? existing.sortOrder
-        : Number.isFinite(Number(body.sortOrder))
-          ? Math.floor(Number(body.sortOrder))
-          : existing.sortOrder,
-    isActive: body?.isActive === undefined ? existing.isActive : Boolean(body.isActive),
+    title, slug, indexingMode, reviewStatus, isActive,
+    description: body?.description === undefined ? existing.description : String(body.description ?? "").trim() || null,
+    seoTitle: body?.seoTitle === undefined ? existing.seoTitle : String(body.seoTitle ?? "").trim() || null,
+    seoDescription: body?.seoDescription === undefined
+      ? existing.seoDescription : String(body.seoDescription ?? "").trim() || null,
+    sortOrder: body?.sortOrder === undefined
+      ? existing.sortOrder
+      : Number.isFinite(Number(body.sortOrder)) ? Math.floor(Number(body.sortOrder)) : existing.sortOrder,
   };
 
   try {
-    const updated = await prisma.discoveryTag.update({
-      where: { id },
-      data,
+    const updated = await prisma.$transaction(async (tx) => {
+      const tag = await tx.discoveryTag.update({ where: { id }, data });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: user.id, actorRole: user.role,
+          action: "DISCOVERY_TAG_UPDATE", entityType: "DiscoveryTag", entityId: id,
+          before: { title: existing.title, slug: existing.slug, isActive: existing.isActive, indexingMode: existing.indexingMode, reviewStatus: existing.reviewStatus },
+          after: { title: tag.title, slug: tag.slug, isActive: tag.isActive, indexingMode: tag.indexingMode, reviewStatus: tag.reviewStatus },
+        },
+      });
+      return tag;
     });
     invalidatePublicArticleLists();
     return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ error: "Tag with this slug already exists" }, { status: 409 });
+      return NextResponse.json({ error: "Такой тег уже существует" }, { status: 409 });
     }
     console.error("[PATCH /api/admin/discovery-tags/[id]]", error);
     return NextResponse.json({ error: "Failed to update discovery tag" }, { status: 500 });
@@ -101,16 +109,23 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
 export async function DELETE(_req: Request, { params }: RouteParams) {
   const user = await requireManager();
-  if (!user) {
+  if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
 
   try {
-    const disabled = await prisma.discoveryTag.update({
-      where: { id },
-      data: { isActive: false },
+    const disabled = await prisma.$transaction(async (tx) => {
+      const tag = await tx.discoveryTag.update({ where: { id }, data: { isActive: false } });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: user.id, actorRole: user.role,
+          action: "DISCOVERY_TAG_DISABLE", entityType: "DiscoveryTag", entityId: id,
+          after: { isActive: false, slug: tag.slug },
+        },
+      });
+      return tag;
     });
     invalidatePublicArticleLists();
     return NextResponse.json({ ok: true, tag: disabled });
