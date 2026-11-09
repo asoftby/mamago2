@@ -28,3 +28,20 @@ export function collectionContiguousCardRuns(blocks: readonly ArticleMvpResolved
   flush();
   return runs;
 }
+
+/**
+ * The inline TOC must not be attached to a card that cannot render:
+ * unpublished/missing cards and duplicate linked references are skipped by
+ * the collection renderer. Keeping the authored index preserves placement
+ * and heading spacing without changing ARTICLE or BREAKING_NEWS pages.
+ */
+export function firstRenderableCollectionBodyBlockIndex(
+  blocks: readonly ArticleMvpResolvedBlock[],
+  suppressedHeadingIds: ReadonlySet<string>,
+  renderedRunStartIds: ReadonlySet<string>,
+): number {
+  return blocks.findIndex((block) => {
+    if (block.type === "intro" || suppressedHeadingIds.has(block.id)) return false;
+    return block.type !== "activityCard" || renderedRunStartIds.has(block.id);
+  });
+}

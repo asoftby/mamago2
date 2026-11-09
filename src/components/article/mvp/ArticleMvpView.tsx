@@ -10,7 +10,7 @@ import { CollectionOfferCard } from "@/components/article/collection/CollectionO
 import { CollectionPersonalList } from "@/components/article/collection/CollectionPersonalList";
 import { CollectionEventCard } from "@/components/article/collection/CollectionEventCard";
 import { collectionDuplicateHeadingIds } from "@/lib/article/collectionDuplicateHeadings";
-import { collectionContiguousCardRuns } from "@/lib/article/collectionCardRuns";
+import { collectionContiguousCardRuns, firstRenderableCollectionBodyBlockIndex } from "@/lib/article/collectionCardRuns";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleCalloutBlock } from "@/components/article/blocks/ArticleCalloutBlock";
@@ -143,7 +143,6 @@ export function ArticleMvpView({
   const headingEntries = extractHeadingEntriesFromArticleBlocks(blocks.filter((block) => !duplicateHeadingIds.has(block.id)) as ArticleBlockMvp[]);
   const showToc = shouldShowArticleToc(headingEntries);
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
-  const firstBodyBlockIndex = blocks.findIndex((b) => b.type !== "intro" && !duplicateHeadingIds.has(b.id));
 
   const renderActivityCard = (block: Extract<ArticleMvpResolvedBlock, { type: "activityCard" }>): ReactNode => {
           const c = block.card;
@@ -198,6 +197,12 @@ export function ArticleMvpView({
       return [run[0].id, items] as const;
     }),
   );
+
+  // Collection cards can be hidden when unpublished or de-duplicated.
+  // Anchor the TOC to the first block that will actually render.
+  const firstBodyBlockIndex = publicationType === "COLLECTION"
+    ? firstRenderableCollectionBodyBlockIndex(blocks, duplicateHeadingIds, new Set(collectionRunItemsByStartId.keys()))
+    : blocks.findIndex((b) => b.type !== "intro" && !duplicateHeadingIds.has(b.id));
 
   const subtitleTrim = (isBreakingNews ? "" : subtitle?.trim()) || "";
   const leadHtml = !isBreakingNews ? deriveArticleLeadHtml({ blocks: blocks as ArticleBlockMvp[] }) : null;
