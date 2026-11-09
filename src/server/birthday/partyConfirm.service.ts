@@ -1,3 +1,4 @@
+import { isAllocationOverlapError } from "@/server/services/booking/resourceAllocation";
 import { lockPartyRequestGroup } from "./partyRequestLock";
 import "server-only";
 import {
@@ -8,7 +9,7 @@ import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
 import {
-  allocatePartyUnit, isAllocationOverlapError, lockAvailablePartyUnit, type PartyUnitWindow,
+  allocatePartyUnit, lockAvailablePartyUnit, type PartyUnitWindow,
 } from "./partyUnitAllocation";
 import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
 import { assertPartyConfirmationEnabled } from "./partyConfirmationFlag";
