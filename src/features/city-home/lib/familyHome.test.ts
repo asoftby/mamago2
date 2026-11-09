@@ -233,6 +233,7 @@ test("UI contract: one save control, poster, keyboard/ARIA, and truthful empty/e
   assert.match(ui, /state === "error" && !data[\s\S]*?<p role="alert"[^>]*>Не удалось загрузить события/, "initial failure renders an inline error, not an empty event card");
   assert.doesNotMatch(ui, /SoftAudienceNotice|hasEvents=\{false\}/, "no explanatory poster is inserted into an organic feed");
   assert.match(ui, /loadHomePublicFallback\(citySlug\)/, "a failed personalized API attempts a public catalog recovery");
+  assert.match(ui, /safeFallbackEvents\.length === 0[\s\S]*?В этой подборке пока нет подходящих событий/, "age-filtered public fallback must not claim the entire catalog is empty");
   assert.match(ui, /safeFallbackEvents\.map/, "age-eligible recovered events are rendered as real poster cards");
   assert.doesNotMatch(ui, /wasAuthorized && mounted\.current/, "auth resolution must not start a duplicate recommendation request");
   assert.doesNotMatch(ui, /setTimeout\(\(\) => \{[\s\S]*?setState\("error"\)/, "component must not race request-level timeout with a second deadline");
