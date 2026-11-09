@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { GeoScope } from "@prisma/client";
+import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { ArticleSectionExhausted } from "@/components/article/continuous/ArticleContinuationDivider";
 import { articleRatingTitle } from "@/lib/article/articleRatingTitle";
@@ -79,6 +80,8 @@ export function ContinuousArticleReader({
     }
     return base;
   });
+  const { user } = useAuthMe();
+  const canEdit = user?.role === "ADMIN" || user?.role === "MODERATOR";
   const [loaded, setLoaded] = useState<PublicContinuousArticleDto[]>([]);
   const [liveMessage, setLiveMessage] = useState("");
 
@@ -485,7 +488,10 @@ export function ContinuousArticleReader({
                 blocks={article.blocks}
                 tags={article.tags}
                 categoryLabel={article.categoryLabel}
+                categoryHref={article.section && citySlug ? `/${citySlug}/blog/category/${article.section.slug}` : undefined}
                 citySlug={citySlug}
+                publicationType={article.publicationType}
+                editHref={canEdit ? `/admin/content/articles/${article.id}/edit?returnTo=${encodeURIComponent(article.href)}` : undefined}
                 continuousVariant="continuation"
                 articleAriaLabel={article.title}
                 journalFooterHref={journalHref}

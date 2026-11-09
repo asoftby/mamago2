@@ -4,6 +4,8 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExterna
 import { Sparkles } from "lucide-react";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { cn } from "@/lib/utils";
+import { familyFitBadgeLabel } from "@/lib/family/fitBadgeLabel";
+import { CollectionFitBadgeProvider } from "./CollectionFitBadgeContext";
 import {
   ageMonthsFromBirthDate,
   kidsFromGuestYears,
@@ -218,9 +220,13 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
   return (
     <div>
       {plaque}
-      <div className="flex flex-col gap-[22px] md:gap-7">
+      <div className="flex flex-col gap-8 md:gap-10">
         {ordered.map((item) => {
           const reason = activeKids.length ? reasonFor(item, activeKids) : null;
+          const namedMatches = reason ? activeKids.filter((kid) => reason.kidIds.includes(kid.id) && kid.name) : [];
+          const fitLabel = reason && namedMatches.length === reason.kidIds.length
+            ? familyFitBadgeLabel({ matchedChildNames: namedMatches.map((kid) => kid.name!) })
+            : reason?.text ?? null;
           return (
             <div
               key={item.id}
@@ -230,10 +236,7 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
                 else nodes.current.delete(item.id);
               }}
             >
-              {reason ? (
-                <div className="not-prose mb-2.5 inline-flex max-w-full items-center rounded-full bg-[#E0EEE5] px-3.5 py-1.5 text-[13.5px] font-semibold text-[#24563F]">{reason.text}</div>
-              ) : null}
-              {item.node}
+              <CollectionFitBadgeProvider label={fitLabel}>{item.node}</CollectionFitBadgeProvider>
             </div>
           );
         })}
