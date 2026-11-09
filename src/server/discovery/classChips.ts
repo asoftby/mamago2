@@ -78,14 +78,32 @@ export async function listPopulatedDiscoveryClassChips(
     });
 
     try {
-      const rows = await prismaBase.offer.findMany({
+      // One bounded existence probe for «Все», followed by at most one probe
+      // per configured active category. No catalogue-sized rows are fetched.
+      const anyOffer = await prismaBase.offer.findFirst({
         where,
-        select: { classChipSlugs: true },
+        select: { id: true },
       });
-      return {
-        hasPublishedClasses: rows.length > 0,
-        populatedSlugs: Array.from(new Set(rows.flatMap((row) => row.classChipSlugs))),
-      };
+      if (!anyOffer) {
+        return { hasPublishedClasses: false, populatedSlugs: [] as string[] };
+      }
+
+      const populatedSlugs: string[] = [];
+      const activeCategories = chips.filter((chip) => chip.isActive && chip.slug !== "all");
+      // Keep the database fan-out bounded even if an admin adds many chips.
+      for (let offset = 0; offset < activeCategories.length; offset += 4) {
+        const batch = activeCategories.slice(offset, offset + 4);
+        const found = await Promise.all(batch.map((chip) =>
+          prismaBase.offer.findFirst({
+            where: { AND: [where, { classChipSlugs: { has: chip.slug } }] },
+            select: { id: true },
+          }),
+        ));
+        for (let index = 0; index < batch.length; index += 1) {
+          if (found[index]) populatedSlugs.push(batch[index].slug);
+        }
+      }
+      return { hasPublishedClasses: true, populatedSlugs };
     } catch (error) {
       // A not-yet-migrated installation can still show "Все", but must not
       // invent chip availability when classChipSlugs is absent.
@@ -94,7 +112,7 @@ export async function listPopulatedDiscoveryClassChips(
       const offer = await prismaBase.offer.findFirst({ where, select: { id: true } });
       return { hasPublishedClasses: Boolean(offer), populatedSlugs: [] as string[] };
     }
-  }, ["populated-classes-chips-v1", cityId, citySlug], { revalidate: 60 })();
+  }, ["populated-classes-chips-v2", cityId, citySlug, chips.filter((chip) => chip.isActive && chip.slug !== "all").map((chip) => chip.slug).sort().join("|")], { revalidate: 60 })();
 
   return filterPopulatedClassChips(chips, inventory.hasPublishedClasses, new Set(inventory.populatedSlugs));
 }
