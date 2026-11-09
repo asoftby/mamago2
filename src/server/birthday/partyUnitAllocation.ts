@@ -1,20 +1,12 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
+import { expireBookingUnitHolds, lockBookingUnits } from "@/server/services/booking/resourceAllocation";
 import { PartyApiError } from "./partyDraft.validation";
 import { isWithinSchedule, minskBookingWindow } from "./partyConfirmationAvailability";
 
 export type PartyUnitWindow = {
   serviceStart: Date; serviceEnd: Date; blockStart: Date; blockEnd: Date;
 };
-
-/** Postgres exclusion `BookingAllocation_no_active_overlap` (23P01), raw or wrapped by Prisma. */
-export function isAllocationOverlapError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const value = error as { code?: string; message?: string; meta?: { code?: string } };
-  return value.code === "23P01" ||
-    (value.code === "P2010" && value.meta?.code === "23P01") ||
-    Boolean(value.message?.includes("BookingAllocation_no_active_overlap"));
-}
 
 /**
  * Locks an exclusive resource (room or performer) and proves it is free for the party:
@@ -35,7 +27,10 @@ export async function lockAvailablePartyUnit(tx: Prisma.TransactionClient, param
   const { unitId, businessId, offerId, order, now } = params;
   // Lock the canonical resource *before* reading availability; a stale
   // preflight snapshot must not authorize a room just disabled by admin.
-  await tx.$queryRaw`SELECT "id" FROM "BookingUnit" WHERE "id" = ${unitId} FOR UPDATE`;
+  if (!await lockBookingUnits(tx, businessId, [unitId])) {
+    throw new PartyApiError(409, "Ресурс больше не доступен");
+  }
+  const checkedAt = new Date(Math.max(now.getTime(), Date.now()));
   const locked = await tx.bookingUnit.findUnique({
     where: { id: unitId },
     select: {
@@ -58,18 +53,13 @@ export async function lockAvailablePartyUnit(tx: Prisma.TransactionClient, param
     locked.prepMinutes, locked.cleanupMinutes);
   const { serviceStart, serviceEnd, blockStart, blockEnd } = times;
   if ((locked.capacity !== null && (order.childrenCount ?? 0) + (order.adultsCount ?? 0) > locked.capacity) ||
-      serviceStart <= now ||
+      serviceStart <= checkedAt ||
       (locked.minDurationMinutes !== null &&
         serviceEnd.getTime() - serviceStart.getTime() < locked.minDurationMinutes * 60_000)) {
     throw new PartyApiError(422, "Недоступная продолжительность праздника");
   }
 
-  // PostgreSQL exclusion constraint remains the final line of defense
-  // against concurrent bookings through other reservation pathways.
-  await tx.$executeRaw`UPDATE "BookingAllocation"
-    SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
-    WHERE "bookingUnitId" = ${unitId} AND "status" = 'HELD'
-    AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
+  await expireBookingUnitHolds(tx, [unitId]);
   const exceptions = await tx.availabilityException.findMany({
     where: { bookingUnitId: unitId, date: order.eventDate },
     select: { kind: true, startMinutes: true, endMinutes: true },
@@ -84,7 +74,7 @@ export async function lockAvailablePartyUnit(tx: Prisma.TransactionClient, param
     }),
     tx.bookingAllocation.findFirst({
       where: { bookingUnitId: unitId, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart },
-        OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: now } }] },
+        OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: checkedAt } }] },
       select: { id: true },
     }),
   ]);
