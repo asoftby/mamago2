@@ -5,7 +5,7 @@ import { deleteSavedDays, listSavedDayPoints, listSavedDays, parseDeleteRequest,
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a loose in-memory row stands in for Prisma models
 type Row = Record<string, any>;
 
-function makeDb(seed: { scenarios: Row[]; items: Row[] }) {
+function makeDb(seed: { scenarios: Row[]; items: Row[]; shares?: Row[] }) {
   let state: { scenarios: Row[]; items: Row[] } = { scenarios: seed.scenarios.map((r) => ({ acceptedConflictKeys: [], legsJson: "legs", planFingerprint: "old", ...r })), items: seed.items.map((r) => ({ cancelledAt: null, ...r })) };
   const matches = (row: Row, where: Row): boolean =>
     Object.entries(where).every(([key, cond]) => {
@@ -18,8 +18,16 @@ function makeDb(seed: { scenarios: Row[]; items: Row[] }) {
       }
       return row[key] === cond;
     });
+  const shares: Row[] = (seed as { shares?: Row[] }).shares ?? [];
   const tx = {
     $queryRaw: async () => [],
+    dayScenarioShare: {
+      updateMany: async ({ where, data }: Row) => {
+        const hit = shares.filter((r) => r.userId === where.userId && r.revokedAt === null && where.date.in.includes(r.date));
+        for (const r of hit) Object.assign(r, data);
+        return { count: hit.length };
+      },
+    },
     dayScenario: {
       findMany: async ({ where }: Row) => state.scenarios.filter((r) => matches(r, where)).sort((a, b) => a.date.localeCompare(b.date)),
       findUnique: async ({ where }: Row) => state.scenarios.find((r) => r.userId === where.userId_date.userId && r.date === where.userId_date.date) ?? null,
@@ -57,7 +65,7 @@ function makeDb(seed: { scenarios: Row[]; items: Row[] }) {
       }
     },
   } as unknown as NonNullable<SavedDayDeps["db"]>;
-  return { db, tx: tx as unknown as Parameters<typeof listSavedDays>[3], get: () => state };
+  return { db, tx: tx as unknown as Parameters<typeof listSavedDays>[3], get: () => state, shares };
 }
 
 const SAT = "2026-11-14";
@@ -154,6 +162,16 @@ async function run() {
     await deleteSavedDays("u1", SAT, "day", deps(db));
     assert.ok(get().items.some((i) => i.id === "moved"), "deleting the day leaves the point the user moved elsewhere");
     assert.ok(!get().items.some((i) => i.id === "p1"), "while the day's own points go");
+  }
+
+  // ---- deleting a day closes the links to it, so a day saved again on that date does not revive an old link
+  {
+    const open = () => ({ userId: "u1", revokedAt: null });
+    const { db, shares } = makeDb({ scenarios: scenarios(), items: items(), shares: [{ ...open(), token: "d", date: SAT }, { ...open(), token: "w", date: SUN }, { ...open(), token: "other", date: MON }, { userId: "u2", revokedAt: null, token: "x", date: SAT }] });
+    await deleteSavedDays("u1", SAT, "group", deps(db));
+    const closed = (token: string) => Boolean(shares.find((s) => s.token === token)!.revokedAt);
+    assert.deepEqual([closed("d"), closed("w")], [true, true], "the links of both deleted days are closed");
+    assert.deepEqual([closed("other"), closed("x")], [false, false], "another day's and another user's links are not");
   }
 
   // ---- contracts

@@ -122,6 +122,7 @@ model User {
   inboxItems                        InboxItem[]
   experiences                       Experience[]
   dayScenarios                      DayScenario[]
+  dayScenarioShares                 DayScenarioShare[]
   routes                            Route[]                          @relation("RouteAuthor")
   routeIdeas                        RouteIdea[]
   routeRatings                      RouteRating[]
@@ -896,6 +897,23 @@ model DayScenario {
   @@unique([userId, date])
   @@index([userId])
   @@index([groupId])
+}
+
+/// «Поделиться» днём/выходными от mamaGo: отзываемая ссылка-возможность (capability URL, /d/[token]).
+/// Ссылка читает сценарий вживую: что в плане сейчас, то и видно. Без данных о владельце.
+model DayScenarioShare {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  /// День, с которого поделились (для выходных — любой из двух).
+  date      String
+  /// Не null: делимся всей группой (Сб+Вс); null: одним днём.
+  groupId   String?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
 /// Сценарий-специфичная организация одного PlanItem внутри Сценария дня —
