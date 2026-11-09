@@ -16,6 +16,7 @@ import { seedPlaceCategories } from "./seed/place-categories";
 import { seedEventCategories } from "./seed/event-categories";
 import { seedDiscoverySectionFilters } from "./seed/discovery-section-filters";
 import { seedDiscoveryTags } from "./seed/discovery-tags";
+import { seedJournalCategories } from "./seed/journal-categories";
 import { CAMP_OFFER_DISCOVERY_GROUPS } from "./seed/camp-offer-discovery-signals";
 
 const prisma = new PrismaClient();
@@ -749,6 +750,7 @@ async function main() {
   // ── Discovery Tags ────────────────────────────────────────────────────────
   // Global tags for all publication types (News, Article, Collection, Breaking News).
   // Available city-scoped via /[city]/tags/[tagSlug] and in publication wizards.
+  await seedJournalCategories(prisma);
   await seedDiscoveryTags(prisma);
 
   console.log("✅ System seed complete.");
