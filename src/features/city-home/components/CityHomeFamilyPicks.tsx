@@ -243,7 +243,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
                 framing="fixed" coverRatio="2/3" coverFit="cover" imagePriority={index < 2} />
             </div>
           ))}
-          {safeFallbackEvents.length === 0 && <p role="status" className="py-6 text-sm text-muted-foreground">Пока нет опубликованных событий.</p>}
+          {safeFallbackEvents.length === 0 && <p role="status" className="py-6 text-sm text-muted-foreground">В этой подборке пока нет подходящих событий.</p>}
           {safeFallbackEvents.length > 0 && <HomeMoreEventsCard href={catalogHref} />}
         </HorizontalCardRow>
       ) : state === "error" && !data ? (
