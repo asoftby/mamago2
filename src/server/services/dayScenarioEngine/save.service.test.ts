@@ -78,8 +78,8 @@ const multiNoSession = { id: "ev-multi", title: "Многодатное без �
 const withdrawn = { id: "ev-withdrawn", title: "Сеанс отозван", coverImageUrl: null, status: "PUBLISHED", scheduleJson: { dates: [SAT], startTime: "11:00", scheduleItems: [{ date: SAT, startTime: "11:00" }] }, sessions: [session(at(SAT, "08:00"), true)] };
 const oneTimeNoSession = { id: "ev-nosession", title: "Без сеансов и правил", coverImageUrl: null, status: "PUBLISHED", scheduleJson: null, sessions: [] };
 const draftEvent = { id: "ev-draft", title: "Черновик", coverImageUrl: null, status: "DRAFT", scheduleJson: WEEKLY_RULE, sessions: [] };
-const park = { id: "pl-park", slug: "park", title: "Парк", images: [{ url: "p.jpg" }] };
-const cafe = { id: "pl-cafe", slug: "cafe", title: "Кафе", images: [] };
+const park = { id: "pl-park", slug: "park", title: "Парк", shortAddress: "ул. Парковая 1", formattedAddr: null, customAddress: null, images: [{ url: "p.jpg" }] };
+const cafe = { id: "pl-cafe", slug: "cafe", title: "Кафе", shortAddress: null, formattedAddr: " ул. Кафейная 2 ", customAddress: null, images: [] };
 const seedCatalog = () => ({ activities: [concert, weekly, multiNoSession, withdrawn, oneTimeNoSession, draftEvent], places: [park, cafe] });
 
 async function run() {
@@ -127,6 +127,8 @@ async function run() {
     assert.ok(created.every((r) => r.scenarioId === get().dayScenarios[0]!.id && r.userId === "u1" && r.familyId === "fam1" && r.date === SAT));
     const parkRow = created.find((r) => r.placeId === "pl-park")!;
     assert.equal(parkRow.planPlaceSlug, "park");
+    assert.equal(parkRow.locationText, "ул. Парковая 1", "a place point keeps its address on the entry");
+    assert.equal("locationText" in created.find((r) => r.activityId === "ev-session")!, false, "an event entry gets no address of its own");
     assert.equal(parkRow.title, "Парк");
     assert.equal(created.find((r) => r.activityId === "ev-session")!.coverImageUrl, "c.jpg");
     assert.deepEqual(get().planItems.find((r) => r.id === "manual1"), manual, "a manual entry of the day is not touched");

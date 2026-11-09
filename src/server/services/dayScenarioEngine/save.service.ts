@@ -96,7 +96,7 @@ type EventRow = {
   /** All ActivitySession rows of the event (the loaded `sessions` are only those near the saved days). */
   _count: { sessions: number };
 };
-type PlaceRow = { id: string; slug: string | null; title: string; images: { url: string }[] };
+type PlaceRow = { id: string; slug: string | null; title: string; shortAddress: string | null; formattedAddr: string | null; customAddress: string | null; images: { url: string }[] };
 
 /**
  * Time type of a point, judged exactly like the draft pool judged it:
@@ -159,7 +159,7 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
             })
           : Promise.resolve([] as EventRow[]),
         placeIds.length
-          ? tx.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, slug: true, title: true, images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } } } })
+          ? tx.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, slug: true, title: true, shortAddress: true, formattedAddr: true, customAddress: true, images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } } } })
           : Promise.resolve([] as PlaceRow[]),
         // What the user already has of these points. Entries this very scenario created are ours to rewrite; anything else is not touched.
         tx.planItem.findMany({
@@ -205,6 +205,8 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
             endsAt: new Date(item.endsAt),
             title: event?.title ?? place!.title,
             coverImageUrl: event?.coverImageUrl ?? place?.images[0]?.url ?? null,
+            // A place point keeps its address on the entry, so its preview needs no extra query on the day list.
+            ...(place ? { locationText: place.shortAddress?.trim() || place.formattedAddr?.trim() || place.customAddress?.trim() || null } : {}),
             timeType,
             pinned: item.pinned,
             scenarioId: row.id,
