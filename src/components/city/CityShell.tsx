@@ -13,6 +13,7 @@ import { getClassesListingPage } from "@/server/discovery/classesListingPage";
 import { getBirthdayDiscoveryPage } from "@/server/discovery/birthdayDiscoveryFeed";
 import {
   listDiscoveryClassChips,
+  listPopulatedDiscoveryClassChips,
   resolveDiscoveryClassChipSlug,
 } from "@/server/discovery/classChips";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
@@ -87,7 +88,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
   let classesPagination: { page: number; totalPages: number; total: number } | undefined;
   let birthdayPagination: { page: number; totalPages: number; total: number } | undefined;
   let classChips = undefined;
-  let activeClassChipSlug = undefined;
+  let activeClassChipSlug: string | undefined;
   let budgetConfig: BudgetConfig = null;
   let alternativeEventFilters: EventRuntimeFilters | null = null;
   const activeOccasions = intent === "kuda" ? await getActivePublicOccasions() : [];
@@ -174,9 +175,15 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
             return Number.isFinite(value) && value >= 0 ? value : null;
           })();
 
-    classChips = await listDiscoveryClassChips();
-    activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, classChips);
-    const chipTitleBySlug = new Map(classChips.map((chip) => [chip.slug, chip.title]));
+    const configuredClassChips = await listDiscoveryClassChips();
+    activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, configuredClassChips);
+    classChips = await listPopulatedDiscoveryClassChips(city.id, city.slug, configuredClassChips);
+    // A stale admin default without public offers must not open an empty
+    // category on the bare /classes route. Explicit deep links still work.
+    if (!requestedChip && !classChips.some((chip) => chip.slug === activeClassChipSlug)) {
+      activeClassChipSlug = "all";
+    }
+    const chipTitleBySlug = new Map(configuredClassChips.map((chip) => [chip.slug, chip.title]));
     const rawPage = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page;
     const requestedPage = Number(rawPage);
     const listing = await getClassesListingPage(city.id, city.slug, {

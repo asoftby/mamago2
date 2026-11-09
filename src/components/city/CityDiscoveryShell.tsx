@@ -234,7 +234,7 @@ export function CityDiscoveryShell({
           {filterButton}
         </div>
         {intent === "kuda" ? <EventQuickFilters activeOccasions={activeOccasions} /> : null}
-        {intent === "classes" && classChips && activeClassChipSlug ? (
+        {intent === "classes" && classChips && classChips.length > 0 && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
         <DiscoveryActivitiesGrid
