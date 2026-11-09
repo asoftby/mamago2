@@ -50,6 +50,12 @@ const openWhere = (userId: string, target: { weekend: boolean; dates: string[] }
   groupId: target.weekend ? { not: null } : null,
 });
 
+/**
+ * Closing covers EVERY open link of those dates, day or weekend: a weekend link whose group was broken (the anchor day
+ * saved on its own) still resolves to the anchor day, so it must close with it.
+ */
+const closeWhere = (userId: string, target: { dates: string[] }) => ({ userId, revokedAt: null, date: { in: target.dates } });
+
 /** The link to share: the existing open one for the same target, else a new one. */
 export async function createOrGetShare(userId: string, date: string, scope: ShareScope, db: Db = prisma, token: () => string = generateShareToken): Promise<{ token: string }> {
   const target = await targetOf(userId, date, scope, db);
@@ -63,7 +69,7 @@ export async function createOrGetShare(userId: string, date: string, scope: Shar
 /** Closes every open link of the target (idempotent: none open is fine). Returns how many were closed. */
 export async function revokeShares(userId: string, date: string, scope: ShareScope, db: Db = prisma): Promise<{ closed: number }> {
   const target = await targetOf(userId, date, scope, db);
-  const result = await db.dayScenarioShare.updateMany({ where: openWhere(userId, target), data: { revokedAt: new Date() } });
+  const result = await db.dayScenarioShare.updateMany({ where: closeWhere(userId, target), data: { revokedAt: new Date() } });
   return { closed: result.count };
 }
 
@@ -95,6 +101,7 @@ export async function getSharedDays(token: string, db: ReadDb = prisma): Promise
     where: { userId: share.userId, scenarioId: { in: scenarios.map((s) => s.id) }, cancelledAt: null, startsAt: { not: null } },
     select: {
       scenarioId: true, date: true, startsAt: true, title: true, coverImageUrl: true, timeType: true, locationText: true, planPlaceSlug: true, placeId: true,
+      place: { select: { city: { select: { slug: true } } } },
       activity: { select: { id: true, slug: true, title: true, coverImageUrl: true, place: { select: { title: true, shortAddress: true, formattedAddr: true, customAddress: true, city: { select: { slug: true } } } } } },
     },
     orderBy: { startsAt: "asc" },
@@ -116,7 +123,7 @@ export async function getSharedDays(token: string, db: ReadDb = prisma): Promise
           startsAt: row.startsAt!.toISOString(),
           suggestedTime: row.timeType === "SUGGESTED",
           locationText: address,
-          href: activity ? (slug ? `/${city}/events/${slug}` : null) : placeSlug ? `/${DEFAULT_CITY}/places/${placeSlug}` : null,
+          href: activity ? (slug ? `/${city}/events/${slug}` : null) : placeSlug ? `/${safeSlug(row.place?.city?.slug) ?? DEFAULT_CITY}/places/${placeSlug}` : null,
         };
       });
     if (points.length > 0) days.push({ date: scenario.date, points });

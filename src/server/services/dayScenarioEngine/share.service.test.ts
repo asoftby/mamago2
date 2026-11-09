@@ -50,7 +50,7 @@ const scenarios = () => [
   { id: "s-edit", userId: "u1", date: "2026-11-22", source: null, groupId: null },
   { id: "s-other", userId: "u2", date: SAT, source: "ENGINE", groupId: "gx" },
 ];
-const point = (scenarioId: string, date: string, over: Row = {}) => ({ userId: "u1", scenarioId, date, startsAt: new Date(`${date}T08:00:00Z`), title: "Парк", coverImageUrl: null, timeType: "SUGGESTED", locationText: "ул. Парковая 1", planPlaceSlug: "park", placeId: "p1", activity: null, cancelledAt: null, ...over });
+const point = (scenarioId: string, date: string, over: Row = {}) => ({ userId: "u1", scenarioId, date, place: { city: { slug: "minsk" } }, startsAt: new Date(`${date}T08:00:00Z`), title: "Парк", coverImageUrl: null, timeType: "SUGGESTED", locationText: "ул. Парковая 1", planPlaceSlug: "park", placeId: "p1", activity: null, cancelledAt: null, ...over });
 const eventPoint = (scenarioId: string, date: string) => point(scenarioId, date, { placeId: null, planPlaceSlug: null, timeType: "CONFIRMED", locationText: null, title: "Концерт", activity: { id: "a1", slug: "koncert", title: "Концерт", coverImageUrl: "c.jpg", place: { title: "Зал", shortAddress: "пр. Независимости 1", formattedAddr: null, customAddress: null, city: { slug: "minsk" } } } });
 const code = async (fn: () => Promise<unknown>) => { try { await fn(); } catch (e) { return e instanceof ShareError ? `${e.status}:${e.code}` : "other"; } return "none"; };
 
@@ -86,16 +86,28 @@ async function run() {
     const { db, state } = makeDb({ scenarios: scenarios() });
     await createOrGetShare("u1", SAT, "day", db, () => "A".repeat(32));
     await createOrGetShare("u1", SAT, "group", db, () => "C".repeat(32));
-    assert.deepEqual(await revokeShares("u1", SUN, "group", db), { closed: 1 }, "the weekend link closes from the other day");
-    assert.ok(state.shares.find((s) => s.token === "C".repeat(32))!.revokedAt && !state.shares.find((s) => s.token === "A".repeat(32))!.revokedAt, "the day link stays");
-    assert.deepEqual(await revokeShares("u1", SAT, "day", db), { closed: 1 });
+    assert.deepEqual(await revokeShares("u1", SUN, "group", db), { closed: 2 }, "closing the weekend (from either day) closes every open link of its days");
+    assert.ok(state.shares.every((s) => s.revokedAt), "the weekend link and the day link are both closed");
     assert.deepEqual(await revokeShares("u1", SAT, "day", db), { closed: 0 }, "idempotent");
     assert.equal((await createOrGetShare("u1", SAT, "day", db, () => "F".repeat(32))).token, "F".repeat(32), "after closing, a new link is a new token");
   }
 
+  // ---- a weekend link whose group was broken (the anchor day saved on its own) still closes
+  {
+    const { db, state } = makeDb({ scenarios: scenarios() });
+    await createOrGetShare("u1", SAT, "group", db, () => "W".repeat(32));
+    for (const s of state.scenarios.filter((r) => r.groupId === "g1")) s.groupId = null; // each day saved on its own
+    assert.deepEqual(await revokeShares("u1", SAT, "day", db), { closed: 1 }, "the day scope also closes the old weekend link anchored there");
+    assert.equal(await getSharedDays("W".repeat(32), db), null, "and it shows nothing any more");
+    const second = makeDb({ scenarios: scenarios() });
+    await createOrGetShare("u1", SAT, "day", second.db, () => "A".repeat(32));
+    await createOrGetShare("u1", SAT, "group", second.db, () => "B".repeat(32));
+    assert.deepEqual(await revokeShares("u1", SAT, "group", second.db), { closed: 2 }, "closing the weekend closes every open link of its days");
+  }
+
   // ---- the public read
   {
-    const items = [eventPoint("s-sat", SAT), point("s-sat", SAT), point("s-sun", SUN), point("s-sat", "2026-11-30", { title: "Перенесённая" }), point("s-other", SAT, { userId: "u2" })];
+    const items = [eventPoint("s-sat", SAT), point("s-sat", SAT), point("s-sun", SUN, { place: { city: { slug: "grodno" } } }), point("s-sat", "2026-11-30", { title: "Перенесённая" }), point("s-other", SAT, { userId: "u2" })];
     const { db, state } = makeDb({ scenarios: scenarios(), items, shares: [
       { token: "W".repeat(32), userId: "u1", date: SAT, groupId: "g1", revokedAt: null },
       { token: "D".repeat(32), userId: "u1", date: SAT, groupId: null, revokedAt: null },
@@ -103,6 +115,7 @@ async function run() {
     ] });
     const weekend = (await getSharedDays("W".repeat(32), db))!;
     assert.deepEqual(weekend.map((d) => [d.date, d.points.length]), [[SAT, 2], [SUN, 1]], "both days of the weekend; the point moved to another day is not shown");
+    assert.equal(weekend[1]!.points[0]!.href, "/grodno/places/park", "a place link uses the place's own city");
     const day = (await getSharedDays("D".repeat(32), db))!;
     assert.deepEqual(day.map((d) => d.date), [SAT], "a day link shows that day only");
     const concert = day[0]!.points.find((p) => p.kind === "event")!;
