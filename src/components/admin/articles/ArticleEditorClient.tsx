@@ -192,8 +192,10 @@ export function ArticleEditorClient({
   const [regions, setRegions] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; label: string; slug: string }[]>([]);
   const [discoveryTags, setDiscoveryTags] = useState<
-    { id: string; title: string; description: string | null; isActive: boolean }[]
+    { id: string; title: string; description: string | null; isActive: boolean; reviewStatus?: "APPROVED" | "PENDING" }[]
   >([]);
+  const [newTagTitle, setNewTagTitle] = useState("");
+  const [creatingTag, setCreatingTag] = useState(false);
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
   const [content, setContent] = useState<ArticleContentPayload>(initialArticleMedia.content);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
@@ -340,7 +342,7 @@ export function ArticleEditorClient({
       const tagsRes = await fetch(tagsUrl);
       if (!tagsRes.ok || cancelled) return;
       const tagsData = (await tagsRes.json().catch(() => null)) as
-        | { id: string; title: string; description: string | null; isActive: boolean }[]
+        | { id: string; title: string; description: string | null; isActive: boolean; reviewStatus?: "APPROVED" | "PENDING" }[]
         | null;
       if (!tagsData || cancelled) return;
       setDiscoveryTags(tagsData);
@@ -365,6 +367,42 @@ export function ArticleEditorClient({
     emptyFallback: "article",
     slugHistorySupported: true,
   });
+
+  const trimmedNewTagTitle = newTagTitle.trim();
+  const tagSearchResults = trimmedNewTagTitle
+    ? discoveryTags.filter((tag) => tag.title.toLocaleLowerCase("ru").includes(trimmedNewTagTitle.toLocaleLowerCase("ru"))).slice(0, 5)
+    : [];
+  const matchingTag = trimmedNewTagTitle
+    ? discoveryTags.find((tag) => tag.title.toLocaleLowerCase("ru") === trimmedNewTagTitle.toLocaleLowerCase("ru"))
+    : undefined;
+
+  const createTagInline = async () => {
+    if (!trimmedNewTagTitle || matchingTag || creatingTag) return;
+    setCreatingTag(true);
+    try {
+      const response = await fetch("/api/admin/discovery-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmedNewTagTitle }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.id) {
+        toast.error(response.status === 409 ? "Такой тег уже есть в справочнике" : result?.error ?? "Не удалось создать тег");
+        return;
+      }
+      const created = result as { id: string; title: string; description: string | null; isActive: boolean; reviewStatus: "APPROVED" | "PENDING" };
+      setDiscoveryTags((current) => [...current, created]);
+      setTagIds((current) => current.includes(created.id) ? current : [...current, created.id]);
+      setNewTagTitle("");
+      toast.success(created.reviewStatus === "PENDING"
+        ? "Тег добавлен в черновик и отправлен на одобрение"
+        : "Тег создан и выбран");
+    } catch {
+      toast.error("Не удалось создать тег");
+    } finally {
+      setCreatingTag(false);
+    }
+  };
 
   const selectedCity = cities.find((c) => c.id === cityId) ?? null;
   const previewSeg = previewSlug;
@@ -1021,6 +1059,7 @@ export function ArticleEditorClient({
               <CardMultiSelect
                 placeholder="Выберите дополнительные категории"
                 values={additionalCategoryIds}
+                maxSelected={2}
                 onChange={(ids) => setAdditionalCategoryIds(ids.filter((id) => id !== categoryId))}
                 options={categories
                   .filter((category) => category.id !== categoryId)
@@ -1034,17 +1073,59 @@ export function ArticleEditorClient({
             <p className="text-xs text-muted-foreground">
               Теги управляют подборками и SEO-страницами, но не зависят от города публикации.
             </p>
-            <div id="article-discovery-tags">
-              <CardMultiSelect
-                placeholder="Выберите теги"
-                values={tagIds}
-                onChange={setTagIds}
-                options={discoveryTags.map((tag) => ({
-                  value: tag.id,
-                  label: tag.isActive ? tag.title : `${tag.title} (выключен)`,
-                }))}
-                allowClear
+            <div className="space-y-2">
+              <Input
+                aria-label="Найти или создать тег"
+                placeholder="Найти или создать тег…"
+                value={newTagTitle}
+                maxLength={80}
+                onChange={(event) => setNewTagTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && trimmedNewTagTitle && !matchingTag) {
+                    event.preventDefault();
+                    void createTagInline();
+                  }
+                }}
               />
+              {trimmedNewTagTitle ? (
+                <div className="rounded-xl border border-border p-2 space-y-1" aria-label="Результаты поиска тегов">
+                  {tagSearchResults.map((tag) => (
+                    <Button
+                      key={tag.id}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setTagIds((current) => current.includes(tag.id) ? current : [...current, tag.id]);
+                        setNewTagTitle("");
+                      }}
+                    >
+                      {tag.title}{tag.reviewStatus === "PENDING" ? " (ожидает одобрения)" : ""}
+                    </Button>
+                  ))}
+                  {!matchingTag ? (
+                    <Button type="button" size="sm" variant="outline" disabled={creatingTag} onClick={() => void createTagInline()}>
+                      {creatingTag ? "Создаём…" : `+ Создать «${trimmedNewTagTitle}»`}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              <div id="article-discovery-tags">
+                <CardMultiSelect
+                  placeholder="Выберите теги"
+                  values={tagIds}
+                  onChange={setTagIds}
+                  options={discoveryTags.map((tag) => ({
+                    value: tag.id,
+                    label: tag.reviewStatus === "PENDING" ? `${tag.title} (ожидает одобрения)` : tag.isActive ? tag.title : `${tag.title} (выключен)`,
+                  }))}
+                  allowClear
+                />
+              </div>
+              {tagIds.length > 0 ? (
+                <p className="text-xs text-muted-foreground">Выбрано тегов: {tagIds.length}. Обычно достаточно 2–5 релевантных тем.</p>
+              ) : null}
             </div>
           </div>
           <PublicationSlugField

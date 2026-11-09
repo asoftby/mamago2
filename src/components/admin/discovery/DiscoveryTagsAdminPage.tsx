@@ -27,6 +27,8 @@ type DiscoveryTagItem = {
   description: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
+  indexingMode: "AUTO" | "INDEX" | "NOINDEX";
+  reviewStatus: "APPROVED" | "PENDING";
   isActive: boolean;
   sortOrder: number;
   articleCount: number;
@@ -35,6 +37,7 @@ type DiscoveryTagItem = {
 export function DiscoveryTagsAdminPage() {
   const [tags, setTags] = useState<DiscoveryTagItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const draft = useAutoSlug("", "");
   const [description, setDescription] = useState("");
   const [seoTitle, setSeoTitle] = useState("");
@@ -49,6 +52,7 @@ export function DiscoveryTagsAdminPage() {
         credentials: "include",
       });
       const data = await response.json().catch(() => []);
+      setIsAdmin(response.headers.get("X-Tag-Manager-Role") === "ADMIN");
       setTags(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
@@ -82,6 +86,7 @@ export function DiscoveryTagsAdminPage() {
         seoDescription: seoDescription || null,
         sortOrder: Number(sortOrder) || 0,
         isActive,
+        indexingMode: "AUTO",
       }),
     });
 
@@ -97,7 +102,7 @@ export function DiscoveryTagsAdminPage() {
     setSeoDescription("");
     setSortOrder("100");
     setIsActive(true);
-    toast.success("Тег создан");
+    toast.success(isAdmin ? "Тег создан" : "Тег предложен на утверждение администратору");
     await load();
   };
 
@@ -135,7 +140,7 @@ export function DiscoveryTagsAdminPage() {
     <DiscoveryTaxonomyPageShell>
       <DiscoveryTaxonomyPageHeader
         title="Теги discovery"
-        description="Глобальные теги для публикаций. Тег не привязан к городу, а городская выдача определяется через параметры статьи."
+        description="Глобальные темы публикаций. Автоматическая индексация от 5 релевантных опубликованных материалов в городе. Администратор может изменить режим для каждого тега."
       />
 
       <div className="space-y-6">
@@ -169,8 +174,10 @@ export function DiscoveryTagsAdminPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Switch checked={isActive} onCheckedChange={setIsActive} />
-            <span className="text-sm text-muted-foreground">Активный тег доступен в редакторах публикаций</span>
+            {isAdmin ? <Switch checked={isActive} onCheckedChange={setIsActive} /> : null}
+            <span className="text-sm text-muted-foreground">
+              {isAdmin ? "Активный тег доступен в редакторах публикаций" : "Новый тег отправится на одобрение. Его можно использовать в черновике статьи."}
+            </span>
           </div>
           <DiscoveryTitleSlugCreateRow
             titleLabel="Название"
@@ -201,6 +208,8 @@ export function DiscoveryTagsAdminPage() {
                 <th className={discoveryTh("min-w-[220px]")}>SEO title</th>
                 <th className={discoveryTh("min-w-[280px]")}>SEO description</th>
                 <th className={discoveryTh("w-24")}>Статей</th>
+                <th className={discoveryTh("min-w-[180px]")}>Индексация</th>
+                <th className={discoveryTh("min-w-[150px]")}>Проверка</th>
                 <th className={discoveryTh("w-24")}>Порядок</th>
                 <th className={discoveryTh("w-24")}>Активен</th>
                 <th className={discoveryTh("w-40")}>Действия</th>
@@ -211,6 +220,7 @@ export function DiscoveryTagsAdminPage() {
                 <EditableTagRow
                   key={tag.id}
                   tag={tag}
+                  isAdmin={isAdmin}
                   onSave={updateTag}
                   onDisable={disableTag}
                 />
@@ -225,10 +235,12 @@ export function DiscoveryTagsAdminPage() {
 
 function EditableTagRow({
   tag,
+  isAdmin,
   onSave,
   onDisable,
 }: {
   tag: DiscoveryTagItem;
+  isAdmin: boolean;
   onSave: (tag: DiscoveryTagItem) => Promise<void>;
   onDisable: (tag: DiscoveryTagItem) => Promise<void>;
 }) {
@@ -269,6 +281,31 @@ function EditableTagRow({
       <td className={cn(discoveryTd(), "text-sm text-muted-foreground")}>
         {draft.articleCount}
       </td>
+      <td className={discoveryTd("min-w-[180px]")}>
+        <select
+          aria-label={`Индексация тега ${draft.title}`}
+          className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
+          value={draft.indexingMode}
+          disabled={!isAdmin}
+          onChange={(e) => setDraft((prev) => ({ ...prev, indexingMode: e.target.value as DiscoveryTagItem["indexingMode"] }))}
+        >
+          <option value="AUTO">Автоматически (5+)</option>
+          <option value="INDEX">Разрешить с 1 статьи</option>
+          <option value="NOINDEX">Запретить</option>
+        </select>
+      </td>
+      <td className={discoveryTd("min-w-[150px]")}>
+        {draft.reviewStatus === "PENDING" ? (
+          <div className="space-y-2">
+            <span className="text-xs text-muted-foreground">Ожидает одобрения</span>
+            {isAdmin ? (
+              <Button size="sm" variant="outline" onClick={() => void onSave({ ...draft, reviewStatus: "APPROVED", isActive: true })}>
+                Одобрить
+              </Button>
+            ) : null}
+          </div>
+        ) : <span className="text-xs text-muted-foreground">Одобрен</span>}
+      </td>
       <td className={discoveryTd()}>
         <Input
           value={String(draft.sortOrder)}
@@ -278,6 +315,7 @@ function EditableTagRow({
       </td>
       <td className={discoveryTd()}>
         <Switch
+          disabled={!isAdmin || draft.reviewStatus === "PENDING"}
           checked={draft.isActive}
           onCheckedChange={(nextIsActive) => setDraft((prev) => ({ ...prev, isActive: nextIsActive }))}
         />
@@ -291,7 +329,7 @@ function EditableTagRow({
             size="sm"
             variant="outline"
             onClick={() => void onDisable(draft)}
-            disabled={!draft.isActive}
+            disabled={!isAdmin || !draft.isActive}
           >
             Отключить
           </Button>
