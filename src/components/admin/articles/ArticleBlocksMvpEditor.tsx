@@ -47,6 +47,7 @@ const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   image: "Изображение",
   gallery: "Галерея",
   activityCard: "Карточка сущности",
+  dynamicAfisha: "Динамическая афиша",
   embed: "Вставка",
   contacts: "Контакты",
   price: "Стоимость",
@@ -63,6 +64,7 @@ const PICKER_ITEMS: { type: ArticleBlockMvp["type"]; label: string; introOnly?: 
   { type: "image", label: "Изображение" },
   { type: "gallery", label: "Галерея" },
   { type: "activityCard", label: "Карточка активности" },
+  { type: "dynamicAfisha", label: "Динамическая афиша" },
   { type: "embed", label: "Вставка" },
   { type: "info", label: "Полезная информация" },
 ];
@@ -440,6 +442,25 @@ export function ArticleBlocksMvpEditor({
             </fieldset>
           ) : null}
         </>
+      )}
+      {block.type === "dynamicAfisha" && (
+        <div className="space-y-2">
+          <Label htmlFor={`dynamic-afisha-occasion-${block.id}`}>Повод из «Куда пойти» (необязательно)</Label>
+          <Input
+            id={`dynamic-afisha-occasion-${block.id}`}
+            placeholder="Например: new-year"
+            value={block.occasionSlug ?? ""}
+            onChange={(event) => updateAt(i, {
+              ...block,
+              occasionSlug: event.target.value.trim().toLowerCase() || undefined,
+            })}
+          />
+          <p className="text-xs text-muted-foreground">
+            Без повода — общая афиша города. С поводом — та же выдача, Boost и ранжирование,
+            что в «Куда пойти». Вне периода активности повода показывается пустая выдача.
+            События вручную не выбираются.
+          </p>
+        </div>
       )}
       {block.type === "embed" && (
         <EmbedBlockEditor
