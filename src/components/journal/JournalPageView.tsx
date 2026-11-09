@@ -13,7 +13,8 @@ import {
   journalTypeFilterHref,
   type JournalTypeFilter,
 } from "@/lib/journal/journalCardMeta";
-import { JournalFeedGridCard, JournalFeedRow, JournalMainCard, JournalMobileCard, JournalNewsCard } from "./JournalCards";
+import { JournalMainCard, JournalNewsCard } from "./JournalCards";
+import { JournalFeedCards } from "./JournalFeedCards";
 
 const NEWS_CARD_SHELL = "shrink-0 snap-start w-[33.6vw] min-w-[112px] max-w-[160px] lg:w-[16%] lg:max-w-none";
 
@@ -178,70 +179,13 @@ export function JournalPageView({
               </Link>
             )}
           </div>
-          <div className="flex flex-col gap-12 pt-5 md:hidden">
-            {feed.map((article, index) => (
-              <AnalyticsCardViewTracker
-                key={article.id}
-                entityType="ARTICLE"
-                entityId={article.id}
-                vertical="CITY"
-                citySlug={citySlug}
-                meta={{ section: "journal", block: "feed-mobile", position: index + 1 }}
-              >
-                <JournalMobileCard article={article} index={index + 1} saveStatus={saveStatuses[article.id]} />
-              </AnalyticsCardViewTracker>
-            ))}
-          </div>
-          <div className="hidden border-b border-border md:block lg:hidden">
-            {feed.map((article, index) => (
-              <AnalyticsCardViewTracker
-                key={article.id}
-                entityType="ARTICLE"
-                entityId={article.id}
-                vertical="CITY"
-                citySlug={citySlug}
-                meta={{ section: "journal", block: "feed", position: index + 1 }}
-              >
-                <JournalFeedRow
-                  article={article}
-                  index={index + 1}
-                  saveStatus={saveStatuses[article.id]}
-                  typeHref={
-                    article.publicationType === "BREAKING_NEWS"
-                      ? typeHref("BREAKING_NEWS")
-                      : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
-                        ? typeHref("COLLECTION")
-                        : null
-                  }
-                />
-              </AnalyticsCardViewTracker>
-            ))}
-          </div>
-          <div className="hidden grid-cols-4 gap-x-6 gap-y-12 pt-4 lg:grid">
-            {feed.map((article, index) => (
-              <AnalyticsCardViewTracker
-                key={article.id}
-                entityType="ARTICLE"
-                entityId={article.id}
-                vertical="CITY"
-                citySlug={citySlug}
-                meta={{ section: "journal", block: "feed-grid", position: index + 1 }}
-              >
-                <JournalFeedGridCard
-                  article={article}
-                  index={index + 1}
-                  saveStatus={saveStatuses[article.id]}
-                  typeHref={
-                    article.publicationType === "BREAKING_NEWS"
-                      ? typeHref("BREAKING_NEWS")
-                      : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
-                        ? typeHref("COLLECTION")
-                        : null
-                  }
-                />
-              </AnalyticsCardViewTracker>
-            ))}
-          </div>
+          <JournalFeedCards
+            articles={feed}
+            saveStatuses={saveStatuses}
+            citySlug={citySlug}
+            blogHref={basePath}
+            typeFilter={typeFilter}
+          />
         </section>
       ) : null}
 
