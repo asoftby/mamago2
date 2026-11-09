@@ -35,6 +35,8 @@ async function run() {
   assert.match(screen, /mode: pickedMode \?\? undefined/, "the first build leaves the mode to the server");
   assert.match(screen, /const mode: ScenarioMode = pickedMode \?\? current\?\.mode \?\? "car";/, "the toggle shows the mode the server used");
   assert.match(screen, /if \(isGuest\) return;[\s\S]*\/api\/plan\/day-scenario\/travel-mode/, "a member's pick is remembered, a guest's is not");
+  assert.match(screen, /modeWrites\.current = modeWrites\.current\.then\(/, "preference writes are queued, so the last pick stays saved");
+  assert.match(screen, /if \(next === mode\) \{[\s\S]*?if \(pickedMode === null\) persistMode\(next\);\s*return;\s*\}\s*setPickedMode\(next\);/, "choosing the mode already in use never rebuilds the draft");
 
   console.log("day-scenario travel mode tests passed");
 }
