@@ -4,6 +4,9 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExterna
 import { Sparkles } from "lucide-react";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { cn } from "@/lib/utils";
+import { familyFitBadgeLabel } from "@/lib/family/fitBadgeLabel";
+import { CollectionFitBadgeProvider } from "./CollectionFitBadgeContext";
+import { readGuestAgesRaw, serverGuestAgesRaw, subscribeGuestAges, writeGuestAges } from "./collectionGuestAgesStore";
 import {
   ageMonthsFromBirthDate,
   kidsFromGuestYears,
@@ -20,10 +23,7 @@ export type CollectionListItem = {
   node: ReactNode;
 };
 
-const GUEST_AGES_KEY = "mamago:collection-guest-ages";
 const GUEST_AGE_OPTIONS = Array.from({ length: 15 }, (_, i) => i);
-
-const GUEST_AGES_EVENT = "mamago:collection-guest-ages";
 
 function parseGuestAges(raw: string): number[] {
   try {
@@ -32,33 +32,6 @@ function parseGuestAges(raw: string): number[] {
   } catch {
     return [];
   }
-}
-
-function subscribeGuestAges(cb: () => void) {
-  window.addEventListener("storage", cb);
-  window.addEventListener(GUEST_AGES_EVENT, cb);
-  return () => {
-    window.removeEventListener("storage", cb);
-    window.removeEventListener(GUEST_AGES_EVENT, cb);
-  };
-}
-
-function readGuestAgesRaw(): string {
-  try {
-    return localStorage.getItem(GUEST_AGES_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function writeGuestAges(ages: number[]) {
-  try {
-    if (ages.length) localStorage.setItem(GUEST_AGES_KEY, JSON.stringify(ages));
-    else localStorage.removeItem(GUEST_AGES_KEY);
-  } catch {
-    /* хранилище недоступно — выбор не сохранится */
-  }
-  window.dispatchEvent(new Event(GUEST_AGES_EVENT));
 }
 
 const chipBase = "inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-sm font-semibold";
@@ -84,11 +57,10 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
   const persona = useFamilyPersona();
   const [sel, setSel] = useState<string>("all");
   // Выбор гостя хранится только на устройстве; на сервере и при гидратации — пусто.
-  const guestAgesRaw = useSyncExternalStore(subscribeGuestAges, readGuestAgesRaw, () => "");
-  // Запасной вариант в памяти: если запись в хранилище не удалась, порядок всё равно применяется на этой странице.
-  const [memoryAges, setMemoryAges] = useState<number[] | null>(null);
-  const storedAges = useMemo(() => parseGuestAges(guestAgesRaw), [guestAgesRaw]);
-  const guestAges = memoryAges ?? storedAges;
+  const guestAgesRaw = useSyncExternalStore(subscribeGuestAges, readGuestAgesRaw, serverGuestAgesRaw);
+  // Единый снимок для всех групп. При недоступном localStorage используется
+  // общий in-memory fallback, а не локальное состояние отдельной группы.
+  const guestAges = useMemo(() => parseGuestAges(guestAgesRaw), [guestAgesRaw]);
   const [pick, setPick] = useState<number[]>([]);
   const [askOpen, setAskOpen] = useState(false);
 
@@ -137,7 +109,6 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
   };
   const applyGuest = (ages: number[]) => {
     snapshot();
-    setMemoryAges(ages);
     writeGuestAges(ages);
     setAskOpen(false);
   };
@@ -218,9 +189,13 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
   return (
     <div>
       {plaque}
-      <div className="flex flex-col gap-[22px] md:gap-7">
+      <div className="flex flex-col gap-8 md:gap-10">
         {ordered.map((item) => {
           const reason = activeKids.length ? reasonFor(item, activeKids) : null;
+          const namedMatches = reason ? activeKids.filter((kid) => reason.kidIds.includes(kid.id) && kid.name) : [];
+          const fitLabel = reason && namedMatches.length === reason.kidIds.length
+            ? familyFitBadgeLabel({ matchedChildNames: namedMatches.map((kid) => kid.name!) })
+            : reason?.text ?? null;
           return (
             <div
               key={item.id}
@@ -230,10 +205,7 @@ export function CollectionPersonalList({ items }: { items: CollectionListItem[] 
                 else nodes.current.delete(item.id);
               }}
             >
-              {reason ? (
-                <div className="not-prose mb-2.5 inline-flex max-w-full items-center rounded-full bg-[#E0EEE5] px-3.5 py-1.5 text-[13.5px] font-semibold text-[#24563F]">{reason.text}</div>
-              ) : null}
-              {item.node}
+              <CollectionFitBadgeProvider label={fitLabel}>{item.node}</CollectionFitBadgeProvider>
             </div>
           );
         })}
