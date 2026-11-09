@@ -55,7 +55,7 @@ export function CityHomeBirthdayOffers({ offers }: { offers: BirthdayCatalogItem
           href: `/${citySlug}/birthday?category=${category}`,
         }))} />}
       >
-        {preview.map((offer, index) => (
+        {preview.map((offer) => (
           <Fragment key={offer.id}>
           <div className={EVENT_CARD_SHELL}>
             <OfferCard
