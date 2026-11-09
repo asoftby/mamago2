@@ -29,7 +29,6 @@ import {
   buildMainTitle,
 } from "@/features/city-home/lib/audiencePersonalization";
 import { rankHomeByAudience, homeAudienceSections } from "@/features/city-home/lib/rankHomeByAudience";
-import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
 import { HomeJournalCategoryChips } from "@/features/city-home/components/HomeJournalCategoryChips";
 import { HomeSectionQuickChips } from "@/features/city-home/components/HomeSectionQuickChips";
 import type { CityBlogCategory } from "@/server/article/cityBlogCategories";
@@ -169,7 +168,7 @@ export function CityHomeClassesSection({
   [activities, family?.personas, family?.selectedPersonaIds, applied.age]);
   const preview = [...sections.primary, ...sections.alternatives].slice(0, 12);
 
-  if (mode === "empty") {
+  if (mode === "empty" || preview.length === 0) {
     return null;
   }
 
@@ -191,8 +190,6 @@ export function CityHomeClassesSection({
           />
         }
       >
-        {sections.active && preview.length === 0 && <SoftAudienceNotice noAlternatives actionHref={appendCityQuery(`/${citySlug}/classes`)} actionLabel="Занятия" />}
-        {sections.active && sections.primary.length === 0 && preview.length > 0 && <SoftAudienceNotice label="занятия" />}
         {preview.map((activity, index) => {
           const href =
             activity.href ??
@@ -205,7 +202,6 @@ export function CityHomeClassesSection({
           const priceLabel = formatPublicCardPrice({ priceMode: activity.priceMode, priceFrom: activity.priceMin, priceTo: activity.priceMax, currency: activity.currency }) ?? undefined;
           return (
             <Fragment key={activity.id}>
-              {sections.active && sections.primary.length > 0 && sections.alternatives.length > 0 && index === sections.primary.length && <SoftAudienceNotice label="занятия" afterMatches />}
             <div className={cardShell + " flex flex-col"}>
               <AnalyticsCardViewTracker
                 entityType="OFFER"
@@ -259,7 +255,7 @@ export function CityHomeRoutesSection({
   [routes, family?.personas, family?.selectedPersonaIds, applied.age]);
   const preview = [...sections.primary, ...sections.alternatives].slice(0, 12);
 
-  if (mode === "empty") {
+  if (mode === "empty" || preview.length === 0) {
     return null;
   }
 
@@ -278,11 +274,8 @@ export function CityHomeRoutesSection({
           />
         }
       >
-        {sections.active && preview.length === 0 && <SoftAudienceNotice noAlternatives />}
-        {sections.active && sections.primary.length === 0 && preview.length > 0 && <SoftAudienceNotice label="маршруты" />}
         {preview.map((route, index) => (
           <Fragment key={route.id}>
-            {sections.active && sections.primary.length > 0 && sections.alternatives.length > 0 && index === sections.primary.length && <SoftAudienceNotice label="маршруты" afterMatches />}
           <div className={cardShell}>
             <RouteCard route={route} homeCard />
           </div>
