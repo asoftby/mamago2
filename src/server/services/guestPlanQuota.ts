@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-function guestMaxLifetimeGenerations(): number {
+export function guestMaxLifetimeGenerations(): number {
   const raw = process.env.GUEST_MAX_GENERATIONS;
   if (raw !== undefined && raw.trim() !== "") {
     const n = Number(raw);

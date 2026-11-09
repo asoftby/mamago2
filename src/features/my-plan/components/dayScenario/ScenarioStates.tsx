@@ -92,16 +92,23 @@ export function AllShown({ onRestart }: { onRestart: () => void }) {
 const ERROR_TEXT: Record<DraftErrorKind, string> = {
   rate_limited: "Слишком много запросов подряд. Подождите минуту и попробуйте снова.",
   unavailable: "Подбор дня сейчас недоступен.",
+  requires_auth: "Вы уже собрали дни как гость. Войдите или зарегистрируйтесь, чтобы собрать ещё один — собранное сохранится.",
   failed: "Не получилось собрать день. Проверьте интернет и попробуйте ещё раз.",
 };
 
-export function DraftError({ kind, onRetry }: { kind: DraftErrorKind; onRetry: () => void }) {
+export function DraftError({ kind, onRetry, authHref }: { kind: DraftErrorKind; onRetry: () => void; /** Where "Войти" leads (a guest over the allowance). */ authHref?: string }) {
   return (
     <Panel
       icon={<AlertTriangle className="h-5 w-5" strokeWidth={1.8} aria-hidden />}
-      title="Не получилось"
+      title={kind === "requires_auth" ? "Нужен вход" : "Не получилось"}
       actions={
-        kind === "unavailable" ? null : (
+        kind === "unavailable" ? null : kind === "requires_auth" ? (
+          authHref ? (
+            <a href={authHref} className={PRIMARY}>
+              Войти или зарегистрироваться
+            </a>
+          ) : null
+        ) : (
           <button type="button" onClick={onRetry} className={PRIMARY}>
             Повторить
           </button>

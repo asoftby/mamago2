@@ -4,6 +4,8 @@ import { checkRateLimit } from "@/lib/security/rateLimit";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
 import { isDayScenarioEngineEnabled } from "@/server/services/dayScenarioEngine/flag";
 import { draftRequestSchema, runDayScenarioDraft } from "@/server/services/dayScenarioEngine/draft.service";
+import { chargeGuestScenarioDate } from "@/server/services/dayScenarioEngine/guestQuota.service";
+import { resolveGuestUsageKey } from "@/server/services/guestPlanQuota";
 
 /**
  * POST /api/plan/day-scenario/draft — build / rebuild / replace a day-scenario draft.
@@ -33,6 +35,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "rate_limited", message: "Слишком частые запросы. Подождите минуту." }, { status: 429 });
     }
 
+    // A guest pays for the FIRST build of a date only; variants, replacements and rebuilds are free. Over the allowance:
+    // sign in (the answer is the same "requires_auth" the old guest picks gave).
+    if (!user && parsed.data.action === "build") {
+      const key = resolveGuestUsageKey(parsed.data.anonymousId, getTrustedClientIp(request), request.headers.get("user-agent"));
+      if (key) {
+        const charge = await chargeGuestScenarioDate(key, parsed.data.date);
+        if (!charge.ok) return NextResponse.json({ error: "requires_auth", message: "Войдите или зарегистрируйтесь, чтобы собрать ещё один день." }, { status: 403 });
+      }
+    }
     const body = await runDayScenarioDraft(parsed.data, user ? { id: user.id } : null);
     return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
