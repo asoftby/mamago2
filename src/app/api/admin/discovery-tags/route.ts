@@ -54,6 +54,7 @@ export async function GET(req: Request) {
         seoDescription: true,
         indexingMode: true,
         reviewStatus: true,
+        group: true,
         isActive: true,
         sortOrder: true,
         _count: {
@@ -75,6 +76,7 @@ export async function GET(req: Request) {
         seoDescription: tag.seoDescription,
         indexingMode: tag.indexingMode,
         reviewStatus: tag.reviewStatus,
+        group: tag.group,
         isActive: tag.isActive,
         sortOrder: tag.sortOrder,
         articleCount: tag._count.articles,
@@ -105,9 +107,13 @@ export async function POST(req: Request) {
   const sortOrder = Number.isFinite(Number(body?.sortOrder)) ? Math.floor(Number(body.sortOrder)) : 0;
   const isAdmin = user.role === "ADMIN";
   const indexingMode = body?.indexingMode ?? "AUTO";
+  const group = body?.group ?? "OTHER";
 
   if (!title || title.length > 80 || !slug) {
     return NextResponse.json({ error: "Название тега обязательно (не более 80 символов)" }, { status: 400 });
+  }
+  if (!["PLACES", "ENTERTAINMENT", "INTERESTS", "DEVELOPMENT", "CELEBRATIONS", "FAMILY", "TRAVEL", "OTHER"].includes(group)) {
+    return NextResponse.json({ error: "Недопустимая тематическая группа" }, { status: 400 });
   }
   if (!["AUTO", "INDEX", "NOINDEX"].includes(indexingMode) || (!isAdmin && indexingMode !== "AUTO")) {
     return NextResponse.json({ error: "Недопустимый режим индексации" }, { status: 403 });
@@ -125,7 +131,7 @@ export async function POST(req: Request) {
       const tag = await tx.discoveryTag.create({
         data: {
           title, slug, description, seoTitle, seoDescription, sortOrder,
-          indexingMode,
+          indexingMode, group,
           // Moderator suggestions are usable in drafts, but remain unpublished until admin approval.
           isActive: isAdmin && (body?.isActive === undefined ? true : body.isActive === true),
           reviewStatus: isAdmin ? "APPROVED" : "PENDING",

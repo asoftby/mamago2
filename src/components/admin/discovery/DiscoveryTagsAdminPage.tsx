@@ -20,6 +20,17 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
+const TAG_GROUP_LABELS: Record<DiscoveryTagItem["group"], string> = {
+  PLACES: "Места",
+  ENTERTAINMENT: "Развлечения",
+  INTERESTS: "Интересы",
+  DEVELOPMENT: "Развитие",
+  CELEBRATIONS: "Праздники",
+  FAMILY: "Семья",
+  TRAVEL: "Путешествия",
+  OTHER: "Другое",
+};
+
 type DiscoveryTagItem = {
   id: string;
   title: string;
@@ -29,6 +40,7 @@ type DiscoveryTagItem = {
   seoDescription: string | null;
   indexingMode: "AUTO" | "INDEX" | "NOINDEX";
   reviewStatus: "APPROVED" | "PENDING";
+  group: "PLACES" | "ENTERTAINMENT" | "INTERESTS" | "DEVELOPMENT" | "CELEBRATIONS" | "FAMILY" | "TRAVEL" | "OTHER";
   isActive: boolean;
   sortOrder: number;
   articleCount: number;
@@ -43,6 +55,7 @@ export function DiscoveryTagsAdminPage() {
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [sortOrder, setSortOrder] = useState("100");
+  const [group, setGroup] = useState<DiscoveryTagItem["group"]>("OTHER");
   const [isActive, setIsActive] = useState(true);
 
   const load = async () => {
@@ -87,6 +100,7 @@ export function DiscoveryTagsAdminPage() {
         sortOrder: Number(sortOrder) || 0,
         isActive,
         indexingMode: "AUTO",
+        group,
       }),
     });
 
@@ -101,6 +115,7 @@ export function DiscoveryTagsAdminPage() {
     setSeoTitle("");
     setSeoDescription("");
     setSortOrder("100");
+    setGroup("OTHER");
     setIsActive(true);
     toast.success(isAdmin ? "Тег создан" : "Тег предложен на утверждение администратору");
     await load();
@@ -160,6 +175,17 @@ export function DiscoveryTagsAdminPage() {
               <Input id="tag-seo-title" value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="tag-group">Группа темы</Label>
+              <select
+                id="tag-group"
+                className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={group}
+                onChange={(event) => setGroup(event.target.value as DiscoveryTagItem["group"])}
+              >
+                {Object.entries(TAG_GROUP_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="tag-sort">Порядок</Label>
               <Input id="tag-sort" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} inputMode="numeric" />
             </div>
@@ -204,6 +230,7 @@ export function DiscoveryTagsAdminPage() {
               <tr>
                 <th className={discoveryTh("min-w-[180px]")}>Название</th>
                 <th className={discoveryTh("min-w-[160px]")}>Slug</th>
+                <th className={discoveryTh("min-w-[150px]")}>Тема</th>
                 <th className={discoveryTh("min-w-[220px]")}>Описание</th>
                 <th className={discoveryTh("min-w-[220px]")}>SEO title</th>
                 <th className={discoveryTh("min-w-[280px]")}>SEO description</th>
@@ -257,6 +284,16 @@ function EditableTagRow({
       </td>
       <td className={discoveryTd("min-w-[160px]")}>
         <Input value={draft.slug} onChange={(e) => setDraft((prev) => ({ ...prev, slug: e.target.value }))} />
+      </td>
+      <td className={discoveryTd("min-w-[150px]")}>
+        <select
+          aria-label={`Тема тега ${draft.title}`}
+          value={draft.group}
+          className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
+          onChange={(event) => setDraft((prev) => ({ ...prev, group: event.target.value as DiscoveryTagItem["group"] }))}
+        >
+          {Object.entries(TAG_GROUP_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
       </td>
       <td className={discoveryTd("min-w-[220px]")}>
         <Textarea

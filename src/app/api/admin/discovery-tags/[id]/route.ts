@@ -56,6 +56,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   const indexingMode = body?.indexingMode ?? existing.indexingMode;
   const reviewStatus = body?.reviewStatus ?? existing.reviewStatus;
   const isActive = body?.isActive === undefined ? existing.isActive : body.isActive === true;
+  const group = body?.group ?? existing.group;
+  if (!["PLACES", "ENTERTAINMENT", "INTERESTS", "DEVELOPMENT", "CELEBRATIONS", "FAMILY", "TRAVEL", "OTHER"].includes(group)) {
+    return NextResponse.json({ error: "Недопустимая тематическая группа" }, { status: 400 });
+  }
   if (!["AUTO", "INDEX", "NOINDEX"].includes(indexingMode) ||
       !["APPROVED", "PENDING"].includes(reviewStatus)) {
     return NextResponse.json({ error: "Недопустимый статус тега" }, { status: 400 });
@@ -73,7 +77,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
 
   const data = {
-    title, slug, indexingMode, reviewStatus, isActive,
+    title, slug, indexingMode, reviewStatus, isActive, group,
     description: body?.description === undefined ? existing.description : String(body.description ?? "").trim() || null,
     seoTitle: body?.seoTitle === undefined ? existing.seoTitle : String(body.seoTitle ?? "").trim() || null,
     seoDescription: body?.seoDescription === undefined
