@@ -8,6 +8,7 @@ import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import type { PlanItemWithActivity } from "../../types/event";
+import { isLinkedEntityMove } from "../../lib/planMoveEligibility";
 export { canMovePlanItem } from "../../lib/planMoveEligibility";
 
 /** Заметке доступны любые даты — берём ближайшие два месяца, остальное листается в «Показать все даты». */
@@ -33,7 +34,9 @@ export function PlanMoveSheet({
   onClose: () => void;
   onMoved: (dateISO: string) => void;
 }) {
-  const isNote = item?.source === "MANUAL";
+  const isEntity = item ? isLinkedEntityMove(item) : false;
+  // A note and a place/offer/route entry accept any date; an event moves along its sessions.
+  const isNote = item?.source === "MANUAL" || isEntity;
   const itemId = item?.id ?? null;
   const activityId = item?.activityId ?? null;
   const [catalog, setCatalog] = useState<{ itemId: string; dates: string[]; sessionsByDate: SessionsByDate } | null>(null);
@@ -77,7 +80,17 @@ export function PlanMoveSheet({
     const previousDate = item.date;
     try {
       let response: Response;
-      if (isNote) {
+      if (isEntity) {
+        response = await fetch(`/api/plan/items/${item.id}/date`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            date: result.dateISO,
+            expectedUpdatedAt: new Date(item.updatedAt ?? Date.now()).toISOString(),
+          }),
+        });
+      } else if (isNote) {
         response = await fetch(`/api/plan/manual/${item.id}`, {
           method: "PATCH",
           credentials: "include",

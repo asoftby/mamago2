@@ -145,7 +145,6 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
 
       const eventIds = days.flatMap((d) => d.items.filter((i) => i.kind === "event").map((i) => i.activityId));
       const placeIds = days.flatMap((d) => d.items.filter((i) => i.kind === "place").map((i) => i.activityId));
-      const scenarioIds = rows.map((row) => row.id);
 
       const [events, places, taken] = await Promise.all([
         eventIds.length
@@ -166,13 +165,15 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
         tx.planItem.findMany({
           // AND, never a spread: the family scope has its own top-level OR (shared entries or the user's own) that a second OR would replace.
           where: { AND: [scope, { OR: [...(eventIds.length ? [{ activityId: { in: eventIds } }] : []), ...(placeIds.length ? [{ placeId: { in: placeIds } }] : [])] }] },
-          select: { id: true, activityId: true, placeId: true, scenarioId: true },
+          select: { id: true, activityId: true, placeId: true, scenarioId: true, date: true },
         }),
       ]);
       const eventById = new Map<string, EventRow>(events.map((e) => [e.id, e]));
       const placeById = new Map<string, PlaceRow>(places.map((p) => [p.id, p]));
 
-      const foreign = taken.filter((row) => !row.scenarioId || !scenarioIds.includes(row.scenarioId));
+      // An entry of this scenario still on its day is ours to rewrite; one the user moved to another day is theirs (a clash).
+      const dayOf = new Map(rows.map((r) => [r.id, r.date]));
+      const foreign = taken.filter((row) => !row.scenarioId || dayOf.get(row.scenarioId) !== row.date);
       const dupEvents = foreign.flatMap((row) => (row.activityId ? [row.activityId] : []));
       const dupPlaces = foreign.flatMap((row) => (row.placeId ? [row.placeId] : []));
       if (dupEvents.length > 0) throw new DaySaveError(409, "DUPLICATE_ACTIVITY", { ids: [...new Set(dupEvents)] });
@@ -184,7 +185,7 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
       for (const day of days) {
         const row = rows.find((r) => r.date === day.date)!;
         // Re-saving a day: its own earlier entries are replaced; manual and foreign entries stay.
-        const mine = await tx.planItem.findMany({ where: { scenarioId: row.id }, select: { id: true, activityId: true, placeId: true } });
+        const mine = await tx.planItem.findMany({ where: { scenarioId: row.id, date: day.date }, select: { id: true, activityId: true, placeId: true } });
         // Points the draft could not hold (keep) are not touched: neither rewritten nor treated as dropped.
         const wanted = new Set([...day.items.map((item) => `${item.kind}:${item.activityId}`), ...day.keep.map((point) => `${point.kind}:${point.activityId}`)]);
         const stale = mine.filter((item) => !wanted.has(item.activityId ? `event:${item.activityId}` : `place:${item.placeId}`));

@@ -172,6 +172,17 @@ async function run() {
     assert.ok(!get().planItems.some((r) => r.id === parkId), "without keep the dropped point is removed, as before");
   }
 
+  // ---- a point of the scenario that the user moved to another day is theirs: saving the same point again is a clash
+  {
+    const { db, get } = makeDb(seedCatalog());
+    const first = await saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30"), placeItem("pl-park", SAT, "10:30", "12:00")] }]), "key-move-0001", deps(db));
+    const parkId = first.days[0]!.items.find((i) => i.activityId === "pl-park")!.planItemId;
+    get().planItems.find((r) => r.id === parkId)!.date = "2026-11-20"; // moved by «Перенести»
+    await assert.rejects(saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30"), placeItem("pl-park", SAT, "10:30", "12:00")] }]), "key-move-0002", deps(db)), (e: unknown) => e instanceof DaySaveError && e.code === "DUPLICATE_PLACE", "the moved place is not duplicated on the day");
+    await saveDayScenarios("u1", parse([{ date: SAT, items: [eventItem("ev-session", SAT, "08:00", "09:30")] }]), "key-move-0003", deps(db));
+    assert.ok(get().planItems.some((r) => r.id === parkId), "re-saving the day without the point does not delete the moved one");
+  }
+
   // ---- a weekend: one transaction, one group, both scenarios
   {
     const { db, get } = makeDb(seedCatalog());
