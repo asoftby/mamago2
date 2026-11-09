@@ -25,7 +25,7 @@ import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { listPopulatedCityBlogCategories } from "@/server/article/cityBlogCategories";
 import { listNearbyCities, type NearbyCity } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
-import { listDiscoveryClassChips } from "@/server/discovery/classChips";
+import { listPopulatedDiscoveryClassChips } from "@/server/discovery/classChips";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getHomeSectionAvailability } from "@/features/city-home/config/homeSectionAvailability";
@@ -101,7 +101,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
   const birthdayOffersPromise = sectionAvailability.birthday
     ? getPublicBirthdayCatalog(city.slug, 120).catch(() => [])
     : Promise.resolve([]);
-  const classChipsPromise = sectionAvailability.classes ? listDiscoveryClassChips().catch(() => []) : Promise.resolve([]);
+  const classChipsPromise = sectionAvailability.classes ? listPopulatedDiscoveryClassChips(city.id, city.slug).catch(() => []) : Promise.resolve([]);
   const localClassesPromise = sectionAvailability.classes
     ? getClassesDiscoveryFeed(city.id, city.slug, {
         take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"], homeGeoFallback: true,
