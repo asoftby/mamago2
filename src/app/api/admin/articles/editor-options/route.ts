@@ -16,13 +16,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const selectedOccasionId = new URL(request.url).searchParams.get("selectedOccasionId");
   const selectedCategoryIds = new URL(request.url).searchParams.get("selectedCategoryIds")
     ?.split(",").filter(Boolean) ?? [];
   const selectedRegionIds = new URL(request.url).searchParams.get("selectedRegionIds")
     ?.split(",").filter(Boolean) ?? [];
   const selectedCityIds = new URL(request.url).searchParams.get("selectedCityIds")
     ?.split(",").filter(Boolean) ?? [];
-  const [cities, regions, authors, categories] = await Promise.all([
+  const [cities, regions, authors, categories, occasions] = await Promise.all([
     prisma.city.findMany({
       where: buildArticleEditorCityOptionsWhere(selectedCityIds),
       orderBy: { name: "asc" },
@@ -57,6 +58,15 @@ export async function GET(request: Request) {
       orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }],
       select: { id: true, nameRu: true, slug: true },
     }),
+    prisma.occasion.findMany({
+      where: {
+        type: { in: ["HOLIDAY", "SEASON", "EVENT"] },
+        OR: [{ isActive: true, startsAt: { not: null }, endsAt: { not: null } },
+          ...(selectedOccasionId ? [{ id: selectedOccasionId }] : [])],
+      },
+      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
   ]);
 
   const authorOptions = authors.map((a) => ({
@@ -73,6 +83,11 @@ export async function GET(request: Request) {
       id: c.id,
       label: c.nameRu,
       slug: c.slug,
+    })),
+    occasions: occasions.map((occasion) => ({
+      id: occasion.id, label: occasion.name, isActive: occasion.isActive,
+      startsAt: occasion.startsAt?.toISOString() ?? null,
+      endsAt: occasion.endsAt?.toISOString() ?? null,
     })),
   });
 }

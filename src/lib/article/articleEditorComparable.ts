@@ -34,6 +34,8 @@ export function buildEditorComparable(input: {
   authorLabel: string | null;
   cityContext: string | null;
   categoryId: string | null;
+  occasionId?: string | null;
+  seasonReviewRequested?: boolean;
   additionalCategoryIds?: string[];
   additionalGeographyTargets?: ArticleEditorSnapshot["additionalGeographyTargets"];
   tagIds: string[];
@@ -63,6 +65,8 @@ export function buildEditorComparable(input: {
     authorLabel: input.authorLabel ?? "",
     cityContext: input.cityContext ?? "",
     categoryId: input.categoryId ?? "",
+    occasionId: input.occasionId ?? "",
+    seasonReviewRequested: input.seasonReviewRequested ?? false,
     additionalCategoryIds: input.additionalCategoryIds ?? [],
     additionalGeographyTargets: input.additionalGeographyTargets ?? [],
     tagIds: input.tagIds,
@@ -95,6 +99,8 @@ export function buildSavedComparable(snap: ArticleEditorSnapshot): string {
     authorLabel: snap.authorLabel,
     cityContext: snap.cityContext,
     categoryId: snap.categoryId,
+    occasionId: snap.occasionId,
+    seasonReviewRequested: false,
     additionalCategoryIds: snap.additionalCategoryIds,
     additionalGeographyTargets: snap.additionalGeographyTargets,
     tagIds: snap.tagIds,
