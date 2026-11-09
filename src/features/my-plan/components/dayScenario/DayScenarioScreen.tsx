@@ -97,7 +97,8 @@ export function DayScenarioScreen({
   const [otherIso, setOtherIso] = useState<string | null>(null);
   const [ageKeys, setAgeKeys] = useState<string[]>([]);
   const [guestDates, setGuestDates] = useState<string[]>([]);
-  const [mode, setMode] = useState<ScenarioMode>("car");
+  // Until the user picks, the first build uses the family's saved mode (the server answers which); then it is theirs.
+  const [pickedMode, setPickedMode] = useState<ScenarioMode | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>(() => initialPersonSelection(people.map((person) => person.id), initialPersonaIds));
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -110,7 +111,7 @@ export function DayScenarioScreen({
     enabled: phase === "draft" && dates.length > 0,
     city,
     dates,
-    mode,
+    mode: pickedMode ?? undefined,
     ageRanges: isGuest ? rangesForAnswers(ageKeys) : [],
     personaIds,
     seed,
@@ -210,6 +211,18 @@ export function DayScenarioScreen({
 
   const title = phase === "params" ? "Куда сходить?" : dates.length > 1 ? "Выходные" : activeDate ? dayTitle(activeDate) : "Куда сходить?";
   const kicker = phase === "params" ? "Собрать день" : "Собрали за вас";
+  const mode: ScenarioMode = pickedMode ?? current?.mode ?? "car";
+  // A pick is remembered for the family (the next draft starts from it); a guest has no family, nothing to save.
+  const setMode = (next: ScenarioMode) => {
+    setPickedMode(next);
+    if (isGuest) return;
+    void fetch("/api/plan/day-scenario/travel-mode", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: next }),
+    }).catch(() => undefined);
+  };
   const walking = mode === "walk";
   const showFewNearby = current?.status === "few_nearby" && (current.suggestMode === "car" || walking) && items.length > 0;
   const showEmpty = Boolean(current) && !loading && items.length === 0;
