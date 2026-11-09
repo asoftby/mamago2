@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { deleteSavedDays, listSavedDays, parseDeleteRequest, SavedDayError, type SavedDayDeps } from "./savedDay.service";
+import { deleteSavedDays, listSavedDayPoints, listSavedDays, parseDeleteRequest, SavedDayError, type SavedDayDeps } from "./savedDay.service";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a loose in-memory row stands in for Prisma models
 type Row = Record<string, any>;
@@ -13,6 +13,7 @@ function makeDb(seed: { scenarios: Row[]; items: Row[] }) {
       if (key === "OR") return (cond as Row[]).some((sub) => matches(row, sub));
       if (cond && typeof cond === "object" && !(cond instanceof Date)) {
         if ("in" in cond) return cond.in.includes(row[key]);
+        if ("not" in cond) return row[key] !== cond.not;
         if ("gte" in cond || "lte" in cond) return (cond.gte === undefined || row[key] >= cond.gte) && (cond.lte === undefined || row[key] <= cond.lte);
       }
       return row[key] === cond;
@@ -34,7 +35,7 @@ function makeDb(seed: { scenarios: Row[]; items: Row[] }) {
         for (const item of state.items.filter((r) => matches(r, where))) counts.set(item.scenarioId, (counts.get(item.scenarioId) ?? 0) + 1);
         return [...counts].map(([scenarioId, n]) => ({ scenarioId, _count: { _all: n } }));
       },
-      findMany: async ({ where }: Row) => state.items.filter((r) => matches(r, where)),
+      findMany: async ({ where, orderBy }: Row) => state.items.filter((r) => matches(r, where)).sort((a, b) => (orderBy ? String(a.startsAt).localeCompare(String(b.startsAt)) : 0)),
       deleteMany: async ({ where }: Row) => {
         const before = state.items.length;
         state.items = state.items.filter((r) => !matches(r, where));
@@ -65,7 +66,7 @@ const scenarios = () => [
   { id: "s-mon", userId: "u1", date: MON, source: null, groupId: null }, // a plan-editor day
   { id: "s-other", userId: "u2", date: SAT, source: "ENGINE", groupId: "gx" },
 ];
-const item = (id: string, date: string, scenarioId: string | null, userId = "u1") => ({ id, userId, date, scenarioId, activityId: `a-${id}`, routeId: null, placeId: null, articleId: null, startsAt: null, endsAt: null, childId: null });
+const item = (id: string, date: string, scenarioId: string | null, userId = "u1") => ({ id, userId, date, scenarioId, activityId: `a-${id}`, routeId: null, placeId: null, articleId: null, startsAt: null, endsAt: null, childId: null, pinned: false });
 const items = () => [item("p1", SAT, "s-sat"), item("p2", SAT, "s-sat"), item("m1", SAT, null), item("p3", SUN, "s-sun"), item("m2", SUN, null), item("o1", SAT, "s-other", "u2")];
 const deps = (db: NonNullable<SavedDayDeps["db"]>): SavedDayDeps => ({ db, scopeFor: async (userId) => ({ userId }) });
 
@@ -122,6 +123,25 @@ async function run() {
     assert.equal(plain.get().items.length, items().length, "nothing was deleted");
   }
 
+  // ---- the points of a saved day, for «Изменить день»
+  {
+    const at = (iso: string) => new Date(iso);
+    const rows = [
+      { ...item("e1", SAT, "s-sat"), startsAt: at("2026-11-14T10:00:00Z"), pinned: true },
+      { ...item("pl", SAT, "s-sat"), activityId: null, placeId: "place-9", startsAt: at("2026-11-14T08:00:00Z") },
+      { ...item("untimed", SAT, "s-sat"), startsAt: null },
+      { ...item("manual", SAT, null), startsAt: at("2026-11-14T09:00:00Z") },
+      { ...item("other", SAT, "s-other", "u2"), startsAt: at("2026-11-14T09:30:00Z") },
+    ];
+    const { tx } = makeDb({ scenarios: scenarios(), items: rows });
+    assert.deepEqual(await listSavedDayPoints("u1", SAT, tx), [
+      { kind: "place", activityId: "place-9", startsAt: "2026-11-14T08:00:00.000Z", pinned: false },
+      { kind: "event", activityId: "a-e1", startsAt: "2026-11-14T10:00:00.000Z", pinned: true },
+    ], "only the scenario's timed points, in time order; the place by its place id");
+    assert.deepEqual(await listSavedDayPoints("u1", MON, tx), [], "a plan-editor day is not a saved scenario");
+    assert.deepEqual(await listSavedDayPoints("u3", SAT, tx), [], "another user's day");
+  }
+
   // ---- contracts
   {
     const route = readFileSync("src/app/api/plan/day-scenario/saved/route.ts", "utf8");
@@ -130,6 +150,10 @@ async function run() {
     assert.match(route, /checkRateLimit\(`day-scenario-delete:\$\{user\.id\}`, 20, 60_000\)/);
     const markers = readFileSync("src/app/api/plan/day-markers/route.ts", "utf8");
     assert.match(markers, /isDayScenarioEngineEnabled\(\) \? listSavedDays\(user\.id, from, to\) : Promise\.resolve\(\{\}\)/, "no extra queries with the flag off");
+    assert.match(route, /export async function GET[\s\S]*isDayScenarioEngineEnabled[\s\S]*UNAUTHENTICATED[\s\S]*day-scenario-saved-read/, "the read of a saved day has the same gates");
+    const draft = readFileSync("src/server/services/dayScenarioEngine/draft.service.ts", "utf8");
+    assert.match(draft, /\.\.\.\(editScenario \? \{ scenarioId: null \} : \{\}\)/, "editing: the scenario's own entries are neither busy time nor already planned");
+    assert.match(draft, /editScenario: z\.boolean\(\)\.optional\(\)\.default\(false\)/);
     const service = readFileSync("src/server/services/dayScenarioEngine/savedDay.service.ts", "utf8");
     assert.match(service, /planItem\.deleteMany\(\{ where: \{ scenarioId: \{ in: rows\.map\(\(row\) => row\.id\) \}, userId \} \}\)/, "only entries of the scenario, only the user's own");
   }

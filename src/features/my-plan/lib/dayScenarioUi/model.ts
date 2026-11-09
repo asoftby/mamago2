@@ -244,10 +244,12 @@ export type ScenarioQuery = {
   /** Guest answers; ignored for a signed-in user, who sends `personaIds`. */
   ageRanges: string[];
   personaIds: string[];
+  /** «Изменить день»: every request of the session treats the saved scenario's own entries as the draft, not as busy time. */
+  editScenario?: boolean;
 };
 
 type DraftRequestInput = Pick<DraftRequest, "date" | "action" | "mode" | "ageRanges" | "personaIds" | "variant" | "targetCount" | "dayStart" | "dayEnd"> &
-  Partial<Pick<DraftRequest, "current" | "pinnedActivityIds" | "replaceActivityId" | "city" | "shownActivityIds">>;
+  Partial<Pick<DraftRequest, "current" | "pinnedActivityIds" | "replaceActivityId" | "city" | "shownActivityIds" | "editScenario">>;
 
 export const DEFAULT_TARGET_COUNT = 3;
 export const MAX_TARGET_COUNT = 4;
@@ -256,7 +258,7 @@ export const MAX_TARGET_COUNT = 4;
 export function buildDraftBody(
   query: ScenarioQuery,
   action: DraftRequest["action"],
-  options: { variant?: number; items?: readonly DraftItem[]; pinAll?: boolean; targetCount?: number; replaceActivityId?: string; shown?: readonly string[] } = {},
+  options: { variant?: number; items?: readonly DraftItem[]; pinAll?: boolean; targetCount?: number; replaceActivityId?: string; shown?: readonly string[]; editScenario?: boolean } = {},
 ): DraftRequestInput {
   const { dayStart, dayEnd } = windowFor(query.date);
   const items = options.items ?? [];
@@ -275,6 +277,7 @@ export function buildDraftBody(
     pinnedActivityIds: options.pinAll ? items.map((item) => item.activityId) : [],
     ...(options.replaceActivityId ? { replaceActivityId: options.replaceActivityId } : {}),
     ...(options.shown ? { shownActivityIds: [...options.shown].slice(-100) } : {}),
+    ...(options.editScenario || query.editScenario ? { editScenario: true } : {}),
   };
 }
 

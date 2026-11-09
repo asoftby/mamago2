@@ -99,8 +99,17 @@ export function useDayScenarioDraft(input: {
   mode: ScenarioMode;
   ageRanges: string[];
   personaIds: string[];
+  /**
+   * «Изменить день»: the saved points of the first day. The first draft of that day is a rebuild around them (all
+   * pinned, as many points as were saved) instead of a fresh build, so the day opens as it is in the plan.
+   */
+  seed?: { activityId: string; startsAt: string }[] | null;
 }): DayScenarioDraftApi {
-  const { enabled, city, dates, mode, ageRanges, personaIds } = input;
+  const { enabled, city, dates, mode, ageRanges, personaIds, seed } = input;
+  const seedRef = useRef(seed);
+  seedRef.current = seed;
+  const firstDateRef = useRef(dates[0]);
+  firstDateRef.current = dates[0];
   const [byDate, dispatch] = useReducer(reducer, {} as Record<string, DateDraftState>);
   const stateRef = useRef(byDate);
   stateRef.current = byDate;
@@ -109,7 +118,7 @@ export function useDayScenarioDraft(input: {
 
   const queryKey = JSON.stringify([enabled, city, dates, mode, ageRanges, personaIds]);
   const query = useMemo(
-    () => (date: string) => ({ city, date, mode, ageRanges, personaIds }),
+    () => (date: string) => ({ city, date, mode, ageRanges, personaIds, editScenario: Boolean(seedRef.current?.length) }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- queryKey is the serialized identity of these inputs
     [queryKey],
   );
@@ -135,7 +144,14 @@ export function useDayScenarioDraft(input: {
 
   const build = useCallback(
     async (date: string) => {
-      const response = await request(date, buildDraftBody(queryRef.current(date), "build"));
+      const saved = seedRef.current;
+      const seeded = saved && saved.length > 0 && date === firstDateRef.current;
+      const response = await request(
+        date,
+        seeded
+          ? buildDraftBody(queryRef.current(date), "rebuild", { items: saved as unknown as DraftItem[], pinAll: true, targetCount: saved.length })
+          : buildDraftBody(queryRef.current(date), "build"),
+      );
       if (response) dispatch({ type: "history", date, history: pushDraft(emptyHistory(), toDraft(response), 0) });
     },
     [request],

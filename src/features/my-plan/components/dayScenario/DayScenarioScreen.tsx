@@ -71,6 +71,7 @@ export function DayScenarioScreen({
   initialPersonaIds = [],
   ownEntries = [],
   hasPlanItems = false,
+  seed = null,
   onBack,
   onClose,
 }: {
@@ -85,6 +86,8 @@ export function DayScenarioScreen({
   initialPersonaIds?: string[];
   ownEntries?: OwnPlanEntry[];
   hasPlanItems?: boolean;
+  /** «Изменить день»: the saved points of the open day; the draft starts from them (all pinned). */
+  seed?: { activityId: string; startsAt: string }[] | null;
   onBack: () => void;
   onClose?: () => void;
 }) {
@@ -110,6 +113,7 @@ export function DayScenarioScreen({
     mode,
     ageRanges: isGuest ? rangesForAnswers(ageKeys) : [],
     personaIds,
+    seed,
   });
   const saver = useDayScenarioSave();
   const state = activeDate ? api.byDate[activeDate] : undefined;
@@ -199,7 +203,7 @@ export function DayScenarioScreen({
     if (!ok) return;
     invalidatePlanDayMarkers();
     requestPlanRefetchForDate(activeDate);
-    toast.success("День сохранён в план");
+    toast.success(seed ? "День обновлён" : "День сохранён в план");
     onBack();
   };
   const saveError = saver.state.status === "error" ? SAVE_FAILURE_TEXT[saver.state.failure] : null;
@@ -337,7 +341,7 @@ export function DayScenarioScreen({
             ) : (
               <>
                 <button type="button" disabled={!canSave} aria-busy={saving} aria-describedby={saveError ? "scenario-save-hint" : undefined} onClick={() => void saveDay()} className={PRIMARY_BTN}>
-                  {saving ? "Сохраняем…" : saveLabel(dates.length)}
+                  {saving ? "Сохраняем…" : seed ? "Сохранить изменения" : saveLabel(dates.length)}
                 </button>
                 {saveError ? (
                   <p id="scenario-save-hint" role="alert" className="mp-font-ui m-0 mt-2 text-center text-[13px] text-[var(--mp-ac-dark)]">{saveError}</p>

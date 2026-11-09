@@ -292,4 +292,13 @@ assert.equal(AGE_ANSWERS.length, 4);
   assert.equal(pairLinkLabel({ date: "2026-11-14", count: 3, direction: "prev" }), "← Суббота");
 }
 
+// ---- «Изменить день»: the session's requests carry editScenario
+{
+  const base = { city: "minsk", date: "2026-11-14", mode: "car" as const, ageRanges: [], personaIds: ["p1"] };
+  assert.equal("editScenario" in buildDraftBody(base, "build"), false, "a normal build does not send it");
+  assert.equal(buildDraftBody({ ...base, editScenario: true }, "another").editScenario, true, "an edit session sends it on every action");
+  const rebuilt = buildDraftBody({ ...base, editScenario: true }, "rebuild", { items: [{ activityId: "a", startsAt: "2026-11-14T10:00:00Z" } as DraftItem], pinAll: true, targetCount: 1 });
+  assert.deepEqual([rebuilt.pinnedActivityIds, rebuilt.targetCount, rebuilt.editScenario], [["a"], 1, true], "the seed is rebuilt with every saved point pinned");
+}
+
 console.log("dayScenarioUi model tests passed");

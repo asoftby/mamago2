@@ -52,6 +52,11 @@ export const draftRequestSchema = z.object({
   pinnedActivityIds: z.array(z.string().min(1).max(64)).max(8).optional().default([]),
   replaceActivityId: z.string().min(1).max(64).optional(),
   variant: z.number().int().min(0).max(1000).optional().default(0),
+  /**
+   * «Изменить день»: the entries a saved scenario created on this day are the draft itself, so they are neither busy time
+   * nor "already planned" (otherwise the day would be rebuilt around, and without, its own points).
+   */
+  editScenario: z.boolean().optional().default(false),
   targetCount: z.number().int().min(1).max(4).optional().default(3),
   /** Planning window inside the day, local "HH:MM" (default 09:00-20:00), e.g. 16:00-20:00 on a weekday. */
   dayStart: hhmm.optional().default(DEFAULT_DAY_START),
@@ -119,10 +124,10 @@ function toDraftItemsFrom(items: BuildResult["items"]): DraftItem[] {
   }));
 }
 
-async function loadUserContext(userId: string, date: string, personaIds: string[]) {
+async function loadUserContext(userId: string, date: string, personaIds: string[], editScenario = false) {
   const [plan, profile] = await Promise.all([
     prisma.planItem.findMany({
-      where: { ...(await activePlanScopeFor(userId)), date },
+      where: { ...(await activePlanScopeFor(userId)), date, ...(editScenario ? { scenarioId: null } : {}) },
       select: { activityId: true, placeId: true, startsAt: true, endsAt: true },
     }),
     personaIds.length > 0
@@ -159,7 +164,7 @@ export async function runDayScenarioDraft(
   const { value: pool, hit } = await getDayScenarioPool(request.city, request.date);
 
   const ctx = user
-    ? await loadUserContext(user.id, request.date, request.personaIds)
+    ? await loadUserContext(user.id, request.date, request.personaIds, request.editScenario)
     : { busy: [], planned: [], childRanges: [] as string[], interests: [] as string[] };
 
   const ageRanges = [...new Set([...request.ageRanges, ...ctx.childRanges])];
