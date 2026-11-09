@@ -190,7 +190,7 @@ export function CityHomeClassesSection({
           />
         }
       >
-        {preview.map((activity, index) => {
+        {preview.map((activity) => {
           const href =
             activity.href ??
             publicActivityPath(activity.id, activity.citySlug ?? citySlug, activity.slug);
@@ -274,7 +274,7 @@ export function CityHomeRoutesSection({
           />
         }
       >
-        {preview.map((route, index) => (
+        {preview.map((route) => (
           <Fragment key={route.id}>
           <div className={cardShell}>
             <RouteCard route={route} homeCard />
