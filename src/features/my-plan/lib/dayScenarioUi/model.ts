@@ -244,12 +244,14 @@ export type ScenarioQuery = {
   /** Guest answers; ignored for a signed-in user, who sends `personaIds`. */
   ageRanges: string[];
   personaIds: string[];
+  /** A guest's anonymous id: the server counts the first build of each date against the guest quota. */
+  anonymousId?: string;
   /** «Изменить день»: every request of the session treats the saved scenario's own entries as the draft, not as busy time. */
   editScenario?: boolean;
 };
 
 type DraftRequestInput = Pick<DraftRequest, "date" | "action" | "mode" | "ageRanges" | "personaIds" | "variant" | "targetCount" | "dayStart" | "dayEnd"> &
-  Partial<Pick<DraftRequest, "current" | "pinnedActivityIds" | "replaceActivityId" | "city" | "shownActivityIds" | "editScenario">>;
+  Partial<Pick<DraftRequest, "current" | "pinnedActivityIds" | "replaceActivityId" | "city" | "shownActivityIds" | "editScenario" | "anonymousId">>;
 
 export const DEFAULT_TARGET_COUNT = 3;
 export const MAX_TARGET_COUNT = 4;
@@ -278,6 +280,7 @@ export function buildDraftBody(
     ...(options.replaceActivityId ? { replaceActivityId: options.replaceActivityId } : {}),
     ...(options.shown ? { shownActivityIds: [...options.shown].slice(-100) } : {}),
     ...(options.editScenario || query.editScenario ? { editScenario: true } : {}),
+    ...(query.anonymousId ? { anonymousId: query.anonymousId } : {}),
   };
 }
 

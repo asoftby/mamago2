@@ -2,6 +2,10 @@
 
 import { toast } from "@/lib/toast";
 import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
+import { applyGuestDayScenarioAfterAuth } from "@/lib/my-plan/guestDayScenarioDraft";
+import { persistSelectedPlanDate } from "@/features/my-plan/lib/planRecommendationDraftStorage";
+import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { invalidatePlanDayMarkers } from "@/features/plan-calendar/usePlanDayCounts";
 import type { AuthEntryPoint, PendingPostAuthAction } from "./types";
 import { getPostAuthContext, clearPostAuthAction, clearPostAuthContext } from "./storage";
 import { executePendingPostAuthAction } from "./executePendingAction";
@@ -91,6 +95,23 @@ export async function runPostAuthPipeline(
     }
   } catch (e) {
     console.error("[post-auth] guest my-plan migration failed", e);
+  }
+
+  // A day the guest built with «Собрать день» and saved before signing in: saved now, once. A rejection is told to the
+  // user; a passing failure keeps the draft for the next time.
+  try {
+    const guestDay = await applyGuestDayScenarioAfterAuth();
+    if (guestDay.kind === "saved") {
+      persistSelectedPlanDate(guestDay.dates[0]!);
+      invalidatePlanDayMarkers();
+      for (const date of guestDay.dates) requestPlanRefetchForDate(date);
+      toast.success(guestDay.dates.length > 1 ? "Выходные сохранены в план" : "День сохранён в план");
+      trackPostAuthEvent("pending_action_executed", { source });
+    } else if (guestDay.kind === "rejected") {
+      toast.error("Не удалось сохранить день", { description: guestDay.message });
+    }
+  } catch (e) {
+    console.error("[post-auth] guest day scenario save failed", e);
   }
 
   if (pendingActionExecutor || ctx?.pendingAction) {

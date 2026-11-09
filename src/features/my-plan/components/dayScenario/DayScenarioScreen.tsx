@@ -16,7 +16,10 @@ import {
 } from "../v3/planChipStyles";
 import { useDayScenarioDraft } from "../../hooks/useDayScenarioDraft";
 import { useDayScenarioSave } from "../../hooks/useDayScenarioSave";
-import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { appendMyPlanOpenToHref, requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
+import { getOrCreateAnonymousId } from "@/lib/anonymous/clientAnonymousId";
+import { writeGuestDayScenarioDraft } from "@/lib/my-plan/guestDayScenarioDraft";
 import { invalidatePlanDayMarkers } from "@/features/plan-calendar/usePlanDayCounts";
 import { toast } from "@/lib/toast";
 import {
@@ -101,19 +104,26 @@ export function DayScenarioScreen({
   const [selectedIds, setSelectedIds] = useState<string[]>(() => initialPersonSelection(people.map((person) => person.id), initialPersonaIds));
   const [activeIdx, setActiveIdx] = useState(0);
 
+  const [guestId, setGuestId] = useState<string | null>(null);
+  useEffect(() => {
+    if (isGuest) setGuestId(getOrCreateAnonymousId() || null);
+  }, [isGuest]);
+
   const dates = useMemo(() => (isGuest ? guestDates : [initialDate]), [isGuest, guestDates, initialDate]);
   const activeDate = dates[Math.min(activeIdx, Math.max(0, dates.length - 1))] ?? null;
   const everyone = useMemo(() => people.map((person) => person.id), [people]);
   const personaIds = isGuest ? [] : selectedIds.length > 0 ? selectedIds : everyone;
 
   const api = useDayScenarioDraft({
-    enabled: phase === "draft" && dates.length > 0,
+    // A guest's first build waits for the anonymous id: the server counts the first build of each date per guest.
+    enabled: phase === "draft" && dates.length > 0 && (!isGuest || guestId !== null),
     city,
     dates,
     mode,
     ageRanges: isGuest ? rangesForAnswers(ageKeys) : [],
     personaIds,
     seed,
+    anonymousId: guestId ?? undefined,
   });
   const saver = useDayScenarioSave();
   const state = activeDate ? api.byDate[activeDate] : undefined;
@@ -206,6 +216,21 @@ export function DayScenarioScreen({
     toast.success(seed ? "День обновлён" : "День сохранён в план");
     onBack();
   };
+  // A guest's «Сохранить»: the shown day(s) wait in this browser, the guest signs in or registers, and the post-auth step
+  // saves them (one save, once). Without storage nothing is lost silently: the guest is told.
+  const guestSaveDays = dates.map((date) => ({ date, items: api.byDate[date]?.history.current?.items ?? [] })).filter((day) => day.items.length > 0);
+  const canGuestSave = isGuest && phase === "draft" && guestSaveDays.length > 0 && !loading;
+  const saveAsGuest = () => {
+    if (!canGuestSave) return;
+    const stored = writeGuestDayScenarioDraft(guestSaveDays, (() => { try { return window.localStorage; } catch { return null; } })(), Date.now(), `gd-${crypto.randomUUID()}`);
+    if (!stored) {
+      toast.error("Не удалось подготовить сохранение", { description: "Разрешите хранение данных в браузере и попробуйте ещё раз." });
+      return;
+    }
+    const here = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(buildAuthUrl({ redirectTo: appendMyPlanOpenToHref(here) }));
+  };
+  const authHref = buildAuthUrl({ redirectTo: typeof window === "undefined" ? undefined : appendMyPlanOpenToHref(`${window.location.pathname}${window.location.search}`) });
   const saveError = saver.state.status === "error" ? SAVE_FAILURE_TEXT[saver.state.failure] : null;
 
   const title = phase === "params" ? "Куда сходить?" : dates.length > 1 ? "Выходные" : activeDate ? dayTitle(activeDate) : "Куда сходить?";
@@ -267,7 +292,7 @@ export function DayScenarioScreen({
               ))}
             </div>
 
-            {state?.error ? <DraftError kind={state.error} onRetry={() => activeDate && api.retry(activeDate)} /> : null}
+            {state?.error ? <DraftError kind={state.error} onRetry={() => activeDate && api.retry(activeDate)} authHref={authHref} /> : null}
 
             {!current && loading ? <DraftSkeleton /> : null}
 
@@ -337,11 +362,10 @@ export function DayScenarioScreen({
           <>
             {isGuest ? (
               <>
-                {/* A guest cannot save yet: the sign-in flow that keeps the draft is PR 3c. */}
-                <button type="button" disabled aria-describedby="scenario-save-hint" className={PRIMARY_BTN}>
+                <button type="button" disabled={!canGuestSave} aria-describedby="scenario-save-hint" onClick={saveAsGuest} className={PRIMARY_BTN}>
                   {saveLabel(dates.length)}
                 </button>
-                <p id="scenario-save-hint" className="mp-font-ui m-0 mt-2 text-center text-[13px] text-[var(--mp-tx2)]">Сохранение для гостей появится в следующем обновлении</p>
+                <p id="scenario-save-hint" className="mp-font-ui m-0 mt-2 text-center text-[13px] text-[var(--mp-tx2)]">Нужен вход: после него день сохранится в план сам</p>
               </>
             ) : (
               <>

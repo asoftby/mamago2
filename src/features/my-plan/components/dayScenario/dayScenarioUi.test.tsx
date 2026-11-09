@@ -111,6 +111,15 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.match(readFileSync("src/features/my-plan/components/PlanMainContent.tsx", "utf8"), /\{savedDayMenu \? renderDayHeading\(compact\) : null\}\s*<p\s+role="status"/, "a past day emptied by a person filter still shows the heading with its menu");
 }
 
+// ---- a guest over the allowance is sent to sign in; elsewhere the error panels are unchanged
+{
+  const withAuth = renderToStaticMarkup(<DraftError kind="requires_auth" onRetry={() => {}} authHref="/login?redirectTo=%2Fminsk" />);
+  assert.ok(withAuth.includes("Нужен вход") && withAuth.includes('href="/login?redirectTo=%2Fminsk"') && withAuth.includes("Войти или зарегистрироваться"), "the way on is signing in");
+  assert.ok(!withAuth.includes("Повторить"), "retrying cannot help");
+  assert.ok(!renderToStaticMarkup(<DraftError kind="requires_auth" onRetry={() => {}} />).includes("<a "), "no link without a target");
+  assert.ok(renderToStaticMarkup(<DraftError kind="failed" onRetry={() => {}} authHref="/login" />).includes("Повторить"), "other errors still retry");
+}
+
 // ---- guest params: two questions, pressed state, a day picker only for «Другой день»
 {
   const base = { onWhen: () => {}, otherIso: null, onOtherIso: () => {}, todayIso: "2026-11-08", onToggleAge: () => {} };
@@ -179,7 +188,7 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   const shell = readFileSync("src/components/city/CityDiscoveryShell.tsx", "utf8");
   assert.doesNotMatch(shell, /KudaDayScenarioEntry/, "«Куда пойти» does not duplicate the day scenario entry");
   const screen = readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8");
-  assert.match(screen, /<button type="button" disabled aria-describedby="scenario-save-hint"/, "a guest cannot save until PR 3c");
+  assert.match(screen, /<button type="button" disabled=\{!canGuestSave\} aria-describedby="scenario-save-hint" onClick=\{saveAsGuest\}/, "a guest saves through sign-in");
   assert.match(screen, /useDayScenarioSave\(\)/);
   assert.match(screen, /const canSave = !isGuest && Boolean\(activeDate\) && items\.length > 0 && !loading && !saving;/, "a member saves a shown, non-empty, settled draft");
   assert.match(screen, /requestPlanRefetchForDate\(activeDate\);[\s\S]{0,120}onBack\(\)/, "after a save the plan refetches the day and the widget goes back to it");

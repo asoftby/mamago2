@@ -19,7 +19,7 @@ import {
   type ScenarioMode,
 } from "../lib/dayScenarioUi/model";
 
-export type DraftErrorKind = "rate_limited" | "unavailable" | "failed";
+export type DraftErrorKind = "rate_limited" | "unavailable" | "requires_auth" | "failed";
 
 export type DateDraftState = {
   history: DraftHistory;
@@ -64,6 +64,8 @@ async function postDraft(body: unknown, signal: AbortSignal): Promise<DraftRespo
   });
   if (res.status === 429) throw new DraftApiError("rate_limited");
   if (res.status === 404) throw new DraftApiError("unavailable");
+  // A guest used up the allowance of built days: the way on is signing in.
+  if (res.status === 403) throw new DraftApiError("requires_auth");
   if (!res.ok) throw new DraftApiError("failed");
   return (await res.json()) as DraftResponse;
 }
@@ -101,13 +103,15 @@ export function useDayScenarioDraft(input: {
   mode: ScenarioMode;
   ageRanges: string[];
   personaIds: string[];
+  /** A guest's anonymous id: the server counts the first build of each date against the guest quota. Undefined for a member. */
+  anonymousId?: string;
   /**
    * «Изменить день»: the saved points of the first day. The first draft of that day is a rebuild around them (all
    * pinned, as many points as were saved) instead of a fresh build, so the day opens as it is in the plan.
    */
   seed?: { kind: "event" | "place"; activityId: string; startsAt: string }[] | null;
 }): DayScenarioDraftApi {
-  const { enabled, city, dates, mode, ageRanges, personaIds, seed } = input;
+  const { enabled, city, dates, mode, ageRanges, personaIds, seed, anonymousId } = input;
   const [kept, setKept] = useState<{ kind: "event" | "place"; activityId: string }[]>([]);
   const seedRef = useRef(seed);
   seedRef.current = seed;
@@ -121,7 +125,7 @@ export function useDayScenarioDraft(input: {
 
   const queryKey = JSON.stringify([enabled, city, dates, mode, ageRanges, personaIds]);
   const query = useMemo(
-    () => (date: string) => ({ city, date, mode, ageRanges, personaIds, editScenario: Boolean(seedRef.current?.length) }),
+    () => (date: string) => ({ city, date, mode, ageRanges, personaIds, anonymousId, editScenario: Boolean(seedRef.current?.length) }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- queryKey is the serialized identity of these inputs
     [queryKey],
   );
