@@ -6979,8 +6979,21 @@ model DiscoveryFilterPlacement {
   @@index([categoryId, isActive, sortOrder])
 }
 
+enum DiscoveryTagIndexingMode {
+  AUTO
+  INDEX
+  NOINDEX
+}
+
+enum DiscoveryTagReviewStatus {
+  APPROVED
+  PENDING
+}
+
 model DiscoveryTag {
   id             String   @id @default(cuid())
+  indexingMode   DiscoveryTagIndexingMode @default(AUTO)
+  reviewStatus   DiscoveryTagReviewStatus @default(APPROVED)
   slug           String   @unique
   title          String
   description    String?

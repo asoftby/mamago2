@@ -21,6 +21,7 @@ import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
 import { listDiscoveryClassChips } from "@/server/discovery/classChips";
 import { countPublicClassesCategory } from "@/server/discovery/classesCategoryCount";
+import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
 
 export const dynamic = "force-dynamic";
 
@@ -51,8 +52,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         take: 50,
       }),
       prisma.discoveryTag.findMany({
-        where: { isActive: true },
-        select: { id: true, slug: true, updatedAt: true },
+        where: { isActive: true, reviewStatus: "APPROVED" },
+        select: { id: true, slug: true, updatedAt: true, indexingMode: true },
         orderBy: { sortOrder: "asc" },
       }),
       prisma.eventCategory.findMany({
@@ -98,7 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }),
     ]);
 
-    const populatedTagHubs = new Set<string>();
+    const eligibleTagArticleCounts = new Map<string, number>();
     const populatedArticleCategoryHubs = new Set<string>();
     for (const article of articlesForHubs) {
       if (hasNoindexRobots(article.seoRobots)) continue;
@@ -113,7 +114,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
               (target.type === "REGION" && Boolean(city.regionId) && target.regionId === city.regionId),
           );
         if (!matchesCity) continue;
-        for (const tag of article.tags) populatedTagHubs.add(`${city.id}:${tag.id}`);
+        for (const tag of article.tags) {
+          const key = `${city.id}:${tag.id}`;
+          eligibleTagArticleCounts.set(key, (eligibleTagArticleCounts.get(key) ?? 0) + 1);
+        }
         if (article.categoryId) populatedArticleCategoryHubs.add(`${city.id}:${article.categoryId}`);
         for (const link of article.additionalCategoryLinks) {
           populatedArticleCategoryHubs.add(`${city.id}:${link.categoryId}`);
@@ -198,7 +202,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
 
       for (const tag of tags) {
-        if (!populatedTagHubs.has(`${city.id}:${tag.id}`)) continue;
+        if (!shouldIndexTagPage(tag.indexingMode, eligibleTagArticleCounts.get(`${city.id}:${tag.id}`) ?? 0)) continue;
         entries.push({
           url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "tag", slug: tag.slug })}`,
           lastModified: tag.updatedAt,
