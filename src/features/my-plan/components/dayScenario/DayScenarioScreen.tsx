@@ -104,9 +104,10 @@ export function DayScenarioScreen({
   const [selectedIds, setSelectedIds] = useState<string[]>(() => initialPersonSelection(people.map((person) => person.id), initialPersonaIds));
   const [activeIdx, setActiveIdx] = useState(0);
 
+  // "" is a valid answer: with storage blocked the server falls back to IP + User-Agent, so only "not asked yet" waits.
   const [guestId, setGuestId] = useState<string | null>(null);
   useEffect(() => {
-    if (isGuest) setGuestId(getOrCreateAnonymousId() || null);
+    if (isGuest) setGuestId(getOrCreateAnonymousId());
   }, [isGuest]);
 
   const dates = useMemo(() => (isGuest ? guestDates : [initialDate]), [isGuest, guestDates, initialDate]);
@@ -123,7 +124,7 @@ export function DayScenarioScreen({
     ageRanges: isGuest ? rangesForAnswers(ageKeys) : [],
     personaIds,
     seed,
-    anonymousId: guestId ?? undefined,
+    anonymousId: guestId || undefined,
   });
   const saver = useDayScenarioSave();
   const state = activeDate ? api.byDate[activeDate] : undefined;

@@ -24,7 +24,30 @@ export function guestScenarioChargeFor(
   return { kind: "charge" };
 }
 
+const MAX_ATTEMPTS = 5;
+
+/** Two builds of one guest at once (the weekend starts both dates together) can collide on the usage row. */
+export function isQuotaConflict(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2034" || error.code === "P2002");
+}
+
+/**
+ * Charges the first build of a date. A serialization or unique-key conflict with a concurrent build of the same guest
+ * retries the WHOLE transaction (the quota is read again against the updated row), so a weekend's two dates both get
+ * their answer instead of one failing with a 500.
+ */
 export async function chargeGuestScenarioDate(key: string, date: string, db: { $transaction: typeof prisma.$transaction } = prisma, maxLifetime: number = guestMaxLifetimeGenerations()): Promise<GuestScenarioCharge> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await chargeOnce(key, date, db, maxLifetime);
+    } catch (error) {
+      if (!isQuotaConflict(error) || attempt >= MAX_ATTEMPTS) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 15 * attempt));
+    }
+  }
+}
+
+async function chargeOnce(key: string, date: string, db: { $transaction: typeof prisma.$transaction }, maxLifetime: number): Promise<GuestScenarioCharge> {
   return db.$transaction(
     async (tx: Tx) => {
       const row = await tx.guestUsage.findUnique({ where: { anonymousId: key }, select: { generationsCount: true, scenarioDates: true } });

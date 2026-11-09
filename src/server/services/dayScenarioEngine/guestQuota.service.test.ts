@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { chargeGuestScenarioDate, guestScenarioChargeFor } from "./guestQuota.service";
+import { Prisma } from "@prisma/client";
+import { chargeGuestScenarioDate, guestScenarioChargeFor, isQuotaConflict } from "./guestQuota.service";
 
 // ---- the rule: only the first build of a date costs
 assert.deepEqual(guestScenarioChargeFor(null, "2026-11-14", 2), { kind: "charge" }, "a new guest pays for the first date");
@@ -37,6 +38,29 @@ async function run() {
   assert.deepEqual(await chargeGuestScenarioDate("anon:a", "2026-11-21", db, 2), { ok: false, reason: "requires_auth" }, "over the allowance");
   assert.deepEqual([rows[0]!.generationsCount, rows[0]!.scenarioDates], [2, ["2026-11-14", "2026-11-15"]], "two dates, two charges, nothing for the repeats and the refusal");
   assert.deepEqual(await chargeGuestScenarioDate("anon:b", "2026-11-14", db, 2), { ok: true, charged: true }, "another guest has their own allowance");
+
+  // ---- two builds of one guest at once (a weekend's two dates): a conflict retries the whole charge
+  {
+    const conflict = (code: string) => new Prisma.PrismaClientKnownRequestError("conflict", { code, clientVersion: "test" });
+    assert.equal(isQuotaConflict(conflict("P2034")), true, "serialization failure");
+    assert.equal(isQuotaConflict(conflict("P2002")), true, "unique key: two new rows for one new guest");
+    assert.equal(isQuotaConflict(conflict("P2025")) || isQuotaConflict(new Error("x")), false, "anything else is not retried");
+    const first = makeDb();
+    let attempts = 0;
+    const flaky = { $transaction: async (fn: (t: never) => Promise<unknown>, opts?: unknown) => {
+      attempts++;
+      if (attempts < 3) throw conflict(attempts === 1 ? "P2034" : "P2002");
+      return (first.db as unknown as { $transaction: (f: typeof fn, o?: unknown) => Promise<unknown> }).$transaction(fn, opts);
+    } } as unknown as Parameters<typeof chargeGuestScenarioDate>[2];
+    assert.deepEqual(await chargeGuestScenarioDate("anon:c", "2026-11-14", flaky, 2), { ok: true, charged: true }, "answered after two conflicts");
+    assert.equal(attempts, 3);
+    const broken = { $transaction: async () => { throw new Error("db down"); } } as unknown as Parameters<typeof chargeGuestScenarioDate>[2];
+    await assert.rejects(chargeGuestScenarioDate("anon:d", "2026-11-14", broken, 2), /db down/, "a real failure is not retried away");
+    let always = 0;
+    const stuck = { $transaction: async () => { always++; throw conflict("P2034"); } } as unknown as Parameters<typeof chargeGuestScenarioDate>[2];
+    await assert.rejects(chargeGuestScenarioDate("anon:e", "2026-11-14", stuck, 2), Prisma.PrismaClientKnownRequestError);
+    assert.equal(always, 5, "gives up after five attempts");
+  }
 
   // ---- contracts
   const route = readFileSync("src/app/api/plan/day-scenario/draft/route.ts", "utf8");
