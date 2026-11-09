@@ -225,12 +225,13 @@ test("newly queued dismissals are sent while an earlier write is pending", async
   assert.ok(records.every(record => record.saved));
 });
 
-test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty states", () => {
+test("UI contract: one save control, poster, keyboard/ARIA, and truthful empty/error states", () => {
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
   assert.ok(ui.includes("homeRecommendationLabel"));
   assert.doesNotMatch(ui, /Не удалось обновить\. Повторить/, "failed background refresh must not add a technical CTA below loaded cards");
-  assert.doesNotMatch(ui, /Не удалось загрузить события\. Повторите попытку\./, "initial load errors use a poster-size card instead of a technical message");
-  assert.match(ui, /state === "error" && !data[\s\S]*?<HomeMoreEventsCard href=\{catalogHref\} hasEvents=\{false\}/, "initial failure renders the same empty event-card component");
+  assert.doesNotMatch(ui, /Не удалось загрузить события\. Повторите попытку\./, "initial error avoids a misleading empty-state poster");
+  assert.match(ui, /state === "error" && !data[\s\S]*?<p role="alert"[^>]*>Не удалось загрузить события/, "initial failure renders an inline error, not an empty event card");
+  assert.doesNotMatch(ui, /SoftAudienceNotice|hasEvents=\{false\}/, "no explanatory poster is inserted into an organic feed");
   assert.match(ui, /loadHomePublicFallback\(citySlug\)/, "a failed personalized API attempts a public catalog recovery");
   assert.match(ui, /safeFallbackEvents\.map/, "age-eligible recovered events are rendered as real poster cards");
   assert.doesNotMatch(ui, /wasAuthorized && mounted\.current/, "auth resolution must not start a duplicate recommendation request");
