@@ -165,6 +165,13 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
     placeSections: ArticlePlaceSectionsSchema.optional(),
   }),
   base.extend({
+    type: z.literal("dynamicAfisha"),
+    /** Optional preset; real date filtering is delegated to the shared afisha parser. */
+    period: z.enum(["ALL", "WEEK", "WEEKEND"]).optional(),
+    /** Optional existing «Куда пойти» occasion; no independent ranking or handpicked events. */
+    occasionSlug: z.string().regex(/^[a-z0-9-]{1,80}$/).optional(),
+  }),
+  base.extend({
     type: z.literal("embed"),
     embedHtml: z.string(),
     caption: z.string().optional(),
@@ -561,6 +568,7 @@ export function newBlock(
     case "gallery": return { id: bid, type: "gallery", mediaIds: [], presentation: "carousel", caption: "" };
     case "activityCard":
       return { id: bid, type: "activityCard", entityType: "PLACE", entityId: "", placeSections: { ...DEFAULT_ARTICLE_PLACE_SECTIONS } };
+    case "dynamicAfisha": return { id: bid, type: "dynamicAfisha", period: "ALL" };
     case "embed": return { id: bid, type: "embed", embedHtml: "", caption: "" };
     case "contacts":
       return { id: bid, type: "contacts", subject: newArticleSubject("", () => `subject_${bid}`), data: { phones: [], socials: [] } };
