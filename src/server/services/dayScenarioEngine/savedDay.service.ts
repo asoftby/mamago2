@@ -24,12 +24,17 @@ export async function listSavedDays(userId: string, from: string, to: string, db
     select: { id: true, date: true, groupId: true },
   });
   if (rows.length === 0) return {};
+  // A point the user moved to another day is no longer part of this day: only entries on the scenario's own date count.
   const counts = await db.planItem.groupBy({
-    by: ["scenarioId"],
+    by: ["scenarioId", "date"],
     where: { scenarioId: { in: rows.map((row) => row.id) }, cancelledAt: null },
     _count: { _all: true },
   });
-  const countOf = new Map(counts.map((entry) => [entry.scenarioId, entry._count._all]));
+  const dateOf = new Map(rows.map((row) => [row.id, row.date]));
+  const countOf = new Map<string, number>();
+  for (const entry of counts) {
+    if (entry.scenarioId && entry.date === dateOf.get(entry.scenarioId)) countOf.set(entry.scenarioId, entry._count._all);
+  }
   const out: Record<string, SavedDayInfo> = {};
   for (const row of rows) {
     const count = countOf.get(row.id) ?? 0;
@@ -80,7 +85,8 @@ export async function deleteSavedDays(userId: string, date: string, scope: Delet
     } else {
       await tx.$queryRaw`SELECT id FROM "DayScenario" WHERE id = ${rows[0]!.id} FOR UPDATE`;
     }
-    await tx.planItem.deleteMany({ where: { scenarioId: { in: rows.map((row) => row.id) }, userId } });
+    // Only the points still on their day: one the user moved elsewhere is theirs now.
+    await tx.planItem.deleteMany({ where: { OR: rows.map((row) => ({ scenarioId: row.id, date: row.date })), userId } });
     for (const row of rows) {
       const items = await tx.planItem.findMany({
         where: { AND: [planScope, { date: row.date }] },
@@ -106,7 +112,7 @@ export async function listSavedDayPoints(userId: string, date: string, db: Pick<
   const scenario = await db.dayScenario.findUnique({ where: { userId_date: { userId, date } }, select: { id: true, source: true } });
   if (!scenario || scenario.source !== "ENGINE") return [];
   const rows = await db.planItem.findMany({
-    where: { scenarioId: scenario.id, userId, cancelledAt: null, startsAt: { not: null } },
+    where: { scenarioId: scenario.id, date, userId, cancelledAt: null, startsAt: { not: null } },
     select: { activityId: true, placeId: true, startsAt: true, pinned: true },
     orderBy: { startsAt: "asc" },
   });

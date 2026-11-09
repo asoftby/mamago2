@@ -240,7 +240,8 @@ export type ScenarioQuery = {
   /** City slug of the page the screen was opened on; the engine's pool is per city. */
   city: string;
   date: string;
-  mode: ScenarioMode;
+  /** Not chosen yet: the request leaves it out and the server answers with the family's saved mode (else the car). */
+  mode?: ScenarioMode;
   /** Guest answers; ignored for a signed-in user, who sends `personaIds`. */
   ageRanges: string[];
   personaIds: string[];
@@ -368,10 +369,8 @@ export const saveLabel = (days: number): string => (days > 1 ? "Сохранит
 /** "Воскресенье" from a calendar date (nominative, capitalised). */
 export const weekdayName = (iso: string): string => WEEKDAYS[weekdayOf(iso)]!;
 
-/** What the banner says: a weekend's day names its weekday, a lone day says only how many places. */
-export function savedDayTitle(date: string, count: number, hasPair: boolean): string {
-  return hasPair ? `Выходные от mamaGo · ${weekdayName(date).toLowerCase()}` : `День от mamaGo · ${pluralPlaces(count)}`;
-}
+/** What the day menu calls the day: «День от mamaGo · 3 места». */
+export const savedDayMenuLabel = (count: number): string => `День от mamaGo · ${pluralPlaces(count)}`;
 
 export type PairDay = { date: string; count: number; direction: "prev" | "next" };
 

@@ -16,6 +16,7 @@ interface BusinessContentListProps<T> {
   emptyDescription: string;
   addButtonText: string;
   addButtonHref: string;
+  allowCreate?: boolean;
   renderItem: (item: T, handlers: ItemHandlers) => ReactNode;
   onDelete?: (id: string) => Promise<void>;
   onRestore?: (id: string) => Promise<void>;
@@ -39,6 +40,7 @@ export function BusinessContentList<T extends { id: string }>({
   emptyDescription,
   addButtonText,
   addButtonHref,
+  allowCreate = true,
   renderItem,
   onDelete: onDeleteProp,
   onRestore: onRestoreProp,
@@ -165,8 +167,8 @@ export function BusinessContentList<T extends { id: string }>({
               ? emptyDescription
               : "Архивные элементы будут появляться здесь, когда вы решите временно убрать их из активной работы."
           }
-          ctaLabel={currentView === "active" ? addButtonText : undefined}
-          ctaHref={currentView === "active" ? addButtonHref : undefined}
+          ctaLabel={allowCreate && currentView === "active" ? addButtonText : undefined}
+          ctaHref={allowCreate && currentView === "active" ? addButtonHref : undefined}
         />
       </div>
     );
@@ -208,7 +210,7 @@ export function BusinessContentList<T extends { id: string }>({
       </div>
 
       {/* Add Button */}
-      {currentView === "active" && (
+      {allowCreate && currentView === "active" && (
         <div className="flex justify-end">
           <Button asChild className="rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-semibold hover:bg-stone-800">
             <Link href={addButtonHref}>

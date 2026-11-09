@@ -56,7 +56,7 @@ export function CityHomeGeneralEvents({
         {incompleteChild ? "Указать возраст" : "+ Добавить ребёнка"}
       </button>
     </div>}
-    {!activities.length && <p role="status" className="py-6 text-sm text-muted-foreground">Пока нет опубликованных событий. Загляните позже.</p>}
+    {!preview.length && <p role="status" className="py-6 text-sm text-muted-foreground">Событий пока нет.</p>}
       </>}
     >
       {preview.slice(0, MAX_PREVIEW_EVENTS).map((activity, index) => (
@@ -68,7 +68,7 @@ export function CityHomeGeneralEvents({
           </AnalyticsCardViewTracker>
         </div>
       ))}
-      <HomeMoreEventsCard href={catalogHref} hasEvents={activities.length > 0} />
+      {preview.length > 0 && <HomeMoreEventsCard href={catalogHref} />}
     </HorizontalCardRow>
     {authenticated && <>
       <FamilyActivationAddChildOverlay open={addingChild} onOpenChange={setAddingChild}

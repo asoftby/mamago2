@@ -6,8 +6,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 
-import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
-
 import {
   buildNextPageParams,
   listingPageHref,
@@ -282,12 +280,7 @@ export function KudaMasonryListing({
       {secondary.length > 0 && listing.secondaryHeading ? (
         <div className="space-y-4">
           <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">{listing.secondaryHeading}</h2>
-          <KudaListingRows
-            items={[
-              ...(!hasMore && primary.length === 0 ? [{ key: "__audience-alternatives__", content: <SoftAudienceNotice inGrid label="события" /> }] : []),
-              ...toMasonry(secondary, listing.offset + primary.length),
-            ]}
-          />
+          <KudaListingRows items={toMasonry(secondary, listing.offset + primary.length)} />
         </div>
       ) : null}
 

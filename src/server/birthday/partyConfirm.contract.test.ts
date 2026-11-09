@@ -7,7 +7,8 @@ const fanout = readFileSync(new URL("./partyAddonFanout.ts", import.meta.url), "
 const unitAllocation = readFileSync(new URL("./partyUnitAllocation.ts", import.meta.url), "utf8");
 // The add-on fan-out and the locked unit check are shared with the fixed-price
 // auto-confirmation; check them together with the confirmation service.
-const service = confirmService + fanout + unitAllocation;
+const resources = readFileSync(new URL("../services/booking/resourceAllocation.ts", import.meta.url), "utf8");
+const service = confirmService + fanout + unitAllocation + resources;
 assert.match(confirmService, /window = await lockAvailablePartyUnit\(tx, \{/);
 assert.match(confirmService, /await allocatePartyUnit\(tx, \{ unitId: unit\.id, requestId, quoteId: quote\.id, window \}\)/);
 assert.match(confirmService, /isAnchor \? await requestPartyAddonsAfterAnchor\(tx,/);
@@ -53,11 +54,11 @@ assert.match(service, /PartyItemRole.STANDALONE/);
 assert.match(service, /responseDueAt: \{ gt: now \}/);
 const reserveSlotSql = readFileSync(new URL("../offers/reserveSlot.ts", import.meta.url), "utf8");
 for (const code of [unitAllocation, reserveSlotSql]) {
-  assert.ok(code.includes(`"expiresAt" < (now() AT TIME ZONE 'UTC')`),
-    "Expiry SQL must compare UTC timestamp without session TZ coercion");
-  assert.ok(code.includes(`"updatedAt" = (now() AT TIME ZONE 'UTC')`),
-    "Raw SQL must also write updatedAt in UTC");
+  assert.match(code, /await expireBookingUnitHolds\(tx,/);
 }
+assert.match(resources, /clock_timestamp\(\) AT TIME ZONE 'UTC'/);
+assert.match(resources, /"expiresAt" <= deadline.utc/);
+assert.match(resources, /"updatedAt" = deadline.utc/);
 assert.match(route, /Idempotency-Key/);
 assert.match(route, /checkRateLimit/);
 assert.ok(!service.includes("customerPhone: order.contactPhone"), "Do not reveal parent phone in business request");

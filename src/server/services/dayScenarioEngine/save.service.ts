@@ -96,7 +96,7 @@ type EventRow = {
   /** All ActivitySession rows of the event (the loaded `sessions` are only those near the saved days). */
   _count: { sessions: number };
 };
-type PlaceRow = { id: string; slug: string | null; title: string; images: { url: string }[] };
+type PlaceRow = { id: string; slug: string | null; title: string; shortAddress: string | null; formattedAddr: string | null; customAddress: string | null; images: { url: string }[] };
 
 /**
  * Time type of a point, judged exactly like the draft pool judged it:
@@ -145,7 +145,6 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
 
       const eventIds = days.flatMap((d) => d.items.filter((i) => i.kind === "event").map((i) => i.activityId));
       const placeIds = days.flatMap((d) => d.items.filter((i) => i.kind === "place").map((i) => i.activityId));
-      const scenarioIds = rows.map((row) => row.id);
 
       const [events, places, taken] = await Promise.all([
         eventIds.length
@@ -160,19 +159,22 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
             })
           : Promise.resolve([] as EventRow[]),
         placeIds.length
-          ? tx.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, slug: true, title: true, images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } } } })
+          ? tx.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, slug: true, title: true, shortAddress: true, formattedAddr: true, customAddress: true, images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } } } })
           : Promise.resolve([] as PlaceRow[]),
         // What the user already has of these points. Entries this very scenario created are ours to rewrite; anything else is not touched.
         tx.planItem.findMany({
           // AND, never a spread: the family scope has its own top-level OR (shared entries or the user's own) that a second OR would replace.
-          where: { AND: [scope, { OR: [...(eventIds.length ? [{ activityId: { in: eventIds } }] : []), ...(placeIds.length ? [{ placeId: { in: placeIds } }] : [])] }] },
-          select: { id: true, activityId: true, placeId: true, scenarioId: true },
+          // From today on only (what the draft excludes): a place visited last month does not block it forever.
+          where: { AND: [scope, { date: { gte: deps.today ?? getLocalDateKey() } }, { OR: [...(eventIds.length ? [{ activityId: { in: eventIds } }] : []), ...(placeIds.length ? [{ placeId: { in: placeIds } }] : [])] }] },
+          select: { id: true, activityId: true, placeId: true, scenarioId: true, date: true },
         }),
       ]);
       const eventById = new Map<string, EventRow>(events.map((e) => [e.id, e]));
       const placeById = new Map<string, PlaceRow>(places.map((p) => [p.id, p]));
 
-      const foreign = taken.filter((row) => !row.scenarioId || !scenarioIds.includes(row.scenarioId));
+      // An entry of this scenario still on its day is ours to rewrite; one the user moved to another day is theirs (a clash).
+      const dayOf = new Map(rows.map((r) => [r.id, r.date]));
+      const foreign = taken.filter((row) => !row.scenarioId || dayOf.get(row.scenarioId) !== row.date);
       const dupEvents = foreign.flatMap((row) => (row.activityId ? [row.activityId] : []));
       const dupPlaces = foreign.flatMap((row) => (row.placeId ? [row.placeId] : []));
       if (dupEvents.length > 0) throw new DaySaveError(409, "DUPLICATE_ACTIVITY", { ids: [...new Set(dupEvents)] });
@@ -184,7 +186,7 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
       for (const day of days) {
         const row = rows.find((r) => r.date === day.date)!;
         // Re-saving a day: its own earlier entries are replaced; manual and foreign entries stay.
-        const mine = await tx.planItem.findMany({ where: { scenarioId: row.id }, select: { id: true, activityId: true, placeId: true } });
+        const mine = await tx.planItem.findMany({ where: { scenarioId: row.id, date: day.date }, select: { id: true, activityId: true, placeId: true } });
         // Points the draft could not hold (keep) are not touched: neither rewritten nor treated as dropped.
         const wanted = new Set([...day.items.map((item) => `${item.kind}:${item.activityId}`), ...day.keep.map((point) => `${point.kind}:${point.activityId}`)]);
         const stale = mine.filter((item) => !wanted.has(item.activityId ? `event:${item.activityId}` : `place:${item.placeId}`));
@@ -204,6 +206,8 @@ export async function saveDayScenarios(userId: string, request: SaveRequest, ide
             endsAt: new Date(item.endsAt),
             title: event?.title ?? place!.title,
             coverImageUrl: event?.coverImageUrl ?? place?.images[0]?.url ?? null,
+            // A place point keeps its address on the entry, so its preview needs no extra query on the day list.
+            ...(place ? { locationText: place.shortAddress?.trim() || place.formattedAddr?.trim() || place.customAddress?.trim() || null } : {}),
             timeType,
             pinned: item.pinned,
             scenarioId: row.id,

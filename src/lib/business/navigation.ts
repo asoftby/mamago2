@@ -14,6 +14,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { buildBusinessPath } from "@/lib/routing/surface";
+import { BUSINESS_OFFERS_ENABLED } from "@/lib/business/publicationAvailability";
 
 export type BusinessNavLink = {
   label: string;
@@ -88,16 +89,15 @@ export const businessNavigation: BusinessNavItem[] = [
         label: "Места",
         href: BUSINESS_PUBLICATIONS_PLACES_HREF,
       },
-      {
-        label: "Предложения",
-        href: BUSINESS_PUBLICATIONS_OFFERS_HREF,
-      },
+      ...(BUSINESS_OFFERS_ENABLED
+        ? [{ label: "Предложения", href: BUSINESS_PUBLICATIONS_OFFERS_HREF }]
+        : []),
     ],
     match: [
       businessRoute("/publications"),
       businessRoute("/publications/events"),
       businessRoute("/publications/places"),
-      businessRoute("/publications/offers"),
+      ...(BUSINESS_OFFERS_ENABLED ? [businessRoute("/publications/offers")] : []),
     ],
   },
   {

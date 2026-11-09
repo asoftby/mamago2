@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
-import test from "node:test";
-import { canMovePlanItem } from "./planMoveEligibility";
+import { canMovePlanItem, isLinkedEntityMove } from "./planMoveEligibility";
 
-test("Telegram record has a move button even without a linked catalog activity", () => {
-  assert.equal(canMovePlanItem({ source: "TELEGRAM_FORWARD", activityId: null }), true);
-  assert.equal(canMovePlanItem({ source: "MANUAL", activityId: null }), true);
-  assert.equal(canMovePlanItem({ source: "CATALOG", activityId: "activity-1" }), true);
-  assert.equal(canMovePlanItem({ source: "CATALOG", activityId: null }), false);
-});
+// «Перенести»: events, notes and place / offer / route entries; never an article
+const mv = (over: Record<string, unknown>) => ({ source: "CATALOG" as const, activityId: null, routeId: null, planRouteSlug: null, placeId: null, planPlaceSlug: null, articleId: null, ...over });
+assert.equal(canMovePlanItem(mv({ activityId: "a" })), true);
+assert.equal(canMovePlanItem(mv({ placeId: "p" })), true, "a place point of a scenario can be moved");
+assert.equal(canMovePlanItem(mv({ planPlaceSlug: "park" })), true);
+assert.equal(canMovePlanItem(mv({ offerId: "o" })), true);
+assert.equal(canMovePlanItem(mv({ planRouteSlug: "r" })), true);
+assert.equal(canMovePlanItem(mv({ source: "TELEGRAM_FORWARD" })), true);
+assert.equal(canMovePlanItem(mv({ source: "MANUAL" })), true);
+assert.equal(canMovePlanItem(mv({ articleId: "ar" })), false, "an article cannot");
+assert.equal(canMovePlanItem(mv({ source: "CATALOG" })), false, "an unlinked leftover cannot");
+assert.equal(isLinkedEntityMove(mv({ placeId: "p" })), true, "moved by date only");
+assert.equal(isLinkedEntityMove(mv({ offerId: "o" })), true);
+assert.equal(isLinkedEntityMove(mv({ activityId: "a" })), false, "an event moves along its sessions");
+assert.equal(isLinkedEntityMove(mv({ source: "MANUAL" })), false, "a note moves through /api/plan/manual");
+assert.equal(isLinkedEntityMove(mv({ articleId: "ar", placeId: "p" })), false);
 
-test("route, place and article bookmarks still do not display a move action", () => {
-  assert.equal(canMovePlanItem({ source: "CATALOG", activityId: null, placeId: "place" }), false);
-  assert.equal(canMovePlanItem({ source: "CATALOG", activityId: null, routeId: "route" }), false);
-  assert.equal(canMovePlanItem({ source: "CATALOG", activityId: null, articleId: "article" }), false);
-});
+console.log("planMoveEligibility tests passed");

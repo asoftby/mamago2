@@ -96,8 +96,13 @@ export type PlanItemWithActivity = {
   title: string | null;
   coverImageUrl: string | null;
   createdAt: Date;
-  /** Source drives the intentionally tiny UI taxonomy: CATALOG = event, everything user-created = note. */
+  /** Origin of the entry. The card type is decided by the catalog link (planItemLinkKind), not by this. */
   source?: PlanItemSource;
+  /** «Сценарий дня»: the scenario that created the entry (null/absent for any other entry). */
+  scenarioId?: string | null;
+  /** Where the time of a scenario point comes from: a real session or the engine's suggestion. */
+  timeType?: "CONFIRMED" | "SUGGESTED" | null;
+  pinned?: boolean;
   entryType?: "EVENT" | "ACTIVITY" | "TASK" | null;
   childId?: string | null;
   endsAt?: Date | null;

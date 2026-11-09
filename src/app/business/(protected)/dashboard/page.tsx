@@ -130,7 +130,7 @@ export default async function BusinessDashboardPage({
 
   if (totalPublications === 0) {
     nextActions.push({
-      label: "Создайте первую публикацию — событие или предложение",
+      label: "Создайте первую публикацию — событие или место",
       href: href("/events"),
       cta: "Создать",
     });
