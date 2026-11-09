@@ -490,6 +490,8 @@ export async function buildArticleMvpResolvedBlocks(
     loadBasicCards?: (blocks: ArticleBlockMvp[]) => Promise<Map<string, ResolvedActivityCard>>;
     /** The published article city, never the visitor’s selected city. */
     citySlug?: string | null;
+    /** Metadata reads must not execute feed ranking or register commercial exposures. */
+    hydrateDynamicAfisha?: boolean;
   } = {},
 ): Promise<ArticleMvpResolvedBlock[]> {
   const renderableBlocks = blocks.filter(
@@ -523,7 +525,7 @@ export async function buildArticleMvpResolvedBlocks(
     resolveActivityCard,
   );
 
-  const dynamicAfishaBlocks = renderableBlocks.filter(
+  const dynamicAfishaBlocks = dependencies.hydrateDynamicAfisha === false ? [] : renderableBlocks.filter(
     (block): block is Extract<ArticleBlockMvp, { type: "dynamicAfisha" }> =>
       block.type === "dynamicAfisha",
   );
@@ -597,6 +599,7 @@ export async function buildArticleMvpResolvedBlocks(
 export async function loadArticleMvpBySlugPublic(
   slug: string,
   cityId: string | null,
+  options: { hydrateDynamicAfisha?: boolean } = {},
 ) {
   const resolved = await findArticleBySlug(slug, cityId);
   if (!resolved) return null;
@@ -620,6 +623,7 @@ export async function loadArticleMvpBySlugPublic(
   // Подборка: текст статьи, затем связанные объекты в сохранённом порядке.
   const resolvedBlocks = await buildArticleMvpResolvedBlocks([...content.blocks, ...linkedBlocks], {
     citySlug: article.geoScope === "CITY" ? article.city?.slug ?? null : null,
+    hydrateDynamicAfisha: options.hydrateDynamicAfisha,
   });
   // Скрытые/снятые с публикации связанные объекты не показываем (без «не найдено»).
   const blocks = resolvedBlocks.filter(
