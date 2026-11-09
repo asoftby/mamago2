@@ -6,7 +6,7 @@ import { ScenarioTimeline, mergeTimeline } from "./ScenarioTimeline";
 import { ScenarioParams } from "./ScenarioParams";
 import { ReplaceOptionsList, ScenarioReplaceScreen } from "./ScenarioReplaceScreen";
 import { ScenarioItemPreview } from "./ScenarioItemPreview";
-import { SavedDayBanner } from "./SavedDayBanner";
+import { SavedDayMenu } from "./SavedDayMenu";
 import { AllShown, DraftError, DraftSkeleton, EmptyResult, FewNearbyBanner } from "./ScenarioStates";
 import { useDayScenarioEnabled } from "../../hooks/useDayScenarioEnabled";
 import type { DraftItem } from "../../lib/dayScenarioUi/model";
@@ -98,15 +98,16 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(noCity.includes('href="/minsk/events/muzej-nauki"'), "the item's own city is enough");
 }
 
-// ---- the saved day: banner, link to the other day, ⋯ menu
+// ---- the saved day: the ⋯ menu at the day heading (no banner above it)
 {
   const pair = { date: "2026-11-15", count: 2, direction: "next" as const };
-  const weekend = renderToStaticMarkup(<SavedDayBanner date="2026-11-14" count={3} pair={pair} onOpenDate={() => {}} />);
-  assert.ok(weekend.includes("Выходные от mamaGo · суббота") && weekend.includes("Воскресенье: 2 места →"), "a weekend day names its weekday and links to the other day");
-  assert.ok(weekend.includes('aria-label="Действия с днём от mamaGo"'), "the ⋯ menu button is labelled");
-  const lone = renderToStaticMarkup(<SavedDayBanner date="2026-11-14" count={3} pair={null} onOpenDate={() => {}} />);
-  assert.ok(lone.includes("День от mamaGo · 3 места") && !lone.includes("→"), "a lone day: how many places, no link");
-  assert.ok(!weekend.includes("Удалить"), "the menu is closed until opened");
+  const weekend = renderToStaticMarkup(<SavedDayMenu date="2026-11-14" count={3} pair={pair} onOpenDate={() => {}} onEdit={() => {}} />);
+  assert.ok(weekend.includes('aria-label="Действия с днём: День от mamaGo · 3 места"'), "one ⋯ button, labelled with what the day is");
+  assert.ok(!weekend.includes("Выходные от mamaGo") && !weekend.includes("Удалить"), "the menu is closed until opened, and there is no banner text");
+  const src = readFileSync("src/features/my-plan/components/dayScenario/SavedDayMenu.tsx", "utf8");
+  for (const text of ["Изменить день", "Удалить день от mamaGo", "Удалить выходные", "pairLinkLabel(pair)"]) assert.ok(src.includes(text), text);
+  assert.ok(/\{pair \? \(\s*<button[^>]*\n[^]*?Удалить выходные/.test(src), "«Удалить выходные» only for a weekend pair");
+  assert.ok(!readFileSync("src/features/my-plan/components/PlanMainContent.tsx", "utf8").includes("SavedDayBanner"), "the banner is gone");
 }
 
 // ---- guest params: two questions, pressed state, a day picker only for «Другой день»
@@ -191,14 +192,11 @@ const play = item("g", "Игровая комната", "2026-11-14T12:40:00Z", 
   assert.ok(!screen.includes("SaveFlowContainer") && !screen.includes("ScenarioReplaceSheet"), "no modal on top of the widget");
   assert.match(main, /<DayScenarioScreen[\s\S]*?city=\{city\}/, "the member screen gets the page's city");
   assert.match(main, /const savedDay = dayScenarioEnabled \? savedDays\[selectedDate\] : undefined;/, "the banner exists only with the flag on");
-  assert.match(main, /\{renderPersonFilter\(false\)\}\s*\{savedDayBanner\}/, "the banner sits in the desktop layout");
-  assert.match(main, /\{renderPersonFilter\(true\)\}\s*\{savedDayBanner\}/, "and in the mobile one");
+  assert.match(main, /\{audienceLabel\}\s*<\/span>\s*\{savedDayMenu\}/, "the day menu sits in the day heading, in both layouts (one heading renderer)");
   assert.match(readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8"), /saver\.save\(\[\{ date: activeDate, items, keep: api\.kept \}\]\)/, "a save carries the saved points the draft could not hold");
   assert.match(main, /seed=\{editSeed\}/, "«Изменить день» opens the screen with the saved points");
   assert.match(main, /setEditSeed\(null\);\s*setScreen\("plan"\);/, "the seed is dropped when the screen closes, so a normal open is a fresh build");
   assert.match(main, /!editSeed \|\| !editSeed\.some\(/, "the day's own saved entries are not shown twice as «уже в плане»");
-  const bannerSrc = readFileSync("src/features/my-plan/components/dayScenario/SavedDayBanner.tsx", "utf8");
-  assert.match(bannerSrc, /Изменить день/, "the menu has «Изменить день»");
   const ribbon = readFileSync("src/features/my-plan/components/v3/PlanDayRibbon.tsx", "utf8");
   assert.match(ribbon, /usePlanScenarioDays\(\{ from, to \}\)/, "the ribbon reads saved days from the cached chunks");
   assert.match(ribbon, /✦/, "a ✦ on days saved as «от mamaGo»");
