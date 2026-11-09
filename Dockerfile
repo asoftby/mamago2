@@ -50,8 +50,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/prisma ./prisma
-// This standalone, explicitly gated DEV fixture runner is never invoked at app startup.
-// It needs APP_ENV=dev and an exact DEV database fingerprint before any writes.
+# This standalone, explicitly gated DEV fixture runner is never invoked at app startup.
+# It needs APP_ENV=dev and an exact DEV database fingerprint before any writes.
 COPY --from=builder /app/scripts/dev/seed-class-offers.ts ./scripts/dev/seed-class-offers.ts
 # System seed imports Territory dual-write helpers through the @/ path alias.
 # Keep the required sources and tsconfig in the runtime image for tsx resolution.
