@@ -1,3 +1,4 @@
+import { isAllocationOverlapError } from "@/server/services/booking/resourceAllocation";
 import { lockPartyRequestGroup } from "./partyRequestLock";
 import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import { BookingKind, BookingStatus, PartyItemStatus, PartyOrderStatus, Prisma } from "@prisma/client";
@@ -11,7 +12,7 @@ import { clockMinutes, isFixedPriceReply } from "./partyFixedPrice";
 import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
 import { isPartyConfirmationEnabled } from "./partyConfirmationFlag";
 import {
-  allocatePartyUnit, isAllocationOverlapError, lockAvailablePartyUnit, type PartyUnitWindow,
+  allocatePartyUnit, lockAvailablePartyUnit, type PartyUnitWindow,
 } from "./partyUnitAllocation";
 
 
