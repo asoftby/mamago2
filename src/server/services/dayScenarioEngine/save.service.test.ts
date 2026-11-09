@@ -261,7 +261,7 @@ async function run() {
     assert.match(draftSrc, /AND: \[\s*await activePlanScopeFor\(userId\)/, "the family scope's own OR stays intact");
     assert.match(draftSrc, /unpooledPinnedIds = request\.action === "rebuild"/, "pinned points the pool does not hold are reported");
     const service = readFileSync("src/server/services/dayScenarioEngine/save.service.ts", "utf8");
-    assert.match(service, /where: \{ AND: \[scope, \{ OR: /, "the scope is combined with AND: a spread would replace the scope's own OR");
+    assert.match(service, /where: \{ AND: \[scope, \{ date: \{ gte: [^}]*\} \}, \{ OR: /, "the scope is combined with AND: a spread would replace the scope's own OR");
     assert.ok(!/plan\.service|\baddPlanItem\(|\baddPlacePlanItem\(/.test(service), "never the helpers that re-date an existing entry");
     assert.ok(/planItem\.deleteMany\(\{ where: \{ id: \{ in: [^}]*\} , scenarioId: row\.id \} \}\)|planItem\.deleteMany\(\{ where: \{ id: \{ in: [^}]*\}, scenarioId: row\.id \} \}\)/.test(service), "a delete is always scoped by the scenario's own id");
     const migration = readFileSync("prisma/migrations/20261108190000_day_scenario_save_fields/migration.sql", "utf8");
