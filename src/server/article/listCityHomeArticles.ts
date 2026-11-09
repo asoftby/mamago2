@@ -321,7 +321,7 @@ async function queryNationalBlogArticles(
  * National journal /blog: every published article across Belarus, newest first.
  */
 export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
-  return unstable_cache(queryNationalBlogArticles, ["public-article-list:national:seasonal"], {
+  return unstable_cache(queryNationalBlogArticles, ["public-article-list:national"], {
     tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
     revalidate: 300,
   })();
