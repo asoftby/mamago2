@@ -177,7 +177,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
 
     const configuredClassChips = await listDiscoveryClassChips();
     activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, configuredClassChips);
-    classChips = await listPopulatedDiscoveryClassChips(city.id, city.slug);
+    classChips = await listPopulatedDiscoveryClassChips(city.id, city.slug, configuredClassChips);
     // A stale admin default without public offers must not open an empty
     // category on the bare /classes route. Explicit deep links still work.
     if (!requestedChip && !classChips.some((chip) => chip.slug === activeClassChipSlug)) {
