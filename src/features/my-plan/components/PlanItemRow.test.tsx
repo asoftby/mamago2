@@ -18,10 +18,16 @@ function item(id: string, title = `Item ${id}`): PlanItemWithActivity {
   };
 }
 
-assert.equal(planItemVisualKind({ source: "CATALOG" }), "event");
+// The card type is the catalog link, not the source.
+assert.equal(planItemVisualKind({ source: "CATALOG", activityId: "a1" }), "event");
+assert.equal(planItemVisualKind({ source: "CATALOG", placeId: "p1" }), "event", "a place is a catalog card");
+assert.equal(planItemVisualKind({ source: "CATALOG", offerId: "o1" }), "event");
+assert.equal(planItemVisualKind({ source: "CATALOG", planRouteSlug: "r" }), "event");
+assert.equal(planItemVisualKind({ source: "CATALOG", articleId: "ar" }), "event");
 assert.equal(planItemVisualKind({ source: "MANUAL" }), "note");
 assert.equal(planItemVisualKind({ source: "TELEGRAM_FORWARD" }), "note");
-assert.equal(planItemVisualKind({ source: undefined }), "event");
+assert.equal(planItemVisualKind({ source: "MANUAL", activityId: "a1" }), "event", "a linked entry is a catalog card whoever made it");
+assert.equal(planItemVisualKind({ source: undefined }), "note", "no link: a note");
 
 const longTitle = "Очень длинный заголовок события для проверки двух строк";
 

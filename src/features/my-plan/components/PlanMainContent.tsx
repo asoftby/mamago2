@@ -29,6 +29,8 @@ import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanStickyCounter } from "./PlanStickyCounter";
 import { PlanArticleScreen } from "./v3/PlanArticleScreen";
+import { PlanEntryScreen } from "./v3/PlanEntryScreen";
+import { isEditableNote, planItemLinkKind } from "../lib/planItemLink";
 import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
@@ -1289,7 +1291,9 @@ export function PlanMainContent({
         onRemove={() => handleRemoveFromPlan(item.id)}
         onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
         onOpen={() => {
-          if (item.source === "MANUAL") {
+          // A catalog link (event, place, offer, route, article) opens the short preview; an unlinked note opens its editor.
+          if (planItemLinkKind(item) === null) {
+            if (!isEditableNote(item)) return;
             setEditingNote(item);
             openNestedScreen("new");
             return;
@@ -1781,6 +1785,18 @@ export function PlanMainContent({
           ) : mountedNestedScreen === "event" ? (
             openedEvent?.articleId ? (
               <PlanArticleScreen
+                key={openedEvent.id}
+                onNavigate={onRequestClose}
+                item={openedEvent}
+                onBack={closeNestedScreen}
+                onRemove={() => {
+                  handleRemoveFromPlan(openedEvent.id);
+                  closeNestedScreen();
+                }}
+                onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
+              />
+            ) : openedEvent && planItemLinkKind(openedEvent) !== "activity" ? (
+              <PlanEntryScreen
                 key={openedEvent.id}
                 onNavigate={onRequestClose}
                 item={openedEvent}
