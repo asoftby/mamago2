@@ -24,7 +24,7 @@ test("guest afisha has no age chips or extra registration flow", () => {
   assert.match(html, /Куда пойти с ребёнком в Минске/);
   assert.doesNotMatch(html, /На этой неделе|На ближайшие 7 дней/);
   assert.doesNotMatch(html, /Выберите возраст|Возраст ребёнка|3–5 лет|Для кого:|Добавить ребёнка/);
-  assert.match(html, /Пока нет опубликованных событий/);
+  assert.match(html, /Событий пока нет/);
   assert.doesNotMatch(html, /По вашему запросу мы ничего не нашли|Больше под ваш запрос/);
   assert.match(html, /Куда пойти/);
   assert.doesNotMatch(html, /Для вашей семьи|child_000|Зарегистрируйтесь/);
