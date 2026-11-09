@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
-import { BookingStatus, PublicationType } from "@prisma/client";
+import { BookingStatus, PublicationType, type Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { updateBookingStatus } from "./bookingQuery.service";
 import { BookingHoldExpiredError } from "./bookingHold";
 import { closePastStandardBooking } from "./bookingOutcome.service";
+import { lockBookingUnits } from "./resourceAllocation";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl || !["localhost", "127.0.0.1"].includes(new URL(databaseUrl).hostname)) {
@@ -113,12 +114,15 @@ test("offer sessions, event sessions and request holds share the same PostgreSQL
       ...allocation, activitySessionId: "missing-session-" + suffix,
     } }), /BookingAllocation_activitySessionId_fkey/);
 
+    const reserve = (data: Prisma.BookingAllocationUncheckedCreateInput) =>
+      prisma.$transaction(async (tx) => {
+        assert.equal(await lockBookingUnits(tx, businessId, [room.id]), true);
+        return tx.bookingAllocation.create({ data });
+      });
     const attempts = await Promise.allSettled([
-      prisma.bookingAllocation.create({ data: { ...allocation, offerSessionId: classSession.id } }),
-      prisma.bookingAllocation.create({ data: { ...allocation, activitySessionId: eventSession.id } }),
-      prisma.bookingAllocation.create({ data: {
-        ...allocation, bookingRequestId: booking.id, status: "HELD", expiresAt: blockStart,
-      } }),
+      reserve({ ...allocation, offerSessionId: classSession.id }),
+      reserve({ ...allocation, activitySessionId: eventSession.id }),
+      reserve({ ...allocation, bookingRequestId: booking.id, status: "HELD", expiresAt: blockStart }),
     ]);
     const winner = attempts.find((result) => result.status === "fulfilled");
     assert.ok(winner);
