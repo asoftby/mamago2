@@ -176,6 +176,7 @@ export type ArticleMvpResolvedBlock =
   | (Extract<ArticleBlockMvp, { type: "activityCard" }> & {
       card: ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | ResolvedArticlePlaceCard | null;
     })
+  | Extract<ArticleBlockMvp, { type: "dynamicAfisha" }>
   | Extract<ArticleBlockMvp, { type: "embed" }>
   | Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" | "info" }>;
 
@@ -563,7 +564,7 @@ export async function buildArticleMvpResolvedBlocks(
       out.push({ ...b, card });
       continue;
     }
-    if (b.type === "embed" || b.type === "contacts" || b.type === "price" || b.type === "openingHours" || b.type === "info") {
+    if (b.type === "dynamicAfisha" || b.type === "embed" || b.type === "contacts" || b.type === "price" || b.type === "openingHours" || b.type === "info") {
       out.push(b);
     }
   }
