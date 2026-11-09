@@ -51,12 +51,13 @@ export async function loadJournalPage(input: {
   const page = Math.max(1, Math.trunc(input.page));
   const load = async (): Promise<JournalPageData> => {
     const top = showJournalTopBlocks(page, input.typeFilter);
-    const current = await getSeasonallyCurrentJournalWhere();
+    // News-only views do not query occasions.
+    const current = input.typeFilter === "BREAKING_NEWS" ? null : await getSeasonallyCurrentJournalWhere();
     const base = journalBlockWheres({ scopeWhere: input.scopeWhere, typeFilter: input.typeFilter, mainId: null });
     const [mainRows, news] = top
       ? await Promise.all([
-          queryJournalArticles(null, { additionalWhere: { AND: [base.main, current] }, seasonalPriority: false, take: 1 }),
-          queryJournalArticles(input.city, { additionalWhere: base.news, take: JOURNAL_NEWS_LIMIT }),
+          queryJournalArticles(null, { additionalWhere: { AND: [base.main, current ?? {}] }, seasonalPriority: false, take: 1 }),
+          queryJournalArticles(input.city, { additionalWhere: base.news, seasonalPriority: false, take: JOURNAL_NEWS_LIMIT }),
         ])
       : [[], []];
     const main = mainRows[0] ?? null;
@@ -64,7 +65,7 @@ export async function loadJournalPage(input: {
     const { feed: feedWhere } = journalBlockWheres({
       scopeWhere: input.scopeWhere,
       typeFilter: input.typeFilter,
-      mainId: input.typeFilter ? null : await resolveMainId(main, input.scopeWhere, top, current),
+      mainId: input.typeFilter ? null : await resolveMainId(main, input.scopeWhere, top, current ?? {}),
     });
     const newsFeedWhere: Prisma.ArticleWhereInput = input.typeFilter === "BREAKING_NEWS"
       ? { AND: [feedWhere, input.newsArchive
@@ -80,6 +81,7 @@ export async function loadJournalPage(input: {
       : await queryJournalArticles(input.typeFilter ? null : input.city, {
       additionalWhere: feedWhere,
       pinnedFirst: !input.typeFilter,
+      seasonalWhere: current ?? undefined,
       skip: (page - 1) * pageSize,
       take: pageSize,
     });

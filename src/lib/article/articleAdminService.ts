@@ -273,6 +273,10 @@ async function resolveArticleSeasonalFields(
     || !occasion.startsAt || !occasion.endsAt) {
     throw new Error("Выберите действующий календарный повод с датами");
   }
+  // A period change between editor load and save must not silently approve a new season.
+  if (!input.seasonReviewStartsAt || new Date(input.seasonReviewStartsAt).getTime() !== occasion.startsAt.getTime()) {
+    throw new Error("Период повода изменился. Обновите редактор и подтвердите актуальность повторно");
+  }
   return { occasionId: occasion.id, seasonReviewedForStart: occasion.startsAt };
 }
 

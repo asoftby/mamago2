@@ -76,6 +76,8 @@ export type ArticleSaveInput = {
   categoryId: string | null;
   occasionId?: string | null;
   seasonReviewRequested?: boolean;
+  /** Season start displayed to the editor during approval. */
+  seasonReviewStartsAt?: string | null;
   additionalCategoryIds?: string[];
   additionalGeographyTargets?: ArticleGeographyTargetInput[];
   /** undefined = не менять в БД; null = охват не выбран. */

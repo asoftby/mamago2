@@ -258,6 +258,8 @@ export async function queryJournalArticles(
     pinnedFirst?: boolean;
     /** false for breaking news and previews already filtered to current articles. */
     seasonalPriority?: boolean;
+    /** Reuse calendar predicate already loaded by the journal page. */
+    seasonalWhere?: Prisma.ArticleWhereInput;
   } = {},
 ): Promise<CityHomeJournalArticle[]> {
   const base: Prisma.ArticleWhereInput = options.additionalWhere
@@ -268,7 +270,7 @@ export async function queryJournalArticles(
   if (options.seasonalPriority === false) {
     return queryBucketedJournal(base, geographyBuckets, options);
   }
-  const current = await getSeasonallyCurrentJournalWhere();
+  const current = options.seasonalWhere ?? await getSeasonallyCurrentJournalWhere();
   // Active and approved content outranks old seasons, even if the latter is pinned.
   // Both groups remain public and paginated with the same disjoint bucket rules.
   const buckets: JournalBucket[] = [
