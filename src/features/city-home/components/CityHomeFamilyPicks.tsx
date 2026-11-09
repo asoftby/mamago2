@@ -26,7 +26,6 @@ import type { HomeFamilyDelivery } from "@/server/services/recommendations/famil
 import { postFamilyPicks as post } from "../lib/familyPicksRequest";
 import { loadHomePublicFallback } from "../lib/loadHomePublicFallback";
 import { homeAudienceSections, homeAgeEligible } from "../lib/rankHomeByAudience";
-import { SoftAudienceNotice } from "./SoftAudienceNotice";
 import type { ActivityMock } from "@/types/activity";
 
 /** One read-only family recommendation feed. Audience filtering belongs in the header/catalog. */
@@ -244,12 +243,12 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
                 framing="fixed" coverRatio="2/3" coverFit="cover" imagePriority={index < 2} />
             </div>
           ))}
-          {safeFallbackEvents.length === 0 && <SoftAudienceNotice noAlternatives />}
-          {safeFallbackEvents.length > 0 && <HomeMoreEventsCard href={catalogHref} hasEvents />}
+          {safeFallbackEvents.length === 0 && <p role="status" className="py-6 text-sm text-muted-foreground">Пока нет опубликованных событий.</p>}
+          {safeFallbackEvents.length > 0 && <HomeMoreEventsCard href={catalogHref} />}
         </HorizontalCardRow>
       ) : state === "error" && !data ? (
         <HorizontalCardRow headerTitle={carouselHeader} navLeading={carouselLink} underHeader={carouselChips}>
-          <HomeMoreEventsCard href={catalogHref} hasEvents={false} />
+          <p role="alert" className="py-6 text-sm text-muted-foreground">Не удалось загрузить события. Обновите страницу, чтобы повторить.</p>
         </HorizontalCardRow>
       ) : data ? (
         <>
@@ -288,13 +287,11 @@ export function FamilyHomeResults({ data, context, citySlug, impressed, onImpres
     navLeading={showHomeHeader ? <CityHomeAllLink href={href} label="[все события]" /> : undefined}
     underHeader={showHomeHeader ? <HomeEventsQuickChips citySlug={citySlug} /> : undefined}
   >
-    {sections.active && items.length === 0 && <SoftAudienceNotice noAlternatives />}
-    {sections.active && sections.primary.length === 0 && items.length > 0 && <SoftAudienceNotice label="события" />}
+    {items.length === 0 && !data.hasCatalogEvents && <p role="status" className="py-6 text-sm text-muted-foreground">Пока нет опубликованных событий.</p>}
     {items.slice(0, 10).map((item, index) => {
       const recommendation = homeRecommendationLabel(item, context);
       const identity = item.exposureId ?? `${context.signature}:all:${item.id}`;
       return <Fragment key={identity}>
-        {sections.active && sections.primary.length > 0 && sections.alternatives.length > 0 && index === sections.primary.length && <SoftAudienceNotice label="события" afterMatches />}
         <div className={EVENT_CARD_SHELL + " flex flex-col"} data-recommendation-run={data.runId ?? undefined}>
         <AnalyticsCardViewTracker entityType="EVENT" entityId={item.id} vertical="CITY" citySlug={citySlug}
           threshold={0.5} dwellMs={1000} meta={meta(item)} wasImpressed={impressed.has(identity)}
@@ -320,7 +317,7 @@ export function FamilyHomeResults({ data, context, citySlug, impressed, onImpres
       </div>
       </Fragment>;
     })}
-    {(!sections.active || items.length > 0) && <HomeMoreEventsCard href={href} hasEvents={data.hasCatalogEvents}
+    {data.hasCatalogEvents && <HomeMoreEventsCard href={href}
       onClick={() => void postAnalyticsEvent(homeCatalogEvent(null, citySlug))} />}
   </HorizontalCardRow>;
 }
