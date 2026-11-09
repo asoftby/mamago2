@@ -14,7 +14,7 @@ export function useDayScenarioSave() {
   const keyRef = useRef<{ signature: string; key: string } | null>(null);
   const inFlight = useRef(false);
 
-  const save = useCallback(async (days: readonly { date: string; items: readonly DraftItem[] }[]): Promise<boolean> => {
+  const save = useCallback(async (days: readonly { date: string; items: readonly DraftItem[]; keep?: readonly { kind: "event" | "place"; activityId: string }[] }[]): Promise<boolean> => {
     if (inFlight.current) return false;
     const body = buildSaveBody(days);
     const signature = JSON.stringify(body);

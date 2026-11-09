@@ -87,7 +87,7 @@ export function DayScenarioScreen({
   ownEntries?: OwnPlanEntry[];
   hasPlanItems?: boolean;
   /** «Изменить день»: the saved points of the open day; the draft starts from them (all pinned). */
-  seed?: { activityId: string; startsAt: string }[] | null;
+  seed?: { kind: "event" | "place"; activityId: string; startsAt: string }[] | null;
   onBack: () => void;
   onClose?: () => void;
 }) {
@@ -199,7 +199,7 @@ export function DayScenarioScreen({
   const canSave = !isGuest && Boolean(activeDate) && items.length > 0 && !loading && !saving;
   const saveDay = async () => {
     if (!activeDate || !canSave) return;
-    const ok = await saver.save([{ date: activeDate, items }]);
+    const ok = await saver.save([{ date: activeDate, items, keep: api.kept }]);
     if (!ok) return;
     invalidatePlanDayMarkers();
     requestPlanRefetchForDate(activeDate);
@@ -288,6 +288,11 @@ export function DayScenarioScreen({
                       {summaryLine(items)}
                       {hasPlanItems ? <span className="block text-[14px] text-[var(--mp-tx2)]">Подобрали к тому, что уже в плане</span> : null}
                     </p>
+                    {seed && api.kept.length > 0 ? (
+                      <p className="mp-font-ui m-0 mt-2 rounded-2xl bg-[var(--mp-card)] p-3 text-[13.5px] leading-[1.4] text-[var(--mp-tx2)]">
+                        {api.kept.length === 1 ? "Одно сохранённое место" : `${api.kept.length} сохранённых мест`} в этом дне уже нельзя пересобрать (событие началось или место закрылось). Они останутся в плане как есть.
+                      </p>
+                    ) : null}
                     {showFewNearby ? <FewNearbyBanner onSwitchToCar={() => setMode("car")} /> : null}
                     <ScenarioTimeline
                       items={items}

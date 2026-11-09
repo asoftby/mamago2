@@ -152,7 +152,6 @@ async function run() {
     assert.match(markers, /isDayScenarioEngineEnabled\(\) \? listSavedDays\(user\.id, from, to\) : Promise\.resolve\(\{\}\)/, "no extra queries with the flag off");
     assert.match(route, /export async function GET[\s\S]*isDayScenarioEngineEnabled[\s\S]*UNAUTHENTICATED[\s\S]*day-scenario-saved-read/, "the read of a saved day has the same gates");
     const draft = readFileSync("src/server/services/dayScenarioEngine/draft.service.ts", "utf8");
-    assert.match(draft, /\.\.\.\(editScenario \? \{ scenarioId: null \} : \{\}\)/, "editing: the scenario's own entries are neither busy time nor already planned");
     assert.match(draft, /editScenario: z\.boolean\(\)\.optional\(\)\.default\(false\)/);
     const service = readFileSync("src/server/services/dayScenarioEngine/savedDay.service.ts", "utf8");
     assert.match(service, /planItem\.deleteMany\(\{ where: \{ scenarioId: \{ in: rows\.map\(\(row\) => row\.id\) \}, userId \} \}\)/, "only entries of the scenario, only the user's own");

@@ -329,10 +329,11 @@ export function entryLabel(hasPlanItems: boolean): "Собрать день" | "
 export type SaveFailure = "duplicate" | "sign_in" | "rate_limited" | "past_day" | "stale" | "failed";
 
 /** The body of POST /api/plan/day-scenario/save for one or two days of the draft (only what the server needs). */
-export function buildSaveBody(days: readonly { date: string; items: readonly DraftItem[] }[]) {
+export function buildSaveBody(days: readonly { date: string; items: readonly DraftItem[]; keep?: readonly { kind: "event" | "place"; activityId: string }[] }[]) {
   return {
     days: days.map((day) => ({
       date: day.date,
+      ...(day.keep && day.keep.length > 0 ? { keep: day.keep.map((point) => ({ kind: point.kind, activityId: point.activityId })) } : {}),
       items: [...day.items]
         .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
         .map((item) => ({ kind: item.kind, activityId: item.activityId, startsAt: item.startsAt, endsAt: item.endsAt, pinned: item.pinned, travel: item.travel })),

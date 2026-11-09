@@ -446,7 +446,7 @@ export function PlanMainContent({
   const [ideasCountOverride, setIdeasCountOverride] = useState<number | null>(null);
   const shownIdeasCount = ideasCountOverride ?? ideasCount;
   // «Изменить день»: the saved points the draft screen starts from (null = a fresh build).
-  const [editSeed, setEditSeed] = useState<{ activityId: string; startsAt: string }[] | null>(null);
+  const [editSeed, setEditSeed] = useState<{ kind: "event" | "place"; activityId: string; startsAt: string }[] | null>(null);
   const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
@@ -1174,9 +1174,9 @@ export function PlanMainContent({
     try {
       const response = await fetch(`/api/plan/day-scenario/saved?date=${encodeURIComponent(selectedDate)}`, { credentials: "include" });
       if (!response.ok) throw new Error(String(response.status));
-      const { points } = (await response.json()) as { points: { activityId: string; startsAt: string }[] };
+      const { points } = (await response.json()) as { points: { kind: "event" | "place"; activityId: string; startsAt: string }[] };
       if (points.length === 0) throw new Error("empty");
-      setEditSeed(points.map((point) => ({ activityId: point.activityId, startsAt: point.startsAt })));
+      setEditSeed(points.map((point) => ({ kind: point.kind, activityId: point.activityId, startsAt: point.startsAt })));
       openNestedScreen("dayScenario");
     } catch {
       toast.error("Не удалось открыть день для изменения. Попробуйте ещё раз.");

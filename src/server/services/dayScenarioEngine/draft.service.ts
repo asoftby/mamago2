@@ -97,6 +97,11 @@ export type DraftResponse = {
   alternatives: DraftItem[][];
   /** action "another" only: no new variant exists ("Мы показали всё, что подходит"); `items` is empty. */
   exhausted: boolean;
+  /**
+   * action "rebuild": pinned points the pool does not hold (an event whose last session already started, a place that
+   * closed): the draft cannot show them, but they are still the user's saved points. The client keeps them in a save.
+   */
+  unpooledPinnedIds: string[];
   meta: { poolCache: "hit" | "miss"; poolSize: number; poolPlaces: number; poolVirtual: number; staleGeoCells: number; candidateCount: number; buildMs: number };
 };
 
@@ -125,9 +130,18 @@ function toDraftItemsFrom(items: BuildResult["items"]): DraftItem[] {
 }
 
 async function loadUserContext(userId: string, date: string, personaIds: string[], editScenario = false) {
+  // Editing: only THIS user's saved scenario of the day stops being busy time / "already planned". Other visible
+  // scenarios (a family member's) and every other entry stay. AND keeps the family scope's own OR intact.
+  const editedScenario = editScenario ? await prisma.dayScenario.findUnique({ where: { userId_date: { userId, date } }, select: { id: true } }) : null;
   const [plan, profile] = await Promise.all([
     prisma.planItem.findMany({
-      where: { ...(await activePlanScopeFor(userId)), date, ...(editScenario ? { scenarioId: null } : {}) },
+      where: {
+        AND: [
+          await activePlanScopeFor(userId),
+          { date },
+          ...(editedScenario ? [{ OR: [{ scenarioId: null }, { scenarioId: { not: editedScenario.id } }] }] : []),
+        ],
+      },
       select: { activityId: true, placeId: true, startsAt: true, endsAt: true },
     }),
     personaIds.length > 0
@@ -226,6 +240,8 @@ export async function runDayScenarioDraft(
     result = buildDayScenario(pool.events, input, deps);
   }
 
+  const pooled = new Set(pool.events.map((event) => event.activityId));
+  const unpooledPinnedIds = request.action === "rebuild" ? request.pinnedActivityIds.filter((id) => !pooled.has(id)) : [];
   return {
     status: result.status,
     mode: result.mode,
@@ -234,6 +250,7 @@ export async function runDayScenarioDraft(
     items: toDraftItems(result),
     alternatives,
     exhausted,
+    unpooledPinnedIds,
     meta: {
       poolCache: hit ? "hit" : "miss",
       poolSize: pool.events.length,
