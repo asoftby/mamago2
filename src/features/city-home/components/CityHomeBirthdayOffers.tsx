@@ -5,7 +5,6 @@ import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { rankHomeByAudience, homeAudienceSections } from "@/features/city-home/lib/rankHomeByAudience";
-import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
 import { HomeSectionQuickChips } from "@/features/city-home/components/HomeSectionQuickChips";
 import { selectHomeBirthdayOffers } from "@/features/city-home/lib/homeBirthdayPreview";
 import { OfferCard } from "@/components/offers/OfferCard";
@@ -43,7 +42,7 @@ export function CityHomeBirthdayOffers({ offers }: { offers: BirthdayCatalogItem
     return homeAudienceSections(selectHomeBirthdayOffers(eligibleFirst), audience, age);
   }, [offers, family?.personas, family?.selectedPersonaIds, applied.age]);
   const preview = [...sections.primary, ...sections.alternatives];
-  if (offers.length === 0) return null;
+  if (offers.length === 0 || preview.length === 0) return null;
   const categories = [...new Set(offers.flatMap(offer => offer.category ? [offer.category] : []))];
 
   return (
@@ -56,11 +55,8 @@ export function CityHomeBirthdayOffers({ offers }: { offers: BirthdayCatalogItem
           href: `/${citySlug}/birthday?category=${category}`,
         }))} />}
       >
-        {sections.active && preview.length === 0 && <SoftAudienceNotice noAlternatives actionHref={appendCityQuery(`/${citySlug}/birthday`)} actionLabel="Праздник" />}
-        {sections.active && sections.primary.length === 0 && preview.length > 0 && <SoftAudienceNotice label="варианты праздника" />}
         {preview.map((offer, index) => (
           <Fragment key={offer.id}>
-          {sections.active && sections.primary.length > 0 && sections.alternatives.length > 0 && index === sections.primary.length && <SoftAudienceNotice label="варианты праздника" afterMatches />}
           <div className={EVENT_CARD_SHELL}>
             <OfferCard
               id={offer.id}
