@@ -61,8 +61,6 @@ export type RunParams = {
   toddler: boolean;
   window: { start: string; end: string };
   planItem: boolean;
-  /** A deliberately narrow run (few candidates) that exists to reach «показали всё». */
-  narrow?: boolean;
 };
 
 export type SpecInfo = {
@@ -300,33 +298,6 @@ export function weeklyViolation(cov: WeeklyCoverage): Violation | null {
   return { run: cov.eligible[0]!, step: "Все шаги подходящих прогонов", rule: "Повторяющееся событие без сеансов ни разу не попало в сценарий", detail: `подходит по дате, возрасту и окну в ${cov.eligible.length} прогонах (${cov.eligible.join(", ")}), в сценарии не было ни разу` };
 }
 
-// ------------------------------------------------------------ «показали всё» on a narrow pool
-
-export type ExhaustedRow = { id: string; newVariants: number; stopAt: number | null; left: string[] };
-export type ExhaustedCoverage = { rows: ExhaustedRow[]; justified: number; premature: number };
-
-/**
- * What the narrow runs did with their «Другой вариант» chain: where «показали всё» came and how many seeded
- * candidates the oracle still saw at that moment (empty = justified by the seed, otherwise premature).
- */
-export function exhaustedCoverage(runs: readonly RunRecord[]): ExhaustedCoverage {
-  const rows = runs
-    .filter((r) => r.params.narrow)
-    .map((r) => {
-      const anothers = r.steps.filter((st) => st.anotherNo !== undefined);
-      const stop = anothers.find((st) => st.exhausted);
-      return { id: r.params.id, newVariants: anothers.filter((st) => !st.exhausted).length, stopAt: stop?.anotherNo ?? null, left: stop?.unseenLeft ?? [] };
-    });
-  const reached = rows.filter((r) => r.stopAt !== null);
-  return { rows, justified: reached.filter((r) => r.left.length === 0).length, premature: reached.filter((r) => r.left.length > 0).length };
-}
-
-/** The violation to attach when narrow runs exist but none of them reached a justified «показали всё». */
-export function exhaustedViolation(cov: ExhaustedCoverage): Violation | null {
-  if (cov.rows.length === 0 || cov.justified > 0) return null;
-  return { run: cov.rows[0]!.id, step: "Цепочки узких прогонов", rule: "Ветка «показали всё» не проверена вживую", detail: `ни один из ${cov.rows.length} узких прогонов (${cov.rows.map((r) => r.id).join(", ")}) не дошёл до обоснованного «показали всё»` };
-}
-
 // ------------------------------------------------------------ report
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -404,9 +375,7 @@ ${input.notes.map((n) => `<p class="muted">${esc(n)}</p>`).join("")}
 <p class="muted">Столбец «Остаток» — сколько ещё непоказанных мест из сида подходят по возрасту и часам работы в тот день и лежат в радиусе режима (пешком: своя и соседняя ячейка ~1 км; машина: ячейка ~5 км) от прежнего черновика. Оракул знает только места мок-каталога, но не весь пул DEV, поэтому «0» подтверждает «обоснованно» только по сиду.</p>
 <table><thead><tr><th>Прогон</th><th>Новых вариантов до конца</th><th>«Показали всё» на</th><th>Остаток</th><th>Какие</th><th>Вывод</th></tr></thead><tbody>${chainRows.join("")}</tbody></table>
 <h2>Повторяющееся событие без сеансов (c-weekly)</h2>
-${input.weekly ? `<p class="muted">Событие из сида: еженедельно по субботам 11:00, возраст 5–7 / 7–9, без ActivitySession (время по расписанию). Должно попасть в сценарий хотя бы в одном из прогонов, где подходят дата, возраст и окно дня.</p><p>Подходящих прогонов: <b>${input.weekly.eligible.length}</b>${input.weekly.eligible.length ? ` (${input.weekly.eligible.map(esc).join(", ")})` : ""}. Попало в сценарий в: <b class="${input.weekly.eligible.length && input.weekly.seenIn.length === 0 ? "bad" : "ok"}">${input.weekly.seenIn.length ? input.weekly.seenIn.map(esc).join(", ") : "—"}</b>.</p>` : `<p class="muted">Проверка не выполнялась.</p>`}
-<h2>Узкие прогоны: «показали всё» вживую</h2>
-${input.exhausted && input.exhausted.rows.length ? `<p class="muted">Прогоны N-… с заведомо малым выбором (узкое окно дня, возраст, режим). Они нужны, чтобы ветка exhausted сработала на DEV. «Обосновано» — оракул не видит в сиде ни одного подходящего непоказанного места рядом; пул DEV шире сида, поэтому это проверка по мок-каталогу.</p><table><thead><tr><th>Прогон</th><th>Новых вариантов до конца</th><th>«Показали всё» на</th><th>Остаток по сиду</th><th>Вывод</th></tr></thead><tbody>${input.exhausted.rows.map((r) => `<tr><td><a href="#${esc(r.id)}">${esc(r.id)}</a></td><td>${r.newVariants}</td><td>${r.stopAt === null ? "—" : `шаг ${r.stopAt}`}</td><td>${r.stopAt === null ? "—" : r.left.length}${r.left.length ? `: ${esc(r.left.slice(0, 4).join("; "))}` : ""}</td><td>${r.stopAt === null ? "не наступило" : r.left.length ? `<span class="bad">преждевременно</span>` : `<span class="ok">обосновано</span>`}</td></tr>`).join("")}</tbody></table><p>Обоснованных: <b class="${input.exhausted.justified ? "ok" : "bad"}">${input.exhausted.justified}</b>, преждевременных: <b class="${input.exhausted.premature ? "bad" : "ok"}">${input.exhausted.premature}</b>.</p>` : `<p class="muted">Узких прогонов не было.</p>`}
+${input.weekly ? `<p class="muted">Событие из сида: еженедельно по субботам 11:00, возраст 5–7 / 7–9, без ActivitySession (время по расписанию). Должно попасть в сценарий хотя бы в одном из прогонов, где подходят дата, возраст и окно дня. Само по себе оно самое слабое из событий и в обычных прогонах уступает сильным, поэтому есть прогон-доказательство W-…: события-конкуренты из ответов по очереди исключаются (excludeActivityIds), пока оно не выберется.</p><p>Подходящих прогонов: <b>${input.weekly.eligible.length}</b>${input.weekly.eligible.length ? ` (${input.weekly.eligible.map(esc).join(", ")})` : ""}. Попало в сценарий в: <b class="${input.weekly.eligible.length && input.weekly.seenIn.length === 0 ? "bad" : "ok"}">${input.weekly.seenIn.length ? input.weekly.seenIn.map(esc).join(", ") : "—"}</b>.</p>` : `<p class="muted">Проверка не выполнялась.</p>`}
 <h2>Нарушения (${all.length})</h2>
 ${all.length ? `<table><thead><tr><th>Прогон</th><th>Шаг</th><th>Правило</th><th>Детали</th></tr></thead><tbody>${violationRows.join("")}</tbody></table><p>По правилам: ${[...byRule].map(([k, n]) => `${esc(k)} — ${n}`).join("; ")}</p>` : `<p class="ok">Нарушений не найдено.</p>`}
 <h2>Прогоны</h2>
