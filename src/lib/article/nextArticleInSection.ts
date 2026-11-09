@@ -163,7 +163,9 @@ export async function mapRowToPublicContinuousArticleDto(
   if (!row.slug || !row.geoScope) return null;
   const content = parseArticleContentJson(row.contentJson);
   if (content.blocks.length === 0) return null;
-  const blocks = await buildArticleMvpResolvedBlocks(content.blocks);
+  const blocks = await buildArticleMvpResolvedBlocks(content.blocks, {
+    citySlug: row.geoScope === "CITY" ? row.city?.slug ?? null : null,
+  });
   const cover = await fetchCoverPublicUrl(row.id);
   const heroUrl = cover?.publicUrl ?? row.heroImage ?? row.seoOgImage ?? null;
   const href = buildArticlePublicPath({

@@ -12,7 +12,7 @@ import {
   isEdgeSwipeBack,
   pairLinkLabel,
   pairOf,
-  savedDayTitle,
+  savedDayMenuLabel,
   weekdayName,
   buildSaveBody,
   saveFailureOf,
@@ -281,9 +281,8 @@ assert.equal(AGE_ANSWERS.length, 4);
 {
   assert.equal(weekdayName("2026-11-14"), "Суббота");
   assert.equal(weekdayName("2026-11-15"), "Воскресенье");
-  assert.equal(savedDayTitle("2026-11-14", 3, false), "День от mamaGo · 3 места");
-  assert.equal(savedDayTitle("2026-11-14", 3, true), "Выходные от mamaGo · суббота");
-  assert.equal(savedDayTitle("2026-11-15", 2, true), "Выходные от mamaGo · воскресенье");
+  assert.equal(savedDayMenuLabel(3), "День от mamaGo · 3 места");
+  assert.equal(savedDayMenuLabel(1), "День от mamaGo · 1 место");
   const weekend = { "2026-11-14": { groupId: "g1", count: 3 }, "2026-11-15": { groupId: "g1", count: 2 } };
   assert.deepEqual(pairOf("2026-11-14", weekend), { date: "2026-11-15", count: 2, direction: "next" });
   assert.deepEqual(pairOf("2026-11-15", weekend), { date: "2026-11-14", count: 3, direction: "prev" });
