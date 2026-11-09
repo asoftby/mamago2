@@ -11,6 +11,7 @@ import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { buildJournalFeedBuckets, type JournalBucket } from "@/server/journal/journalPageQueries";
+import { getSeasonallyCurrentJournalWhere } from "@/lib/journal/seasonalJournal";
 import {
   PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG,
   PUBLIC_ARTICLE_LIST_CACHE_TAG,
@@ -239,7 +240,7 @@ async function queryBucketedJournal(
  */
 export async function queryCityHomeArticles(
   city: CityHomeArticleCity,
-  options: { skip?: number; take?: number; additionalWhere?: Prisma.ArticleWhereInput } = {},
+  options: { skip?: number; take?: number; additionalWhere?: Prisma.ArticleWhereInput; seasonalPriority?: boolean } = {},
 ): Promise<CityHomeJournalArticle[]> {
   return queryJournalArticles(city, options);
 }
@@ -255,13 +256,28 @@ export async function queryJournalArticles(
     take?: number;
     additionalWhere?: Prisma.ArticleWhereInput;
     pinnedFirst?: boolean;
+    /** false for breaking news and previews already filtered to current articles. */
+    seasonalPriority?: boolean;
+    /** Reuse calendar predicate already loaded by the journal page. */
+    seasonalWhere?: Prisma.ArticleWhereInput;
   } = {},
 ): Promise<CityHomeJournalArticle[]> {
   const base: Prisma.ArticleWhereInput = options.additionalWhere
     ? { AND: [publicJournalWhere(), options.additionalWhere] }
     : publicJournalWhere();
   const territoryScope = city ? await resolveTerritoryScope(city.slug) : null;
-  return queryBucketedJournal(base, buildJournalFeedBuckets(city, { ...options, territoryScope }), options);
+  const geographyBuckets = buildJournalFeedBuckets(city, { ...options, territoryScope });
+  if (options.seasonalPriority === false) {
+    return queryBucketedJournal(base, geographyBuckets, options);
+  }
+  const current = options.seasonalWhere ?? await getSeasonallyCurrentJournalWhere();
+  // Active and approved content outranks old seasons, even if the latter is pinned.
+  // Both groups remain public and paginated with the same disjoint bucket rules.
+  const buckets: JournalBucket[] = [
+    ...geographyBuckets.map((bucket) => ({ group: bucket.group, where: { AND: [current, bucket.where] } })),
+    ...geographyBuckets.map((bucket) => ({ group: bucket.group, where: { AND: [{ NOT: current }, bucket.where] } })),
+  ];
+  return queryBucketedJournal(base, buckets, options);
 }
 
 /** Total for {@link queryJournalArticles} with the same filter. */
@@ -277,8 +293,10 @@ export async function countJournalArticles(additionalWhere?: Prisma.ArticleWhere
 export async function queryCityHomePreviewArticles(
   city: CityHomeArticleCity,
 ): Promise<CityHomeJournalArticle[]> {
+  const current = await getSeasonallyCurrentJournalWhere();
   return queryCityHomeArticles(city, {
-    additionalWhere: { publicationType: { not: "BREAKING_NEWS" } },
+    additionalWhere: { AND: [{ publicationType: { not: "BREAKING_NEWS" } }, current] },
+    seasonalPriority: false,
   });
 }
 
@@ -298,14 +316,7 @@ export async function listCityHomeArticles(
 async function queryNationalBlogArticles(
   options: { skip?: number; take?: number } = {},
 ): Promise<CityHomeJournalArticle[]> {
-  const rows = await prisma.article.findMany({
-    where: publicJournalWhere(),
-    orderBy: JOURNAL_ORDER,
-    skip: options.skip ?? 0,
-    take: options.take ?? 100,
-    select: JOURNAL_SELECT,
-  });
-  return rows.map(row => toJournalArticle(row, null));
+  return queryJournalArticles(null, { skip: options.skip, take: options.take ?? 100 });
 }
 
 /**
@@ -314,6 +325,6 @@ async function queryNationalBlogArticles(
 export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
   return unstable_cache(queryNationalBlogArticles, ["public-article-list:national"], {
     tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
-    revalidate: PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,
+    revalidate: 300,
   })();
 }

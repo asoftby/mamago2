@@ -122,6 +122,7 @@ model User {
   inboxItems                        InboxItem[]
   experiences                       Experience[]
   dayScenarios                      DayScenario[]
+  dayScenarioShares                 DayScenarioShare[]
   routes                            Route[]                          @relation("RouteAuthor")
   routeIdeas                        RouteIdea[]
   routeRatings                      RouteRating[]
@@ -898,6 +899,23 @@ model DayScenario {
   @@index([groupId])
 }
 
+/// «Поделиться» днём/выходными от mamaGo: отзываемая ссылка-возможность (capability URL, /d/[token]).
+/// Ссылка читает сценарий вживую: что в плане сейчас, то и видно. Без данных о владельце.
+model DayScenarioShare {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  /// День, с которого поделились (для выходных — любой из двух).
+  date      String
+  /// Не null: делимся всей группой (Сб+Вс); null: одним днём.
+  groupId   String?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
 /// Сценарий-специфичная организация одного PlanItem внутри Сценария дня —
 /// сейчас только назначенное вручную время для изначально «гибких»
 /// (без источника времени) пунктов. Не дублирует контент PlanItem/Activity;
@@ -1074,6 +1092,7 @@ model Occasion {
   updatedAt   DateTime     @updatedAt
 
   activityLinks ActivityOccasion[]
+  articles Article[] @relation("ArticleOccasion")
 
   @@index([sortOrder])
   @@index([type, sortOrder])
@@ -3701,6 +3720,11 @@ model Article {
   relatedPlace       Place?               @relation("ArticleRelatedPlace", fields: [relatedPlaceId], references: [id], onDelete: SetNull)
   /// EventCategory с publicationType=ARTICLE (корневая категория журнала).
   categoryId         String?
+  /// Null means evergreen. The calendar owns the occasion's active window.
+  occasionId         String?
+  occasion           Occasion? @relation("ArticleOccasion", fields: [occasionId], references: [id], onDelete: SetNull)
+  /// Start of the season explicitly approved by an editor.
+  seasonReviewedForStart DateTime?
   category           EventCategory?       @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
   additionalCategoryLinks ArticleCategoryLink[]
   additionalGeographyTargets ArticleGeographyTarget[]
@@ -3727,6 +3751,7 @@ model Article {
   @@index([geoScope])
   @@index([relatedPlaceId])
   @@index([categoryId])
+  @@index([occasionId])
   @@index([territoryId])
   @@index([regionTerritoryId])
   @@index([publicationType, status, publishedAt])
