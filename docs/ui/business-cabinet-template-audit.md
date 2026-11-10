@@ -25,9 +25,13 @@ visual source of truth for business pages.
 | `/business/reviews` | Standalone heading and square cards | Shared header, consistent radius/borders |
 | `/business/support` | Component-owned title/max-width/padding | Shared header, optional embedded mode |
 | `/business/billing` | Standalone balance title card | Shared header; retain balance flows |
+| `/business/billing/plan` | No unified page heading | Shared header; unchanged tariff state |
+| `/business/billing/documents` | No unified page heading | Shared header; unchanged document list |
+| `/business/billing/requisites` | Standalone narrow title | Shared full-width header; form keeps its appropriate width |
+| `/business/billing/history` | Shared section header | Keep |
 | `/business/dashboard` | Customized dashboard structure | Follow-up: compare main header and cards |
 | `/business/settings` | Generic renderSettingsPage | Follow-up: verify scope-specific wrapper |
-| Other billing, promotion, publication editor detail routes | Not yet fully reviewed | Follow-up: inventory all nested pages |
+| Other promotion and publication editor detail routes | Not yet fully reviewed | Follow-up: inventory all nested pages |
 
 ## Review requirements before rollout
 
