@@ -35,5 +35,6 @@ export const UI_LAB_CATALOG: CatalogEntry[] = [
   { id:"filter", title:"Фильтры каталога", source:"src/features/discovery/filters/DiscoveryFilters.tsx", status:"review", scope:"public", note:"Desktop/mobile различия допустимы" },
   { id:"activity-card", title:"Карточки событий", source:"src/components/content-cards/ActivityCard.tsx", status:"review", scope:"public", note:"Карточка одна, variant/density/actions" },
   { id:"wizard", title:"Мастер создания", source:"src/components/form-shell", status:"draft", scope:"business", note:"Проверить переключение шагов и адаптивность" },
+  { id:"manual-booking", title:"Ручная запись", source:"src/components/business/bookings/ManualBookingDialog.tsx", status:"review", scope:"business", note:"Диалог в Записях и заказах: загрузка, пустой список, слот, ошибка, сохранение" },
   { id:"admin-forms", title:"Формы админки", source:"src/app/(ui)/ui-lab-admin/_sections/FormsSection.tsx", status:"legacy", scope:"admin", note:"Архив примеров, не источник стилевых правил" },
 ];

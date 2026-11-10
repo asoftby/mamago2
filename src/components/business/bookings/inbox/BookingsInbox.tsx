@@ -260,7 +260,7 @@ function InboxCard({
               {isParty ? <PartyPopper className="h-3.5 w-3.5" /> : <CalendarDays className="h-3.5 w-3.5" />}
               {isParty ? "Праздник" : "Запись"}
             </span>
-            <span className="text-stone-500">Получена {formatInboxDate(item.createdAt)}</span>
+            <span className="text-stone-500">{item.source === "MANUAL" ? "Добавлено вручную" : `Получена ${formatInboxDate(item.createdAt)}`}</span>
           </div>
           <h3 className="line-clamp-2 text-lg font-semibold leading-snug text-stone-950">
             {item.title ?? (isParty ? "Заявка на праздник" : "Заявка")}
