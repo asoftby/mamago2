@@ -35,9 +35,21 @@ import type { PlanItemWithActivity } from "../types/event";
 import type { MyPlanIdea } from "../hooks/useMyPlan";
 import { normalizePlanSuggestions } from "../lib/planSuggestions";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { formatActivityAddressLine } from "../lib/formatActivityAddress";
+import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
+import {
+  appendSuggestionBatch,
+  canGoBackSuggestionBatch,
+  currentSuggestionBatch,
+  emptySuggestionBatchHistory,
+  goBackSuggestionBatch,
+  type SuggestionBatchHistory,
+} from "../lib/suggestionBatchHistory";
 import type { MyPlanGuestPanelPhase } from "./guestMyPlanTypes";
 
 type GuestSlot = GuestPlanSlot;
+type GuestScenarioRow = { slot: GuestSlot; activity: NonNullable<MyPlanIdea["activity"]> };
 
 const KID_AGE_GROUPS = AGE_GROUPS.filter((g) => g.value !== "18+");
 
@@ -154,9 +166,10 @@ export function GuestMyPlanPanel({
   const [interests, setInterests] = useState<string[]>([]);
   const [showInterests, setShowInterests] = useState(false);
 
-  const [scenarioSlots, setScenarioSlots] = useState<
-    Array<{ slot: GuestSlot; activity: NonNullable<MyPlanIdea["activity"]> }>
-  >([]);
+  const [scenarioSlots, setScenarioSlots] = useState<GuestScenarioRow[]>([]);
+  const [batchHistory, setBatchHistory] = useState<SuggestionBatchHistory<GuestScenarioRow>>(
+    () => emptySuggestionBatchHistory(),
+  );
   const [committedBySlot, setCommittedBySlot] = useState<
     Partial<Record<GuestSlot, PlanItemWithActivity>>
   >({});
@@ -167,6 +180,8 @@ export function GuestMyPlanPanel({
   const scenarioGenerationInFlightRef = useRef(false);
   /** Restored empty drafts retry once; a real failed/empty response never loops. */
   const scenarioRequestAttemptedRef = useRef(false);
+  /** All activity ids shown this session — forward fetch must not repeat them after going back. */
+  const shownGuestActivityIdsRef = useRef<Set<string>>(new Set());
 
   /** Остаток подборок с сервера (null — ещё не было успешного ответа) */
   const [guestRemainingGenerations, setGuestRemainingGenerations] = useState<
@@ -177,9 +192,16 @@ export function GuestMyPlanPanel({
 
   const scenarioSlotsRef = useRef(scenarioSlots);
   scenarioSlotsRef.current = scenarioSlots;
+  const batchHistoryRef = useRef(batchHistory);
+  batchHistoryRef.current = batchHistory;
   const committedRef = useRef(committedBySlot);
   committedRef.current = committedBySlot;
   const restoreDoneRef = useRef(false);
+
+  const clearBatchHistory = useCallback(() => {
+    shownGuestActivityIdsRef.current = new Set();
+    setBatchHistory(emptySuggestionBatchHistory());
+  }, []);
 
   const resolvedTargetDate = useMemo(() => {
     if (whenChoice === "today") return todayIso;
@@ -205,6 +227,7 @@ export function GuestMyPlanPanel({
       setFormatChoice("any");
       setInterests([]);
       setScenarioSlots([]);
+      clearBatchHistory();
       setCommittedBySlot({});
       setGuestRemainingGenerations(null);
       setGuestQuotaBlocked(false);
@@ -282,6 +305,12 @@ export function GuestMyPlanPanel({
         }
         setScenarioSlots(validated);
         setCommittedBySlot(validatedChosen);
+        if (validated.length > 0) {
+          for (const row of validated) shownGuestActivityIdsRef.current.add(row.activity.id);
+          setBatchHistory(appendSuggestionBatch(emptySuggestionBatchHistory(), validated, MAX_SUGGESTION_BATCHES));
+        } else {
+          clearBatchHistory();
+        }
         if (draft.phase === "engaged" && Object.keys(validatedChosen).length > 0) setPhase("engaged");
       } catch {
         if (active) {
@@ -296,7 +325,7 @@ export function GuestMyPlanPanel({
       }
     })();
     return () => { active = false; };
-  }, [citySlug, setSelectedPlanDate, todayIso]);
+  }, [citySlug, clearBatchHistory, setSelectedPlanDate, todayIso]);
 
   useEffect(() => {
     if (!restoreDoneRef.current) return;
@@ -376,11 +405,9 @@ export function GuestMyPlanPanel({
       }
       setLoadingScenario(true);
       try {
-        const exclude: string[] = [];
-        for (const row of scenarioSlotsRef.current)
-          exclude.push(row.activity.id);
+        const exclude = new Set<string>(shownGuestActivityIdsRef.current);
         for (const item of Object.values(committedRef.current)) {
-          if (item?.activityId) exclude.push(item.activityId);
+          if (item?.activityId) exclude.add(item.activityId);
         }
 
         const anonymousId = getOrCreateAnonymousId();
@@ -393,7 +420,7 @@ export function GuestMyPlanPanel({
             city: citySlug,
             date: resolvedTargetDate,
             ...(whenChoice === "weekend" ? { dateTo: addDaysIso(resolvedTargetDate, 1) } : {}),
-            exclude,
+            exclude: [...exclude],
             ageRanges: whoKey === "me" ? ["18+"] : whoKey === "kids" ? kidRanges.slice().sort() : [],
             ...(interests.length > 0 ? { interests } : {}),
           }),
@@ -439,6 +466,8 @@ export function GuestMyPlanPanel({
         const merged = normalizePlanSuggestions(raw, 6);
         const distributed = distributeActivitiesToSlots(merged.slice(0, 6));
 
+        for (const row of distributed) shownGuestActivityIdsRef.current.add(row.activity.id);
+        setBatchHistory((prev) => appendSuggestionBatch(prev, distributed, MAX_SUGGESTION_BATCHES));
         setScenarioSlots(distributed);
         setSelectedPlanDate(resolvedTargetDate);
         setPhase((p) => (p === "engaged" ? "engaged" : "generated"));
@@ -469,6 +498,14 @@ export function GuestMyPlanPanel({
     recordEngagement();
     void fetchScenario();
   }, [fetchScenario, recordEngagement]);
+
+  const handleShowPreviousBatch = useCallback(() => {
+    const next = goBackSuggestionBatch(batchHistoryRef.current);
+    if (next.index === batchHistoryRef.current.index) return;
+    const batch = currentSuggestionBatch(next);
+    setBatchHistory(next);
+    if (batch) setScenarioSlots(batch);
+  }, []);
 
   const handleAddScenarioToPlan = useCallback(
     async (slot: GuestSlot, activity: NonNullable<MyPlanIdea["activity"]>) => {
@@ -549,9 +586,16 @@ export function GuestMyPlanPanel({
       label: "Выходные",
       sub: (() => {
         const sat = upcomingSaturdayIso(todayIso);
+        const sun = addDaysIso(sat, 1);
         const [, m0, d0] = sat.split("-").map(Number);
-        const [, m1, d1] = addDaysIso(sat, 1).split("-").map(Number);
-        return m0 === m1 ? `сб–вс, ${d0}–${d1}` : `сб–вс`;
+        const [, m1, d1] = sun.split("-").map(Number);
+        const monthShort = (iso: string) =>
+          new Date(`${iso}T12:00:00`)
+            .toLocaleDateString("ru-RU", { month: "short" })
+            .replace(/\./g, "");
+        return m0 === m1
+          ? `сб–вс, ${d0}–${d1} ${monthShort(sat)}`
+          : `сб–вс, ${d0} ${monthShort(sat)} – ${d1} ${monthShort(sun)}`;
       })(),
     },
   ];
@@ -581,14 +625,16 @@ export function GuestMyPlanPanel({
   useEffect(() => {
     if (!refetchForWeekend || whenChoice !== "weekend") return;
     setRefetchForWeekend(false);
+    clearBatchHistory();
     void fetchScenario({ showGeneratedShellFirst: true });
-  }, [refetchForWeekend, whenChoice, fetchScenario]);
+  }, [refetchForWeekend, whenChoice, fetchScenario, clearBatchHistory]);
 
   const runQuiz = () => {
     if (!guestCanGenerateMore) {
       setShowOut(true);
       return;
     }
+    clearBatchHistory();
     void fetchScenario({ showGeneratedShellFirst: true });
   };
 
@@ -613,13 +659,12 @@ export function GuestMyPlanPanel({
     </div>
   );
 
-  const guestPickMeta = (activity: NonNullable<MyPlanIdea["activity"]>, item: PlanItemWithActivity) => {
-    const age = activity.ageLabel ?? null;
+  const guestPickFields = (activity: NonNullable<MyPlanIdea["activity"]>, item: PlanItemWithActivity) => {
     const startsAt = item.startsAt ?? confirmedGuestStartsAt(activity);
-    const datePart = startsAt
+    const date = startsAt
       ? startsAt.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Europe/Minsk" })
       : null;
-    const timePart = startsAt
+    const time = startsAt
       ? startsAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Minsk" })
       : null;
     const priceText = activity.priceText?.trim();
@@ -630,19 +675,27 @@ export function GuestMyPlanPanel({
         : activity.priceFrom != null && !Number.isNaN(activity.priceFrom)
           ? formatPriceFrom(activity.priceFrom)
           : null;
-    return [age, datePart, timePart, price].filter(Boolean).join(" · ");
+    return {
+      address: formatActivityAddressLine(activity),
+      date,
+      time,
+      price,
+    };
   };
 
   const resultCards = scenarioSlots.map((row) => {
     const committed = committedList.find((c) => c.item.activityId === row.activity.id);
     const item = committed?.item ?? activityToPlanItem(resolvedTargetDate, row.slot, row.activity);
+    const fields = guestPickFields(row.activity, item);
     return (
       <PlanPickCard
         key={`${row.slot}-${row.activity.id}`}
         title={row.activity.title}
         coverImageUrl={row.activity.coverImageUrl}
-        category={row.activity.eventCategory?.nameRu}
-        meta={guestPickMeta(row.activity, item)}
+        address={fields.address}
+        date={fields.date}
+        time={fields.time}
+        price={fields.price}
         inPlan={Boolean(committed)}
         onAdd={() => void handleAddScenarioToPlan(row.slot, row.activity)}
         onRemove={committed ? () => handleRemoveCommitted(committed.sk) : undefined}
@@ -778,12 +831,24 @@ export function GuestMyPlanPanel({
               Нашли {scenarioSlots.length} {scenarioSlots.length === 1 ? "вариант" : scenarioSlots.length < 5 ? "варианта" : "вариантов"}
             </h3>
             <div className="space-y-2.5">{resultCards}</div>
-            {guestCanGenerateMore ? (
-              <button type="button" className={cn(quietBtn, "mt-2")} disabled={loadingScenario} onClick={handleRegenerate}>
-                <Repeat2 className="h-[17px] w-[17px]" aria-hidden />
-                Показать другие варианты
-              </button>
-            ) : null}
+            <div className="mt-2 flex flex-col gap-1">
+              {canGoBackSuggestionBatch(batchHistory) ? (
+                <button
+                  type="button"
+                  className={quietBtn}
+                  disabled={loadingScenario}
+                  onClick={handleShowPreviousBatch}
+                >
+                  К прошлым вариантам
+                </button>
+              ) : null}
+              {guestCanGenerateMore ? (
+                <button type="button" className={quietBtn} disabled={loadingScenario} onClick={handleRegenerate}>
+                  <Repeat2 className="h-[17px] w-[17px]" aria-hidden />
+                  Показать другие варианты
+                </button>
+              ) : null}
+            </div>
           </>
         )}
       </>
@@ -864,7 +929,9 @@ export function GuestMyPlanPanel({
                 <div className="line-clamp-2 text-[15px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">
                   {item.title || item.activity?.title}
                 </div>
-                <div className="mt-0.5 text-[13px] text-[var(--mp-tx2)]">{summaryDateLine(item)}</div>
+                <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline text-[13px] text-[var(--mp-tx2)]">
+                  {summaryDateLine(item)}
+                </div>
               </div>
               <button
                 type="button"
@@ -978,14 +1045,51 @@ export function GuestMyPlanPanel({
   );
 }
 
-function summaryDateLine(item: PlanItemWithActivity): string {
+function summaryDateLine(item: PlanItemWithActivity): React.ReactNode {
   const src = item.startsAt ?? (item.date ? new Date(`${item.date}T12:00:00`) : null);
-  if (!src) return "";
+  if (!src) return null;
   const d = src instanceof Date ? src : new Date(src);
-  if (Number.isNaN(d.getTime())) return "";
-  const day = d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Minsk" }).replace(/\./g, "");
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d
+    .toLocaleDateString("ru-RU", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      timeZone: "Europe/Minsk",
+    })
+    .replace(/\./g, "");
   const time = item.startsAt
-    ? item.startsAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Minsk" })
+    ? item.startsAt.toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Minsk",
+      })
     : "время уточняется";
-  return [day, time, item.activity?.ageLabel].filter(Boolean).join(" · ");
+  const activity = item.activity;
+  const priceText = activity?.priceText?.trim();
+  const price = priceText
+    ? normalizeUiCurrencyText(priceText)
+    : activity?.priceFrom === 0
+      ? "Бесплатно"
+      : activity?.priceFrom != null && !Number.isNaN(activity.priceFrom)
+        ? formatPriceFrom(activity.priceFrom)
+        : null;
+  const parts: React.ReactNode[] = [day, time];
+  if (price) {
+    parts.push(
+      price === "Бесплатно" ? (
+        price
+      ) : (
+        <span key="price" className="inline-flex items-baseline gap-[0.15em]">
+          {renderCurrencyText(price, { iconSize: "sm" })}
+        </span>
+      ),
+    );
+  }
+  return parts.map((part, i) => (
+    <span key={i} className="inline-flex min-w-0 items-baseline">
+      {i > 0 ? <span className="mx-1.5 shrink-0" aria-hidden>·</span> : null}
+      {part}
+    </span>
+  ));
 }

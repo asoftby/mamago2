@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { PLAN_FOCUS } from "./planChipStyles";
 import { PlanScreenHeader } from "./PlanScreenHeader";
 import { PlanPickCard } from "../PlanPickCard";
+import { formatActivityAddressLine } from "../../lib/formatActivityAddress";
 import type { PlanSuggestionItem } from "../../lib/fetchPlanSuggestions";
 
 export type PlanPicksPerson = { id: string; label: string };
@@ -33,9 +34,11 @@ export function PlanPicksScreen({
   metaFor,
   ageQuestion,
   exhausted,
+  canGoPrevious = false,
   onAdd,
   onRetry,
   onMore,
+  onPrevious,
   onOpenCatalog,
   onBack,
   onClose,
@@ -56,13 +59,15 @@ export function PlanPicksScreen({
   loading: boolean;
   failed: boolean;
   addingActivityId: string | null;
-  metaFor: (activity: PlanSuggestionItem) => string;
+  metaFor: (activity: PlanSuggestionItem) => { date?: string | null; time?: string | null; price?: string | null };
   /** Вопрос про возраст детей, если без него подборку не построить. */
   ageQuestion: ReactNode;
   exhausted: boolean;
+  canGoPrevious?: boolean;
   onAdd: (activity: PlanSuggestionItem) => void;
   onRetry: () => void;
   onMore: () => void;
+  onPrevious?: () => void;
   onOpenCatalog: () => void;
   onBack: () => void;
   onClose?: () => void;
@@ -182,13 +187,16 @@ export function PlanPicksScreen({
             <div className="flex flex-col gap-2.5">
               {suggestions.map((activity) => {
                 const isSaved = saved.includes(activity.id);
+                const fields = metaFor(activity);
                 return (
                   <PlanPickCard
                     key={activity.id}
                     title={activity.title}
                     coverImageUrl={activity.coverImageUrl}
-                    category={activity.eventCategory?.nameRu}
-                    meta={metaFor(activity)}
+                    address={formatActivityAddressLine(activity)}
+                    date={fields.date}
+                    time={fields.time}
+                    price={fields.price}
                     adding={addingActivityId === activity.id}
                     onAdd={() => onAdd(activity)}
                     isSaved={isSaved}
@@ -202,18 +210,29 @@ export function PlanPicksScreen({
         </div>
 
         {!ageQuestion && !loading && !failed && suggestions.length > 0 ? (
-          <button
-            type="button"
-            onClick={exhausted ? onOpenCatalog : onMore}
-            className={cn("mx-auto mt-[22px] flex min-h-11 items-center gap-2 px-3 text-center text-[14px] font-medium text-[var(--mp-tx2)] hover:text-[var(--mp-tx)]", PLAN_FOCUS)}
-          >
-            {exhausted ? "Открыть каталог →" : (
-              <>
-                <RefreshCw className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-                Показать ещё
-              </>
-            )}
-          </button>
+          <div className="mt-[22px] flex flex-col items-center gap-1">
+            {canGoPrevious && onPrevious ? (
+              <button
+                type="button"
+                onClick={onPrevious}
+                className={cn("flex min-h-11 items-center gap-2 px-3 text-center text-[14px] font-medium text-[var(--mp-tx2)] hover:text-[var(--mp-tx)]", PLAN_FOCUS)}
+              >
+                К прошлым вариантам
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={exhausted ? onOpenCatalog : onMore}
+              className={cn("flex min-h-11 items-center gap-2 px-3 text-center text-[14px] font-medium text-[var(--mp-tx2)] hover:text-[var(--mp-tx)]", PLAN_FOCUS)}
+            >
+              {exhausted ? "Открыть каталог →" : (
+                <>
+                  <RefreshCw className="h-4 w-4" strokeWidth={1.8} aria-hidden />
+                  Показать ещё
+                </>
+              )}
+            </button>
+          </div>
         ) : null}
       </div>
     </div>

@@ -276,7 +276,19 @@ async function applyPlaces(ctx: Ctx): Promise<Map<string, string>> {
       lng: spec.lng,
       geoCell6: cells?.geoCell6 ?? null,
       geoCell5: cells?.geoCell5 ?? null,
-      shortAddress: `Минск, ${CLUSTER_LABEL[spec.cluster]} (тестовая точка)`,
+      // Street+house only — city comes from Place.city for "Город, улица, дом".
+      shortAddress: `${
+        (
+          {
+            center: "ул. Немига",
+            uruche: "пр-т Независимости",
+            kamgorka: "ул. Притыцкого",
+            serebr: "ул. Якубова",
+            bor: "ул. 40 лет Победы",
+            zhd: "ул. Тимирязева",
+          } as const
+        )[spec.cluster]
+      }, ${10 + ((ordinal - 1) % 80)}`,
       primaryCategoryId: ctx.categories.get(spec.primary)!,
       ageTags: spec.ages,
       agePolicy: spec.adultOnly ? ("ADULT_ONLY" as const) : spec.ages.length > 0 ? ("SPECIFIC" as const) : ("UNKNOWN" as const),
