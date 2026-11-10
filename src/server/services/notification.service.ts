@@ -1197,6 +1197,16 @@ export async function resolveNotificationActionById(
   }
 
   const action = resolveNotificationAction(notification);
+  // Historical business Direct notifications were stored with a /me/direct
+  // URL during Phase 3.2. Resolve them in the business cabinet without a
+  // destructive data migration or accidentally rerouting personal messages.
+  if (
+    notification.audience === "BUSINESS" &&
+    (notification.type === "DIRECT_NEW_MESSAGE" || notification.type === "DIRECT_THREAD_CREATED") &&
+    action.actionUrl?.startsWith("/me/direct/")
+  ) {
+    action.actionUrl = action.actionUrl.replace(/^\/me\/direct\//, "/business/direct/");
+  }
 
   if (notification.readAt == null) {
     await prisma.notification.update({
