@@ -7,7 +7,7 @@ import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEven
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
-import { createPublicBooking } from "./booking.service";
+import { createManualBooking, createPublicBooking } from "./booking.service";
 import { getBusinessBookings, updateBookingStatus } from "./bookingQuery.service";
 import { getBusinessInbox } from "./businessInbox.service";
 
@@ -148,6 +148,51 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.ok((await prisma.activitySession.findUniqueOrThrow({ where: { id: second.id } })).withdrawnAt);
     assert.equal((await prisma.bookingRequest.findUniqueOrThrow({ where: { id: replacement.bookingId } })).selectedSessionId, first.id);
     await assert.rejects(submit(calendar.id, 6, second.id), /Слот недоступен/);
+
+    const context = { businessId: business.id, actorId: owner.id, requestKey: randomUUID() };
+    const manualInput = {
+      publicationType: "EVENT" as const, publicationId: request.id, status: "CONFIRMED" as const,
+      customerName: "Manual Parent", customerPhone: "+375291110091",
+    };
+    await assert.rejects(createManualBooking(manualInput, { ...context, businessId: "foreign-business" }), /недоступно/);
+    const [manual, replay] = await Promise.all([createManualBooking(manualInput, context), createManualBooking(manualInput, context)]);
+    assert.deepEqual(manual, replay);
+    assert.equal(manual.status, "CONFIRMED");
+    const manualRow = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: manual.bookingId }, include: { activities: true },
+    });
+    assert.equal(manualRow.source, "MANUAL");
+    assert.equal(manualRow.userId, null);
+    assert.equal(manualRow.requestedDate, null);
+    assert.deepEqual(manualRow.activities.map(({ type, actorType, actorId }) => ({ type, actorType, actorId })),
+      [{ type: "CREATED", actorType: "BUSINESS", actorId: owner.id }]);
+    await assert.rejects(createManualBooking({ ...manualInput, customerName: "Different" }, context), /Ключ уже использован/);
+
+    const book = (input: Partial<Parameters<typeof createManualBooking>[0]>) =>
+      createManualBooking({ ...manualInput, ...input }, { ...context, requestKey: randomUUID() });
+    await assert.rejects(book({ publicationId: calendar.id, selectedSessionId: second.id }), /Слот недоступен/);
+    await assert.rejects(book({ publicationId: calendar.id, selectedSessionId: first.id }), /недостаточно мест/);
+    await updateBookingStatus(replacement.bookingId, business.id, "REJECTED");
+    const competing = await Promise.allSettled([
+      book({ publicationId: calendar.id, selectedSessionId: first.id }),
+      submit(calendar.id, 7, first.id),
+    ]);
+    assert.equal(competing.filter((entry) => entry.status === "fulfilled").length, 1);
+    assert.match(String(competing.find((entry) => entry.status === "rejected")?.reason), /недостаточно мест/);
+    const accepted = competing.find((entry) => entry.status === "fulfilled")!;
+    await updateBookingStatus(accepted.value.bookingId, business.id, "REJECTED");
+    const manualSlot = await book({ publicationId: calendar.id, selectedSessionId: first.id });
+    assert.ok((await getBusinessInbox({ businessId: business.id, bucket: "UPCOMING", kind: "standard" }))
+      .items.some((item) => item.id === manualSlot.bookingId && item.source === "MANUAL"));
+    assert.ok((await getBusinessBookings({ businessId: business.id, date: new Date(date) }))
+      .items.some((item) => item.id === manualSlot.bookingId && item.source === "MANUAL"));
+    await assert.rejects(book({ publicationId: dateOnly.id, requestedDate: today }), /недостаточно мест/);
+    await updateBookingStatus(dayBooking.bookingId, business.id, "REJECTED");
+    const manualDate = await book({ publicationId: dateOnly.id, requestedDate: today });
+    const manualDateRow = await prisma.bookingRequest.findUniqueOrThrow({ where: { id: manualDate.bookingId } });
+    assert.equal(manualDateRow.requestedDate?.toISOString(), new Date(today).toISOString());
+    assert.equal(manualDateRow.requestedTime, null);
+
   } finally {
     await prisma.bookingRequest.deleteMany({ where: { businessId: business.id } });
     await prisma.activity.deleteMany({ where: { businessId: business.id } });
