@@ -13,7 +13,7 @@ const base = {
   ],
 };
 assert.equal(bookingUnitUpdateSchema.safeParse(base).success, true);
-assert.equal(bookingUnitUpdateSchema.safeParse({ ...base, offerIds: [] }).success, true);
+assert.deepEqual(bookingUnitUpdateSchema.parse({ ...base, offerIds: [] }).offerIds, []);
 assert.equal(bookingUnitUpdateSchema.safeParse({ ...base, exceptions: [
   { date: "2026-11-10", kind: "CLOSED", startMinutes: 600, endMinutes: 900 },
   { date: "2026-11-10", kind: "OPEN_OVERRIDE", startMinutes: 800, endMinutes: 1000 },
