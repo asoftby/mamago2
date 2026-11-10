@@ -14,6 +14,7 @@ const blank = emptyUnitForm();
 assert.equal(blank.rules.length, 5);
 assert.deepEqual(blank.rules.map(r => r.weekday), [1, 2, 3, 4, 5]);
 assert.equal(blank.status, "ACTIVE");
+assert.deepEqual(toUnitPayload({ ...blank, name: "Зал" }).offerIds, []);
 assert.equal(blank.exceptions.length, 0);
 const created = toUnitPayload({ ...blank, name: "Комната", capacity: "20", offerIds: ["o1"] });
 assert.equal(created.capacity, 20);
