@@ -67,7 +67,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
     if (markedReadRef.current) return;
     markedReadRef.current = true;
     for (const occasion of detail.occasions) {
-      fetch(`/api/direct/${occasion.threadId}/read`, { method: "POST", credentials: "include" }).catch(() => {});
+      fetch(`/api/direct/${occasion.threadId}/read${businessMode ? "?as=business" : ""}`, { method: "POST", credentials: "include" }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
