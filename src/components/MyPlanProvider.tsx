@@ -3,10 +3,11 @@
 import { useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
-import { MyPlanWidget, MyPlanMobileWidget, MyPlanOverlay } from "@/features/my-plan";
+import { MyPlanWidget, MyPlanOverlay } from "@/features/my-plan";
+import { MobilePlanBottomStack } from "@/features/my-plan/components/MobilePlanBottomStack";
 import { PlanQuickAddHost } from "@/features/my-plan/components/PlanQuickAddHost";
 import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
-import { appendMyPlanOpenToHref, landingFromOpenEvent, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
+import { landingFromOpenEvent, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 import { isMyPlanShellExcludedPath, shouldHideMyPlanWidget } from "@/lib/intent";
 import { isMyPlanFullPageRoute, resolveMobileBottomSlot } from "@/lib/mobile/bottomSlot";
 import { PlanOverlayProvider, usePlanOverlay } from "@/lib/my-plan/usePlanOverlay";
@@ -60,7 +61,7 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   return (
     <>
       {!hidePlanEntryEffective ? <MyPlanWidget /> : null}
-      {showMobilePlanBar ? <MyPlanMobileWidget keepVisible={planOpen} /> : null}
+      {showMobilePlanBar ? <MobilePlanBottomStack keepVisible={planOpen} /> : null}
       <MyPlanOverlay open={planOpen} onOpenChange={handlePlanOpenChange} />
       <PlanQuickAddHost />
     </>

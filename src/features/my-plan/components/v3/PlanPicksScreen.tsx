@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Heart, RefreshCw, X } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { PLAN_FOCUS } from "./planChipStyles";
 import { PlanScreenHeader } from "./PlanScreenHeader";
+import { PlanPickCard } from "../PlanPickCard";
 import type { PlanSuggestionItem } from "../../lib/fetchPlanSuggestions";
 
 export type PlanPicksPerson = { id: string; label: string };
@@ -180,48 +181,20 @@ export function PlanPicksScreen({
           ) : (
             <div className="flex flex-col gap-2.5">
               {suggestions.map((activity) => {
-                const meta = metaFor(activity);
-                const category = activity.eventCategory?.nameRu;
                 const isSaved = saved.includes(activity.id);
                 return (
-                  <article key={activity.id} className="flex items-start gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-3">
-                    <span className="flex h-[100px] w-[86px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-[var(--mp-soft)]">
-                      {activity.coverImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={activity.coverImageUrl} alt="" className="h-full w-full object-cover" />
-                      ) : null}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="m-0 line-clamp-2 text-[15px] font-semibold leading-[1.25] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
-                        {activity.title}
-                      </h3>
-                      {category ? <p className="m-0 mt-1 truncate text-[13px] text-[var(--mp-tx2)]">{category}</p> : null}
-                      {meta ? <p className="mp-font-meta m-0 mt-0.5 truncate text-[11px] tracking-[.02em] text-[var(--mp-tx2)]">{meta}</p> : null}
-                      <div className="mt-2.5 flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={addingActivityId === activity.id}
-                          onClick={() => onAdd(activity)}
-                          className="h-11 rounded-full bg-[var(--mp-tx)] px-[18px] text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                        >
-                          В план
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={isSaved ? "Сохранено в идеи" : "Сохранить в идеи"}
-                          aria-pressed={isSaved}
-                          disabled={savingId === activity.id}
-                          onClick={() => void saveIdea(activity)}
-                          className={cn(
-                            "flex h-11 w-11 items-center justify-center rounded-full bg-[var(--mp-ac-soft)] text-[var(--mp-ac-dark)] transition-colors hover:bg-brand-soft-hover disabled:opacity-60",
-                            PLAN_FOCUS,
-                          )}
-                        >
-                          <Heart className="h-[18px] w-[18px]" strokeWidth={2} fill={isSaved ? "currentColor" : "none"} aria-hidden />
-                        </button>
-                      </div>
-                    </div>
-                  </article>
+                  <PlanPickCard
+                    key={activity.id}
+                    title={activity.title}
+                    coverImageUrl={activity.coverImageUrl}
+                    category={activity.eventCategory?.nameRu}
+                    meta={metaFor(activity)}
+                    adding={addingActivityId === activity.id}
+                    onAdd={() => onAdd(activity)}
+                    isSaved={isSaved}
+                    saving={savingId === activity.id}
+                    onSave={() => void saveIdea(activity)}
+                  />
                 );
               })}
             </div>

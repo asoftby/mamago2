@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -27,12 +28,13 @@ import {
 import { appendMyPlanOpenToHref } from "@/lib/my-plan/myPlanOpenIntent";
 import { buildAuthUrl } from "@/lib/auth/redirectTo";
 import { getOrCreateAnonymousId } from "@/lib/anonymous/clientAnonymousId";
-import { RecommendationCard } from "./RecommendationCard";
+import { PlanPickCard } from "./PlanPickCard";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanScreenHead } from "./v3/PlanScreenHead";
 import type { PlanItemWithActivity } from "../types/event";
 import type { MyPlanIdea } from "../hooks/useMyPlan";
 import { normalizePlanSuggestions } from "../lib/planSuggestions";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import type { MyPlanGuestPanelPhase } from "./guestMyPlanTypes";
 
 type GuestSlot = GuestPlanSlot;
@@ -563,7 +565,7 @@ export function GuestMyPlanPanel({
     setGoAdult(key === "me");
     if (key !== "kids") setKidRanges([]);
   };
-  const summaryText = (() => {
+  const summaryParts = (() => {
     const who =
       whoKey === "kids"
         ? `С детьми ${KID_AGE_GROUPS.filter((g) => kidRanges.includes(g.value)).map((g) => g.label).join(", ")}`.trim()
@@ -572,7 +574,7 @@ export function GuestMyPlanPanel({
           : "С кем угодно";
     const w = WHEN_OPTIONS.find((o) => o.key === whenChoice)!;
     const it = interests.map((k) => getSystemInterestLabel(k).toLowerCase()).join(", ");
-    return `${who} · ${w.label}, ${w.sub}${it ? ` · ${it}` : ""}`;
+    return [who, `${w.label}, ${w.sub}`, ...(it ? [it] : [])];
   })();
   const quizValid = !(whoKey === "kids" && kidRanges.length === 0);
 
@@ -611,17 +613,39 @@ export function GuestMyPlanPanel({
     </div>
   );
 
+  const guestPickMeta = (activity: NonNullable<MyPlanIdea["activity"]>, item: PlanItemWithActivity) => {
+    const age = activity.ageLabel ?? null;
+    const startsAt = item.startsAt ?? confirmedGuestStartsAt(activity);
+    const datePart = startsAt
+      ? startsAt.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Europe/Minsk" })
+      : null;
+    const timePart = startsAt
+      ? startsAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Minsk" })
+      : null;
+    const priceText = activity.priceText?.trim();
+    const price = priceText
+      ? normalizeUiCurrencyText(priceText)
+      : activity.priceFrom === 0
+        ? "Бесплатно"
+        : activity.priceFrom != null && !Number.isNaN(activity.priceFrom)
+          ? formatPriceFrom(activity.priceFrom)
+          : null;
+    return [age, datePart, timePart, price].filter(Boolean).join(" · ");
+  };
+
   const resultCards = scenarioSlots.map((row) => {
     const committed = committedList.find((c) => c.item.activityId === row.activity.id);
     const item = committed?.item ?? activityToPlanItem(resolvedTargetDate, row.slot, row.activity);
     return (
-      <RecommendationCard
+      <PlanPickCard
         key={`${row.slot}-${row.activity.id}`}
-        item={item}
-        isInPlan={Boolean(committed)}
-        guestDraft
-        onAddToPlan={() => void handleAddScenarioToPlan(row.slot, row.activity)}
-        onRemoveFromPlan={() => committed && handleRemoveCommitted(committed.sk)}
+        title={row.activity.title}
+        coverImageUrl={row.activity.coverImageUrl}
+        category={row.activity.eventCategory?.nameRu}
+        meta={guestPickMeta(row.activity, item)}
+        inPlan={Boolean(committed)}
+        onAdd={() => void handleAddScenarioToPlan(row.slot, row.activity)}
+        onRemove={committed ? () => handleRemoveCommitted(committed.sk) : undefined}
       />
     );
   });
@@ -684,8 +708,8 @@ export function GuestMyPlanPanel({
                     on ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]" : "border-[var(--mp-line)] bg-[var(--mp-card)] hover:border-[var(--mp-line-strong)]",
                   )}
                 >
-                  <b className="text-[15px] font-bold">{o.label}</b>
-                  <span className={cn("mt-0.5 text-[12.5px]", on ? "text-white/80" : "text-[var(--mp-tx2)]")}>{o.sub}</span>
+                  <b className="text-[15px] font-bold text-[var(--mp-tx)]">{o.label}</b>
+                  <span className="mt-0.5 text-[12.5px] text-[var(--mp-tx)]">{o.sub}</span>
                 </button>
               );
             })}
@@ -694,7 +718,7 @@ export function GuestMyPlanPanel({
         <div>
           <button type="button" aria-expanded={showInterests}
             onClick={() => setShowInterests((prev) => !prev)}
-            className="min-h-11 text-left text-sm font-semibold text-[var(--mp-ac-dark)]">
+            className="min-h-11 text-left text-sm font-normal text-[var(--mp-tx)] underline underline-offset-2">
             {showInterests ? "Скрыть интересы" : interests.length > 0 ? `Интересы выбраны: ${interests.length} · Изменить` : "Уточнить по интересам (необязательно)"}
           </button>
           {showInterests ? (
@@ -730,7 +754,14 @@ export function GuestMyPlanPanel({
     body = (
       <>
         <div className="mb-[18px] flex items-center gap-2 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-2 pl-3.5 pr-1">
-          <span className="flex-1 text-[13.5px] leading-[1.4] text-[var(--mp-tx2)]">{summaryText}</span>
+          <span className="flex-1 text-[13.5px] leading-[1.4] text-[var(--mp-tx)]">
+            {summaryParts.map((part, i) => (
+              <Fragment key={`${i}-${part}`}>
+                {i > 0 ? <span className="text-[var(--mp-tx2)]"> · </span> : null}
+                {part}
+              </Fragment>
+            ))}
+          </span>
           <button type="button" onClick={() => setPhase("onboarding")} className="min-h-11 rounded-xl px-3 text-sm font-bold text-[var(--mp-ac-dark)]">
             Изменить
           </button>
@@ -866,14 +897,38 @@ export function GuestMyPlanPanel({
         {benefit(<Users className="h-5 w-5" aria-hidden />, "Точнее — запомним возраст детей")}
         {benefit(<Bell className="h-5 w-5" aria-hidden />, <>Напомним о&nbsp;событиях вовремя</>)}
         {benefit(<Monitor className="h-5 w-5" aria-hidden />, <>Один план для семьи на&nbsp;телефоне и&nbsp;компьютере</>)}
-        <div className="mt-[18px] flex items-start gap-2.5 rounded-[14px] bg-[var(--mp-soft)] px-3.5 py-3 text-[13.5px] leading-[1.45] text-[var(--mp-tx2)]">
+        <button
+          type="button"
+          onClick={() => {
+            setShowOut(false);
+            if (committedCount > 0) setPhase("engaged");
+            else if (scenarioSlots.length > 0) setPhase("generated");
+            else setPhase("onboarding");
+          }}
+          className="mt-[18px] flex w-full items-start gap-2.5 rounded-[14px] bg-[var(--mp-soft)] px-3.5 py-3 text-left text-[13.5px] leading-[1.45] text-[var(--mp-tx2)] transition-colors hover:bg-[var(--mp-soft)]/80"
+        >
           <Repeat2 className="mt-px h-[18px] w-[18px] shrink-0" aria-hidden />
           <span>
-            {committedCount > 0
-              ? `Ваш план (${committedCount} ${committedCount === 1 ? "событие" : committedCount < 5 ? "события" : "событий"}) перенесётся в аккаунт.`
-              : "Всё выбранное перенесётся в аккаунт."}
+            {committedCount > 0 ? (
+              <>
+                Ваш план (
+                {committedCount}{" "}
+                {committedCount === 1 ? "событие" : committedCount < 5 ? "события" : "событий"}
+                ) перенесётся в аккаунт.{" "}
+                <span className="font-semibold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+                  Открыть сохранённый подбор
+                </span>
+              </>
+            ) : (
+              <>
+                Всё выбранное перенесётся в аккаунт.{" "}
+                <span className="font-semibold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+                  Открыть подбор
+                </span>
+              </>
+            )}
           </span>
-        </div>
+        </button>
       </>
     );
     footer = (
