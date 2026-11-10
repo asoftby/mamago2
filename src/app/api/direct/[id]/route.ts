@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canAccessBusinessResource } from "@/server/permissions/business-permissions";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import {
   nextResponseFromDirectAccessError,
   requireDirectThreadAccess,
@@ -37,7 +37,7 @@ export async function GET(
   const currentUser = user!;
 
   const asBusiness = new URL(request.url).searchParams.get("as") === "business";
-  if (asBusiness && !(await canAccessBusinessResource(currentUser, thread.businessId))) {
+  if (asBusiness && !(await canAccessBusiness(currentUser.id, thread.businessId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const resolved = asBusiness
