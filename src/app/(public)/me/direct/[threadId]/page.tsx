@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import {
@@ -44,8 +44,7 @@ export default async function DirectThreadPage({
   // Keep personal pages customer-only and forward authorized business threads
   // into the business shell rather than rendering them in the personal profile.
   if (thread.customerUserId !== user.id) {
-    const business = await getMyBusiness(user.id);
-    if (!business || business.id !== thread.businessId) notFound();
+    if (!(await canAccessBusiness(user.id, thread.businessId))) notFound();
     const routing = await getCurrentRequestRoutingContext();
     redirect(buildSurfaceRedirectDestination({
       targetSurface: "business",
