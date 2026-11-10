@@ -1,17 +1,48 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/server";
+import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { isDirectAccessError, requireDirectThreadAccess } from "@/lib/auth/directAccess";
+import { getUnifiedConversationDetail } from "@/server/services/direct/directConversation.service";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { DirectThreadClient } from "@/app/(public)/me/direct/[threadId]/DirectThreadClient";
 
-/**
- * Technical compatibility only (Phase 3.2) — see /business/direct/page.tsx.
- * Old notification links (notifyDirectMessage ctaAction generated before
- * this phase) still point at /business/direct/{threadId}; this route just
- * forwards them to the unified /me/direct/{threadId} screen, which renders
- * the correct side of the conversation based on who's signed in.
- */
-export default async function BusinessDirectThreadRedirectPage({
+export default async function BusinessDirectThreadPage({
   params,
 }: {
   params: Promise<{ threadId: string }>;
 }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const business = await getMyBusiness(user.id);
+  if (!business) notFound();
   const { threadId } = await params;
-  redirect(`/me/direct/${threadId}`);
+
+  let thread;
+  try {
+    thread = await requireDirectThreadAccess(user, threadId);
+  } catch (error) {
+    if (isDirectAccessError(error)) notFound();
+    throw error;
+  }
+  // A personal customer thread is never a business-cabinet thread,
+  // even if its customer also happens to own a business.
+  if (thread.businessId !== business.id) notFound();
+
+  const detail = await getUnifiedConversationDetail(
+    thread.businessId,
+    thread.customerUserId,
+    "BUSINESS",
+  );
+  if (!detail) notFound();
+
+  return (
+    <div className="space-y-6">
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Сообщения"
+        description="Переписка с клиентами вашей организации"
+      />
+      <DirectThreadClient initialDetail={detail} businessMode />
+    </div>
+  );
 }
