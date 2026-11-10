@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DirectActorType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
+import { canAccessBusinessResource } from "@/server/permissions/business-permissions";
 import {
   nextResponseFromDirectAccessError,
   requireDirectThreadAccess,
@@ -45,7 +46,13 @@ export async function POST(
     const body = await request.json();
     const data = sendMessageSchema.parse(body);
 
-    const senderType = resolveDirectActorType(currentUser, thread);
+    const asBusiness = request.nextUrl.searchParams.get("as") === "business";
+    if (asBusiness && !(await canAccessBusinessResource(currentUser, thread.businessId))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const senderType = asBusiness && currentUser.role !== "ADMIN" && currentUser.role !== "MODERATOR"
+      ? "BUSINESS"
+      : resolveDirectActorType(currentUser, thread);
     // senderUserId always records the real actor (CUSTOMER/BUSINESS/ADMIN are
     // all live people) for audit/accountability — masking which BusinessMember
     // wrote a message from the *customer*'s view happens at the DTO layer
