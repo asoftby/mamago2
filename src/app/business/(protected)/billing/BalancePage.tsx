@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { HeroBalanceCard } from "@/components/business/billing/HeroBalanceCard";
 import { QuickTopUpBlock } from "@/components/business/billing/QuickTopUpBlock";
 import { BalanceStats } from "@/components/business/billing/BalanceStats";
@@ -79,12 +80,11 @@ export function BalancePage({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-stone-200 bg-white p-4 sm:p-6">
-        <h1 className="text-2xl font-bold text-stone-950">Баланс и расходы</h1>
-        <p className="mt-2 text-sm text-stone-600">
-          Баланс хранится в BYN и не сгорает. Лиды, заявки и контакты бесплатны; средства списываются только после явного подтверждения Boost.
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Баланс и расходы"
+        description="Баланс хранится в BYN и не сгорает. Лиды, заявки и контакты бесплатны; средства списываются только после явного подтверждения Boost."
+      />
 
       {/* Hero Balance Card */}
       <HeroBalanceCard
