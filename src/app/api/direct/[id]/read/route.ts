@@ -22,15 +22,17 @@ export async function POST(
     return nextResponseFromDirectAccessError(error) ?? NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const asBusiness = new URL(request.url).searchParams.get("as") === "business";
+  // Enforce explicit business membership before the staff no-op: a moderator
+  // may moderate any thread but must not impersonate an unrelated business.
+  if (asBusiness && !(await canAccessBusiness(user!.id, thread.businessId))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Admin/Moderator viewing a thread is not "reading as" either participant —
   // skip rather than incorrectly clearing one side's unread count for them.
   if (user!.role === "ADMIN" || user!.role === "MODERATOR") {
     return NextResponse.json({ markedCount: 0 });
-  }
-
-  const asBusiness = new URL(request.url).searchParams.get("as") === "business";
-  if (asBusiness && !(await canAccessBusiness(user!.id, thread.businessId))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const readerType = asBusiness || user!.id !== thread.customerUserId
     ? DirectActorType.BUSINESS
