@@ -164,12 +164,12 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
   }
 
   return (
-    <div className={businessMode ? "space-y-4" : styles.page}>
+    <div className={businessMode ? `${styles.businessPage} space-y-4` : styles.page}>
       <div className={businessMode ? "text-sm text-stone-500" : `${styles.wrap} ${styles.breadcrumbs}`}>
         <Link href={businessMode ? "/business/direct" : "/me/direct"}>← {businessMode ? "Все сообщения" : "Мои сообщения"}</Link>
       </div>
 
-      <div className={businessMode ? `rounded-2xl border border-stone-200 bg-white p-4 md:p-6 ${styles.threadWrap}` : styles.threadWrap}>
+      <div className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : styles.threadWrap}>
         <ConversationHeader
           counterpartyName={detail.counterpartyName}
           counterpartyLogoUrl={detail.counterpartyLogoUrl}
