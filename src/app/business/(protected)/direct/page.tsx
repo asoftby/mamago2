@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
-import { getBusinessConversationsForUser, type ConversationTab } from "@/server/services/direct/directConversation.service";
+import { countConversationsByTab, getBusinessConversationsForUser } from "@/server/services/direct/directConversation.service";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { BusinessDirectInbox } from "./BusinessDirectInbox";
 
@@ -13,14 +13,7 @@ export default async function BusinessDirectPage() {
 
   // Query only this organization’s conversations: personal direct messages stay in /me/direct.
   const all = await getBusinessConversationsForUser(user.id, business.id);
-  const counts: Record<ConversationTab, number> = {
-    ALL: all.length,
-    ACTIVE: 0,
-    WAITING: 0,
-    COMPLETED: 0,
-    ARCHIVE: 0,
-  };
-  for (const item of all) counts[item.tab] += 1;
+  const counts = countConversationsByTab(all);
 
   return (
     <div className="space-y-6">
