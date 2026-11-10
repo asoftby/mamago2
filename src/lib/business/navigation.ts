@@ -47,6 +47,7 @@ export const BUSINESS_PUBLICATIONS_EVENTS_HREF = businessRoute("/publications/ev
 export const BUSINESS_PUBLICATIONS_PLACES_HREF = businessRoute("/publications/places");
 export const BUSINESS_PUBLICATIONS_OFFERS_HREF = businessRoute("/publications/offers");
 export const BUSINESS_EVENTS_HREF = businessRoute("/events");
+export const BUSINESS_DIRECT_HREF = businessRoute("/direct");
 export const BUSINESS_BOOKINGS_HREF = businessRoute("/bookings");
 export const BUSINESS_BOOKING_UNITS_HREF = businessRoute("/booking-units");
 export const BUSINESS_NOTIFICATIONS_HREF = businessRoute("/notifications");
@@ -75,7 +76,7 @@ export const businessNavigation: BusinessNavItem[] = [
     icon: LayoutDashboard,
     match: [businessRoute("/dashboard")],
   },
-  { type: "item", label: "Сообщения", href: "/me/direct", icon: MessageSquareText },
+  { type: "item", label: "Сообщения", href: BUSINESS_DIRECT_HREF, icon: MessageSquareText, match: [BUSINESS_DIRECT_HREF] },
   {
     type: "group",
     label: "Публикации",
@@ -176,6 +177,7 @@ export const businessQuickActions = {
   publicationsOffers: BUSINESS_PUBLICATIONS_OFFERS_HREF,
   events: BUSINESS_EVENTS_HREF,
   bookings: BUSINESS_BOOKINGS_HREF,
+  direct: BUSINESS_DIRECT_HREF,
   bookingUnits: BUSINESS_BOOKING_UNITS_HREF,
   reviews: BUSINESS_REVIEWS_HREF,
   notifications: BUSINESS_NOTIFICATIONS_HREF,
