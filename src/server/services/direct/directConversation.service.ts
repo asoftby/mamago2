@@ -210,6 +210,30 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
   return items;
 }
 
+/** Personal-profile inbox: only conversations where this user is the customer.
+ * Business replies are available via getBusinessConversationsForUser instead.
+ */
+export async function getCustomerConversationsForUser(
+  userId: string,
+): Promise<UnifiedConversationListItem[]> {
+  return getCustomerSideItems(userId);
+}
+
+/** Single counter contract for both personal and business inboxes. */
+export function countConversationsByTab(
+  items: UnifiedConversationListItem[],
+): Record<ConversationTab, number> {
+  const counts: Record<ConversationTab, number> = {
+    ALL: items.length,
+    ACTIVE: 0,
+    WAITING: 0,
+    COMPLETED: 0,
+    ARCHIVE: 0,
+  };
+  for (const item of items) counts[item.tab] += 1;
+  return counts;
+}
+
 /** Only client conversations for the selected, authorized business cabinet.
  * Never query or combine this user's personal customer conversations here.
  */
