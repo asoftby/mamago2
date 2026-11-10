@@ -28,9 +28,11 @@ function parsePageTab(raw: string | null): NotificationPageTabValue {
 export function NotificationCenter({
   stream,
   title = "Уведомления",
+  showHeader = true,
 }: {
   stream: "user" | "business";
   title?: string;
+  showHeader?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -162,14 +164,18 @@ export function NotificationCenter({
   return (
     <>
       <section className="space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-neutral-950">{title}</h1>
-          <p className="text-sm text-neutral-500">
-            Последние события, новости и действия, которые требуют внимания.
-          </p>
-        </div>
+        {showHeader && (
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold text-neutral-950">{title}</h1>
+            <p className="text-sm text-neutral-500">
+              Последние события, новости и действия, которые требуют внимания.
+            </p>
+          </div>
+        )}
 
-        <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
+        <div className={stream === "business"
+          ? "rounded-[28px] border border-stone-200/80 bg-white shadow-sm"
+          : "rounded-2xl border border-neutral-200 bg-white shadow-sm"}>
           <div className="space-y-4 border-b border-neutral-200 px-4 py-4 sm:px-6">
             <NotificationTabs
               value={activePageTab}
