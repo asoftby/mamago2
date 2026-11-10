@@ -1,6 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/server";
+import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import {
   isDirectAccessError,
   requireDirectThreadAccess,
@@ -15,13 +18,7 @@ export const metadata: Metadata = {
   title: "Мои сообщения — mamaGo",
 };
 
-/**
- * The URL param is a single DirectThread id (kept stable — both the
- * /me/direct/{id} customer links and the legacy /business/direct/{id}
- * business links, which now redirect here, point at it). The page renders
- * the MERGED conversation for that thread's (business, customer) pair, from
- * whichever side the current user is on — see directConversation.service.ts.
- */
+/** Personal customer thread; legacy business links are forwarded to the B2B screen. */
 export default async function DirectThreadPage({
   params,
 }: {
@@ -43,8 +40,22 @@ export default async function DirectThreadPage({
     throw error;
   }
 
+  // Old business notifications/bookmarks may still point at /me/direct/[id].
+  // Keep personal pages customer-only and forward authorized business threads
+  // into the business shell rather than rendering them in the personal profile.
+  if (thread.customerUserId !== user.id) {
+    const business = await getMyBusiness(user.id);
+    if (!business || business.id !== thread.businessId) notFound();
+    const routing = await getCurrentRequestRoutingContext();
+    redirect(buildSurfaceRedirectDestination({
+      targetSurface: "business",
+      targetPath: `/direct/${threadId}`,
+      ...routing,
+    }));
+  }
+
   const resolved = await resolveViewerRoleForThread(user.id, thread);
-  if (!resolved) notFound();
+  if (!resolved || resolved.viewerRole !== "CUSTOMER") notFound();
 
   const detail = await getUnifiedConversationDetail(
     resolved.businessId,
