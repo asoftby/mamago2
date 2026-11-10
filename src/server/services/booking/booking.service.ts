@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 /**
  * Booking Service
  * Единый command-layer для создания заявок на запись (BookingRequest).
@@ -10,7 +11,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
 import { reserveSlot } from "@/server/offers/reserveSlot";
@@ -158,6 +159,7 @@ function validateBookingCustomer(input: {
 async function createBookingWithInitialActivity(
   data: Prisma.BookingRequestUncheckedCreateInput,
   transaction?: Prisma.TransactionClient,
+  actorId?: string,
 ): Promise<CreateBookingResult> {
   const now = new Date();
   async function create(tx: Prisma.TransactionClient) {
@@ -169,7 +171,8 @@ async function createBookingWithInitialActivity(
       data: {
         bookingId: booking.id,
         type: "CREATED",
-        actorType: "SYSTEM",
+        actorType: actorId ? "BUSINESS" : "SYSTEM",
+        actorId,
         payload: Prisma.JsonNull,
         createdAt: now,
       },
@@ -392,9 +395,70 @@ export async function createPublicClassSlotBooking(input: {
  * Создаёт публичную заявку для EVENT / OFFER / PLACE.
  * Все публичные write-paths должны идти через этот command-layer.
  */
-export async function createPublicBooking(
-  input: CreatePublicBookingInput,
+export function createPublicBooking(input: CreatePublicBookingInput): Promise<CreateBookingResult> {
+  return createPublicationBooking(input);
+}
+
+export const manualRequestOfferWhere = {
+  bookingMode: "REQUEST_ONLY", offerBooking: null, classGroups: { none: {} }, campProgramType: null,
+} satisfies Prisma.OfferWhereInput;
+
+export const manualScheduledOfferWhere = {
+  bookingEnabled: true,
+  bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] },
+  productType: { in: ["REGULAR_ACTIVITY", "ONE_TIME_ACTIVITY"] },
+  offerBooking: { isNot: null },
+} satisfies Prisma.OfferWhereInput;
+
+type ManualBookingInput = Omit<CreatePublicBookingInput, "userId" | "planItemId"> & {
+  status: "NEW" | "CONFIRMED";
+  offerSlot?: { startsAt: string; endsAt: string; groupId?: string; tariffId?: string; unitId?: string };
+};
+
+export async function createManualBooking(
+  input: ManualBookingInput,
+  context: { businessId: string; actorId: string; requestKey: string },
 ): Promise<CreateBookingResult> {
+  const hash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${context.businessId + ":" + context.requestKey}, 0))`;
+    const previous = await tx.bookingRequest.findUnique({
+      where: { businessId_manualRequestKey: { businessId: context.businessId, manualRequestKey: context.requestKey } },
+      select: { id: true, status: true, manualRequestHash: true },
+    });
+    if (previous) {
+      if (previous.manualRequestHash !== hash) throw new BookingValidationError("requestKey", "Ключ уже использован для другой записи");
+      return { bookingId: previous.id, status: previous.status };
+    }
+    if (input.offerSlot && input.publicationType === PublicationType.OFFER) {
+      const offer = await tx.offer.findFirst({
+        where: { ...getPublicPublishedOfferWhere(), ...manualScheduledOfferWhere, id: input.publicationId, place: { ownerBusinessId: context.businessId } },
+        select: { id: true },
+      });
+      if (!offer) throw new BookingNotFoundError("Предложение недоступно для записи");
+      const { customerName, customerPhone } = validateBookingCustomer(input);
+      const adultsCount = input.adultsCount ?? 1;
+      const childrenCount = input.childrenCount ?? 0;
+      const slot = input.offerSlot;
+      const result = await reserveSlot({
+        offerId: offer.id, startsAt: new Date(slot.startsAt), endsAt: new Date(slot.endsAt),
+        classGroupId: slot.groupId, classTariffId: slot.tariffId, unitId: slot.unitId,
+        seats: adultsCount + childrenCount, customerName, customerPhone,
+        customerEmail: input.customerEmail, customerComment: input.customerComment,
+      }, { ...context, tx, hash, status: input.status, adultsCount, childrenCount });
+      return { bookingId: result.bookingId, status: result.status };
+    }
+    return createPublicationBooking(input, { ...context, hash, status: input.status, tx });
+  }, { timeout: 30_000 });
+}
+
+async function createPublicationBooking(
+  input: CreatePublicBookingInput,
+  manual?: { businessId: string; actorId: string; requestKey: string; hash: string; status: "NEW" | "CONFIRMED"; tx: Prisma.TransactionClient },
+): Promise<CreateBookingResult> {
+  const db = manual?.tx ?? prisma;
+  const source = manual ? { source: "MANUAL" as const, manualRequestKey: manual.requestKey, manualRequestHash: manual.hash } : {};
+  const status = manual?.status ?? BookingStatus.NEW;
   const { customerName, customerPhone } = validateBookingCustomer(input);
   const customerEmail = normalizeOptionalString(input.customerEmail);
   const customerComment = normalizeOptionalString(input.customerComment);
@@ -413,7 +477,7 @@ export async function createPublicBooking(
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
 
-  const planLink = await resolveBookingPlanItem({
+  const planLink = manual ? { planItemId: null, invalid: false } : await resolveBookingPlanItem({
     userId: input.userId,
     planItemId: input.planItemId,
     publicationType: input.publicationType,
@@ -432,12 +496,13 @@ export async function createPublicBooking(
   }
 
   if (input.publicationType === PublicationType.EVENT) {
-    const { activity, result } = await prisma.$transaction(async (tx) => {
+    async function createEvent(tx: Prisma.TransactionClient) {
       // Serialize capacity and duplicate checks for the same event. Read the
       // booking configuration after obtaining the lock used by event edits.
-      await tx.$queryRaw`SELECT "id" FROM "Activity" WHERE "id" = ${input.publicationId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "Activity" WHERE "id" = ${input.publicationId}
+        ${manual ? Prisma.sql`AND "businessId" = ${manual.businessId}` : Prisma.empty} FOR UPDATE`;
       const activity = await tx.activity.findFirst({
-        where: { ...getPublicActivityDetailWhere(), id: input.publicationId, type: "EVENT" },
+        where: { ...getPublicActivityDetailWhere(), id: input.publicationId, type: "EVENT", ...(manual ? { businessId: manual.businessId } : {}) },
         select: {
           id: true,
           title: true,
@@ -463,6 +528,9 @@ export async function createPublicBooking(
         throw new BookingValidationError("requestedDate", "Нужно выбрать дату");
       }
 
+      if (manual && activity.bookingMode === BookingMode.REQUEST_ONLY && (requestedDate || requestedTime || input.selectedSessionId)) {
+        throw new BookingValidationError("requestedDate", "Для заявки дата и время не указываются");
+      }
       let date = requestedDate;
       let time = requestedTime;
       let capacity: number | undefined;
@@ -478,6 +546,19 @@ export async function createPublicBooking(
         }
         date = new Date(dateKey);
         capacity = day.capacity;
+      } else if (manual && activity.bookingMode === BookingMode.USE_PUBLICATION_DATES) {
+        const dateKey = date?.toISOString().slice(0, 10) ?? "";
+        if (!dateKey || dateKey < getLocalDateKey() || input.selectedSessionId || time) {
+          throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
+        }
+        const session = await tx.activitySession.findFirst({
+          where: {
+            activityId: activity.id, withdrawnAt: null, OR: [{ isSaleOpen: null }, { isSaleOpen: true }],
+            startsAt: { gte: localWallClockToUtc(dateKey, "00:00"), lt: localWallClockToUtc(addDaysLocal(dateKey, 1), "00:00"), gt: new Date() },
+          },
+          select: { id: true },
+        });
+        if (!session) throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
       } else if (input.selectedSessionId) {
         const session = await tx.activitySession.findFirst({
           where: {
@@ -549,10 +630,13 @@ export async function createPublicBooking(
         customerComment: customerComment ?? undefined,
         adultsCount,
         childrenCount,
-        status: BookingStatus.NEW,
-      }, tx);
+        status,
+        ...source,
+      }, tx, manual?.actorId);
       return { activity: { ...activity, businessId: activity.businessId }, result };
-    });
+    }
+    const { activity, result } = manual ? await createEvent(manual.tx) : await prisma.$transaction(createEvent);
+    if (manual) return result;
 
     triggerBookingCreatedSideEffects({
       planItemId: planLink.planItemId,
@@ -590,10 +674,14 @@ export async function createPublicBooking(
   }
 
   if (input.publicationType === PublicationType.OFFER) {
-    const offer = await prisma.offer.findFirst({
+    const offer = await db.offer.findFirst({
       where: {
         id: input.publicationId,
         ...getPublicPublishedOfferWhere(),
+        ...(manual ? {
+          place: { ownerBusinessId: manual.businessId },
+          ...manualRequestOfferWhere,
+        } : {}),
       },
       select: {
         id: true,
@@ -651,8 +739,10 @@ export async function createPublicBooking(
       customerComment: customerComment ?? undefined,
       adultsCount,
       childrenCount,
-      status: BookingStatus.NEW,
-    });
+      status,
+      ...source,
+    }, manual?.tx, manual?.actorId);
+    if (manual) return result;
 
     triggerBookingCreatedSideEffects({
       planItemId: planLink.planItemId,
@@ -688,10 +778,11 @@ export async function createPublicBooking(
     return result;
   }
 
-  const place = await prisma.place.findFirst({
+  const place = await db.place.findFirst({
     where: {
       id: input.publicationId,
       ...getPublicPublishedPlaceWhere(),
+      ...(manual ? { ownerBusinessId: manual.businessId } : {}),
     },
     select: {
       id: true,
@@ -737,8 +828,10 @@ export async function createPublicBooking(
     customerComment: customerComment ?? undefined,
     adultsCount,
     childrenCount,
-    status: BookingStatus.NEW,
-  });
+    status,
+    ...source,
+  }, manual?.tx, manual?.actorId);
+  if (manual) return result;
 
   triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,

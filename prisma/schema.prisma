@@ -6285,10 +6285,17 @@ enum BookingMode {
 }
 
 /// Заявка на запись/заказ от клиента
+enum BookingSource {
+  MANUAL
+}
+
 model BookingRequest {
   id         String  @id @default(cuid())
   businessId String
   userId     String?
+  source BookingSource?
+  manualRequestKey String?
+  manualRequestHash String?
 
   // Тип публикации
   publicationType PublicationType
@@ -6397,6 +6404,7 @@ model BookingRequest {
   @@index([activityId])
   @@index([offerId])
   @@unique([offerId, slotIdempotencyKey])
+  @@unique([businessId, manualRequestKey])
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([offerSessionId, status, holdUntil])
