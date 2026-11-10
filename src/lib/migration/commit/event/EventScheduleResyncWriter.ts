@@ -19,7 +19,7 @@ export interface EventScheduleResyncTransactionClient {
   activity: Pick<PrismaClient["activity"], "update">;
   activitySession: Pick<
     PrismaClient["activitySession"],
-    "createMany" | "deleteMany" | "findFirst" | "findMany"
+    "createMany" | "deleteMany" | "updateMany" | "findFirst" | "findMany"
   >;
 }
 
@@ -44,7 +44,7 @@ export interface EventScheduleResyncResult {
 }
 
 /**
- * One transaction, one Activity: delete+recreate `ActivitySession` rows
+ * One transaction, one Activity: reconcile `ActivitySession` rows
  * from the source-derived `scheduleDraft`, then resync `nextOccurrenceAt`
  * from whatever sessions now exist. Both steps already exist and are
  * already used by `EventCommitWriter` for CREATE/UPDATE — this function

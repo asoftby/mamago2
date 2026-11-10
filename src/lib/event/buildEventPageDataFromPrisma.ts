@@ -8,6 +8,8 @@ import { sanitizeRichContent } from "@/components/content/richContentHtml";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { BYN_SYMBOL, formatPrice, formatPriceAmount, formatPriceFrom, formatPriceRange } from "@/lib/formatters/format-price";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { eventBookingSlotKey, getEventBookingSchedule } from "./eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
 import type { EventPageData } from "./eventPageTypes";
 import {
@@ -48,6 +50,7 @@ export type ActivityForEventPageInput = {
   faqItems?: unknown | null;
   scheduleJson?: unknown | null;
   /** Серверная запись (режим «Оставить заявку» включает REQUEST_ONLY). */
+  businessId?: string | null;
   bookingEnabled?: boolean | null;
   bookingMode?: string | null;
   /** Денормализованный URL обложки; может дублировать запись по coverImageId в images */
@@ -62,7 +65,7 @@ export type ActivityForEventPageInput = {
     width?: number | null;
     height?: number | null;
   }>;
-  sessions: Array<{ id: string; startsAt: Date; isSaleOpen?: boolean | null; title?: string | null }>;
+  sessions: Array<{ id: string; startsAt: Date; isSaleOpen?: boolean | null; withdrawnAt?: Date | null; title?: string | null }>;
   /** Контактные телефоны события (собственные, до фоллбэка на площадку) */
   phone?: string | null;
   phoneLabel?: string | null;
@@ -304,53 +307,46 @@ export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "sc
 
 function resolveSimpleBooking(
   activityId: string,
-  activity: Pick<ActivityForEventPageInput, "scheduleJson" | "bookingEnabled" | "bookingMode">,
-): import("@/lib/event/eventPageTypes").EventSimpleBookingData | undefined {
-  const json = getScheduleJsonRecord(activity);
-  if (!json) return undefined;
-  const mode = json.participationMode;
-
-  if (mode === "simple-booking") {
-    return {
-      activityId,
-      date: typeof json.simpleBookingDate === "string" ? json.simpleBookingDate : undefined,
-      time: typeof json.simpleBookingTime === "string" ? json.simpleBookingTime : undefined,
-    };
+  activity: ActivityForEventPageInput,
+): EventPageData["cta"]["simpleBooking"] {
+  if (!activity.bookingEnabled || !activity.businessId) return undefined;
+  const mode = getScheduleJsonRecord(activity)?.participationMode;
+  if (activity.bookingMode === "REQUEST_ONLY") {
+    if (mode === "request") return { activityId, label: "Оставить заявку" };
+    if (mode === "simple-booking") return { activityId };
   }
+  if (activity.bookingMode !== "USE_PUBLICATION_SLOTS" ||
+      (mode !== "time-slots" && mode !== "simple-booking")) return undefined;
 
-  // «Оставить заявку»: без слотов и даты. Кнопка нужна только при включённой серверной записи, иначе API
-  // отклонит заявку (старые события с этим режимом в scheduleJson колонок не имеют).
-  if (mode === "request") {
-    return activity.bookingEnabled ? { activityId, label: "Оставить заявку" } : undefined;
-  }
-
-  if (mode === "time-slots") {
-    const ts = json.timeSlots as { dates?: Array<{ id: string; isoDate: string; slots: Array<{ id: string; startTime: string; endTime?: string; capacity?: number }> }> } | undefined;
-    const slots = (ts?.dates ?? []).flatMap((d) =>
-      (d.slots ?? []).map((s) => ({
-        id: s.id,
-        isoDate: d.isoDate,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        capacity: s.capacity,
-      })),
-    );
-    if (slots.length === 0) return undefined;
-    return { activityId, slots };
-  }
-
-  return undefined;
+  const configured = getEventBookingSchedule(activity.scheduleJson);
+  const now = new Date();
+  const slots = activity.sessions.flatMap((session) => {
+    if (session.startsAt <= now || session.withdrawnAt || session.isSaleOpen === false) return [];
+    const isoDate = getLocalDateKey(session.startsAt);
+    const startTime = formatHHMM(session.startsAt);
+    const key = eventBookingSlotKey(isoDate, startTime);
+    const slot = configured.get(key);
+    if (!slot || slot.capacity === 0) return [];
+    configured.delete(key);
+    return [{ id: session.id, isoDate, startTime, endTime: slot.endTime }];
+  });
+  return slots.length ? { activityId, slots } : undefined;
 }
 
-function resolveEventCanonicalCta(activity: ActivityForEventPageInput) {
+function resolveEventCanonicalCta(
+  activity: ActivityForEventPageInput,
+  booking: EventPageData["cta"]["simpleBooking"],
+) {
+  const mode = getScheduleJsonString(activity, "participationMode");
+  const wizardBooking = mode === "request" || mode === "simple-booking" || mode === "time-slots";
   const primaryPhone = resolveActivityPhones(activity)[0]?.value;
 
   return resolveCanonicalCta({
     entityType: "EVENT",
     entity: {
       id: activity.id,
-      participationMode: getScheduleJsonString(activity, "participationMode"),
-      bookingEnabled: activity.bookingEnabled ?? null,
+      participationMode: wizardBooking && !booking ? "walk-in" : mode,
+      bookingEnabled: wizardBooking ? Boolean(booking) : activity.bookingEnabled ?? null,
       bookingMode: activity.bookingMode ?? null,
       ticketLink: decorateStoredTicketLink(getScheduleJsonString(activity, "ticketLink")),
       prebookMethod: getScheduleJsonString(activity, "prebookMethod"),
@@ -569,6 +565,7 @@ export function buildEventPageDataFromPrismaActivity(
     typeof posterWidth === "number" && posterWidth > 0 &&
     typeof posterHeight === "number" && posterHeight > 0;
 
+  const simpleBooking = resolveSimpleBooking(activity.id, activity);
   const sessions: EventPageData["sessions"] = activity.sessions.map((s) => ({
     id: s.id,
     startsAt: s.startsAt.toISOString(),
@@ -652,10 +649,10 @@ export function buildEventPageDataFromPrismaActivity(
       buyLabel: activity.format === "ONLINE" ? "Участвовать онлайн" : "Купить билет",
       saveLabel: "В идеи",
       purchaseUrl: resolvePurchaseUrl(activity),
-      simpleBooking: resolveSimpleBooking(activity.id, activity),
+      simpleBooking,
       phones: resolveEventActionPhones(activity),
     },
-    resolvedCta: resolveEventCanonicalCta(activity),
+    resolvedCta: resolveEventCanonicalCta(activity, simpleBooking),
     reelsUrl: resolveReelsUrl(activity),
     galleryItems: buildGalleryItems(activity, poster, options?.reelsThumbnailUrl),
     ownerEditHref: options?.ownerEditHref,

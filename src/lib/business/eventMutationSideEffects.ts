@@ -82,6 +82,7 @@ export async function syncActivityNextOccurrenceAt(
   const nextUpcomingSession = await prisma.activitySession.findFirst({
     where: {
       activityId,
+      withdrawnAt: null,
       startsAt: { gte: new Date() },
     },
     orderBy: { startsAt: "asc" },

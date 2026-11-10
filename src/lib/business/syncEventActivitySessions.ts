@@ -8,7 +8,7 @@ import { formatHHMM } from "@/lib/formatters/date";
 type EventActivitySessionsPrisma = {
   activitySession: Pick<
     PrismaClient["activitySession"],
-    "createMany" | "deleteMany" | "findMany"
+    "createMany" | "deleteMany" | "findMany" | "updateMany"
   >;
 };
 
@@ -29,9 +29,10 @@ export function eventSessionScheduleFingerprint(scheduleJson: unknown): string {
  * Europe/Minsk wall clock, so ambient server timezone must never participate.
  */
 export function eventSessionFingerprintFromStoredSessions(
-  sessions: { startsAt: Date; title?: string | null }[],
+  sessions: { startsAt: Date; title?: string | null; withdrawnAt?: Date | null }[],
 ): string {
   const occurrences = sessions
+    .filter((session) => !session.withdrawnAt)
     .map((session) => ({
       date: getLocalDateKey(session.startsAt),
       startTime: formatHHMM(session.startsAt),
@@ -54,7 +55,7 @@ export async function activitySessionsMatchScheduleJson(
   const { prisma, activityId, scheduleJson } = input;
   const fromJson = eventSessionScheduleFingerprint(scheduleJson);
   const rows = await prisma.activitySession.findMany({
-    where: { activityId },
+    where: { activityId, withdrawnAt: null },
     orderBy: { startsAt: "asc" },
     select: { startsAt: true, title: true },
   });
@@ -74,14 +75,10 @@ export async function activitySessionsMatchScheduleJson(
  * explicit manual-takeover action clears source/externalId first and stores a
  * PREFER_MANUAL override, after which this normal wizard resync is allowed.
  *
- * For source:null rows we preserve ticket metadata when the occurrence instant
- * itself did not change. That makes manual takeover non-destructive: editing a
- * different date does not throw away buyUrl/price/sale-state for untouched
- * sessions. Metadata is deliberately not copied to a changed instant because
- * an imported ticket URL may identify one exact performance.
- *
- * The read and delete are not serializable, but the delete itself is scoped to
- * `source: null`; a concurrent imported row can therefore never be deleted.
+ * Keep stable IDs and ticket metadata for unchanged times. Retire removed
+ * sessions still referenced by bookings or allocations so existing bookings
+ * retain their original session and resource history.
+
  */
 export async function replaceActivitySessionsFromScheduleJson(
   input: {
@@ -96,12 +93,11 @@ export async function replaceActivitySessionsFromScheduleJson(
   const existingSessions = await prisma.activitySession.findMany({
     where: { activityId },
     select: {
+      id: true,
       startsAt: true,
       source: true,
-      buyUrl: true,
-      priceMinCents: true,
-      priceMaxCents: true,
-      isSaleOpen: true,
+      title: true,
+      withdrawnAt: true,
     },
   });
   const hasImportedSessions = existingSessions.some((s) => s.source != null);
@@ -113,71 +109,62 @@ export async function replaceActivitySessionsFromScheduleJson(
     return { count: 0, skipped: true };
   }
 
-  const metadataByInstant = new Map(
-    existingSessions.map((session) => [
-      session.startsAt.toISOString(),
-      {
-        buyUrl: session.buyUrl,
-        priceMinCents: session.priceMinCents,
-        priceMaxCents: session.priceMaxCents,
-        isSaleOpen: session.isSaleOpen,
-      },
-    ]),
-  );
-
-  const occurrences = extractScheduleOccurrences(scheduleJson);
-
-  const deleteStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-  // Never delete an imported row, even if one lands concurrently after the
-  // read above.
-  await prisma.activitySession.deleteMany({ where: { activityId, source: null } });
-  const deleteMs = isServerSavePerfEnabled() ? Math.round(performance.now() - deleteStarted) : 0;
-
-  if (occurrences.length === 0) {
-    if (isServerSavePerfEnabled()) {
-      console.info("[event-sessions-sync]", {
-        activityId,
-        sessionsCount: 0,
-        deleteMs,
-        createMs: 0,
-        totalMs: Math.round(performance.now() - started),
-      });
+  const desired = new Map(extractScheduleOccurrences(scheduleJson).map((occurrence) => {
+    const startsAt = localWallClockToUtc(occurrence.date, occurrence.startTime);
+    return [startsAt.getTime(), { startsAt, title: occurrence.title ?? null }];
+  }));
+  const count = desired.size;
+  const removedIds: string[] = [];
+  const updates = new Map<string | null, string[]>();
+  for (const session of existingSessions) {
+    const instant = session.startsAt.getTime();
+    const target = desired.get(instant);
+    if (!target) {
+      if (!session.withdrawnAt) removedIds.push(session.id);
+      continue;
     }
-    return { count: 0, skipped: false };
+    desired.delete(instant);
+    if (session.title !== target.title || session.withdrawnAt) {
+      const ids = updates.get(target.title) ?? [];
+      ids.push(session.id);
+      updates.set(target.title, ids);
+    }
   }
-
-  const startsAtList = occurrences.map((occurrence) =>
-    localWallClockToUtc(occurrence.date, occurrence.startTime),
-  );
-  const titleByInstant = new Map(
-    occurrences.map((occurrence, index) => [
-      startsAtList[index]!.toISOString(),
-      occurrence.title ?? null,
-    ]),
-  );
-
+  const deleteStarted = isServerSavePerfEnabled() ? performance.now() : 0;
+  if (removedIds.length) {
+    const where = { activityId, source: null, id: { in: removedIds } };
+    await prisma.activitySession.deleteMany({
+      where: { ...where, bookingRequests: { none: {} }, allocations: { none: {} } },
+    });
+    await prisma.activitySession.updateMany({
+      where,
+      data: { withdrawnAt: new Date() },
+    });
+  }
+  for (const [title, ids] of updates) {
+    await prisma.activitySession.updateMany({
+      where: { activityId, source: null, id: { in: ids } },
+      data: { title, withdrawnAt: null },
+    });
+  }
   const createStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-  await prisma.activitySession.createMany({
-    data: startsAtList.map((startsAt) => ({
-      activityId,
-      startsAt,
-      ...(titleByInstant.get(startsAt.toISOString())
-        ? { title: titleByInstant.get(startsAt.toISOString()) }
-        : {}),
-      ...(metadataByInstant.get(startsAt.toISOString()) ?? {}),
-    })),
-  });
-  const createMs = isServerSavePerfEnabled() ? Math.round(performance.now() - createStarted) : 0;
-
+  if (desired.size) {
+    await prisma.activitySession.createMany({
+      data: [...desired.values()].map(({ startsAt, title }) => ({
+        activityId,
+        startsAt,
+        ...(title ? { title } : {}),
+      })),
+    });
+  }
   if (isServerSavePerfEnabled()) {
     console.info("[event-sessions-sync]", {
       activityId,
-      sessionsCount: startsAtList.length,
-      deleteMs,
-      createMs,
+      sessionsCount: count,
+      deleteMs: Math.round(createStarted - deleteStarted),
+      createMs: Math.round(performance.now() - createStarted),
       totalMs: Math.round(performance.now() - started),
     });
   }
-
-  return { count: startsAtList.length, skipped: false };
+  return { count, skipped: false };
 }

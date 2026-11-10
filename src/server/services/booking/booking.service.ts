@@ -10,6 +10,9 @@
  */
 
 import prisma from "@/lib/prisma";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
+import { formatHHMM } from "@/lib/formatters/date";
 import { reserveSlot } from "@/server/offers/reserveSlot";
 import { childScopeFor } from "@/server/family/familyAccess";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
@@ -154,38 +157,26 @@ function validateBookingCustomer(input: {
 
 async function createBookingWithInitialActivity(
   data: Prisma.BookingRequestUncheckedCreateInput,
+  transaction?: Prisma.TransactionClient,
 ): Promise<CreateBookingResult> {
   const now = new Date();
-
-  const booking = await prisma.$transaction(async (tx) => {
-    const created = await tx.bookingRequest.create({
-      data: {
-        ...data,
-        lastActivityAt: now,
-      },
-      select: {
-        id: true,
-        status: true,
-      },
+  async function create(tx: Prisma.TransactionClient) {
+    const booking = await tx.bookingRequest.create({
+      data: { ...data, lastActivityAt: now },
+      select: { id: true, status: true },
     });
-
     await tx.bookingActivity.create({
       data: {
-        bookingId: created.id,
+        bookingId: booking.id,
         type: "CREATED",
         actorType: "SYSTEM",
         payload: Prisma.JsonNull,
         createdAt: now,
       },
     });
-
-    return created;
-  });
-
-  return {
-    bookingId: booking.id,
-    status: booking.status,
-  };
+    return { bookingId: booking.id, status: booking.status };
+  }
+  return transaction ? create(transaction) : prisma.$transaction(create);
 }
 
 function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): void {
@@ -441,71 +432,121 @@ export async function createPublicBooking(
   }
 
   if (input.publicationType === PublicationType.EVENT) {
-    const activity = await prisma.activity.findFirst({
-      where: {
-        id: input.publicationId,
-        ...getPublicActivityDetailWhere(),
-      },
-      select: {
-        id: true,
-        title: true,
-        cityId: true,
-        placeId: true,
-        bookingEnabled: true,
-        bookingMode: true,
-        businessId: true,
-        business: {
-          select: {
-            ownerUserId: true,
-          },
+    const { activity, result } = await prisma.$transaction(async (tx) => {
+      // Serialize capacity and duplicate checks for the same event. Read the
+      // booking configuration after obtaining the lock used by event edits.
+      await tx.$queryRaw`SELECT "id" FROM "Activity" WHERE "id" = ${input.publicationId} FOR UPDATE`;
+      const activity = await tx.activity.findFirst({
+        where: { ...getPublicActivityDetailWhere(), id: input.publicationId, type: "EVENT" },
+        select: {
+          id: true,
+          title: true,
+          cityId: true,
+          placeId: true,
+          bookingEnabled: true,
+          bookingMode: true,
+          bookingCapacityPerSlot: true,
+          scheduleJson: true,
+          businessId: true,
+          business: { select: { ownerUserId: true } },
         },
-      },
-    });
-
-    if (!activity) {
-      throw new BookingNotFoundError("Событие недоступно для записи");
-    }
-    if (!activity.bookingEnabled) {
-      throw new BookingValidationError("publicationId", "Запись недоступна для этого события");
-    }
-    if (!activity.businessId) {
-      throw new BookingValidationError("publicationId", "Бизнес-аккаунт не найден для этого события");
-    }
-    if (activity.bookingMode === BookingMode.USE_PUBLICATION_SLOTS && !input.selectedSessionId) {
-      throw new BookingValidationError("selectedSessionId", "Нужно выбрать слот");
-    }
-    if (activity.bookingMode === BookingMode.USE_PUBLICATION_DATES && !requestedDate) {
-      throw new BookingValidationError("requestedDate", "Нужно выбрать дату");
-    }
-
-    if (input.selectedSessionId) {
-      const session = await prisma.activitySession.findUnique({
-        where: { id: input.selectedSessionId },
-        select: { activityId: true },
       });
 
-      if (!session || session.activityId !== activity.id) {
-        throw new BookingValidationError("selectedSessionId", "Некорректный слот");
+      if (!activity) throw new BookingNotFoundError("Событие недоступно для записи");
+      if (!activity.bookingEnabled || !activity.businessId) {
+        throw new BookingValidationError("publicationId", "Запись недоступна для этого события");
       }
-    }
+      if (activity.bookingMode === BookingMode.USE_PUBLICATION_SLOTS && !input.selectedSessionId) {
+        throw new BookingValidationError("selectedSessionId", "Нужно выбрать слот");
+      }
+      if (activity.bookingMode === BookingMode.USE_PUBLICATION_DATES && !requestedDate) {
+        throw new BookingValidationError("requestedDate", "Нужно выбрать дату");
+      }
 
-    const result = await createBookingWithInitialActivity({
-      planItemId: planLink.planItemId ?? undefined,
-      businessId: activity.businessId,
-      userId: input.userId ?? undefined,
-      publicationType: PublicationType.EVENT,
-      activityId: activity.id,
-      placeId: activity.placeId ?? undefined,
-      selectedSessionId: input.selectedSessionId ?? undefined,
-      requestedDate: requestedDate ?? undefined,
-      requestedTime: requestedTime ?? undefined,
-      customerName,
-      customerPhone,
-      customerEmail: customerEmail ?? undefined,
-      customerComment: customerComment ?? undefined,
-      adultsCount,
-      childrenCount,
-      status: BookingStatus.NEW,
+      let date = requestedDate;
+      let time = requestedTime;
+      let capacity: number | undefined;
+      const schedule = activity.scheduleJson as Record<string, unknown> | null;
+      if (input.selectedSessionId) {
+        const session = await tx.activitySession.findFirst({
+          where: {
+            id: input.selectedSessionId,
+            activityId: activity.id,
+            withdrawnAt: null,
+            startsAt: { gt: new Date() },
+            OR: [{ isSaleOpen: null }, { isSaleOpen: true }],
+          },
+          select: { startsAt: true },
+        });
+        if (!session) throw new BookingValidationError("selectedSessionId", "Слот недоступен");
+        const localDate = getLocalDateKey(session.startsAt);
+        const localTime = formatHHMM(session.startsAt);
+        const slot = getEventBookingSchedule(schedule).get(eventBookingSlotKey(localDate, localTime));
+        if ((schedule?.participationMode === "time-slots" ||
+             schedule?.participationMode === "simple-booking") && !slot) {
+          throw new BookingValidationError("selectedSessionId", "Слот недоступен для записи");
+        }
+        if ((date && date.toISOString().slice(0, 10) !== localDate) || (time && time !== localTime)) {
+          throw new BookingValidationError("selectedSessionId", "Дата или время не соответствуют слоту");
+        }
+        date = new Date(localDate);
+        time = localTime;
+        capacity = slot?.capacity ?? activity.bookingCapacityPerSlot ?? undefined;
+      }
+
+      const active = {
+        activityId: activity.id,
+        publicationType: PublicationType.EVENT,
+        status: { in: [BookingStatus.NEW, BookingStatus.CONFIRMED] },
+        selectedSessionId: input.selectedSessionId ?? null,
+      };
+      const duplicate = await tx.bookingRequest.findFirst({
+        where: {
+          ...active,
+          customerPhone,
+          ...(!input.selectedSessionId ? { requestedDate: date, requestedTime: time } : {}),
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new BookingValidationError("customerPhone", "Заявка на эту запись уже существует");
+      }
+      if (capacity !== undefined) {
+        const { _sum } = await tx.bookingRequest.aggregate({
+          where: {
+            ...active,
+            OR: [
+              { selectedSessionId: input.selectedSessionId },
+              { selectedSessionId: null, requestedDate: date, requestedTime: time },
+            ],
+            selectedSessionId: undefined,
+          },
+          _sum: { adultsCount: true, childrenCount: true },
+        });
+        if ((_sum.adultsCount ?? 0) + (_sum.childrenCount ?? 0) + adultsCount + childrenCount > capacity) {
+          throw new BookingValidationError("selectedSessionId", "На выбранное время недостаточно мест");
+        }
+      }
+
+      const result = await createBookingWithInitialActivity({
+        planItemId: planLink.planItemId ?? undefined,
+        businessId: activity.businessId,
+        userId: input.userId ?? undefined,
+        publicationType: PublicationType.EVENT,
+        activityId: activity.id,
+        placeId: activity.placeId ?? undefined,
+        selectedSessionId: input.selectedSessionId ?? undefined,
+        requestedDate: date ?? undefined,
+        requestedTime: time ?? undefined,
+        customerName,
+        customerPhone,
+        customerEmail: customerEmail ?? undefined,
+        customerComment: customerComment ?? undefined,
+        adultsCount,
+        childrenCount,
+        status: BookingStatus.NEW,
+      }, tx);
+      return { activity: { ...activity, businessId: activity.businessId }, result };
     });
 
     triggerBookingCreatedSideEffects({
