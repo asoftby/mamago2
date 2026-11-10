@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import { isDirectAccessError, requireDirectThreadAccess } from "@/lib/auth/directAccess";
 import { getUnifiedConversationDetail } from "@/server/services/direct/directConversation.service";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
@@ -13,8 +13,6 @@ export default async function BusinessDirectThreadPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const business = await getMyBusiness(user.id);
-  if (!business) notFound();
   const { threadId } = await params;
 
   let thread;
@@ -26,7 +24,7 @@ export default async function BusinessDirectThreadPage({
   }
   // A personal customer thread is never a business-cabinet thread,
   // even if its customer also happens to own a business.
-  if (thread.businessId !== business.id) notFound();
+  if (!(await canAccessBusiness(user.id, thread.businessId))) notFound();
 
   const detail = await getUnifiedConversationDetail(
     thread.businessId,
