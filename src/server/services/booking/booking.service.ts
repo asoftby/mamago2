@@ -10,7 +10,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
 import { reserveSlot } from "@/server/offers/reserveSlot";
@@ -466,6 +466,7 @@ export async function createPublicBooking(
       let date = requestedDate;
       let time = requestedTime;
       let capacity: number | undefined;
+      let slotStart: Date | undefined;
       const schedule = activity.scheduleJson as Record<string, unknown> | null;
       if (input.selectedSessionId) {
         const session = await tx.activitySession.findFirst({
@@ -491,21 +492,23 @@ export async function createPublicBooking(
         }
         date = new Date(localDate);
         time = localTime;
+        slotStart = localWallClockToUtc(localDate, localTime);
         capacity = slot?.capacity ?? activity.bookingCapacityPerSlot ?? undefined;
       }
 
-      const active = {
+      const active: Prisma.BookingRequestWhereInput = {
         activityId: activity.id,
         publicationType: PublicationType.EVENT,
         status: { in: [BookingStatus.NEW, BookingStatus.CONFIRMED] },
-        selectedSessionId: input.selectedSessionId ?? null,
+        ...(slotStart ? {
+          OR: [
+            { session: { startsAt: { gte: slotStart, lt: new Date(slotStart.getTime() + 60_000) } } },
+            { requestedDate: date, requestedTime: time },
+          ],
+        } : { selectedSessionId: null, requestedDate: date, requestedTime: time }),
       };
       const duplicate = await tx.bookingRequest.findFirst({
-        where: {
-          ...active,
-          customerPhone,
-          ...(!input.selectedSessionId ? { requestedDate: date, requestedTime: time } : {}),
-        },
+        where: { ...active, customerPhone },
         select: { id: true },
       });
       if (duplicate) {
@@ -513,14 +516,7 @@ export async function createPublicBooking(
       }
       if (capacity !== undefined) {
         const { _sum } = await tx.bookingRequest.aggregate({
-          where: {
-            ...active,
-            OR: [
-              { selectedSessionId: input.selectedSessionId },
-              { selectedSessionId: null, requestedDate: date, requestedTime: time },
-            ],
-            selectedSessionId: undefined,
-          },
+          where: active,
           _sum: { adultsCount: true, childrenCount: true },
         });
         if ((_sum.adultsCount ?? 0) + (_sum.childrenCount ?? 0) + adultsCount + childrenCount > capacity) {

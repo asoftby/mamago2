@@ -92,6 +92,7 @@ export async function replaceActivitySessionsFromScheduleJson(
 
   const existingSessions = await prisma.activitySession.findMany({
     where: { activityId },
+    orderBy: [{ withdrawnAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
       startsAt: true,

@@ -86,7 +86,10 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     await assert.rejects(submit(calendar.id, 1, simple.sessions[0]!.id), /Слот недоступен/);
     await assert.rejects(submit(calendar.id, 1, first.id, "15:00"), /не соответствуют слоту/);
 
-    const raced = await Promise.allSettled([submit(calendar.id, 2, first.id), submit(calendar.id, 3, first.id)]);
+    const alias = await prisma.activitySession.create({
+      data: { activityId: calendar.id, startsAt: first.startsAt },
+    });
+    const raced = await Promise.allSettled([submit(calendar.id, 2, first.id), submit(calendar.id, 3, alias.id)]);
     const successes = raced.flatMap((entry) => entry.status === "fulfilled" ? [entry.value] : []);
     assert.equal(successes.length, 1);
     const rejected = raced.find((entry) => entry.status === "rejected");
@@ -103,7 +106,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     }
     const calendarView = await getBusinessBookings({ businessId: business.id, date: new Date(date) });
     const row = calendarView.items.find((item) => item.id === winner.bookingId);
-    assert.equal(row?.session?.id, first.id);
+    assert.ok(row?.session && [first.id, alias.id].includes(row.session.id));
     assert.equal(row?.requestedDate, new Date(date).toISOString());
     assert.equal(row?.requestedTime, "13:00");
     assert.equal((await getBusinessBookings({ businessId: "foreign-business" })).items.length, 0);
@@ -113,6 +116,9 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     await updateBookingStatus(winner.bookingId, business.id, "REJECTED");
     const replacement = await submit(calendar.id, 5, first.id);
 
+    // Retain the original first occurrence if a duplicate imported row exists.
+    await prisma.bookingRequest.updateMany({ where: { selectedSessionId: alias.id }, data: { selectedSessionId: first.id } });
+    await prisma.activitySession.delete({ where: { id: alias.id } });
     await replaceActivitySessionsFromScheduleJson({
       prisma, activityId: calendar.id,
       scheduleJson: { dates: [date], startTime: "13:00" },
