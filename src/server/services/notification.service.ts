@@ -1668,9 +1668,8 @@ export async function notifyDirectCreated(params: NotifyDirectCreatedParams) {
     entityType: "DIRECT_THREAD",
     entityId: params.threadId,
     ctaLabel: "Открыть диалог",
-    // Unified "Мои сообщения" (Phase 3.2) — one route for every role;
-    // /business/direct/{id} still exists only as a compatibility redirect.
-    ctaAction: `/me/direct/${params.threadId}`,
+    // Business notifications must open inside the business cabinet.
+    ctaAction: `/business/direct/${params.threadId}`,
   });
 }
 
@@ -1706,9 +1705,9 @@ export async function notifyDirectMessage(params: NotifyDirectMessageParams) {
     entityType: "DIRECT_THREAD",
     entityId: params.messageId,
     ctaLabel: "Открыть диалог",
-    // Unified "Мои сообщения" (Phase 3.2) — one route for every role, the
-    // page itself resolves whether the recipient is the customer or the
-    // business side of this thread.
-    ctaAction: `/me/direct/${params.threadId}`,
+    // Keep the notification in the recipient's surface.
+    ctaAction: params.recipientSurface === "BUSINESS"
+      ? `/business/direct/${params.threadId}`
+      : `/me/direct/${params.threadId}`,
   });
 }
