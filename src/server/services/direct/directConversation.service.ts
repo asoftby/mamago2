@@ -163,12 +163,13 @@ async function getCustomerSideItems(userId: string): Promise<UnifiedConversation
 }
 
 /** Business-side groups: every business this user represents, grouped by which customer messaged them. */
-async function getBusinessSideItems(userId: string): Promise<UnifiedConversationListItem[]> {
+async function getBusinessSideItems(userId: string, selectedBusinessId?: string): Promise<UnifiedConversationListItem[]> {
   const businessIds = await getBusinessIdsUserCanAccess(userId);
-  if (businessIds.length === 0) return [];
+  const permittedIds = selectedBusinessId ? businessIds.filter((id) => id === selectedBusinessId) : businessIds;
+  if (permittedIds.length === 0) return [];
 
   const threads = await prisma.directThread.findMany({
-    where: { businessId: { in: businessIds } },
+    where: { businessId: { in: permittedIds } },
     include: threadIncludeWithCustomer,
     orderBy: { lastMessageAt: "desc" },
   });
@@ -206,6 +207,19 @@ async function getBusinessSideItems(userId: string): Promise<UnifiedConversation
     });
   }
   return items;
+}
+
+/**
+ * Business cabinet inbox only. Unlike /me/direct, never mixes a manager's
+ * private customer threads into the organization's customer inbox.
+ * The selected business is checked against the caller's memberships.
+ */
+export async function getBusinessConversationsForUser(
+  userId: string,
+  businessId: string,
+): Promise<UnifiedConversationListItem[]> {
+  const items = await getBusinessSideItems(userId, businessId);
+  return items.sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
 }
 
 /** Parses "D-10253" or "10253" into a numeric threadNumber for search. */
