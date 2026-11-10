@@ -16,6 +16,7 @@ export type InboxPartyStage =
   | "DECLINED" | "EXPIRED" | "NOT_ACCEPTED" | "CANCELLED";
 
 export interface InboxItem {
+  source?: "MANUAL" | null;
   packageScope?: PackageChangeScope | null;
   id: string;
   kind: "STANDARD" | "PARTY";

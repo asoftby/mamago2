@@ -77,7 +77,18 @@ function sessionCapacity(snapshot: SlotSnapshot, start: Date): number | null {
  * Reserve a slot using the existing BookingRequest and BookingAllocation tables.
  * The preview is recalculated under the transaction; only this path commits a hold.
  */
-export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date; replayed: boolean; status: BookingStatus }> {
+type ManualReservation = {
+  tx: Prisma.TransactionClient;
+  businessId: string;
+  actorId: string;
+  requestKey: string;
+  hash: string;
+  status: "NEW" | "CONFIRMED";
+  adultsCount: number;
+  childrenCount: number;
+};
+
+export async function reserveSlot(input: ReserveSlotInput, manual?: ManualReservation): Promise<{ bookingId: string; holdUntil: Date; replayed: boolean; status: BookingStatus }> {
   const seats = input.seats ?? 1;
   const holdMinutes = input.holdMinutes ?? 24 * 60;
   const requestedUnits = input.unitIds;
@@ -101,16 +112,20 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
   const intentHash = input.idempotencyKey ? slotIntentHash(input) : null;
   const now = new Date();
   try {
-    return await prisma.$transaction(async (tx) => {
+    async function reserve(tx: Prisma.TransactionClient) {
       const offer = await tx.offer.findUnique({
         where: { id: input.offerId },
-        select: { status: true, currency: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true, scheduleKind: true,
+        select: { status: true, bookingEnabled: true, bookingMode: true, currency: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true, scheduleKind: true,
           durationMin: true, maxExtensionHours: true, extensionHourPriceByn: true,
           extensionDiscountPercent: true, basePriceByn: true, options: true } } },
       });
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
         throw new SlotReservationError("OFFER_UNAVAILABLE", "Предложение сейчас недоступно для записи");
+      }
+      if (manual && (businessId !== manual.businessId || !offer.bookingEnabled ||
+          (offer.bookingMode !== "USE_PUBLICATION_DATES" && offer.bookingMode !== "USE_PUBLICATION_SLOTS"))) {
+        throw new SlotReservationError("OFFER_UNAVAILABLE", "Предложение недоступно для записи");
       }
       if (input.idempotencyKey) {
         // Serialize identical retry keys BEFORE availability/holds are inspected.
@@ -261,6 +276,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (!current || !checked || selectedUnitIds.some((id) => !checked.unitIds.includes(id))) {
         throw new SlotReservationError("SLOT_UNAVAILABLE", "Слот только что заняли");
       }
+      const status = manual?.status ?? BookingStatus.NEW;
+      const confirmed = status === BookingStatus.CONFIRMED;
       const booking = await tx.bookingRequest.create({
         data: {
           businessId,
@@ -282,8 +299,14 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           startsAt: input.startsAt,
           endsAt: input.endsAt,
           seats,
-          holdUntil,
-          status: BookingStatus.NEW,
+          holdUntil: confirmed ? null : holdUntil,
+          status,
+          ...(manual ? {
+            source: "MANUAL", manualRequestKey: manual.requestKey, manualRequestHash: manual.hash,
+            adultsCount: manual.adultsCount, childrenCount: manual.childrenCount,
+            requestedDate: new Date(dateKeyInZone(input.startsAt, offer.offerBooking.timezone)),
+            requestedTime: localMinuteKey(input.startsAt, offer.offerBooking.timezone).slice(11, 16),
+          } : {}),
           customerName: input.customerName.trim(),
           childName: input.childName?.trim() || null,
           childAge: input.childAge ?? null,
@@ -295,7 +318,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         select: { id: true },
       });
       await tx.bookingActivity.create({
-        data: { bookingId: booking.id, type: "CREATED", actorType: "SYSTEM", payload: Prisma.JsonNull, createdAt: now },
+        data: { bookingId: booking.id, type: "CREATED", actorType: manual ? "BUSINESS" : "SYSTEM", actorId: manual?.actorId, payload: Prisma.JsonNull, createdAt: now },
       });
       // The request and EVERY required resource hold commit atomically.
       // A conflict on any later allocation rolls back all previous holds.
@@ -307,13 +330,14 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
             bookingRequestId: booking.id,
             blockStart: new Date(input.startsAt.getTime() - unit.prepMinutes * MINUTE_MS),
             blockEnd: new Date(input.endsAt.getTime() + (unit.cleanupMinutes + current.bufferMin) * MINUTE_MS),
-            status: "HELD",
-            expiresAt: holdUntil,
+            status: confirmed ? "CONFIRMED" : "HELD",
+            expiresAt: confirmed ? null : holdUntil,
           })),
         });
       }
-      return { bookingId: booking.id, holdUntil, replayed: false, status: BookingStatus.NEW };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
+      return { bookingId: booking.id, holdUntil, replayed: false, status };
+    }
+    return manual ? await reserve(manual.tx) : await prisma.$transaction(reserve, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {
     if (isAllocationOverlapError(error)) {
       throw new SlotReservationError("SLOT_UNAVAILABLE", "Слот только что заняли");
