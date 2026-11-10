@@ -1,36 +1,38 @@
 import { BookingMode } from "@prisma/client";
+import { getEventBookingSchedule } from "./eventBookingSchedule";
 
 export type EventBookingColumns = {
   bookingEnabled: boolean;
   bookingMode: BookingMode | null;
 };
 
-/**
- * «Оставить заявку» в мастере события (`scheduleJson.participationMode === "request"`) включает серверную
- * запись: публичный API заявок принимает событие только при `bookingEnabled` (режим REQUEST_ONLY — без
- * выбора даты). Мастер больше нигде не пишет эти колонки, поэтому считаем их здесь, в одном месте.
- *
- * Возвращает патч колонок или `null`, если менять ничего не нужно:
- * - режим «заявка» → включить REQUEST_ONLY (если ещё не так);
- * - нет бизнеса (событие без владельца-бизнеса) → не включать, а ранее включённое выключить;
- * - другой режим → выключить только то, что включили сами (REQUEST_ONLY). Запись, настроенная иначе
- *   (импорт, админ, слоты), не трогается.
- */
+/** Sync wizard booking modes while preserving independently configured legacy modes. */
 export function deriveEventRequestBookingColumns(input: {
   participationMode: unknown;
+  previousParticipationMode?: unknown;
+  scheduleJson?: unknown;
   current: EventBookingColumns;
   /** У события есть бизнес-получатель заявок. Без него запись включать нельзя: сервер отклонит заявку. */
   hasBusiness: boolean;
 }): EventBookingColumns | null {
-  const wantsRequest =
-    input.hasBusiness && typeof input.participationMode === "string" && input.participationMode.trim() === "request";
+  const mode = typeof input.participationMode === "string" ? input.participationMode.trim() : null;
   const { bookingEnabled, bookingMode } = input.current;
-  if (wantsRequest) {
-    if (bookingEnabled && bookingMode === BookingMode.REQUEST_ONLY) return null;
-    return { bookingEnabled: true, bookingMode: BookingMode.REQUEST_ONLY };
+  const slots = getEventBookingSchedule(input.scheduleJson);
+  let nextMode: BookingMode | null = null;
+  if (input.hasBusiness) {
+    if (mode === "request" || (mode === "simple-booking" && !slots.size)) {
+      nextMode = BookingMode.REQUEST_ONLY;
+    } else if ((mode === "time-slots" || mode === "simple-booking") && slots.size) {
+      nextMode = [...slots.values()].some((slot) => slot.startTime)
+        ? BookingMode.USE_PUBLICATION_SLOTS : BookingMode.USE_PUBLICATION_DATES;
+    }
   }
-  if (bookingMode === BookingMode.REQUEST_ONLY) {
-    return { bookingEnabled: false, bookingMode: null };
+  if (nextMode) {
+    return bookingEnabled && bookingMode === nextMode ? null : { bookingEnabled: true, bookingMode: nextMode };
+  }
+  if (bookingMode === BookingMode.REQUEST_ONLY ||
+      input.previousParticipationMode === "time-slots" || input.previousParticipationMode === "simple-booking") {
+    return bookingEnabled || bookingMode ? { bookingEnabled: false, bookingMode: null } : null;
   }
   return null;
 }

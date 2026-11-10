@@ -150,7 +150,7 @@ async function testWriterPersistsExactOccurrences() {
     scheduleJson: NEBOREKA_SCHEDULE,
   });
 
-  assert.equal(deleted, true);
+  assert.equal(deleted, false);
   assert.deepEqual(result, { count: 52, skipped: false });
   assert.equal(created.length, 52);
   assert.equal(created[0]?.startsAt.toISOString(), "2026-08-29T09:00:00.000Z");

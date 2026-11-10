@@ -381,6 +381,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       const participationLabels = {
         "external-link": "Покупка по ссылке",
         "time-slots": "Запись по времени",
+        "simple-booking": "Простая запись",
         "walk-in": "Без отдельного действия",
         "prebook": "Предварительная запись",
         "request": "Заявка на участие",

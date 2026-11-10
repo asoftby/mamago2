@@ -1,3 +1,4 @@
+import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -81,6 +82,8 @@ export async function POST(
         coverImageId: true,
         ageTags: true,
         scheduleJson: true,
+        bookingEnabled: true,
+        bookingMode: true,
         businessId: true,
         placeId: true,
         place: { select: { ownerBusinessId: true } },
@@ -180,10 +183,9 @@ export async function POST(
         scheduleJson: scheduleJsonForSync,
       }))
     ) {
-      await replaceActivitySessionsFromScheduleJson({
-        prisma,
-        activityId: id,
-        scheduleJson: scheduleJsonForSync,
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Activity" WHERE "id" = ${id} FOR UPDATE`;
+        await replaceActivitySessionsFromScheduleJson({ prisma: tx, activityId: id, scheduleJson: scheduleJsonForSync });
       });
       sessionSyncRan = true;
       perf.mark("session-sync");
@@ -193,12 +195,13 @@ export async function POST(
 
     const now = new Date();
     const sessionsCount = await prisma.activitySession.count({
-      where: { activityId: id },
+      where: { activityId: id, withdrawnAt: null },
     });
 
     const nextUpcomingSession = await prisma.activitySession.findFirst({
       where: {
         activityId: id,
+        withdrawnAt: null,
         startsAt: { gte: now },
       },
       orderBy: { startsAt: "asc" },
@@ -249,6 +252,12 @@ export async function POST(
 
       const updateData: Prisma.ActivityUncheckedUpdateInput = {
         status: nextStatus,
+        ...deriveEventRequestBookingColumns({
+          participationMode: scheduleJsonForSync.participationMode,
+          scheduleJson: scheduleJsonForSync,
+          current: existing,
+          hasBusiness: Boolean(existing.businessId),
+        }),
         ...(resolved.placeId !== null ? { placeId: resolved.placeId } : {}),
       };
 

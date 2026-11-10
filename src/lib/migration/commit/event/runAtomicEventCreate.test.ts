@@ -174,6 +174,7 @@ function createFakeTx(options: {
       update: (async () => activityFixture()) as unknown as EventCreateTransactionClient["activity"]["update"],
     },
     activitySession: {
+      updateMany: (async () => ({ count: 0 })) as unknown as EventCreateTransactionClient["activitySession"]["updateMany"],
       createMany: (async (args: unknown) => {
         calls.push({ delegate: "activitySession", method: "createMany", args });
         return { count: (args as { data?: unknown[] }).data?.length ?? 0 };

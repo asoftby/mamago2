@@ -7,6 +7,8 @@ on:
       - ".github/workflows/classes-reservation-integration.yml"
       - "src/server/offers/**"
       - "src/server/services/booking/**"
+      - "src/lib/event/**"
+      - "src/lib/business/syncEventActivitySessions.ts"
       - "prisma/**"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -71,3 +73,7 @@ jobs:
         env:
           NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx src/server/services/booking/bookingLifecycle.postgres.integration.test.ts
+      - name: Event booking modes, slot capacity, and business visibility
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx --test src/server/services/booking/eventBooking.postgres.integration.test.ts

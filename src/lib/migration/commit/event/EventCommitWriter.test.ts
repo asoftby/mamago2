@@ -114,6 +114,7 @@ function createFakeClient(
       }) as unknown as EventCommitWriterPrismaClient["activity"]["update"],
     },
     activitySession: {
+      updateMany: (async () => ({ count: 0 })) as unknown as EventCommitWriterPrismaClient["activitySession"]["updateMany"],
       deleteMany: (async (args: unknown) => {
         calls.push({ delegate: "activitySession", method: "deleteMany", args });
         return { count: 0 };
@@ -335,10 +336,7 @@ async function testInvalidScheduleClearsSessionsAndNextOccurrence() {
     }),
   );
 
-  assert.deepEqual(
-    findCall(calls, "activitySession", "deleteMany").args,
-    { where: { activityId: "activity-1" } },
-  );
+  assert.ok(!calls.some((call) => call.delegate === "activitySession" && call.method === "deleteMany"));
   assert.deepEqual(maybeCreateManySessionLocalDateTimes(calls), []);
   findCall(calls, "activity", "update", (args) =>
     (args as { data?: { nextOccurrenceAt?: Date | null } }).data?.nextOccurrenceAt === null,
@@ -472,10 +470,7 @@ async function testUpdateReplacesSessions() {
     }),
   );
 
-  assert.deepEqual(
-    findCall(calls, "activitySession", "deleteMany").args,
-    { where: { activityId: "activity-99" } },
-  );
+  assert.ok(!calls.some((call) => call.delegate === "activitySession" && call.method === "deleteMany"));
   assert.deepEqual(createManySessionLocalDateTimes(calls), [
     "2026-09-01T12:00",
     "2026-09-03T12:00",
