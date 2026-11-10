@@ -707,3 +707,13 @@
   text-transform: uppercase;
   color: var(--accent-deep);
 }
+
+/* Inside the business shell, use the same card canvas and spacing as Bookings.
+   Conversation feed internals remain shared with the public inbox. */
+.businessPage {
+  min-height: 0;
+  background: transparent;
+  color: #1c1917;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+}
