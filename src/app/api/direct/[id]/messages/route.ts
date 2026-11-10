@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DirectActorType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canAccessBusinessResource } from "@/server/permissions/business-permissions";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import {
   nextResponseFromDirectAccessError,
   requireDirectThreadAccess,
@@ -47,7 +47,7 @@ export async function POST(
     const data = sendMessageSchema.parse(body);
 
     const asBusiness = request.nextUrl.searchParams.get("as") === "business";
-    if (asBusiness && !(await canAccessBusinessResource(currentUser, thread.businessId))) {
+    if (asBusiness && !(await canAccessBusiness(currentUser.id, thread.businessId))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const senderType = asBusiness && currentUser.role !== "ADMIN" && currentUser.role !== "MODERATOR"
