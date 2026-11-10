@@ -24,6 +24,7 @@ const QUICK_REPLIES = [
 
 interface Props {
   initialDetail: UnifiedConversationDetail;
+  surface?: "public" | "business";
 }
 
 function statusLabel(status: UnifiedConversationDetail["occasions"][number]["status"]): string {
@@ -39,7 +40,7 @@ function statusLabel(status: UnifiedConversationDetail["occasions"][number]["sta
   }
 }
 
-export function DirectThreadClient({ initialDetail }: Props) {
+export function DirectThreadClient({ initialDetail, surface = "public" }: Props) {
   const [detail, setDetail] = useState(initialDetail);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -163,18 +164,46 @@ export function DirectThreadClient({ initialDetail }: Props) {
   }
 
   return (
-    <div className={styles.page}>
-      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
-        <Link href="/me/direct">← Мои сообщения</Link>
-      </div>
+    <div className={surface === "business" ? `${styles.page} ${styles.businessPage}` : styles.page}>
+      {surface === "business" ? (
+        <div className="mb-4">
+          <Link href="/business/direct" className="text-sm font-semibold text-stone-600 hover:text-stone-950">
+            ← Все сообщения
+          </Link>
+        </div>
+      ) : (
+        <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
+          <Link href="/me/direct">← Мои сообщения</Link>
+        </div>
+      )}
 
-      <div className={styles.threadWrap}>
-        <ConversationHeader
-          counterpartyName={detail.counterpartyName}
-          counterpartyLogoUrl={detail.counterpartyLogoUrl}
-          occasionCount={detail.occasions.length}
-          latestStatusLabel={latestOccasion ? statusLabel(latestOccasion.status) : undefined}
-        />
+      <div className={surface === "business"
+        ? "min-w-0 rounded-[28px] border border-stone-200/80 bg-white p-4 shadow-sm sm:p-6"
+        : styles.threadWrap}>
+        {surface === "business" ? (
+          <div className="flex items-center gap-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-lg font-semibold text-stone-700">
+              {detail.counterpartyLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={detail.counterpartyLogoUrl} alt="" className="h-full w-full object-cover" />
+              ) : detail.counterpartyName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-lg font-semibold text-stone-950">{detail.counterpartyName}</h2>
+              <p className="text-sm text-stone-500">
+                {detail.occasions.length} обращений
+                {latestOccasion ? ` · ${statusLabel(latestOccasion.status)}` : ""}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ConversationHeader
+            counterpartyName={detail.counterpartyName}
+            counterpartyLogoUrl={detail.counterpartyLogoUrl}
+            occasionCount={detail.occasions.length}
+            latestStatusLabel={latestOccasion ? statusLabel(latestOccasion.status) : undefined}
+          />
+        )}
 
         {isWaitingOnMe && (
           <div className={`${styles.banner} ${styles.bannerWaiting}`}>
