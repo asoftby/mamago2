@@ -78,7 +78,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
 
     async function refresh() {
       try {
-        const res = await fetch(`/api/direct/${anchorThreadId}`, { credentials: "include" });
+        const res = await fetch(`/api/direct/${anchorThreadId}${businessMode ? "?as=business" : ""}`, { credentials: "include" });
         if (!res.ok) return;
         setDetail(await res.json());
       } catch {
@@ -110,7 +110,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [anchorThreadId]);
+  }, [anchorThreadId, businessMode]);
 
   async function refreshDetail() {
     if (!anchorThreadId) return;
@@ -123,7 +123,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
     if (!trimmed || sending || !detail.replyTargetThreadId) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/direct/${detail.replyTargetThreadId}/messages`, {
+      const res = await fetch(`/api/direct/${detail.replyTargetThreadId}/messages${businessMode ? "?as=business" : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
