@@ -1,11 +1,31 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { notFound, redirect } from "next/navigation";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { getCurrentUser } from "@/lib/auth/server";
+import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getBusinessConversationsForUser } from "@/server/services/direct/directConversation.service";
+import { BusinessDirectListClient } from "./BusinessDirectListClient";
 
-/**
- * Technical compatibility only (Phase 3.2): "Мои сообщения" is now one
- * unified section for every role — see /me/direct. A business owner/member
- * sees their business's conversations merged into that same list, so this
- * route no longer renders its own inbox; it just forwards old links/bookmarks.
- */
-export default function BusinessDirectRedirectPage() {
-  redirect("/me/direct");
+export const metadata: Metadata = { title: "Сообщения | mamaGo Business" };
+
+/** Business inbox stays under the business shell; personal chats remain in /me/direct. */
+export default async function BusinessDirectPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const business = await getMyBusiness(user.id);
+  if (!business) notFound();
+
+  const conversations = await getBusinessConversationsForUser(user.id, business.id);
+
+  return (
+    <div className="space-y-6">
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Сообщения"
+        description="Переписки с клиентами по вашим событиям, местам и предложениям"
+      />
+      <BusinessDirectListClient initialConversations={conversations} />
+    </div>
+  );
 }
