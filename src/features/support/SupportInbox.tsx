@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Thread = { id: string; businessId: string; subject: string; status: "NEW" | "IN_PROGRESS" | "CLOSED"; lastMessageAt: string };
 type Message = { id: string; body: string; actor: "BUSINESS" | "STAFF"; createdAt: string };
 
-export function SupportInbox({ businessId, staff = false, initialThreadId }: { businessId?: string; staff?: boolean; initialThreadId?: string }) {
+export function SupportInbox({ businessId, staff = false, initialThreadId, embedded = false }: { businessId?: string; staff?: boolean; initialThreadId?: string; embedded?: boolean }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(initialThreadId ?? null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -94,9 +94,9 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
   }, [selected, loadThreads, loadMessages]);
 
   const active = threads.find(t => t.id === selected);
-  return <section className="mx-auto max-w-5xl space-y-5 px-4 py-8">
-    <header><h1 className="text-2xl font-semibold">Поддержка mamaGo</h1>
-      <p className="mt-1 text-sm text-stone-500">Обращения в поддержку отдельно от переписки с клиентами.</p></header>
+  return <section className={embedded ? "space-y-5" : "mx-auto max-w-5xl space-y-5 px-4 py-8"}>
+    {!embedded && <header><h1 className="text-2xl font-semibold">Поддержка mamaGo</h1>
+      <p className="mt-1 text-sm text-stone-500">Обращения в поддержку отдельно от переписки с клиентами.</p></header>}
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!staff && businessId && <form className="space-y-3 rounded-xl border p-4" onSubmit={e => { e.preventDefault(); void post("/api/support/threads", { businessId, subject, body: draft }, () => { setSubject(""); setDraft(""); }); }}>
       <h2 className="font-semibold">Новое обращение</h2>
