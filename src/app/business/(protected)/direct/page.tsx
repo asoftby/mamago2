@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
-import { getUnifiedConversationsForUser, type ConversationTab } from "@/server/services/direct/directConversation.service";
+import { getBusinessConversationsForUser, type ConversationTab } from "@/server/services/direct/directConversation.service";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { BusinessDirectInbox } from "./BusinessDirectInbox";
 
@@ -11,11 +11,8 @@ export default async function BusinessDirectPage() {
   const business = await getMyBusiness(user.id);
   if (!business) redirect("/business/onboarding");
 
-  // The shared aggregation also contains the user's personal customer-side conversations.
-  // Select only threads belonging to the active business; never send personal cards to the B2B UI.
-  const all = (await getUnifiedConversationsForUser(user.id)).filter(
-    (item) => item.viewerRole === "BUSINESS" && item.key.startsWith(`${business.id}:`),
-  );
+  // Query only this organization’s conversations: personal direct messages stay in /me/direct.
+  const all = await getBusinessConversationsForUser(user.id, business.id);
   const counts: Record<ConversationTab, number> = {
     ALL: all.length,
     ACTIVE: 0,
