@@ -7,7 +7,8 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { createManualBooking, BookingNotFoundError, BookingValidationError, manualRequestOfferWhere, manualScheduledOfferWhere } from "@/server/services/booking/booking.service";
 import { getPublicActivityDetailWhere, getPublicPublishedOfferWhere, getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
-import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { getSlots } from "@/server/offers/getSlots";
 import { SlotReservationError } from "@/server/offers/reserveSlot";
 import { parsePriceData } from "@/lib/priceItems";
 import { formatHHMM } from "@/lib/formatters/date";
@@ -89,11 +90,43 @@ export async function GET(request: NextRequest) {
 
   const offerId = params.get("offerId");
   if (type.data === "OFFER" && offerId) {
+    const offerWhere: Prisma.OfferWhereInput = {
+      ...getPublicPublishedOfferWhere(), ...manualScheduledOfferWhere, id: offerId,
+      place: { ownerBusinessId: business.id },
+    };
+    const day = params.get("date");
+    const groupId = params.get("groupId") || undefined;
+    if (day !== null) {
+      if (!date.safeParse(day).success) return NextResponse.json({ error: "Выберите дату" }, { status: 400 });
+      const offer = await prisma.offer.findFirst({
+        where: {
+          ...offerWhere,
+          classGroups: groupId ? { some: { id: groupId, active: true } } : { none: { active: true } },
+        },
+        select: { offerBooking: { select: { timezone: true } } },
+      });
+      if (!offer?.offerBooking) return NextResponse.json({ error: "Расписание недоступно" }, { status: 404 });
+      const zone = offer.offerBooking.timezone;
+      const slots = await getSlots({
+        offerId, classGroupId: groupId,
+        from: localWallClockToUtc(day, "00:00", zone),
+        to: localWallClockToUtc(addDaysLocal(day, 1), "00:00", zone),
+        requestedSeats: 1,
+      });
+      return NextResponse.json({ slots: slots.slice(0, 100).map(({ startsAt, endsAt, unitIds }) => ({ startsAt, endsAt, unitIds })) }, { headers: privateHeaders });
+    }
+
     const offer = await prisma.offer.findFirst({
-      where: { ...getPublicPublishedOfferWhere(), ...manualScheduledOfferWhere, id: offerId, place: { ownerBusinessId: business.id } },
+      where: offerWhere,
       select: {
         priceItems: true,
         offerBooking: { select: { timezone: true } },
+        classGroups: {
+          where: { active: true }, orderBy: [{ position: "asc" }, { id: "asc" }], take: 30,
+          select: { id: true, title: true, tariffs: {
+            where: { active: true }, orderBy: { position: "asc" }, select: { id: true, title: true },
+          } },
+        },
         bookingUnitOffers: {
           where: { bookingUnit: { businessId: business.id, status: "ACTIVE" } },
           take: 100,
@@ -104,6 +137,9 @@ export async function GET(request: NextRequest) {
     if (!offer?.offerBooking) return NextResponse.json({ error: "Предложение недоступно" }, { status: 404 });
     return NextResponse.json({
       timezone: offer.offerBooking.timezone,
+      groups: offer.classGroups.map(({ id, title, tariffs }) => ({
+        id, title, tariffs: tariffs.map(({ id, title }) => ({ id, label: title })),
+      })),
       tariffs: parsePriceData(offer.priceItems).items.map(({ id, label }) => ({ id, label })),
       units: Object.fromEntries(offer.bookingUnitOffers.map(({ bookingUnit }) => [bookingUnit.id, bookingUnit.name])),
     }, { headers: privateHeaders });

@@ -4,13 +4,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { addDaysLocal, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { formatHHMM } from "@/lib/formatters/date";
 import { Textarea } from "@/components/ui/textarea";
 
 type Publication = { id: string; title: string; offerBooking?: { id: string } | null };
 type OfferSlot = { startsAt: string; endsAt: string; unitIds: string[] };
-type OfferChoice = OfferSlot & { groupId?: string; groupTitle?: string; tariffs?: { id: string; label: string }[] };
+type Tariff = { id: string; label: string };
+type OfferDetails = { id: string; timezone: string; tariffs: Tariff[]; units: Record<string, string>; groups: { id: string; title: string; tariffs: Tariff[] }[] };
 type Type = "EVENT" | "PLACE" | "OFFER";
 type Availability = {
   mode: "REQUEST_ONLY" | "USE_PUBLICATION_SLOTS" | "USE_PUBLICATION_DATES";
@@ -31,10 +31,11 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   const [list, setList] = useState<{ key: string; items: Publication[] }>();
   const [publicationId, setPublicationId] = useState("");
   const [availability, setAvailability] = useState<{ id: string; value: Availability }>();
+  const [groupId, setGroupId] = useState("");
   const [offerDate, setOfferDate] = useState("");
-  const [offerSlots, setOfferSlots] = useState<{ key: string; choices: OfferChoice[] }>();
+  const [offerSlots, setOfferSlots] = useState<{ key: string; choices: OfferSlot[] }>();
   const [offerChoiceIndex, setOfferChoiceIndex] = useState("");
-  const [offerDetails, setOfferDetails] = useState<{ id: string; timezone: string; tariffs: { id: string; label: string }[]; units: Record<string, string> }>();
+  const [offerDetails, setOfferDetails] = useState<OfferDetails>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = useRef<{ key: string; intent: string } | null>(null);
@@ -43,12 +44,14 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   const items = list?.key === listKey ? list.items : undefined;
   const options = availability?.id === publicationId ? availability.value : undefined;
   const scheduledOffer = type === "OFFER" && Boolean(items?.find(({ id }) => id === publicationId)?.offerBooking);
-  const offerKey = publicationId + ":" + offerDate;
+  const offerKey = publicationId + ":" + groupId + ":" + offerDate;
   const choices = offerSlots?.key === offerKey ? offerSlots.choices : undefined;
   const choice = offerChoiceIndex && choices ? choices[Number(offerChoiceIndex)] : undefined;
   const details = offerDetails?.id === publicationId ? offerDetails : undefined;
   const unitIds = choice?.unitIds ?? [];
-  const tariffs = choice?.groupId ? choice.tariffs : details?.tariffs;
+  const hasGroups = Boolean(details?.groups.length);
+  const selectedGroup = details?.groups.find((group) => group.id === groupId);
+  const tariffs = hasGroups ? selectedGroup?.tariffs : details?.tariffs;
   const ready = (!scheduledOffer || Boolean(choice)) && Boolean(publicationId && (type !== "EVENT" || (options &&
     (options.mode === "REQUEST_ONLY" || options.slots.length || options.dates.length))));
 
@@ -78,29 +81,18 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   }, [type, publicationId]);
 
   useEffect(() => {
-    if (!scheduledOffer || !offerDate || !details) return;
+    if (!scheduledOffer || !offerDate || !details || (hasGroups && !groupId)) return;
     const controller = new AbortController();
-    const params = new URLSearchParams({
-      from: localWallClockToUtc(offerDate, "00:00", details.timezone).toISOString(),
-      to: localWallClockToUtc(addDaysLocal(offerDate, 1), "00:00", details.timezone).toISOString(),
-    });
-    fetch(`/api/public/offers/${encodeURIComponent(publicationId)}/slots?${params}`, { signal: controller.signal })
+    const params = new URLSearchParams({ type: "OFFER", offerId: publicationId, date: offerDate, groupId });
+    fetch(endpoint + "?" + params, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error();
-        const data = await response.json() as {
-          slots: OfferSlot[];
-          groups: { id: string; title: string; tariffs: { id: string; label: string }[]; slots: OfferSlot[] }[];
-        };
-        setOfferSlots({ key: offerKey, choices: [
-          ...data.slots,
-          ...data.groups.flatMap((group) => group.slots.map((slot) => ({
-            ...slot, groupId: group.id, groupTitle: group.title, tariffs: group.tariffs,
-          }))),
-        ] });
+        const { slots } = await response.json() as { slots: OfferSlot[] };
+        setOfferSlots({ key: offerKey, choices: slots });
       })
       .catch(() => { if (!controller.signal.aborted) setError("Не удалось загрузить слоты предложения"); });
     return () => controller.abort();
-  }, [scheduledOffer, publicationId, offerDate, offerKey, details]);
+  }, [scheduledOffer, publicationId, offerDate, offerKey, details, hasGroups, groupId]);
 
   const needsResourcePicker = unitIds.length > 1;
   useEffect(() => {
@@ -109,7 +101,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
     fetch(endpoint + "?" + new URLSearchParams({ type: "OFFER", offerId: publicationId }), { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error();
-        const metadata = await response.json() as Omit<NonNullable<typeof offerDetails>, "id">;
+        const metadata = await response.json() as Omit<OfferDetails, "id">;
         setOfferDetails({ ...metadata, id: publicationId });
       })
       .catch(() => { if (!controller.signal.aborted) setError("Не удалось загрузить параметры предложения"); });
@@ -126,7 +118,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
       publicationType: type, publicationId,
       selectedSessionId: slot?.id,
       offerSlot: choice ? {
-        startsAt: choice.startsAt, endsAt: choice.endsAt, groupId: choice.groupId,
+        startsAt: choice.startsAt, endsAt: choice.endsAt, groupId: groupId || undefined,
         tariffId: String(data.get("tariff") ?? "") || undefined,
         unitId: choice.unitIds.length === 1 ? choice.unitIds[0] : String(data.get("unit") ?? "") || undefined,
       } : undefined,
@@ -189,7 +181,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
             </div>
             <label className="grid gap-1 text-sm">Публикация
               <select className={selectClass} required value={publicationId} onChange={(e) => {
-                setPublicationId(e.target.value); setOfferDate(""); setOfferChoiceIndex(""); setError("");
+                setPublicationId(e.target.value); setOfferDate(""); setGroupId(""); setOfferChoiceIndex(""); setError("");
               }}>
                 <option value="">{!items ? "Загружаем…" : items.length ? "Выберите публикацию" : "Публикаций нет"}</option>
                 {items?.map(({ id, title }) => <option key={id} value={id}>{title}</option>)}
@@ -212,18 +204,27 @@ export function ManualBookingDialog({ onClose, onCreated }: {
                 </select>
               </label>
             ) : null}
-            {scheduledOffer ? (
+            {scheduledOffer && !details && !error ? <p role="status">Загружаем параметры предложения…</p> : null}
+            {scheduledOffer && details ? (
               <>
-                <label className="grid gap-1 text-sm">Дата
+                {hasGroups ? <label className="grid gap-1 text-sm">Группа
+                  <select className={selectClass} required value={groupId} onChange={(event) => {
+                    setGroupId(event.target.value); setOfferChoiceIndex(""); setError("");
+                  }}>
+                    <option value="">Выберите группу</option>
+                    {details.groups.map(({ id, title }) => <option key={id} value={id}>{title}</option>)}
+                  </select>
+                </label> : null}
+                {(!hasGroups || groupId) ? <label className="grid gap-1 text-sm">Дата
                   <Input type="date" required className="min-h-11 text-base" value={offerDate}
                     onChange={(event) => { setOfferDate(event.target.value); setOfferChoiceIndex(""); setError(""); }} />
-                </label>
-                {offerDate ? <label className="grid gap-1 text-sm">Время
+                </label> : null}
+                {offerDate && (!hasGroups || groupId) ? <label className="grid gap-1 text-sm">Время
                   <select className={selectClass} required value={offerChoiceIndex} onChange={(event) => setOfferChoiceIndex(event.target.value)}>
                     <option value="">{!choices ? "Загружаем…" : choices.length ? "Выберите слот" : "Доступных слотов нет"}</option>
                     {choices?.map((option, index) => (
-                      <option value={index} key={option.startsAt + option.endsAt + (option.groupId ?? "")}>
-                        {formatHHMM(option.startsAt, details?.timezone)}–{formatHHMM(option.endsAt, details?.timezone)}{option.groupTitle ? " · " + option.groupTitle : ""}
+                      <option value={index} key={option.startsAt + option.endsAt}>
+                        {formatHHMM(option.startsAt, details.timezone)}–{formatHHMM(option.endsAt, details.timezone)}
                       </option>
                     ))}
                   </select>
