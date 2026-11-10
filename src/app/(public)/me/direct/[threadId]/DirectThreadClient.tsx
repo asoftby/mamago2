@@ -24,6 +24,7 @@ const QUICK_REPLIES = [
 
 interface Props {
   initialDetail: UnifiedConversationDetail;
+  businessMode?: boolean;
 }
 
 function statusLabel(status: UnifiedConversationDetail["occasions"][number]["status"]): string {
@@ -39,7 +40,7 @@ function statusLabel(status: UnifiedConversationDetail["occasions"][number]["sta
   }
 }
 
-export function DirectThreadClient({ initialDetail }: Props) {
+export function DirectThreadClient({ initialDetail, businessMode = false }: Props) {
   const [detail, setDetail] = useState(initialDetail);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -163,12 +164,12 @@ export function DirectThreadClient({ initialDetail }: Props) {
   }
 
   return (
-    <div className={styles.page}>
-      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
-        <Link href="/me/direct">← Мои сообщения</Link>
+    <div className={businessMode ? "space-y-4" : styles.page}>
+      <div className={businessMode ? "text-sm text-stone-500" : `${styles.wrap} ${styles.breadcrumbs}`}>
+        <Link href={businessMode ? "/business/direct" : "/me/direct"}>← {businessMode ? "Все сообщения" : "Мои сообщения"}</Link>
       </div>
 
-      <div className={styles.threadWrap}>
+      <div className={businessMode ? `rounded-2xl border border-stone-200 bg-white p-4 md:p-6 ${styles.threadWrap}` : styles.threadWrap}>
         <ConversationHeader
           counterpartyName={detail.counterpartyName}
           counterpartyLogoUrl={detail.counterpartyLogoUrl}
