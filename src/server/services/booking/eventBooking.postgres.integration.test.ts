@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
-import { addDaysLocal } from "@/lib/date/localDateKey";
+import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
 import { createPublicBooking } from "./booking.service";
@@ -62,6 +62,14 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       }] },
     });
 
+    const today = getLocalDateKey();
+    const dateOnly = await makeEvent({
+      participationMode: "time-slots", dates: [today], startTime: "00:01",
+      timeSlots: { dates: [{ isoDate: today, slots: [{ startTime: "", capacity: 1 }] }] },
+    });
+    assert.equal(dateOnly.bookingMode, "USE_PUBLICATION_DATES");
+    assert.equal(dateOnly.sessions.length, 1);
+
     const page = (event: typeof calendar) => buildEventPageDataFromPrismaActivity({
       ...event, images: [], place: null, venue: null, eventCategory: null,
     });
@@ -69,6 +77,19 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.equal(page(simple).cta.simpleBooking?.slots?.[0]?.id, simple.sessions[0]?.id);
     assert.deepEqual(page(calendar).cta.simpleBooking?.slots?.map(({ id }) => id), calendar.sessions.map(({ id }) => id));
     assert.equal(page({ ...calendar, bookingEnabled: false }).cta.simpleBooking, undefined);
+
+    assert.deepEqual(page(dateOnly).cta.simpleBooking?.slots, [{ id: today, isoDate: today, startTime: "" }]);
+    const dateInput = {
+      publicationType: "EVENT" as const, publicationId: dateOnly.id, requestedDate: today,
+      customerName: "Test Parent", customerPhone: "+375291110000",
+    };
+    await assert.rejects(createPublicBooking({ ...dateInput, requestedDate: date }), /Дата недоступна/);
+    await assert.rejects(createPublicBooking({ ...dateInput, requestedTime: "00:01" }), /Дата недоступна/);
+    const dayBooking = await createPublicBooking(dateInput);
+    await assert.rejects(createPublicBooking({ ...dateInput, customerPhone: "+375291110099" }), /недостаточно мест/);
+    const dayRow = await prisma.bookingRequest.findUniqueOrThrow({ where: { id: dayBooking.bookingId } });
+    assert.equal(dayRow.requestedTime, null);
+    assert.equal(dayRow.selectedSessionId, null);
 
     const submit = (publicationId: string, phoneSuffix: number, selectedSessionId?: string, requestedTime?: string) =>
       createPublicBooking({

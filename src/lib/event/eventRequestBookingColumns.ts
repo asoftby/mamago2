@@ -17,13 +17,14 @@ export function deriveEventRequestBookingColumns(input: {
 }): EventBookingColumns | null {
   const mode = typeof input.participationMode === "string" ? input.participationMode.trim() : null;
   const { bookingEnabled, bookingMode } = input.current;
-  const hasSlots = getEventBookingSchedule(input.scheduleJson).size > 0;
+  const slots = getEventBookingSchedule(input.scheduleJson);
   let nextMode: BookingMode | null = null;
   if (input.hasBusiness) {
-    if (mode === "request" || (mode === "simple-booking" && !hasSlots)) {
+    if (mode === "request" || (mode === "simple-booking" && !slots.size)) {
       nextMode = BookingMode.REQUEST_ONLY;
-    } else if ((mode === "time-slots" || mode === "simple-booking") && hasSlots) {
-      nextMode = BookingMode.USE_PUBLICATION_SLOTS;
+    } else if ((mode === "time-slots" || mode === "simple-booking") && slots.size) {
+      nextMode = [...slots.values()].some((slot) => slot.startTime)
+        ? BookingMode.USE_PUBLICATION_SLOTS : BookingMode.USE_PUBLICATION_DATES;
     }
   }
   if (nextMode) {

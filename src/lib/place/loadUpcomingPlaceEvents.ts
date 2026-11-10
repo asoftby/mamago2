@@ -55,7 +55,7 @@ export async function loadUpcomingPlaceEvents(input: {
         select: { id: true, url: true, mediaAssetId: true },
       },
       sessions: {
-        where: { startsAt: { gte: now } },
+        where: { withdrawnAt: null, startsAt: { gte: now } },
         orderBy: { startsAt: "asc" },
         take: 100,
         select: { startsAt: true },

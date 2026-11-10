@@ -187,8 +187,11 @@ async function main() {
       createdIds.push(a.id);
       await syncEventHomeStoriesProjection(a.id);
       assert.equal((await prisma.homeStoryItem.count({ where: { sourceType: HomeStorySourceType.EVENT, sourceId: a.id, status: HomeStoryItemStatus.ACTIVE } })), 2);
-      // Simulate the wizard rebuilding sessions from scheduleJson with s2 dropped.
-      await prisma.activitySession.deleteMany({ where: { activityId: a.id, startsAt: s2 } });
+      // A session referenced by a booking is retired instead of deleted.
+      await prisma.activitySession.updateMany({
+        where: { activityId: a.id, startsAt: s2 },
+        data: { withdrawnAt: new Date() },
+      });
       await syncEventHomeStoriesProjection(a.id);
       const rows = await prisma.homeStoryItem.findMany({ where: { sourceType: HomeStorySourceType.EVENT, sourceId: a.id } });
       const active = rows.filter((r) => r.status === HomeStoryItemStatus.ACTIVE);

@@ -109,9 +109,9 @@ export function EventSimpleBookingModal({
         body: JSON.stringify({
           publicationType: "EVENT",
           publicationId: booking.activityId,
-          selectedSessionId: selectedSlot?.id,
+          selectedSessionId: selectedSlot?.startTime ? selectedSlot.id : undefined,
           requestedDate: selectedSlot?.isoDate ?? booking.date,
-          requestedTime: selectedSlot?.startTime ?? booking.time,
+          requestedTime: selectedSlot?.startTime || booking.time,
           customerName: values.customerName.trim(),
           customerPhone: values.customerPhone.trim(),
           customerComment: values.comment.trim() || undefined,
@@ -140,8 +140,8 @@ export function EventSimpleBookingModal({
   }
 
   const submitting = phase === "submitting";
-  const summary = selectedSlot
-    ? `${selectedDate ? `${selectedDate.dow.toLowerCase()}, ${selectedDate.d} ${selectedDate.m}` : ""} · ${slotTimeLabel(selectedSlot)}`
+  const summary = selectedDate
+    ? `${selectedDate.dow.toLowerCase()}, ${selectedDate.d} ${selectedDate.m}${selectedSlot?.startTime ? ` · ${slotTimeLabel(selectedSlot)}` : ""}`
     : (isRequest ? "Без выбора времени" : (eventCategory ?? "Запись на событие"));
 
   return (
@@ -174,7 +174,7 @@ export function EventSimpleBookingModal({
                   }}
                 />
               </RsSection>
-              {selectedDate && selectedDate.slots.length > 0 ? (
+              {selectedSlot?.startTime && selectedDate ? (
                 <RsSection label="Время">
                   <RsChipRow>
                     {selectedDate.slots.map((slot) => (

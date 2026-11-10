@@ -25,10 +25,9 @@ export function eventBookingSlotKey(date: string, time: string): string {
 export function getEventBookingSchedule(value: unknown): Map<string, EventBookingSlotConfig> {
   const schedule = record(value);
   const slots = new Map<string, EventBookingSlotConfig>();
-  const defaultTime = validTime(schedule.startTime) ? schedule.startTime : "10:00";
 
   function add(date: unknown, startTime: unknown, endTime: unknown, capacity: unknown) {
-    if (!isLocalDateString(date) || !validTime(startTime)) return;
+    if (!isLocalDateString(date) || (startTime !== "" && !validTime(startTime))) return;
     const calendarDate = new Date(date);
     if (!Number.isFinite(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== date) return;
     const key = eventBookingSlotKey(date, startTime);
@@ -38,7 +37,7 @@ export function getEventBookingSchedule(value: unknown): Map<string, EventBookin
     slots.set(key, {
       date,
       startTime,
-      endTime: validTime(endTime) && endTime > startTime ? endTime : undefined,
+      endTime: startTime && validTime(endTime) && endTime > startTime ? endTime : undefined,
       capacity: Number.isFinite(limit) ? limit : undefined,
     });
   }
@@ -46,7 +45,7 @@ export function getEventBookingSchedule(value: unknown): Map<string, EventBookin
   if (schedule.participationMode === "simple-booking") {
     const [start, end] = typeof schedule.simpleBookingTime === "string"
       ? schedule.simpleBookingTime.split(/[-–]/).map((time) => time.trim()) : [];
-    add(schedule.simpleBookingDate, start || defaultTime, end, schedule.simpleBookingCapacity);
+    add(schedule.simpleBookingDate, start || "", end, schedule.simpleBookingCapacity);
   }
   if (schedule.participationMode === "time-slots") {
     const dates = record(schedule.timeSlots).dates;
@@ -54,7 +53,7 @@ export function getEventBookingSchedule(value: unknown): Map<string, EventBookin
       const day = record(entry);
       for (const item of Array.isArray(day.slots) ? day.slots : []) {
         const slot = record(item);
-        add(day.isoDate, slot.startTime === "" ? defaultTime : slot.startTime, slot.endTime, slot.capacity);
+        add(day.isoDate, slot.startTime, slot.endTime, slot.capacity);
       }
     }
   }

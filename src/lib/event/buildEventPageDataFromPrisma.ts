@@ -315,11 +315,18 @@ function resolveSimpleBooking(
     if (mode === "request") return { activityId, label: "Оставить заявку" };
     if (mode === "simple-booking") return { activityId };
   }
-  if (activity.bookingMode !== "USE_PUBLICATION_SLOTS" ||
-      (mode !== "time-slots" && mode !== "simple-booking")) return undefined;
+  if (mode !== "time-slots" && mode !== "simple-booking") return undefined;
 
   const configured = getEventBookingSchedule(activity.scheduleJson);
   const now = new Date();
+  if (activity.bookingMode === "USE_PUBLICATION_DATES") {
+    const today = getLocalDateKey(now);
+    const slots = [...configured.values()]
+      .filter((slot) => !slot.startTime && slot.date >= today && slot.capacity !== 0)
+      .map((slot) => ({ id: slot.date, isoDate: slot.date, startTime: "" }));
+    return slots.length ? { activityId, slots, label: "Выбрать дату" } : undefined;
+  }
+  if (activity.bookingMode !== "USE_PUBLICATION_SLOTS") return undefined;
   const slots = activity.sessions.flatMap((session) => {
     if (session.startsAt <= now || session.withdrawnAt || session.isSaleOpen === false) return [];
     const isoDate = getLocalDateKey(session.startsAt);

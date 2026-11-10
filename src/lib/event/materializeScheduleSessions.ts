@@ -257,6 +257,7 @@ export function extractScheduleOccurrences(scheduleJson: unknown, window?: Sched
   }
 
   for (const [key, slot] of getEventBookingSchedule(scheduleJson)) {
+    if (!slot.startTime) continue;
     if (window && (slot.date < window.from || slot.date > window.to)) continue;
     if (!unique.has(key)) unique.set(key, { date: slot.date, startTime: slot.startTime });
   }

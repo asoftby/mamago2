@@ -468,7 +468,17 @@ export async function createPublicBooking(
       let capacity: number | undefined;
       let slotStart: Date | undefined;
       const schedule = activity.scheduleJson as Record<string, unknown> | null;
-      if (input.selectedSessionId) {
+      const wizardCalendar = schedule?.participationMode === "time-slots" ||
+        schedule?.participationMode === "simple-booking";
+      if (wizardCalendar && activity.bookingMode === BookingMode.USE_PUBLICATION_DATES) {
+        const dateKey = date?.toISOString().slice(0, 10) ?? "";
+        const day = getEventBookingSchedule(schedule).get(eventBookingSlotKey(dateKey, ""));
+        if (!day || dateKey < getLocalDateKey() || input.selectedSessionId || time) {
+          throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
+        }
+        date = new Date(dateKey);
+        capacity = day.capacity;
+      } else if (input.selectedSessionId) {
         const session = await tx.activitySession.findFirst({
           where: {
             id: input.selectedSessionId,
@@ -483,8 +493,7 @@ export async function createPublicBooking(
         const localDate = getLocalDateKey(session.startsAt);
         const localTime = formatHHMM(session.startsAt);
         const slot = getEventBookingSchedule(schedule).get(eventBookingSlotKey(localDate, localTime));
-        if ((schedule?.participationMode === "time-slots" ||
-             schedule?.participationMode === "simple-booking") && !slot) {
+        if (wizardCalendar && !slot) {
           throw new BookingValidationError("selectedSessionId", "Слот недоступен для записи");
         }
         if ((date && date.toISOString().slice(0, 10) !== localDate) || (time && time !== localTime)) {
