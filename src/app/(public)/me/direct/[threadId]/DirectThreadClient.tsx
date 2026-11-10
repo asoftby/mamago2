@@ -114,7 +114,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
 
   async function refreshDetail() {
     if (!anchorThreadId) return;
-    const res = await fetch(`/api/direct/${anchorThreadId}`, { credentials: "include" });
+    const res = await fetch(`/api/direct/${anchorThreadId}${businessMode ? "?as=business" : ""}`, { credentials: "include" });
     if (res.ok) setDetail(await res.json());
   }
 
