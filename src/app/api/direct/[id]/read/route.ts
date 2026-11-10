@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DirectActorType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
+import { canAccessBusinessResource } from "@/server/permissions/business-permissions";
 import {
   nextResponseFromDirectAccessError,
   requireDirectThreadAccess,
@@ -8,7 +9,7 @@ import {
 import { markThreadRead } from "@/server/services/direct/directThread.service";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -27,8 +28,13 @@ export async function POST(
     return NextResponse.json({ markedCount: 0 });
   }
 
-  const readerType =
-    user!.id === thread.customerUserId ? DirectActorType.CUSTOMER : DirectActorType.BUSINESS;
+  const asBusiness = new URL(request.url).searchParams.get("as") === "business";
+  if (asBusiness && !(await canAccessBusinessResource(user!, thread.businessId))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const readerType = asBusiness || user!.id !== thread.customerUserId
+    ? DirectActorType.BUSINESS
+    : DirectActorType.CUSTOMER;
 
   const result = await markThreadRead({ threadId: thread.id, readerType });
   return NextResponse.json({ markedCount: result.count });
