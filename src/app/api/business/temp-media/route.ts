@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     const {
       wizardSessionId,
       url,
+      mediaAssetId,
       width,
       height,
       blurhash,
@@ -42,9 +43,30 @@ export async function POST(req: NextRequest) {
       sortOrder,
     } = body;
 
-    if (!wizardSessionId || !url || !kind) {
+    // Library selection is resolved server-side from its MediaAsset id.
+    // Never trust a client-provided URL when attaching someone else's media.
+    let resolvedUrl = url;
+    let resolvedWidth = width;
+    let resolvedHeight = height;
+    if (mediaAssetId !== undefined) {
+      if (typeof mediaAssetId !== "string" || !mediaAssetId.trim()) {
+        return NextResponse.json({ error: "Invalid mediaAssetId" }, { status: 400 });
+      }
+      const asset = await prisma.mediaAsset.findFirst({
+        where: { id: mediaAssetId, uploadedById: user.id, status: "ACTIVE" },
+        select: { publicUrl: true, width: true, height: true },
+      });
+      if (!asset?.publicUrl) {
+        return NextResponse.json({ error: "Media asset not found" }, { status: 404 });
+      }
+      resolvedUrl = asset.publicUrl;
+      resolvedWidth = asset.width;
+      resolvedHeight = asset.height;
+    }
+
+    if (!wizardSessionId || !resolvedUrl || !kind) {
       return NextResponse.json(
-        { error: "wizardSessionId, url, and kind are required" },
+        { error: "wizardSessionId, mediaAssetId or url, and kind are required" },
         { status: 400 },
       );
     }
@@ -84,9 +106,9 @@ export async function POST(req: NextRequest) {
       data: {
         ownerUserId: user.id,
         wizardSessionId,
-        url,
-        width: width || null,
-        height: height || null,
+        url: resolvedUrl,
+        width: resolvedWidth || null,
+        height: resolvedHeight || null,
         blurhash: blurhash || null,
         mimeType: mimeType || null,
         sizeBytes: sizeBytes || null,
