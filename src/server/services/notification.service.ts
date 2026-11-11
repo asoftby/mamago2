@@ -1504,6 +1504,35 @@ export interface NotifyUserBookingParams {
 }
 
 /**
+ * Принятие новой клиентской заявки. Это НЕ подтверждение организатором:
+ * на данном этапе BookingStatus.NEW.
+ * Дубли по BookingRequest.id подавляются тем же механизмом, что и BUSINESS.
+ */
+export async function notifyUserBookingSubmitted(params: NotifyUserBookingParams) {
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "BOOKING_SUBMITTED",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) return null;
+
+  const title = params.publicationTitle?.trim() || "событие";
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "BOOKING_SUBMITTED",
+    title: "Заявка получена",
+    body: `Заявка на «${title}» получена и ожидает подтверждения организатора.`,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Мои записи",
+    ctaAction: "/me/bookings",
+    waitForDelivery: true,
+  });
+}
+
+/**
  * Уведомление пользователю: бизнес подтвердил заявку.
  * Вызывается при переходе NEW → CONFIRMED.
  * Dedup: one per status change (no time window)
