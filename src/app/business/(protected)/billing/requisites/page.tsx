@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
 type PayerType = "LEGAL_ENTITY" | "SOLE_PROPRIETOR" | "SELF_EMPLOYED";
 type Form = {
@@ -64,10 +65,14 @@ export default function BillingRequisitesPage() {
     } finally { setSaving(false); }
   }
   return (
-    <div className="max-w-3xl space-y-6">
-      <div><h1 className="text-2xl font-semibold">Реквизиты для документов</h1><p className="text-sm text-stone-600 mt-2">Данные плательщика для счетов и актов. Изменения не затрагивают публичный профиль компании.</p></div>
+    <div className="space-y-6">
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Реквизиты для документов"
+        description="Данные плательщика для счетов и актов. Изменения не затрагивают публичный профиль компании."
+      />
       {loading ? <p role="status">Загрузка реквизитов…</p> : (
-        <form onSubmit={save} className="space-y-5 rounded-2xl border border-stone-200 bg-white p-5">
+        <form onSubmit={save} className="max-w-3xl space-y-5 rounded-2xl border border-stone-200 bg-white p-5">
           <label className="block text-sm font-medium">Тип плательщика
             <select value={form.payerType} onChange={e => setForm(prev => ({ ...prev, payerType: e.target.value as PayerType }))} className="mt-1 block w-full rounded-lg border border-stone-300 p-2">
               <option value="LEGAL_ENTITY">Юридическое лицо</option><option value="SOLE_PROPRIETOR">ИП</option><option value="SELF_EMPLOYED">Самозанятый</option>

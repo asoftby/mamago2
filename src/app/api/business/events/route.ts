@@ -265,6 +265,7 @@ export async function POST(request: NextRequest) {
         scheduleJson: scheduleJsonWithOrganizer as Prisma.InputJsonValue,
         ...(deriveEventRequestBookingColumns({
           participationMode: scheduleJsonWithOrganizer.participationMode,
+          scheduleJson: scheduleJsonWithOrganizer,
           current: { bookingEnabled: false, bookingMode: null },
           hasBusiness: Boolean(resolvedBusinessId),
         }) ?? {}),
@@ -317,10 +318,9 @@ export async function POST(request: NextRequest) {
     });
     perf.mark("write");
 
-    await replaceActivitySessionsFromScheduleJson({
-      prisma,
-      activityId: event.id,
-      scheduleJson: event.scheduleJson,
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Activity" WHERE "id" = ${event.id} FOR UPDATE`;
+      await replaceActivitySessionsFromScheduleJson({ prisma: tx, activityId: event.id, scheduleJson: event.scheduleJson });
     });
     perf.mark("schedule-sync");
     await syncActivityNextOccurrenceAt({ prisma, activityId: event.id });

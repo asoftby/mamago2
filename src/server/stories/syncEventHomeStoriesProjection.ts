@@ -30,7 +30,7 @@ export async function syncEventHomeStoriesProjection(
       images: { orderBy: { sortOrder: "asc" }, select: { id: true, url: true, mediaAssetId: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       priceFrom: true, priceTo: true, priceText: true, scheduleJson: true,
-      sessions: { where: { startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" }, take: 100 },
+      sessions: { where: { withdrawnAt: null, startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" }, take: 100 },
     },
   });
   const existing = await prisma.homeStoryItem.findMany({

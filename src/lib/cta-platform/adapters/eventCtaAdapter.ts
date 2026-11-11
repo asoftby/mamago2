@@ -72,10 +72,10 @@ function fromParticipationMode(input: EventCtaLegacyInput): CanonicalCtaSeed | n
       actionKind: "REQUEST",
       sourceEntityType: "EVENT",
       sourceEntityId: input.id,
-      primaryLabel: "Выбрать время",
+      primaryLabel: input.bookingMode === "USE_PUBLICATION_DATES" ? "Выбрать дату" : "Выбрать время",
       requestConfig: {
         runtime: "BOOKING",
-        selectionMode: "SLOT",
+        selectionMode: input.bookingMode === "USE_PUBLICATION_DATES" ? "DATE" : "SLOT",
       },
       instructions: input.bookingNote ?? undefined,
       contactFallback: createPhoneFallback(input.bookingPhone ?? "")

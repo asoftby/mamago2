@@ -45,16 +45,18 @@ export async function POST(request: NextRequest) {
   const { rules, offerIds, ...fields } = parsed.data;
   // Offer belongs to a business through its linked Place, not a direct businessId.
   // Keep this guard for every offer: no cross-business resource mappings.
-  const owned = await prisma.offer.count({
-    where: { id: { in: offerIds }, place: { ownerBusinessId: businessId } },
-  });
-  if (owned !== offerIds.length)
-    return NextResponse.json({ error: "Услуги не принадлежат бизнесу" }, { status: 403 });
+  if (offerIds.length > 0) {
+    const owned = await prisma.offer.count({
+      where: { id: { in: offerIds }, place: { ownerBusinessId: businessId } },
+    });
+    if (owned !== offerIds.length)
+      return NextResponse.json({ error: "Услуги не принадлежат бизнесу" }, { status: 403 });
+  }
   const unit = await prisma.bookingUnit.create({
     data: {
       businessId, ...fields, timezone: "Europe/Minsk", type: "EXCLUSIVE",
       rules: { create: rules },
-      offers: { create: offerIds.map(offerId => ({ offerId })) },
+      ...(offerIds.length > 0 ? { offers: { create: offerIds.map(offerId => ({ offerId })) } } : {}),
     },
     select: { id: true, name: true },
   });

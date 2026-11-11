@@ -15,7 +15,7 @@ export interface EventCommitWriterPrismaClient {
   activity: Pick<PrismaClient["activity"], "create" | "update">;
   activitySession: Pick<
     PrismaClient["activitySession"],
-    "createMany" | "deleteMany" | "findFirst" | "findMany"
+    "createMany" | "deleteMany" | "updateMany" | "findFirst" | "findMany"
   >;
   eventVenue: Pick<PrismaClient["eventVenue"], "upsert">;
 }
