@@ -14,6 +14,8 @@ interface PlaceLogoUploadTempProps {
   wizardSessionId: string;
   currentLogoUrl?: string | null;
   currentLogoMediaId?: string | null;
+  placeId?: string;
+  published?: boolean;
   onUploadComplete?: (mediaId: string, url: string) => void;
   onRemove?: () => void;
   disabled?: boolean;
@@ -26,6 +28,8 @@ export function PlaceLogoUploadTemp({
   wizardSessionId,
   currentLogoUrl,
   currentLogoMediaId,
+  placeId,
+  published = false,
   onUploadComplete,
   onRemove,
   disabled = false,
@@ -72,11 +76,20 @@ export function PlaceLogoUploadTemp({
     setSaving(true);
     try {
       if (!item) {
-        if (value && !isExistingPlaceImage) await removeWizardTempMedia(value.id);
-        // Existing PlaceImage removal must go through the place/revision save workflow.
         if (value && isExistingPlaceImage) {
-          toast.error("Удаление сохранённого логотипа требует сохранения изменений места");
-          return;
+          // A published Place must not be changed outside its moderated revision.
+          if (published || !placeId) {
+            toast.error("Для удаления этого логотипа требуется редактирование через ревизию");
+            return;
+          }
+          const response = await fetch(
+            "/api/business/places/" + encodeURIComponent(placeId) +
+              "/images/" + encodeURIComponent(value.id),
+            { method: "DELETE" },
+          );
+          if (!response.ok) throw new Error("Не удалось удалить логотип");
+        } else if (value) {
+          await removeWizardTempMedia(value.id);
         }
         setRestored(null);
         onRemove?.();
