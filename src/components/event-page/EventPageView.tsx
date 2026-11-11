@@ -741,6 +741,13 @@ export function EventPageView({
           priceLabel={data.priceLabel}
           booking={data.cta.simpleBooking}
           initialSessionId={selectedId}
+          isAuthenticated={isAuthenticated}
+          onBooked={() => {
+            void loadSaveStatus();
+            window.dispatchEvent(new CustomEvent("publication-save-changed", {
+              detail: { kind: "event", id: data.id },
+            }));
+          }}
         />
       )}
       <SaveActivityFlowAdaptive
