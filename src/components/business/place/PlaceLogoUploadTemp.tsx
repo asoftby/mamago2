@@ -41,7 +41,7 @@ export function PlaceLogoUploadTemp({
   const busyRef = useRef(false);
 
   useEffect(() => {
-    if (!wizardSessionId) return;
+    if (!wizardSessionId || published) return;
     let cancelled = false;
     void fetch("/api/business/temp-media?wizardSessionId=" + encodeURIComponent(wizardSessionId))
       .then(async (response) => response.ok ? response.json() : null)
@@ -56,7 +56,7 @@ export function PlaceLogoUploadTemp({
     return () => { cancelled = true; };
     // On session change only: callbacks and current data are intentionally not effect dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wizardSessionId]);
+  }, [wizardSessionId, published]);
 
   const value: MediaUploadItem | null = currentLogoUrl
     ? { id: currentLogoMediaId || currentLogoUrl, url: currentLogoUrl }
