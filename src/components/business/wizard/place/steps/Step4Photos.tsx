@@ -23,16 +23,15 @@ export function Step4Photos({
   isEditable = true,
 }: Step4PhotosProps) {
   const logoImage = data.images.find((img) => img.kind === "LOGO");
-  const galleryImages = data.images
-    .filter((img) => img.kind === "GALLERY")
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
   const hasLogo = !!(logoImage?.url || data.logoUrl);
   const isMediaEditable = isEditable && data.status !== "PUBLISHED";
 
   // Convert PlaceImage[] to GalleryItem[]
   const initialGalleryItems: GalleryItem[] = useMemo(() =>
-    galleryImages.map((img) => ({
+    data.images
+      .filter((img) => img.kind === "GALLERY")
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((img) => ({
       id: img.id,
       url: img.url,
       width: img.width ?? undefined,
@@ -42,7 +41,7 @@ export function Step4Photos({
       // A wizard may mix persisted PlaceImages with new TempMedia even in edit mode.
       source: (!data.id || data.tempGalleryMediaIds?.includes(img.id))
         ? "temp" as const : "place" as const,
-    })), [galleryImages, data.id, data.tempGalleryMediaIds]
+    })), [data.images, data.id, data.tempGalleryMediaIds]
   );
 
   const handleLogoUploadComplete = useCallback((mediaId: string, url: string) => {
