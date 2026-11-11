@@ -97,6 +97,22 @@ assert.equal(prebookLink.requestLabelKind, "BOOK");
 assert.equal(prebookLink.legacyOrigin, "BOOKING");
 assert.equal(prebookLink.fallback.website, "https://example.com/prebook");
 
+const prebookInternalInput = createLegacyInput({
+  id: "event-prebook-native",
+  participationMode: "prebook",
+  prebookMethod: "internal",
+  bookingEnabled: true,
+  bookingMode: "REQUEST_ONLY",
+});
+const prebookInternal = mapEventLegacyCtaToStepValue(prebookInternalInput);
+assert.equal(prebookInternal.actionChoice, "REQUEST");
+assert.equal(prebookInternal.nativePrebooking, true);
+assert.deepEqual(
+  mapCtaStepValueToEventLegacy(prebookInternal, { id: prebookInternalInput.id }).prebookMethod,
+  "internal",
+);
+assertCanonicalParity(prebookInternalInput);
+
 const timeSlots = mapEventLegacyCtaToStepValue(
   createLegacyInput({
     id: "event-time-slots",
