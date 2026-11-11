@@ -170,6 +170,7 @@ jobs:
           pnpm exec tsx src/server/offers/bookingPrice.test.ts
           pnpm test:wishlist
           pnpm exec tsx src/server/offers/bookingDuration.test.ts
+          pnpm exec tsx src/components/business/bookings/manualPlaceReservation.test.ts
           pnpm exec tsx src/server/offers/slotIdempotency.test.ts
           pnpm exec tsx src/server/offers/bookingServices.contract.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
