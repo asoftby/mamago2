@@ -109,3 +109,19 @@ export async function reorderWizardTempGallery(
   });
   if (!response.ok) throw new Error("Не удалось сохранить порядок фотографий");
 }
+
+export async function reorderSavedPlaceGallery(
+  placeId: string,
+  updates: Array<{ id: string; sortOrder: number }>,
+): Promise<void> {
+  if (updates.length === 0) return;
+  const response = await fetch(
+    "/api/business/places/" + encodeURIComponent(placeId) + "/images/reorder",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates }),
+    },
+  );
+  if (!response.ok) throw new Error("Не удалось сохранить порядок фотографий места");
+}
