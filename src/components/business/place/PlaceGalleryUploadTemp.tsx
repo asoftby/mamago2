@@ -56,7 +56,7 @@ export function PlaceGalleryUploadTemp({
 
   // Old drafts might have persisted TempMedia but an incomplete local autosave.
   useEffect(() => {
-    if (!wizardSessionId) return;
+    if (!wizardSessionId || published) return;
     let cancelled = false;
     void fetch("/api/business/temp-media?wizardSessionId=" + encodeURIComponent(wizardSessionId))
       .then(async (response) => response.ok ? response.json() : null)
@@ -73,7 +73,7 @@ export function PlaceGalleryUploadTemp({
     return () => { cancelled = true; };
     // Session restoration should happen once per wizard, not on every form edit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wizardSessionId]);
+  }, [wizardSessionId, published]);
 
   const uploadFiles = useCallback(async (files: File[]) => {
     const results = await uploadFilesToPlaceWizard(
