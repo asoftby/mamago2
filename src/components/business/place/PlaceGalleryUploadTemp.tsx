@@ -167,7 +167,7 @@ export function PlaceGalleryUploadTemp({
       mode="multiple"
       value={mediaValue}
       onChange={(next) => { void handleChange(next); }}
-      disabled={disabled || busy || !wizardSessionId}
+      disabled={disabled || busy || !wizardSessionId || published}
       maxFiles={MAX_IMAGE_FILES}
       allowReorder
       allowUpload
