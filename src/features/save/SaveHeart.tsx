@@ -71,12 +71,13 @@ export function SaveHeart({
   const [saveStatus, setSaveStatus] = useState({
     isIdea: false,
     inPlan: false,
+    inBirthday: false,
     planDate: null as string | null,
     planStartsAt: null as string | null,
     planItemId: null as string | null,
   });
 
-  const isSaved = saveStatus.isIdea || saveStatus.inPlan;
+  const isSaved = saveStatus.isIdea || saveStatus.inPlan || saveStatus.inBirthday;
   const normalizedEventPlanDateISO = normalizePlanDateISO(eventPlanDateISO);
 
   const checkSaveStatus = useCallback(async () => {
@@ -84,6 +85,7 @@ export function SaveHeart({
       setSaveStatus({
         isIdea: false,
         inPlan: false,
+        inBirthday: false,
         planDate: null,
         planStartsAt: null,
         planItemId: null,
@@ -101,6 +103,7 @@ export function SaveHeart({
       setSaveStatus({
         isIdea: Boolean(data.isIdea),
         inPlan: Boolean(data.inPlan),
+        inBirthday: Boolean(data.inBirthday),
         planDate: data.planDate ?? null,
         planStartsAt: data.planStartsAt ?? null,
         planItemId: data.planItemId ?? null,
