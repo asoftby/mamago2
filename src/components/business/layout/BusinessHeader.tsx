@@ -80,8 +80,7 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
 
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="truncate text-base lg:text-lg font-semibold tracking-tight text-stone-950">
-              <span className="hidden sm:inline">mamaGo Business</span>
-              <span className="sm:hidden">Business</span>
+              mamaGo Business
             </span>
           </div>
 

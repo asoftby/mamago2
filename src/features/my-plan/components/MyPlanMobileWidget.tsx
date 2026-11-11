@@ -1,19 +1,12 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { MyPlanCapsule } from "./MyPlanCapsule";
 
 /**
- * Mobile My Plan pill: swipe up (scroll page down) hides, swipe down (scroll
- * page up) reveals. Same hysteresis and top-of-page behavior as MobileHeader.
- * The overlay itself never participates in this transition.
+ * Mobile My Plan pill. `hidden` is owned by MobilePlanBottomStack so the beta tip
+ * can tuck with the same scroll signal.
  */
-export function MyPlanMobileWidget({ keepVisible = false }: { keepVisible?: boolean }) {
-  const pathname = usePathname();
-  const scrollingDown = useScrollDirection({ resetKey: pathname });
-  const hidden = scrollingDown && !keepVisible;
-
+export function MyPlanMobileWidget({ hidden = false }: { hidden?: boolean }) {
   return (
     <nav
       aria-label="Мой план"

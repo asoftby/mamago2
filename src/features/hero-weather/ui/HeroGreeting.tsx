@@ -110,12 +110,12 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
       data-hero-weather-scenario={model.weatherScenario}
     >
       {displaySummary ? (
-        <p className="flex items-center gap-3 tracking-tight [text-wrap:balance]" style={{ fontSize: 18 }}>
+        <p className="flex items-center gap-2 leading-snug tracking-tight [text-wrap:balance]" style={{ fontSize: 18 }}>
           <HeroMoodIcon
             scenario={model.weatherScenario}
             timeOfDay={model.timeOfDay}
             maxTemperatureC={model.maxTemperatureC}
-            size={56}
+            size={36}
           />
           <WeatherSummaryText text={displaySummary} />
         </p>

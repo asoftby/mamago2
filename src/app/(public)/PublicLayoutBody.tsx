@@ -126,7 +126,10 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
         <PublicFooter withStickyCtaClearance={hideBottomBar} withPlanStickyClearance={isFullPlanPage} />
       </div>
 
-      {!hideBottomBar ? <BetaTipMobile /> : null}
+      {/* When the plan pill is mounted, beta tip rides in MobilePlanBottomStack (shared scroll). */}
+      {!hideBottomBar && !hasMobilePlanWidget ? (
+        <BetaTipMobile dockAbovePlan={false} />
+      ) : null}
     </>
   );
 }

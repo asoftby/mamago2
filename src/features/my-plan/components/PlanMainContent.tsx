@@ -52,6 +52,14 @@ import { fetchPlanExperienceFeed, hasPendingPlanFeedback, type PlanExperienceFee
 import { ArrowRight, Bookmark, Heart, Lightbulb, Search } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
+import {
+  appendSuggestionBatch,
+  canGoBackSuggestionBatch,
+  currentSuggestionBatch,
+  emptySuggestionBatchHistory,
+  goBackSuggestionBatch,
+  type SuggestionBatchHistory,
+} from "../lib/suggestionBatchHistory";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "../lib/canOpenDayScenario";
@@ -525,6 +533,9 @@ export function PlanMainContent({
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
   const [suggestions, setSuggestions] = useState<PlanSuggestionItem[]>([]);
   const [suggestionsGeneration, setSuggestionsGeneration] = useState(0);
+  const [suggestionBatchHistory, setSuggestionBatchHistory] = useState<
+    SuggestionBatchHistory<PlanSuggestionItem>
+  >(() => emptySuggestionBatchHistory());
   /** Selection local to plan recommendations, separate from global discovery filters. */
   const [planAudienceOverride, setPlanAudienceOverride] = useState<string[] | null>(null);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
@@ -538,8 +549,15 @@ export function PlanMainContent({
   });
   /** Все id, когда-либо показанные в подборках этого сеанса — не даём «Ещё варианты» повторяться. */
   const shownSuggestionActivityIdsRef = useRef<Set<string>>(new Set());
+  const suggestionBatchHistoryRef = useRef(suggestionBatchHistory);
+  suggestionBatchHistoryRef.current = suggestionBatchHistory;
   const hydratedDraftKeyRef = useRef<string | null>(null);
   const skipNextDraftPersistRef = useRef<string | null>(null);
+
+  const beginFreshSuggestionHistory = useCallback(() => {
+    setSuggestionBatchHistory(emptySuggestionBatchHistory());
+    setSuggestionsGeneration(0);
+  }, []);
 
   const restorePendingPlanItem = useCallback((itemId: string) => {
     pendingRemovalIdsRef.current.delete(itemId);
@@ -838,6 +856,7 @@ export function PlanMainContent({
         for (const item of results) {
           shownSuggestionActivityIdsRef.current.add(item.id);
         }
+        setSuggestionBatchHistory((prev) => appendSuggestionBatch(prev, results, MAX_SUGGESTION_BATCHES));
         setSuggestions(results);
         setSuggestionsGeneration((v) => v + 1);
         window.setTimeout(() => {
@@ -871,20 +890,23 @@ export function PlanMainContent({
       const ages = childIds.length === 0 && planAudienceIds.length > 0
         ? ["18+"]
         : deriveAgeRangesFromChildren(childrenList, childIds).map((item) => item.range);
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, planAudienceIds));
       return;
     }
 
     if (defaultParticipants.source === "last-used-age-ranges") {
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(defaultParticipants.ageRanges, []));
       return;
     }
     if (needsAgeAnswerValues?.length) {
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(needsAgeAnswerValues, []));
       return;
     }
     setAwaitingAgeAnswer(true);
-  }, [planAudienceOverride, planAudienceIds, defaultParticipants, personas, childrenList, needsAgeAnswerValues, handleFetchSuggestions]);
+  }, [planAudienceOverride, planAudienceIds, defaultParticipants, personas, childrenList, needsAgeAnswerValues, handleFetchSuggestions, beginFreshSuggestionHistory]);
 
   const handleAgeAnswerConfirm = useCallback(
     (ageRanges: string[]) => {
@@ -892,9 +914,10 @@ export function PlanMainContent({
       setAwaitingAgeAnswer(false);
       writeLastPlanAgeRanges(ageRanges);
       onChangeSelectedAgeRanges(ageRanges.map((range) => ({ range, source: "manual" as const })));
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ageRanges, []));
     },
-    [onChangeSelectedAgeRanges, handleFetchSuggestions],
+    [onChangeSelectedAgeRanges, handleFetchSuggestions, beginFreshSuggestionHistory],
   );
 
   const handleAgeAnswerCancel = useCallback(() => {
@@ -908,6 +931,14 @@ export function PlanMainContent({
     }
     handleDecideClick();
   }, [handleDecideClick, handleFetchSuggestions, suggestionsGeneration]);
+
+  const handleShowPreviousSuggestions = useCallback(() => {
+    const next = goBackSuggestionBatch(suggestionBatchHistoryRef.current);
+    if (next.index === suggestionBatchHistoryRef.current.index) return;
+    const batch = currentSuggestionBatch(next);
+    setSuggestionBatchHistory(next);
+    if (batch) setSuggestions(batch);
+  }, []);
 
   const handleRemoveIdea = async (activityId: string) => {
     if (!onRemoveIdea) return;
@@ -992,7 +1023,17 @@ export function PlanMainContent({
           setAddedSuggestionActivityIds((prev) =>
             prev.includes(activity.id) ? prev : [...prev, activity.id],
           );
-          setSuggestions((prev) => prev.filter((s) => s.id !== activity.id));
+          setSuggestions((prev) => {
+            const next = prev.filter((s) => s.id !== activity.id);
+            setSuggestionBatchHistory((history) => {
+              if (history.index < 0 || history.index >= history.batches.length) return history;
+              const batches = history.batches.map((batch, i) =>
+                i === history.index ? next : batch,
+              );
+              return { batches, index: history.index };
+            });
+            return next;
+          });
           return true;
         }
       } catch {
@@ -1099,8 +1140,14 @@ export function PlanMainContent({
 
   useEffect(() => {
     const draft = loadRecommendationDraft(recommendationDraftKeyValue);
-    setSuggestions(draft?.suggestions ?? []);
+    const restored = draft?.suggestions ?? [];
+    setSuggestions(restored);
     setSuggestionsGeneration(draft?.batchNumber ?? 0);
+    setSuggestionBatchHistory(
+      restored.length > 0
+        ? appendSuggestionBatch(emptySuggestionBatchHistory(), restored, MAX_SUGGESTION_BATCHES)
+        : emptySuggestionBatchHistory(),
+    );
     setSuggestionsError(false);
     setAddedSuggestionActivityIds(draft?.addedActivityIds ?? []);
     lastRequestSnapshotRef.current = {
@@ -1384,7 +1431,11 @@ export function PlanMainContent({
     );
   };
 
-  const ideaMeta = (activity: PlanSuggestionItem) => {
+  const ideaPickFields = (activity: PlanSuggestionItem) => {
+    const date = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+    });
     const text = activity.priceText?.trim();
     const price = text
       ? normalizeUiCurrencyText(text)
@@ -1393,7 +1444,12 @@ export function PlanMainContent({
         : activity.priceFrom != null && !Number.isNaN(activity.priceFrom)
           ? formatPriceFrom(activity.priceFrom)
           : null;
-    return [activity.ageLabel ?? null, price].filter(Boolean).join(" · ");
+    return { date, time: null as string | null, price };
+  };
+
+  const ideaMetaLine = (activity: PlanSuggestionItem) => {
+    const fields = ideaPickFields(activity);
+    return [fields.date, fields.time, fields.price].filter(Boolean).join(" · ");
   };
 
   /** Пустой день: 1–2 сохранённые идеи с кнопкой «Запланировать на {дата}» (тот же механизм, что «+» у идей). */
@@ -1423,8 +1479,8 @@ export function PlanMainContent({
                   <p className="m-0 line-clamp-2 text-[15px] font-semibold leading-[1.3] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
                     {idea.activity.title}
                   </p>
-                  {ideaMeta(idea.activity) ? (
-                    <p className="m-0 mt-0.5 truncate text-[13px] text-[var(--mp-tx2)]">{ideaMeta(idea.activity)}</p>
+                  {ideaMetaLine(idea.activity) ? (
+                    <p className="m-0 mt-0.5 truncate text-[13px] text-[var(--mp-tx2)]">{ideaMetaLine(idea.activity)}</p>
                   ) : null}
                 </div>
               </div>
@@ -1466,6 +1522,7 @@ export function PlanMainContent({
 
   /** Запрос подборки с экрана подборки: свой возраст важнее состава, «Для всех» = возраст «Любой». */
   const refetchPicks = (ids: string[], ages: string[]) => {
+    beginFreshSuggestionHistory();
     if (ages.length > 0) {
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, ids));
       return;
@@ -1882,7 +1939,7 @@ export function PlanMainContent({
               loading={isFetchingSuggestions}
               failed={suggestionsError}
               addingActivityId={addingActivityId}
-              metaFor={ideaMeta}
+              metaFor={ideaPickFields}
               ageQuestion={
                 awaitingAgeAnswer ? (
                   <PlanNeedsAgeQuestion
@@ -1895,9 +1952,11 @@ export function PlanMainContent({
                 ) : null
               }
               exhausted={suggestionsGeneration >= MAX_SUGGESTION_BATCHES}
+              canGoPrevious={canGoBackSuggestionBatch(suggestionBatchHistory)}
               onAdd={(activity) => void handleAddSuggestionToPlan(activity)}
               onRetry={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
               onMore={handleRegenerate}
+              onPrevious={handleShowPreviousSuggestions}
               onOpenCatalog={handleOpenCatalog}
               onBack={closeNestedScreen}
               onClose={onRequestClose}

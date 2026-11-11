@@ -483,6 +483,30 @@ assert.deepEqual(
   },
 );
 
+// Localhost uses the same single-city default as apex public hosts.
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "localhost:3000",
+    protocol: "http:",
+    pathname: "/",
+    search: "",
+  }),
+  {
+    kind: "redirect",
+    location: "http://localhost:3000/minsk",
+  },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "localhost:3000",
+    protocol: "http:",
+    pathname: "/minsk/events",
+    search: "?q=1",
+  }),
+  { kind: "next" },
+);
+
 assert.deepEqual(
   resolveSubdomainMiddlewareDecision({
     host: "admin.mamago.by",

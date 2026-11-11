@@ -458,9 +458,15 @@ interface DashboardClientProps {
 
 export function DashboardClient({ data, defaultPeriod = "week", verificationBanner }: DashboardClientProps) {
   const [period, setPeriod] = useState<DashboardPeriod>(defaultPeriod);
+  // Auto-open only on the very first cabinet visit. `startedAt` is written by the
+  // launchpad on first mount, so later visits never reopen the tour by themselves.
+  // Manual "Возможности кабинета" can still open it.
   const [tourOpen, setTourOpen] = useState(() =>
-    data.onboarding.showLaunchpad && !data.onboarding.tourCompleted &&
-    !data.onboarding.tourSkipped && !data.onboarding.hasAny,
+    data.onboarding.showLaunchpad &&
+      !data.onboarding.startedAt &&
+      !data.onboarding.tourCompleted &&
+      !data.onboarding.tourSkipped &&
+      !data.onboarding.hasAny,
   );
   const router = useRouter();
   const pathname = usePathname();
