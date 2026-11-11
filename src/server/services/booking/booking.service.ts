@@ -23,7 +23,7 @@ import {
   Prisma,
   PublicationType,
 } from "@prisma/client";
-import { notifyBookingCreated } from "@/server/services/notification.service";
+import { notifyBookingCreated, notifyUserBookingSubmitted } from "@/server/services/notification.service";
 import { resolveBookingPlanItem } from "@/server/family/planBooking.service";
 import { trackBookingCreated } from "@/server/analytics/trackBookingEvent";
 import {
@@ -182,7 +182,7 @@ async function createBookingWithInitialActivity(
   return transaction ? create(transaction) : prisma.$transaction(create);
 }
 
-function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): void {
+async function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): Promise<void> {
   void trackBookingCreated({
     userId: context.userId,
     bookingId: context.bookingId,
@@ -199,15 +199,13 @@ function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): v
       // Family Core M6: lets the "make private" rule see another adult's booking.
       ...(context.planItemId ? { planItemId: context.planItemId } : {}),
     },
-  });
+  }).catch((err) => console.error("[booking.service] analytics failed:", err));
 
-  if (!context.ownerUserId) {
-    return;
-  }
-
-  notifyBookingCreated({
+  const promises: Promise<unknown>[] = [];
+  if (context.ownerUserId) promises.push(notifyBookingCreated({
     ownerUserId: context.ownerUserId,
     bookingId: context.bookingId,
+    waitForDelivery: context.entityType === "EVENT",
     offerId: context.offerId ?? null,
     offerTitle: context.offerTitle ?? null,
     activityId: context.activityId ?? null,
@@ -221,9 +219,18 @@ function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): v
     customerName: context.customerName,
     childName: context.childName ?? null,
     childAge: context.childAge ?? null,
-  }).catch((err) =>
-    console.error("[booking.service] notifyBookingCreated failed:", err),
-  );
+  }).catch((err) => {
+    console.error("[booking.service] notifyBookingCreated failed:", { bookingId: context.bookingId, error: err });
+  }));
+
+  if (context.userId) promises.push(notifyUserBookingSubmitted({
+    userId: context.userId,
+    bookingId: context.bookingId,
+    publicationTitle: context.entityTitle,
+  }).catch((err) => {
+    console.error("[booking.service] notifyUserBookingSubmitted failed:", { bookingId: context.bookingId, error: err });
+  }));
+  await Promise.all(promises);
 }
 
 async function logBookingCreatedAudit(params: {
@@ -638,7 +645,7 @@ async function createPublicationBooking(
     const { activity, result } = manual ? await createEvent(manual.tx) : await prisma.$transaction(createEvent);
     if (manual) return result;
 
-    triggerBookingCreatedSideEffects({
+    await triggerBookingCreatedSideEffects({
       planItemId: planLink.planItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
