@@ -108,6 +108,8 @@ jobs:
         run: pnpm exec tsx src/server/birthday/partyAvailabilityPreview.test.ts
       - name: Verify manual calendar block contracts
         run: pnpm exec tsx src/server/birthday/bookingUnitBlocks.test.ts
+      - name: Verify business booking units with and without offers
+        run: pnpm exec tsx src/app/api/business/booking-units/bookingUnits.postgres.integration.test.ts
       - name: Verify real quote acceptance and exclusive confirmation
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyConfirmation.postgres.integration.test.ts
       - name: Verify server closes offers not accepted in time
