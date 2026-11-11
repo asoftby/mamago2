@@ -75,18 +75,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
     }
 
-    if (kind === "PLACE_LOGO") {
-      await prisma.tempMedia.updateMany({
-        where: {
-          ownerUserId: user.id,
-          wizardSessionId,
-          kind: "PLACE_LOGO",
-          status: "TEMP",
-        },
-        data: { status: "DELETED" },
-      });
-    }
-
     let finalSortOrder = sortOrder;
     if (finalSortOrder === undefined) {
       const lastMedia = await prisma.tempMedia.findFirst({
@@ -102,21 +90,31 @@ export async function POST(req: NextRequest) {
       finalSortOrder = (lastMedia?.sortOrder || 0) + 1;
     }
 
-    const media = await prisma.tempMedia.create({
-      data: {
-        ownerUserId: user.id,
-        wizardSessionId,
-        url: resolvedUrl,
-        width: resolvedWidth || null,
-        height: resolvedHeight || null,
-        blurhash: blurhash || null,
-        mimeType: mimeType || null,
-        sizeBytes: sizeBytes || null,
-        kind,
-        sortOrder: finalSortOrder,
-        status: "TEMP",
-      },
-    });
+    const mediaData = {
+      ownerUserId: user.id,
+      wizardSessionId,
+      url: resolvedUrl,
+      width: resolvedWidth || null,
+      height: resolvedHeight || null,
+      blurhash: blurhash || null,
+      mimeType: mimeType || null,
+      sizeBytes: sizeBytes || null,
+      kind,
+      sortOrder: finalSortOrder,
+      status: "TEMP" as const,
+    };
+
+    // Replacing a logo must be atomic. Never delete the previous temp logo
+    // before the replacement has been safely written.
+    const media = kind === "PLACE_LOGO"
+      ? await prisma.$transaction(async (tx) => {
+          await tx.tempMedia.updateMany({
+            where: { ownerUserId: user.id, wizardSessionId, kind: "PLACE_LOGO", status: "TEMP" },
+            data: { status: "DELETED" },
+          });
+          return tx.tempMedia.create({ data: mediaData });
+        })
+      : await prisma.tempMedia.create({ data: mediaData });
 
     return NextResponse.json({ media });
   } catch (error) {
