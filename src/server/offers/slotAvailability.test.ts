@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BookingMode, ScheduleKind } from "@prisma/client";
-import { calculateSlots, type SlotSnapshot } from "./slotAvailability";
+import { calculateSlots, isResourceWindowAvailable, type SlotSnapshot } from "./slotAvailability";
 import { localMinuteToUtc } from "./slotTime";
 
 const now = new Date("2026-03-20T00:00:00.000Z");
@@ -176,4 +176,56 @@ test("extension duration checks the entire exclusive-unit interval and buffers",
     blockEnd: new Date("2026-03-23T09:00:00Z") }];
   assert.equal(calculateSlots(snapshot, { from, to, requestedDurationMinutes: 120 }, now).length, 0);
   assert.ok(calculateSlots(snapshot, { from, to, requestedDurationMinutes: 60 }, now).length > 0);
+});
+
+test("explicit manual resource interval reuses weekly rules, buffers and manual blocks", () => {
+  const unit: SlotSnapshot["units"][number] = {
+    id: "solo-worker", timezone: "Europe/Minsk",
+    prepMinutes: 15, cleanupMinutes: 15, stepMinutes: 30,
+    minDurationMinutes: 30,
+    rules: [{ weekday: 1, startMinutes: 600, endMinutes: 780 }],
+    exceptions: [], blocks: [], allocations: [],
+  };
+  const start = new Date("2026-03-23T07:00:00.000Z"); // 10:00 Minsk
+  const end = new Date("2026-03-23T08:30:00.000Z"); // 11:30 Minsk
+  assert.equal(isResourceWindowAvailable(unit, start, end, now), true);
+  assert.equal(isResourceWindowAvailable(unit, start, new Date(start.getTime() + 15 * 60_000), now), false);
+  unit.blocks = [{
+    blockStart: new Date("2026-03-23T08:40:00Z"), blockEnd: new Date("2026-03-23T09:00:00Z"),
+  }];
+  assert.equal(isResourceWindowAvailable(unit, start, end, now), false, "cleanup buffer overlaps");
+  unit.blocks = [{
+    blockStart: new Date("2026-03-23T08:45:00Z"), blockEnd: new Date("2026-03-23T09:00:00Z"),
+  }];
+  assert.equal(isResourceWindowAvailable(unit, start, end, now), true, "half-open boundary");
+  unit.blocks = [];
+  unit.exceptions = [{
+    date: "2026-03-23", kind: "CLOSED", startMinutes: null, endMinutes: null,
+  }];
+  assert.equal(isResourceWindowAvailable(unit, start, end, now), false, "one-off closed Monday");
+  unit.exceptions = [];
+  unit.allocations = [{
+    blockStart: new Date("2026-03-23T06:45:00Z"),
+    blockEnd: new Date("2026-03-23T08:45:00Z"),
+    status: "HELD", expiresAt: new Date(now.getTime() - 1),
+  }];
+  assert.equal(isResourceWindowAvailable(unit, start, end, now), true, "expired HELD is ignored by preview");
+});
+
+test("manual resource availability honors one-off open overrides and 24:00", () => {
+  const unit: SlotSnapshot["units"][number] = {
+    id: "midnight-room", timezone: "Europe/Minsk",
+    prepMinutes: 0, cleanupMinutes: 0, stepMinutes: 30,
+    minDurationMinutes: null,
+    rules: [], exceptions: [{
+      date: "2026-03-23", kind: "OPEN_OVERRIDE",
+      startMinutes: 1200, endMinutes: 1440,
+    }], blocks: [], allocations: [],
+  };
+  assert.equal(isResourceWindowAvailable(
+    unit, new Date("2026-03-23T20:00:00Z"), new Date("2026-03-23T21:00:00Z"), now,
+  ), true);
+  assert.equal(isResourceWindowAvailable(
+    unit, new Date("2026-03-23T20:00:00Z"), new Date("2026-03-23T21:01:00Z"), now,
+  ), false);
 });
