@@ -9,19 +9,13 @@ type TelegramWebApp = {
   ready: () => void;
   expand?: () => void;
 };
-declare global {
-  interface Window {
-    Telegram?: { WebApp?: TelegramWebApp };
-  }
-}
-
 export function BusinessTelegramOpenClient({ destination }: { destination: string }) {
   const started = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const authenticate = useCallback(async () => {
     if (started.current) return;
-    const webApp = window.Telegram?.WebApp;
+    const webApp = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
     if (!webApp?.initData) {
       setError("Не удалось подтвердить Telegram. Откройте кнопку из личного чата с бизнес-ботом.");
       return;
