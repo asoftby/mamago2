@@ -102,6 +102,30 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       submit(request.id, 1),
       submit(simple.id, 1, simple.sessions[0]!.id),
     ]);
+    const businessNotice = await prisma.notification.findMany({
+      where: { userId: owner.id, type: "BOOKING_CREATED", entityType: "BOOKING", entityId: requestBooking.bookingId },
+    });
+    assert.equal(businessNotice.length, 1, "business notification must exist before booking returns");
+    const client = await prisma.user.create({ data: { email: `event-customer-${suffix}@example.test` } });
+    try {
+      const submitted = await createPublicBooking({
+        publicationType: "EVENT",
+        publicationId: request.id,
+        customerName: "Test Customer",
+        customerPhone: "+375291110099",
+        userId: client.id,
+      });
+      const userNotice = await prisma.notification.findMany({
+        where: { userId: client.id, type: "BOOKING_SUBMITTED", entityType: "BOOKING", entityId: submitted.bookingId },
+      });
+      assert.equal(userNotice.length, 1, "user must receive a submission acknowledgement");
+      assert.equal(userNotice[0]?.audience, "USER");
+      assert.equal(userNotice[0]?.ctaAction, "/me/bookings");
+    } finally {
+      await prisma.bookingRequest.deleteMany({ where: { userId: client.id } });
+      await prisma.notification.deleteMany({ where: { userId: client.id } });
+      await prisma.user.delete({ where: { id: client.id } });
+    }
     await assert.rejects(submit(calendar.id, 1), /выбрать слот/);
     await assert.rejects(submit(calendar.id, 1, "wizard-first"), /Слот недоступен/);
     await assert.rejects(submit(calendar.id, 1, simple.sessions[0]!.id), /Слот недоступен/);
