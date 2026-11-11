@@ -32,7 +32,7 @@ export interface EventLegacyCtaFields {
   id: string;
   participationMode: EventLegacyParticipationMode;
   ticketLink: string;
-  prebookMethod: "phone" | "link" | null;
+  prebookMethod: "internal" | "phone" | "link" | null;
   prebookPhone: string;
   prebookUrl: string;
   timeSlots: EventFormData["timeSlots"];
