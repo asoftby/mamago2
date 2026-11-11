@@ -34,7 +34,17 @@ const bodySchema = z.object({
     startsAt: z.iso.datetime(), endsAt: z.iso.datetime(),
     groupId: z.string().max(128).optional(), tariffId: z.string().max(128).optional(), unitId: z.string().max(128).optional(),
   }).optional(),
-}).refine((data) => (!data.offerSlot || data.publicationType === "OFFER") && (!data.requestedTime || data.requestedDate));
+  // Future manual individual appointments can explicitly reserve a physical
+  // resource; no inferred/automatic allocation for EVENT/group sessions.
+  resourceReservation: z.object({
+    bookingUnitId: z.string().min(1).max(128),
+    startsAt: z.iso.datetime({ offset: true }),
+    endsAt: z.iso.datetime({ offset: true }),
+  }).strict().optional(),
+}).refine((data) =>
+  (!data.offerSlot || data.publicationType === "OFFER") &&
+  (!data.resourceReservation || (data.publicationType === "PLACE" && !data.offerSlot && data.status === "CONFIRMED")) &&
+  (!data.requestedTime || data.requestedDate));
 const eventModes = ["REQUEST_ONLY", "USE_PUBLICATION_SLOTS", "USE_PUBLICATION_DATES"] as const;
 const privateHeaders = { "Cache-Control": "private, no-store" };
 
