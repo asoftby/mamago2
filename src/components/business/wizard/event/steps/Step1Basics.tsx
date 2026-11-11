@@ -17,6 +17,7 @@ import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { AGE_OPTIONS, sortAgeKeys } from "@/lib/config/ages";
 import { AgePolicy } from "@prisma/client";
 import { selectAdultOnlyAge, selectSpecificAge, selectUnrestrictedAge } from "@/lib/age/agePolicy";
+import { getUnrestrictedEventAgeRangeIds } from "../unrestrictedAgeRangeIds";
 import type {
   DiscoveryEventCategory,
   EventStep1Taxonomies,
@@ -557,6 +558,11 @@ export function Step1Basics({
     onChange,
   ]);
 
+  const allAgeRangeIds = useMemo(
+    () => getUnrestrictedEventAgeRangeIds(ageOptions.length > 0 ? ageOptions : FALLBACK_AGE_OPTIONS),
+    [ageOptions],
+  );
+
   const applyAgeBuckets = (
     buckets: string[],
     {
@@ -568,9 +574,19 @@ export function Step1Basics({
     },
   ) => {
     const next = sortAgeKeys([...buckets]);
+    if (next.length === 0) {
+      // Empty buckets mean «Любой»: keep every age chip selected except #nokids.
+      onChange({
+        ...selectUnrestrictedAge(),
+        ageRangeIds: allAgeRangeIds,
+        ageDetectionUserOverride: userOverride,
+        ageDetectionAutoApplied: autoApplied,
+      });
+      return;
+    }
     // Keep `ageTags` synchronized for existing Activity.ai/recommendations pipeline
     onChange({
-      agePolicy: next.length > 0 ? AgePolicy.SPECIFIC : AgePolicy.UNRESTRICTED,
+      agePolicy: AgePolicy.SPECIFIC,
       ageRangeIds: next,
       ageTags: next,
       ageDetectionUserOverride: userOverride,
@@ -578,24 +594,35 @@ export function Step1Basics({
     });
   };
 
-  const toggleAge = (ageValue: string) => {
-    const next = data.ageRangeIds.includes(ageValue)
-      ? data.ageRangeIds.filter((v) => v !== ageValue)
-      : [...data.ageRangeIds, ageValue];
-    const selected = next.length > 0 ? selectSpecificAge(next) : selectUnrestrictedAge();
-    onChange({ ...selected, ageRangeIds: selected.ageTags, ageDetectionUserOverride: true, ageDetectionAutoApplied: false });
-  };
-
   const selectAllAges = () => {
-    const selected = selectUnrestrictedAge();
-    const allAgeRangeIds = sortAgeKeys(ageOptions.map((option) => option.value));
     onChange({
-      ...selected,
+      ...selectUnrestrictedAge(),
       ageRangeIds: allAgeRangeIds,
       ageDetectionUserOverride: true,
       ageDetectionAutoApplied: false,
     });
   };
+
+  const toggleAge = (ageValue: string) => {
+    const next = data.ageRangeIds.includes(ageValue)
+      ? data.ageRangeIds.filter((v) => v !== ageValue)
+      : [...data.ageRangeIds, ageValue];
+    if (next.length === 0) {
+      selectAllAges();
+      return;
+    }
+    const selected = selectSpecificAge(next);
+    onChange({ ...selected, ageRangeIds: selected.ageTags, ageDetectionUserOverride: true, ageDetectionAutoApplied: false });
+  };
+
+  // Legacy drafts / empty UNRESTRICTED: expand «Любой» to the same chip set as a manual click.
+  useEffect(() => {
+    if (!isEditable) return;
+    if (data.agePolicy !== AgePolicy.UNRESTRICTED) return;
+    if (data.ageRangeIds.length > 0) return;
+    if (allAgeRangeIds.length === 0) return;
+    onChange({ ageRangeIds: allAgeRangeIds });
+  }, [allAgeRangeIds, data.agePolicy, data.ageRangeIds.length, isEditable, onChange]);
 
   const clearAgeSelection = () => {
     onChange({
@@ -648,8 +675,9 @@ export function Step1Basics({
     !data.ageDetectionUserOverride &&
     (ageDetection.confidence === "high" || ageDetection.confidence === "medium");
 
+  const isUnrestrictedAge = data.agePolicy === AgePolicy.UNRESTRICTED;
   const ageItems: ChipItem[] = ageOptions.map((o) => {
-    const isActive = data.ageRangeIds.includes(o.value);
+    const isActive = isUnrestrictedAge || data.ageRangeIds.includes(o.value);
     const isPreview =
       showSuggestedAgePreview && ageDetection.suggestedBuckets.includes(o.value);
 
@@ -667,7 +695,7 @@ export function Step1Basics({
   ageItems.unshift({
     id: "unrestricted",
     label: "Любой",
-    active: data.agePolicy === AgePolicy.UNRESTRICTED,
+    active: isUnrestrictedAge,
     disabled: !isEditable || loading,
     onClick: selectAllAges,
   });
