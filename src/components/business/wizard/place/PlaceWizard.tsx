@@ -353,6 +353,11 @@ export function PlaceWizard({
       const isAdmin = userRole === "ADMIN";
       if (isPublished && !isAdmin) return;
 
+      // Never auto-attach a partly selected TempMedia batch while the user is
+      // still editing the gallery. Explicit draft save receives the persisted
+      // PlaceImage ids and reconciles the editor state before editing continues.
+      if (formData.tempLogoMediaId || formData.tempGalleryMediaIds?.length) return;
+
       if (isSaving || isSubmitting || autosaveInFlightRef.current) {
         return;
       }
