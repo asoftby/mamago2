@@ -67,6 +67,8 @@ export function MobileProfileSheet({
   const size = compact ? "compact" : "default";
   const bare = variant === "bare";
 
+  // Header floating chrome is a white pill (`MOBILE_FLOATING_CHROME`), even when
+  // callers pass chrome="dark" — never use white letter text on that surface.
   const letterInner = profileLetter ? (
     <span
       className={cn(
@@ -76,13 +78,9 @@ export function MobileProfileSheet({
           : compact
             ? "h-8 w-8 text-[12px]"
             : "h-[37px] w-[37px] text-[13px]",
-        chrome === "dark"
-          ? isProfileActive
-            ? "bg-[#C24E22]/20 text-[#C24E22]"
-            : "bg-white/10 text-white"
-          : isProfileActive
-            ? "bg-[#EF8759]/15 text-[#C24E22]"
-            : "bg-neutral-100/95 text-neutral-700",
+        isProfileActive
+          ? "bg-[#EF8759]/15 text-[#C24E22]"
+          : "bg-neutral-100/95 text-neutral-700",
       )}
       aria-hidden
     >
