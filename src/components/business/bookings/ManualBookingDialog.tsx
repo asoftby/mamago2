@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatHHMM } from "@/lib/formatters/date";
-import { localWallClockToUtc } from "@/lib/date/localDateKey";
+import { buildManualPlaceReservation } from "./manualPlaceReservation";
 import { Textarea } from "@/components/ui/textarea";
 
 type Publication = { id: string; title: string; offerBooking?: { id: string } | null };
@@ -91,13 +91,17 @@ export function ManualBookingDialog({ onClose, onCreated }: {
       selectedPlaceUnit.minDurationMinutes > 480 ? [selectedPlaceUnit.minDurationMinutes] : []),
   ] : [];
   const selectedDuration = durations.includes(placeDuration) ? placeDuration : (durations[0] ?? 0);
-  const placeStart = reservePlaceResource && placeDate && placeTime && selectedPlaceUnit
-    ? localWallClockToUtc(placeDate, placeTime, selectedPlaceUnit.timezone) : null;
-  const placeEnd = placeStart && Number.isFinite(placeStart.getTime()) && selectedDuration > 0
-    ? new Date(placeStart.getTime() + selectedDuration * 60_000) : null;
+  const placeReservation = reservePlaceResource && selectedPlaceUnit
+    ? buildManualPlaceReservation({
+        bookingUnitId: selectedPlaceUnit.id, date: placeDate, time: placeTime,
+        timezone: selectedPlaceUnit.timezone, durationMinutes: selectedDuration,
+        prepMinutes: selectedPlaceUnit.prepMinutes, cleanupMinutes: selectedPlaceUnit.cleanupMinutes,
+      }) : null;
+  const placeStart = placeReservation ? new Date(placeReservation.resourceReservation.startsAt) : null;
+  const placeEnd = placeReservation ? new Date(placeReservation.resourceReservation.endsAt) : null;
   const placeResourceReady = !reservePlaceResource || (
     type === "PLACE" && bookingStatus === "CONFIRMED" &&
-    Boolean(selectedPlaceUnit && placeStart && placeEnd && placeStart > new Date())
+    Boolean(placeReservation && placeStart && placeStart > new Date())
   );
   const ready = placeResourceReady && (!scheduledOffer || Boolean(choice)) && Boolean(publicationId &&
     (type !== "EVENT" || (options &&
@@ -153,6 +157,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
       if (!response.ok) throw new Error("Не удалось загрузить ресурсы");
       return response.json() as Promise<{ units: PlaceUnit[] }>;
     }).then(({ units }) => {
+      if (!Array.isArray(units)) throw new Error("Резервирование ресурсов недоступно");
       if (!controller.signal.aborted) setPlaceResourceList({ placeId: publicationId, units });
     }).catch(() => {
       if (!controller.signal.aborted) setPlaceResourceError("Не удалось загрузить ресурсы. Повторите выбор места.");
@@ -180,17 +185,15 @@ export function ManualBookingDialog({ onClose, onCreated }: {
     const data = new FormData(event.currentTarget);
     const slot = options?.slots.find(({ id }) => id === data.get("slot"));
     const requestedDate = (scheduledOffer ? offerDate : slot?.date) || String(data.get("date") ?? "") || undefined;
-    if (reservePlaceResource && (!selectedPlaceUnit || !placeStart || !placeEnd ||
-        !Number.isFinite(placeStart.getTime()) || bookingStatus !== "CONFIRMED")) {
+    if (reservePlaceResource && (!selectedPlaceUnit || !placeReservation ||
+        bookingStatus !== "CONFIRMED")) {
       setError("Выберите ресурс, дату, время и продолжительность записи.");
       return;
     }
     const intent = {
       publicationType: type, publicationId,
       selectedSessionId: slot?.id,
-      resourceReservation: reservePlaceResource && selectedPlaceUnit && placeStart && placeEnd
-        ? { bookingUnitId: selectedPlaceUnit.id, startsAt: placeStart.toISOString(), endsAt: placeEnd.toISOString() }
-        : undefined,
+      resourceReservation: reservePlaceResource ? placeReservation?.resourceReservation : undefined,
       offerSlot: choice ? {
         startsAt: choice.startsAt, endsAt: choice.endsAt, groupId: groupId || undefined,
         tariffId: String(data.get("tariff") ?? "") || undefined,
@@ -379,14 +382,12 @@ export function ManualBookingDialog({ onClose, onCreated }: {
                           <option key={minutes} value={minutes}>{durationLabel(minutes)}</option>)}
                       </select>
                     </label>
-                    {selectedPlaceUnit && placeStart && placeEnd && Number.isFinite(placeStart.getTime()) ? (
+                    {selectedPlaceUnit && placeReservation && placeStart && placeEnd ? (
                       <p className="text-xs leading-5 text-stone-600">
                         Ресурс будет занят с {dateTimeLabel(
-                          new Date(placeStart.getTime() - selectedPlaceUnit.prepMinutes * 60_000),
-                          selectedPlaceUnit.timezone,
+                          placeReservation.blockStart, selectedPlaceUnit.timezone,
                         )} до {dateTimeLabel(
-                          new Date(placeEnd.getTime() + selectedPlaceUnit.cleanupMinutes * 60_000),
-                          selectedPlaceUnit.timezone,
+                          placeReservation.blockEnd, selectedPlaceUnit.timezone,
                         )} (включая подготовку и уборку).
                         Окончательную доступность проверим при сохранении.
                       </p>
