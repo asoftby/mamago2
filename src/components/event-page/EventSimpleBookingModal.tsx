@@ -173,7 +173,7 @@ export function EventSimpleBookingModal({
             </Link>
           ) : (
             <p className="mb-3 text-center text-sm text-stone-600">
-              Для отслеживания заявки в личном кабинете потребуется вход и подтверждение контакта.
+              Заявка создана без привязки к аккаунту. Сохраните номер заявки. Для появления в «Моих записях» понадобится подтверждённая привязка.
             </p>
           )}
           <button type="button" onClick={() => handleClose(false)} className="inline-flex min-h-12 w-full items-center justify-center rounded-full border text-[15px] font-semibold" style={{ borderColor: RS.line2 }}>
