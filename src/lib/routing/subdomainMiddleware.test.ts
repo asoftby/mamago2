@@ -506,12 +506,13 @@ assert.deepEqual(
   },
 );
 
-// Business sidebar opens the shared user inbox on the public host, not a
-// non-existent /business/me/direct URL. Both list and legacy thread links work.
-for (const [host, expectedUrl] of [
-  ["business.mamago.by", "https://mamago.by/me/direct"],
-  ["business.dev.mamago.by", "https://dev.mamago.by/me/direct"],
-  ["business.prod.mamago.by", "https://prod.mamago.by/me/direct"],
+// Business messages are served inside the business cabinet. Previously /direct
+// redirected to /me/direct; both the list and legacy thread links must now rewrite
+// to B2B routes on each business subdomain.
+for (const host of [
+  "business.mamago.by",
+  "business.dev.mamago.by",
+  "business.prod.mamago.by",
 ] as const) {
   assert.deepEqual(
     resolveSubdomainMiddlewareDecision({
@@ -520,7 +521,7 @@ for (const [host, expectedUrl] of [
       pathname: "/direct",
       search: "",
     }),
-    { kind: "redirect", location: expectedUrl },
+    { kind: "rewrite", pathname: "/business/direct" },
   );
 }
 
@@ -531,10 +532,7 @@ assert.deepEqual(
     pathname: "/direct/test-thread-123",
     search: "?from=notification",
   }),
-  {
-    kind: "redirect",
-    location: "https://dev.mamago.by/me/direct/test-thread-123?from=notification",
-  },
+  { kind: "rewrite", pathname: "/business/direct/test-thread-123" },
 );
 
 // Unhydrated links on the business host must work as well. Client navigation
@@ -566,7 +564,7 @@ assert.equal(businessMenuLabels[0], "Панель управления");
 assert.equal(businessMenuLabels[1], "Сообщения");
 const messagesHref = businessNavigation.find(({ label }) => label === "Сообщения");
 assert.equal(messagesHref?.type, "item");
-assert.equal(messagesHref?.type === "item" ? messagesHref.href : null, "/me/direct");
+assert.equal(messagesHref?.type === "item" ? messagesHref.href : null, "/business/direct");
 assert.equal(
   buildClientCompatibleDestination("/me/direct", {
     currentHost: "business.dev.mamago.by",
