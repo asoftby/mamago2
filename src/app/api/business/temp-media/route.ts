@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid mediaAssetId" }, { status: 400 });
       }
       const asset = await prisma.mediaAsset.findFirst({
-        where: { id: mediaAssetId, uploadedById: user.id, status: "ACTIVE" },
+        where: { id: mediaAssetId, uploadedById: user.id, status: "ACTIVE", kind: "IMAGE" },
         select: { publicUrl: true, width: true, height: true },
       });
       if (!asset?.publicUrl) {
