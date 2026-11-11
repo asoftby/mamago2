@@ -122,6 +122,7 @@ export function PlaceLogoUploadTemp({
       onUploadFiles={uploadFiles}
       loadMediaLibraryPage={loadPlaceMediaLibraryPage}
       uploadButtonLabel="Загрузить новое"
+      replaceButtonLabel="Загрузить новое"
       singleEmptyHint="Выберите логотип из медиатеки или загрузите новый"
       mediaLibraryDescription="Выберите логотип, который вы ранее загрузили в медиатеку."
       entityType="PLACE"
