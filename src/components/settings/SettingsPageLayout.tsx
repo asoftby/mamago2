@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ChevronLeft } from "lucide-react";
-import { Container } from "@/components/ui/Container";
 import { HistoryBackButton } from "@/components/navigation/HistoryBackButton";
+import { cn } from "@/lib/utils";
 
 export function SettingsPageLayout(props: {
   title: string;
@@ -10,8 +10,13 @@ export function SettingsPageLayout(props: {
   fallbackHref?: string;
 }) {
   return (
-    <div className="min-h-screen bg-background py-8">
-      <Container className={props.maxWidthClassName ?? "max-w-2xl"}>
+    <div className="w-full py-2 sm:py-4">
+      <div
+        className={cn(
+          "mx-auto w-full px-4 sm:px-6 lg:px-8",
+          props.maxWidthClassName ?? "max-w-2xl",
+        )}
+      >
         <div className="space-y-6">
           <div className="flex items-center gap-3">
             <HistoryBackButton
@@ -27,7 +32,7 @@ export function SettingsPageLayout(props: {
 
           {props.children}
         </div>
-      </Container>
+      </div>
     </div>
   );
 }
