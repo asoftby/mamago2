@@ -151,10 +151,12 @@ function buildReplyMarkup(
             registryEntry.ctaLabel,
             absoluteUrl,
             getPublicAppBaseUrl(),
-            notification.audience === "USER" && registryEntry.audience === "USER"
+            ((notification.audience === "USER" && registryEntry.audience === "USER") ||
+              (notification.audience === "BUSINESS" && registryEntry.audience === "BUSINESS"))
               ? registryEntry.telegramOpenIntent ?? "browser"
               : "browser",
             `notification_${notification.type.toLowerCase()}`,
+            notification.audience === "BUSINESS" ? "/telegram/business/open" : "/telegram/open",
           ),
         },
       ],
