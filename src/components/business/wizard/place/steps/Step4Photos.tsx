@@ -110,6 +110,12 @@ export function Step4Photos({
 
   return (
     <div className="space-y-8">
+      {data.status === "PUBLISHED" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          Изображения опубликованного места сохраняются через ревизию.
+          Редактирование изображений временно недоступно до завершения безопасного переноса в ревизию.
+        </p>
+      ) : null}
       {/* Logo */}
       <div>
         <h3 className="font-medium mb-2">Логотип *</h3>
