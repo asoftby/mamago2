@@ -80,9 +80,23 @@ export function PlaceGalleryUploadTemp({
     const results = await uploadFilesToPlaceWizard(
       files, wizardSessionId, "PLACE_GALLERY", initialImages.length,
     );
+    // Upload transport may de-duplicate an existing binary. All results are
+    // already TempMedia rows, so reject duplicate URLs BEFORE returning them
+    // to MediaUploadField; otherwise onChange can throw while invisible rows
+    // remain attached to the session.
+    const seenUrls = new Set(initialImages.map((item) => item.url));
+    const hasDuplicate = results.some((item) => {
+      if (seenUrls.has(item.url)) return true;
+      seenUrls.add(item.url);
+      return false;
+    });
+    if (hasDuplicate) {
+      await Promise.allSettled(results.map((item) => removeWizardTempMedia(item.id)));
+      throw new Error("Эта фотография уже добавлена в галерею");
+    }
     for (const item of results) uploadedIds.current.add(item.id);
     return results;
-  }, [wizardSessionId, initialImages.length]);
+  }, [wizardSessionId, initialImages]);
 
   const handleChange = async (next: MediaUploadItem | MediaUploadItem[] | null) => {
     if (busyRef.current) return;
