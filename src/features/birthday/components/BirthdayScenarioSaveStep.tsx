@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Plus } from "lucide-react";
 import { SaveActivityHeader } from "@/components/activity/SaveActivityHeader";
+import { CompactSaveAuthPanel } from "@/components/auth/CompactSaveAuthPanel";
 import type { ActivityTicketSource } from "@/components/activity/ActivityTicketCard";
 import { toast } from "@/lib/toast";
 
@@ -22,27 +23,47 @@ export function BirthdayScenarioSaveStep({ offerId, title, ticket, onBack, onClo
   const [loginRequired, setLoginRequired] = React.useState(false);
   const [savedPartyId, setSavedPartyId] = React.useState<string | null>(null);
 
+  // The same loader runs on first open and after in-modal login/registration.
+  // Keep this component mounted across authentication so the originating offer
+  // and any chosen scenario are never lost to a page navigation.
+  const loadParties = React.useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/parent/parties/saved-offers", {
+        cache: "no-store", credentials: "same-origin", signal,
+      });
+      if (signal?.aborted) return;
+      if (response.status === 401) {
+        setLoginRequired(true);
+        return;
+      }
+      if (!response.ok) throw new Error("Не удалось загрузить праздники");
+      const data = await response.json() as { parties?: Party[] };
+      if (signal?.aborted) return;
+      const choices = Array.isArray(data.parties) ? data.parties : [];
+      setParties(choices);
+      setCreating(current => current || choices.length === 0);
+      setLoginRequired(false);
+    } catch {
+      if (!signal?.aborted) setError("Не удалось загрузить праздники. Попробуйте ещё раз.");
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     const controller = new AbortController();
-    void (async () => {
-      try {
-        const response = await fetch("/api/parent/parties/saved-offers", { cache: "no-store", signal: controller.signal });
-        if (response.status === 401) { if (!controller.signal.aborted) setLoginRequired(true); return; }
-        if (!response.ok) throw new Error("Не удалось загрузить праздники");
-        const data = await response.json() as { parties?: Party[] };
-        if (!controller.signal.aborted) {
-          const choices = Array.isArray(data.parties) ? data.parties : [];
-          setParties(choices);
-          setCreating(choices.length === 0);
-        }
-      } catch {
-        if (!controller.signal.aborted) setError("Не удалось загрузить праздники. Попробуйте ещё раз.");
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    })();
+    void loadParties(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [loadParties]);
+
+  const handleAuthSuccess = async () => {
+    // CompactSaveAuthPanel has already updated the auth cookie and notified
+    // AuthProvider. Stay on this slide; fetch the newly accessible scenarios.
+    setLoginRequired(false);
+    await loadParties();
+  };
 
   async function save() {
     if (submitting || (!creating && !selected)) return;
@@ -53,8 +74,11 @@ export function BirthdayScenarioSaveStep({ offerId, title, ticket, onBack, onClo
         body: JSON.stringify(creating ? { offerId, childName: childName.trim() || undefined } : { offerId, partyId: selected }),
       });
       const data = await response.json().catch(() => ({})) as { partyId?: string; error?: string };
+      if (response.status === 401) {
+        setLoginRequired(true);
+        return;
+      }
       if (!response.ok || !data.partyId) {
-        if (response.status === 401) setLoginRequired(true);
         throw new Error(data.error || "Не удалось сохранить предложение");
       }
       setSavedPartyId(data.partyId); toast.success("Добавлено в сценарий ДР");
@@ -75,10 +99,16 @@ export function BirthdayScenarioSaveStep({ offerId, title, ticket, onBack, onClo
         <ArrowLeft className="size-4" /> Назад
       </button>
       {loading && <p role="status" className="py-4 text-sm text-muted-foreground">Загружаем праздники…</p>}
-      {loginRequired ? <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Войдите в аккаунт, чтобы сохранить предложение в сценарий.</p>
-        <Link href="/login" className="inline-flex min-h-11 items-center rounded-full bg-[#141210] px-5 text-sm font-semibold text-white">Войти</Link>
-      </div> : !loading ? <div className="space-y-3">
+      {loginRequired ? (
+        <CompactSaveAuthPanel
+          embedded
+          resetKey={offerId}
+          title="Войдите, чтобы сохранить в сценарий ДР"
+          subtitle="После входа вы продолжите выбор праздника для этого предложения"
+          skipRedirect
+          onAuthSuccess={handleAuthSuccess}
+        />
+      ) : !loading ? <div className="space-y-3">
         {parties.length > 0 && <div className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Мои сценарии</p>
           {parties.map(party => <label key={party.id} className="flex min-h-[60px] cursor-pointer items-center gap-3 rounded-xl border border-[rgba(20,18,16,.15)] bg-white p-3">
@@ -102,7 +132,11 @@ export function BirthdayScenarioSaveStep({ offerId, title, ticket, onBack, onClo
           <input id="birthday-scenario-child" value={childName} maxLength={120} onChange={event => setChildName(event.target.value)}
             placeholder="Имя ребёнка" className="h-11 w-full rounded-xl border border-[rgba(20,18,16,.2)] bg-white px-3 text-sm outline-none focus:border-primary" />
         </div>}
-        {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        {error && <div role="alert" className="space-y-2">
+          <p className="text-sm text-red-700">{error}</p>
+          <button type="button" className="min-h-10 text-sm font-medium underline"
+            onClick={() => void loadParties()}>Повторить загрузку</button>
+        </div>}
         <button type="button" disabled={submitting || (!creating && !selected)} onClick={() => void save()}
           className="flex min-h-12 w-full items-center justify-center rounded-full bg-[#141210] px-5 text-sm font-semibold text-white disabled:opacity-40">
           {submitting ? "Сохраняем…" : "Сохранить в сценарий"}
