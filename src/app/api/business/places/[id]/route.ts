@@ -537,6 +537,22 @@ export async function PATCH(
         status: true,
         slug: true,
         updatedAt: true,
+        // The edit wizard must replace TempMedia ids with persisted PlaceImage
+        // ids immediately after PATCH; otherwise "continue editing" deletes
+        // ATTACHED rows and reorders the wrong table.
+        logoImageId: true,
+        images: {
+          orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
+          select: {
+            id: true,
+            url: true,
+            kind: true,
+            sortOrder: true,
+            width: true,
+            height: true,
+            blurhash: true,
+          },
+        },
       },
     });
     perf.mark("response");
