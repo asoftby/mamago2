@@ -563,6 +563,7 @@ export function OfferPageView({
         }}
         scenario={saveScenario}
         collectionTarget={{ offerId: data.id }}
+        birthdayOfferId={data.id}
         onConfirm={handleSavePersist}
         isIdea={isIdeaSaved}
         inPlan={isPlanSaved}

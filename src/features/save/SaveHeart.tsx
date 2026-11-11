@@ -250,6 +250,7 @@ export function SaveHeart({
         onOpenChange={setFlowOpen}
         isAuthenticated={isAuthenticated}
         collectionTarget={offerId ? { offerId } : { activityId }}
+        birthdayOfferId={offerId}
         scenario={{
           kind: "quickdate",
           title: activityTitle,

@@ -50,6 +50,7 @@ export type SaveActivityFlowAdaptiveProps = {
   source?: string;
   planAttribution?: HomePlanAttribution;
   collectionTarget?: IdeaCollectionTarget;
+  birthdayOfferId?: string;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
   /** Show "Видно семье"; enable only when onPersist forwards `result.visibility` to the server. */
@@ -114,6 +115,7 @@ export function SaveActivityFlowAdaptive({
   source,
   planAttribution,
   collectionTarget,
+  birthdayOfferId,
   onPersist,
   nextHref,
   showVisibilityToggle = false,
@@ -284,6 +286,7 @@ export function SaveActivityFlowAdaptive({
           planItemId={planItemId}
           source={source}
           collectionTarget={collectionTarget}
+          birthdayOfferId={birthdayOfferId}
           onCommit={handleCommit}
           onClose={() => onOpenChange(false)}
           showVisibilityToggle={false}
