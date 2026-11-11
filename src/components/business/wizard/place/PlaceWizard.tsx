@@ -47,6 +47,7 @@ import { resolvePlaceWizardSubmitAction } from "./resolvePlaceWizardSubmitAction
 import { canNavigateToPlaceWizardStep } from "./canNavigateToPlaceWizardStep";
 import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
+import { reconcileSavedPlaceMedia, type SavedPlaceMedia } from "./reconcileSavedPlaceMedia";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
 
 import { Step1Profile } from "./steps/Step1Profile";
@@ -529,9 +530,16 @@ export function PlaceWizard({
           if (!response.ok) {
             throw new Error("Failed to save");
           }
+
+          const saved = (await response.json()) as { place?: SavedPlaceMedia | null };
+          if (!saved.place || !Array.isArray(saved.place.images)) {
+            throw new Error("Изменения сохранены, но изображения не синхронизированы. Обновите страницу.");
+          }
+          const reconciled = reconcileSavedPlaceMedia(formData, saved.place);
+          setFormData(reconciled);
+          setOriginalData(reconciled);
         }
 
-        setOriginalData(formData);
         showSuccessModal({
           kind: "place",
           outcome: "draft_saved",
