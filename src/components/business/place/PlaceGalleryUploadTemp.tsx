@@ -8,6 +8,7 @@ import {
   attachAssetToPlaceWizard,
   loadPlaceMediaLibraryPage,
   removeWizardTempMedia,
+  reorderSavedPlaceGallery,
   reorderWizardTempGallery,
   uploadFilesToPlaceWizard,
 } from "./placeWizardMediaAdapter";
@@ -134,6 +135,12 @@ export function PlaceGalleryUploadTemp({
           wizardSessionId,
           reordered.flatMap((item, index) => item.source === "place" ? [] : [{ id: item.id, sortOrder: index }]),
         );
+        if (placeId) {
+          await reorderSavedPlaceGallery(
+            placeId,
+            reordered.flatMap((item, index) => item.source === "place" ? [{ id: item.id, sortOrder: index }] : []),
+          );
+        }
       }
       onImagesChange?.(reordered);
     } catch (error) {
