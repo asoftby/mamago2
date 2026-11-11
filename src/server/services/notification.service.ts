@@ -1488,7 +1488,7 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Открыть заявку",
-    ctaAction: `/business/bookings?id=${params.bookingId}`,
+    ctaAction: `/business/bookings?tab=action&kind=standard&request=${encodeURIComponent(params.bookingId)}`,
     metadata: { templatePayload },
   });
 }
