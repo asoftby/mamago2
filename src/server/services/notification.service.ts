@@ -1406,6 +1406,8 @@ export interface NotifyBookingCreatedParams {
   /** userId владельца бизнеса (получатель уведомления) */
   ownerUserId: string;
   bookingId: string;
+  /** Event P0: persist delivery outcomes before acknowledging the public request. */
+  waitForDelivery?: boolean;
   offerId?: string | null;
   offerTitle?: string | null;
   activityId?: string | null;
@@ -1490,6 +1492,7 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     ctaLabel: "Открыть заявку",
     ctaAction: `/business/bookings?id=${params.bookingId}`,
     metadata: { templatePayload },
+    waitForDelivery: params.waitForDelivery ?? false,
   });
 }
 
