@@ -3,6 +3,7 @@
 import * as React from "react";
 import { SaveActivityHeader } from "@/components/activity/SaveActivityHeader";
 import { IdeaCollectionStep } from "@/components/activity/IdeaCollectionStep";
+import { BirthdayScenarioSaveStep } from "@/features/birthday/components/BirthdayScenarioSaveStep";
 import type { IdeaCollectionTarget, IdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -92,6 +93,7 @@ export interface SaveToPlanModalProps {
   planItemId?: string | null;
   source?: string;
   collectionTarget?: IdeaCollectionTarget;
+  birthdayOfferId?: string;
 }
 
 export interface SaveToPlanPickerBodyProps {
@@ -104,6 +106,7 @@ export interface SaveToPlanPickerBodyProps {
   planItemId?: string | null;
   source?: string;
   collectionTarget?: IdeaCollectionTarget;
+  birthdayOfferId?: string;
   /** Закрыть контейнер */
   onClose?: () => void;
   /**
@@ -594,7 +597,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 function DateSliderView({
   options, title, ticket,
   onConfirm, onIdea, sessionsByDate, confirmLabel,
-  isIdea = false, inPlan = false, onCollections, onRemoveIdea, onRemovePlan,
+  isIdea = false, inPlan = false, onCollections, onBirthday, onRemoveIdea, onRemovePlan,
   initialDateISO, collectionLink,
 }: {
   options: string[]; title: string; ticket?: ActivityTicketSource;
@@ -602,7 +605,7 @@ function DateSliderView({
   initialDateISO?: string | null;
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
   isIdea?: boolean; inPlan?: boolean;
-  onCollections?: () => void; onRemoveIdea?: () => void; onRemovePlan?: () => void;
+  onCollections?: () => void; onBirthday?: () => void; onRemoveIdea?: () => void; onRemovePlan?: () => void;
   /** Подпись кнопки подтверждения; по умолчанию «Сохранить». */
   confirmLabel?: string;
   sessionsByDate?: Record<string, Array<{ id: string; time: string; title?: string }>>;
@@ -755,6 +758,12 @@ function DateSliderView({
             <OrDivider label="или без даты" />
             <IdeasRow onClick={onIdea} />
           </>
+        ) : null}
+        {onBirthday ? (
+          <div className="mt-3">
+            <IdeasRow onClick={onBirthday} title="В сценарий ДР"
+              subtitle="Выбрать праздник или создать новый" />
+          </div>
         ) : null}
         {onRemoveIdea ? (
           <button type="button" onClick={onRemoveIdea}
@@ -1475,10 +1484,10 @@ export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
 function PickerBodyInner({
   scenario, onCommit, isIdea = false, inPlan = false,
   planDate = null, planStartsAt = null, planItemId = null,
-  source, onClose, collectionTarget, onCollectionStepChange,
+  source, onClose, collectionTarget, birthdayOfferId, onCollectionStepChange,
 }: SaveToPlanPickerBodyProps) {
-  const [view, setView] = React.useState<"main" | "calendar" | "collections">("main");
-  React.useEffect(() => { onCollectionStepChange?.(view === "collections"); }, [view, onCollectionStepChange]);
+  const [view, setView] = React.useState<"main" | "calendar" | "collections" | "birthday">("main");
+  React.useEffect(() => { onCollectionStepChange?.(view === "collections" || view === "birthday"); }, [view, onCollectionStepChange]);
   const [replanMode, setReplanMode] = React.useState(false);
   const [collectionLink, setCollectionLink] = React.useState<{ title: string; href: string } | null>(null);
 
@@ -1535,6 +1544,12 @@ function PickerBodyInner({
     if (result.action === "ideas") setView("collections");
     else onCommit(result);
   };
+
+  if (view === "birthday" && birthdayOfferId) {
+    return <BirthdayScenarioSaveStep offerId={birthdayOfferId} title={scenario.title}
+      ticket={scenario.kind === "quickdate" ? scenario.ticket : undefined}
+      onBack={() => setView("main")} onClose={() => onClose?.()} />;
+  }
 
   if (view === "collections") {
     return (
@@ -1618,6 +1633,7 @@ function PickerBodyInner({
         isIdea={isIdea}
         inPlan={inPlan}
         onCollections={collectionTarget ? () => setView("collections") : undefined}
+        onBirthday={birthdayOfferId ? () => setView("birthday") : undefined}
         onRemoveIdea={isIdea ? () => onCommit({ action: "remove-idea" }) : undefined}
         onRemovePlan={inPlan && planItemId ? () => onCommit({ action: "remove-plan", planItemId }) : undefined}
       />
@@ -1629,7 +1645,7 @@ function PickerBodyInner({
 interface ModalContentProps extends SaveToPlanModalProps { onClose: () => void; }
 
 function ModalContent(props: ModalContentProps) {
-  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, planItemId, source, collectionTarget } = props;
+  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, planItemId, source, collectionTarget, birthdayOfferId } = props;
   return (
     <>
       <style>{`
@@ -1646,6 +1662,7 @@ function ModalContent(props: ModalContentProps) {
           planItemId={planItemId}
           source={source}
           collectionTarget={collectionTarget}
+          birthdayOfferId={birthdayOfferId}
           onCommit={(result) => {
             if (result.action === "plan") toastPlan(result.dateISO);
             else if (result.action === "ideas") toastIdea();
