@@ -82,12 +82,19 @@ export async function uploadFilesToPlaceWizard(
   startOrder = 0,
 ): Promise<MediaUploadItem[]> {
   const items: MediaUploadItem[] = [];
-  for (const [index, file] of files.entries()) {
-    // Existing upload transport registers MediaAsset and normalizes HEIC/HEIF.
-    const uploaded = await uploadMediaFile(file);
-    items.push(await attachAssetToPlaceWizard(uploaded.id, wizardSessionId, kind, startOrder + index));
+  try {
+    for (const [index, file] of files.entries()) {
+      // Existing upload transport registers MediaAsset and normalizes HEIC/HEIF.
+      const uploaded = await uploadMediaFile(file);
+      items.push(await attachAssetToPlaceWizard(uploaded.id, wizardSessionId, kind, startOrder + index));
+    }
+    return items;
+  } catch (error) {
+    // MediaUploadField commits the batch only on success. Prevent a partially
+    // uploaded batch from silently reappearing when the session is restored.
+    await Promise.allSettled(items.map((item) => removeWizardTempMedia(item.id)));
+    throw error;
   }
-  return items;
 }
 
 export async function removeWizardTempMedia(id: string): Promise<void> {
