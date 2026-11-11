@@ -492,24 +492,43 @@ export function PlaceWizard({
           return;
         }
         const changes = extractChanges(formData, originalData);
-        if (Object.keys(changes).length === 0) {
+        if (Object.keys(changes).length === 0 && !wizardSessionId) {
           toast.success("Изменения уже сохранены");
           return;
         }
-        const perf = createClientSavePerf("save-place:client", {
-          endpoint: `/api/business/places/${place.id}`,
-          payload: changes,
-        });
 
-        const response = await fetch(`/api/business/places/${place.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(changes),
-        });
-        perf.log({ status: response.status, mode: "save-draft" });
+        // A business may save a draft revision, but must never mutate an
+        // already-published Place just by pressing "Save draft".
+        if (place.status === "PUBLISHED" && userRole !== "ADMIN") {
+          const revisionResponse = await fetch(`/api/business/places/${place.id}/revision`);
+          if (!revisionResponse.ok) throw new Error("Не удалось создать ревизию");
+          const { revision } = await revisionResponse.json();
+          const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              revisionId: revision.id,
+              data: { ...changes, wizardSessionId },
+            }),
+          });
+          if (!saveResponse.ok) throw new Error("Не удалось сохранить черновик ревизии");
+        } else {
+          const payload = { ...changes, wizardSessionId };
+          const perf = createClientSavePerf("save-place:client", {
+            endpoint: `/api/business/places/${place.id}`,
+            payload,
+          });
 
-        if (!response.ok) {
-          throw new Error("Failed to save");
+          const response = await fetch(`/api/business/places/${place.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          perf.log({ status: response.status, mode: "save-draft" });
+
+          if (!response.ok) {
+            throw new Error("Failed to save");
+          }
         }
 
         setOriginalData(formData);
