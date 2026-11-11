@@ -130,6 +130,8 @@ export function Step4Photos({
           wizardSessionId={wizardSessionId || ""}
           currentLogoUrl={logoImage?.url || data.logoUrl || undefined}
           currentLogoMediaId={logoImage?.id || data.logoImageId}
+          placeId={data.id}
+          published={data.status === "PUBLISHED"}
           onUploadComplete={handleLogoUploadComplete}
           onRemove={handleLogoRemove}
           isExistingPlaceImage={Boolean(data.id && logoImage?.id && !data.tempLogoMediaId)}
