@@ -15,7 +15,7 @@ export interface EventCtaLegacyInput {
     | string
     | null;
   ticketLink?: string | null;
-  prebookMethod?: "phone" | "link" | string | null;
+  prebookMethod?: "internal" | "phone" | "link" | string | null;
   prebookPhone?: string | null;
   prebookUrl?: string | null;
   bookingEnabled?: boolean | null;
@@ -47,6 +47,19 @@ function fromParticipationMode(input: EventCtaLegacyInput): CanonicalCtaSeed | n
   }
 
   if (mode === "prebook") {
+    if (input.prebookMethod === "internal" && input.bookingEnabled && input.bookingMode === "REQUEST_ONLY") {
+      return {
+        actionKind: "REQUEST",
+        sourceEntityType: "EVENT",
+        sourceEntityId: input.id,
+        primaryLabel: "Предварительная запись",
+        requestConfig: { runtime: "BOOKING", selectionMode: "NONE" },
+        instructions: input.bookingNote ?? undefined,
+        contactFallback: createPhoneFallback(input.bookingPhone ?? "")
+          ? [createPhoneFallback(input.bookingPhone ?? "")!]
+          : undefined,
+      };
+    }
     const externalTarget =
       input.prebookMethod === "link"
         ? createUrlTarget(input.prebookUrl ?? "")
