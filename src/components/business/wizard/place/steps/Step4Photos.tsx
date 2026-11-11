@@ -28,6 +28,7 @@ export function Step4Photos({
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const hasLogo = !!(logoImage?.url || data.logoUrl);
+  const isMediaEditable = isEditable && data.status !== "PUBLISHED";
 
   // Convert PlaceImage[] to GalleryItem[]
   const initialGalleryItems: GalleryItem[] = useMemo(() =>
@@ -129,7 +130,7 @@ export function Step4Photos({
           wizardSessionId={wizardSessionId}
           hasLogo={hasLogo}
           onImportComplete={handleLogoUploadComplete}
-          isEditable={isEditable}
+          isEditable={isMediaEditable}
         />
 
         <PlaceLogoUploadTemp
@@ -141,7 +142,7 @@ export function Step4Photos({
           onUploadComplete={handleLogoUploadComplete}
           onRemove={handleLogoRemove}
           isExistingPlaceImage={Boolean(data.id && logoImage?.id && !data.tempLogoMediaId)}
-          disabled={!isEditable}
+          disabled={!isMediaEditable}
         />
       </div>
 
@@ -157,7 +158,7 @@ export function Step4Photos({
           initialImages={initialGalleryItems}
           onImagesChange={handleGalleryImagesChange}
           published={data.status === "PUBLISHED"}
-          disabled={!isEditable}
+          disabled={!isMediaEditable}
         />
       </div>
 
@@ -169,7 +170,7 @@ export function Step4Photos({
           placeholder="Ссылка на Instagram Reels, YouTube или Shorts"
           value={reelsUrl}
           onChange={handleReelsUrlChange}
-          disabled={!isEditable}
+          disabled={!isMediaEditable}
           className={reelsUrlError ? "border-red-500" : ""}
         />
         {reelsUrlError ? <p className="text-xs text-red-500">{reelsUrlError}</p> : null}
