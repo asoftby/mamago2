@@ -23,7 +23,9 @@ export function Step4Photos({
   isEditable = true,
 }: Step4PhotosProps) {
   const logoImage = data.images.find((img) => img.kind === "LOGO");
-  const galleryImages = data.images.filter((img) => img.kind === "GALLERY");
+  const galleryImages = data.images
+    .filter((img) => img.kind === "GALLERY")
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const hasLogo = !!(logoImage?.url || data.logoUrl);
 
@@ -36,9 +38,10 @@ export function Step4Photos({
       height: img.height ?? undefined,
       blurhash: img.blurhash || undefined,
       status: "done" as const,
-      // Уже привязанные к месту фото — удаляются через /places/[id]/images, а не /temp-media.
-      source: "place" as const,
-    })), [galleryImages]
+      // A wizard may mix persisted PlaceImages with new TempMedia even in edit mode.
+      source: (!data.id || data.tempGalleryMediaIds?.includes(img.id))
+        ? "temp" as const : "place" as const,
+    })), [galleryImages, data.id, data.tempGalleryMediaIds]
   );
 
   const handleLogoUploadComplete = useCallback((mediaId: string, url: string) => {
@@ -58,6 +61,15 @@ export function Step4Photos({
       logoUrl: url,
       tempLogoMediaId: mediaId,
       images: [...withoutLogo, newLogo],
+    });
+  }, [onChange, data.images]);
+
+  const handleLogoRemove = useCallback(() => {
+    onChange({
+      logoImageId: null,
+      logoUrl: null,
+      tempLogoMediaId: null,
+      images: data.images.filter((img) => img.kind !== "LOGO"),
     });
   }, [onChange, data.images]);
 
@@ -90,7 +102,9 @@ export function Step4Photos({
         ...data.images.filter(img => img.kind !== "GALLERY"),
         ...newImages,
       ],
-      tempGalleryMediaIds: galleryItems.map(item => item.id),
+      tempGalleryMediaIds: galleryItems
+        .filter((item) => item.source !== "place")
+        .map((item) => item.id),
     });
   }, [onChange, data.images]);
 
@@ -115,7 +129,10 @@ export function Step4Photos({
         <PlaceLogoUploadTemp
           wizardSessionId={wizardSessionId || ""}
           currentLogoUrl={logoImage?.url || data.logoUrl || undefined}
+          currentLogoMediaId={logoImage?.id || data.logoImageId}
           onUploadComplete={handleLogoUploadComplete}
+          onRemove={handleLogoRemove}
+          isExistingPlaceImage={Boolean(data.id && logoImage?.id && !data.tempLogoMediaId)}
           disabled={!isEditable}
         />
       </div>
@@ -124,13 +141,14 @@ export function Step4Photos({
       <div>
         <h3 className="font-medium mb-2">Фото места</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Первое фото используется как главное на странице места. Перетащите другое фото на первое место, чтобы сменить главное.
+          Первое фото используется как главное на странице места. Измените порядок фотографий, чтобы сменить главное.
         </p>
         <PlaceGalleryUploadTemp
           wizardSessionId={wizardSessionId || ""}
           placeId={data.id}
           initialImages={initialGalleryItems}
           onImagesChange={handleGalleryImagesChange}
+          published={data.status === "PUBLISHED"}
           disabled={!isEditable}
         />
       </div>
