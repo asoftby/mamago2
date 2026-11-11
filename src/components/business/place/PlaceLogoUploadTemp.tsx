@@ -114,7 +114,7 @@ export function PlaceLogoUploadTemp({
       mode="single"
       value={value}
       onChange={(next) => { void handleChange(next); }}
-      disabled={disabled || saving || !wizardSessionId}
+      disabled={disabled || saving || !wizardSessionId || published}
       allowUpload
       allowMediaLibrary
       onUploadFiles={uploadFiles}
