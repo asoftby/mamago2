@@ -22,6 +22,7 @@ export function getSafeTelegramReturnPath(value: string | null | undefined): str
       parsed.pathname.startsWith("/api/") ||
       parsed.pathname === "/api" ||
       parsed.pathname.startsWith("/telegram/open") ||
+      parsed.pathname.startsWith("/telegram/business/open") ||
       parsed.pathname.startsWith("/login") ||
       parsed.pathname.startsWith("/register")
     ) return "/me/plan";
