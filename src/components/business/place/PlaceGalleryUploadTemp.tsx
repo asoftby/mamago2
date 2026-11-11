@@ -106,6 +106,7 @@ export function PlaceGalleryUploadTemp({
 
     busyRef.current = true;
     setBusy(true);
+    const newlyAttachedIds: string[] = [];
     try {
       const resolved = new Map<string, GalleryItem>();
       for (const item of added) {
@@ -116,6 +117,7 @@ export function PlaceGalleryUploadTemp({
           ? item
           : await attachAssetToPlaceWizard(item.id, wizardSessionId, "PLACE_GALLERY", initialImages.length + resolved.size);
         uploadedIds.current.delete(item.id);
+        newlyAttachedIds.push(actual.id);
         resolved.set(item.id, { id: actual.id, url: actual.url, source: "temp", status: "done" });
       }
       // Remove through the appropriate owner-checked endpoint; never delete the library asset.
@@ -152,6 +154,9 @@ export function PlaceGalleryUploadTemp({
       }
       onImagesChange?.(reordered);
     } catch (error) {
+      // A multi-select can fail after attaching an earlier item. Do not keep
+      // invisible TempMedia that will later be attached when the user saves.
+      await Promise.allSettled(newlyAttachedIds.map((id) => removeWizardTempMedia(id)));
       toast.error(error instanceof Error ? error.message : "Не удалось изменить фотографии");
     } finally {
       busyRef.current = false;
