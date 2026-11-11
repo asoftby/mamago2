@@ -20,6 +20,7 @@ export type PartyOrderScreenData = {
   time: string | null;
   /** Set only when the wishlist feature is on (resolved on the server). */
   giftsHref?: string | null;
+  savedOffers?: Array<{ id: string; title: string; href: string }>;
   items: Array<{
     id: string;
     title: string;
@@ -207,6 +208,22 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             );
           })}
         </div>
+        {party.savedOffers && party.savedOffers.length > 0 ? (
+          <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-foreground">Идеи для сценария</h2>
+            <p className="text-sm text-muted-foreground">
+              Сохранённые предложения не забронированы и не включены в стоимость праздника.
+            </p>
+            <div className="space-y-2">
+              {party.savedOffers.map(offer => (
+                <Link key={offer.id} href={offer.href}
+                  className="block rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-muted/50">
+                  {offer.title}
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {!cancelled && party.giftsHref ? (
           <section className="space-y-2 border-t border-border pt-5">
             <h2 className="text-lg font-semibold text-foreground">Подарки</h2>
