@@ -52,6 +52,7 @@ export function PlaceGalleryUploadTemp({
 }: PlaceGalleryUploadTempProps) {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const hasInteracted = useRef(false);
   const uploadedIds = useRef(new Set<string>());
 
   // Old drafts might have persisted TempMedia but an incomplete local autosave.
@@ -61,7 +62,7 @@ export function PlaceGalleryUploadTemp({
     void fetch("/api/business/temp-media?wizardSessionId=" + encodeURIComponent(wizardSessionId))
       .then(async (response) => response.ok ? response.json() : null)
       .then((payload: { media?: Array<{ id: string; url: string; kind: string; sortOrder: number }> } | null) => {
-        if (cancelled) return;
+        if (cancelled || hasInteracted.current) return;
         const knownIds = new Set(initialImages.map((item) => item.id));
         const missing: GalleryItem[] = (payload?.media ?? [])
           .filter((item) => item.kind === "PLACE_GALLERY" && !knownIds.has(item.id))
@@ -85,6 +86,7 @@ export function PlaceGalleryUploadTemp({
 
   const handleChange = async (next: MediaUploadItem | MediaUploadItem[] | null) => {
     if (busyRef.current) return;
+    hasInteracted.current = true;
     const selection = Array.isArray(next) ? next : next ? [next] : [];
     const existingById = new Map(initialImages.map((item) => [item.id, item]));
     const nextIds = new Set(selection.map((item) => item.id));
