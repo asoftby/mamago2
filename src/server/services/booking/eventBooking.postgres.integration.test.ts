@@ -48,6 +48,30 @@ test("event booking uses persisted sessions, serializes requests and appears in 
   };
 
   try {
+    const nativePrebook = await makeEvent({
+      participationMode: "prebook", prebookMethod: "internal",
+    });
+    const legacyPrebook = await makeEvent({
+      participationMode: "prebook", prebookMethod: "phone", prebookPhone: "+375291112233",
+    });
+    const internalBooking = await createPublicBooking({
+      publicationType: "EVENT", publicationId: nativePrebook.id,
+      customerName: "Prebooking visitor", customerPhone: "+375291110056",
+    });
+    const internalRow = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: internalBooking.bookingId },
+    });
+    assert.equal(nativePrebook.bookingMode, "REQUEST_ONLY");
+    assert.equal(internalRow.status, "NEW");
+    assert.equal(internalRow.publicationType, "EVENT");
+    assert.equal(internalRow.activityId, nativePrebook.id);
+    assert.equal(internalRow.businessId, business.id);
+    assert.equal(legacyPrebook.bookingEnabled, false);
+    await assert.rejects(createPublicBooking({
+      publicationType: "EVENT", publicationId: legacyPrebook.id,
+      customerName: "External visitor", customerPhone: "+375291110057",
+    }), /недоступна|недоступно/);
+
     const request = await makeEvent({ participationMode: "request", dates: [date] });
     const simple = await makeEvent({
       participationMode: "simple-booking", simpleBookingDate: date, simpleBookingTime: "12:00–13:00",
@@ -74,6 +98,8 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       ...event, images: [], place: null, venue: null, eventCategory: null,
     });
     assert.equal(page(request).cta.simpleBooking?.label, "Оставить заявку");
+    assert.equal(page(nativePrebook).cta.simpleBooking?.label, "Предварительная запись");
+    assert.equal(page(legacyPrebook).cta.simpleBooking, undefined);
     assert.equal(page(simple).cta.simpleBooking?.slots?.[0]?.id, simple.sessions[0]?.id);
     assert.deepEqual(page(calendar).cta.simpleBooking?.slots?.map(({ id }) => id), calendar.sessions.map(({ id }) => id));
     assert.equal(page({ ...calendar, bookingEnabled: false }).cta.simpleBooking, undefined);
@@ -122,7 +148,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.match(String(duplicateRace.find((entry) => entry.status === "rejected")?.reason), /уже существует/);
 
     const inbox = await getBusinessInbox({ businessId: business.id, kind: "standard" });
-    for (const result of [requestBooking, simpleBooking, winner]) {
+    for (const result of [requestBooking, simpleBooking, winner, internalBooking]) {
       assert.ok(inbox.items.some((item) => item.id === result.bookingId));
     }
     const calendarView = await getBusinessBookings({ businessId: business.id, date: new Date(date) });
