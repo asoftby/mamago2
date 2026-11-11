@@ -130,12 +130,18 @@ export function PlaceGalleryUploadTemp({
       const orderChanged = reordered.some((item, index) =>
         initialImages[index]?.id !== item.id,
       );
+      const persistedPositions = new Map(
+        initialImages.map((item, index) => [item.id, index]),
+      );
+      const savedImageOrderChanged = reordered.some((item, index) =>
+        item.source === "place" && persistedPositions.get(item.id) !== index,
+      );
       if (orderChanged) {
         await reorderWizardTempGallery(
           wizardSessionId,
           reordered.flatMap((item, index) => item.source === "place" ? [] : [{ id: item.id, sortOrder: index }]),
         );
-        if (placeId) {
+        if (placeId && savedImageOrderChanged) {
           await reorderSavedPlaceGallery(
             placeId,
             reordered.flatMap((item, index) => item.source === "place" ? [{ id: item.id, sortOrder: index }] : []),
