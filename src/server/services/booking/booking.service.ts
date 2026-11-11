@@ -14,7 +14,11 @@ import prisma from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
-import { reserveSlot } from "@/server/offers/reserveSlot";
+import { reserveSlot, SlotReservationError } from "@/server/offers/reserveSlot";
+import { isResourceWindowAvailable } from "@/server/offers/slotAvailability";
+import {
+  expireBookingUnitHolds, isAllocationOverlapError, lockBookingUnits,
+} from "@/server/services/booking/resourceAllocation";
 import { childScopeFor } from "@/server/family/familyAccess";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import {
@@ -413,6 +417,8 @@ export const manualScheduledOfferWhere = {
 type ManualBookingInput = Omit<CreatePublicBookingInput, "userId" | "planItemId"> & {
   status: "NEW" | "CONFIRMED";
   offerSlot?: { startsAt: string; endsAt: string; groupId?: string; tariffId?: string; unitId?: string };
+  /** Only for an explicitly confirmed individual PLACE appointment, not a group session. */
+  resourceReservation?: { bookingUnitId: string; startsAt: string; endsAt: string };
 };
 
 export async function createManualBooking(
@@ -429,6 +435,93 @@ export async function createManualBooking(
     if (previous) {
       if (previous.manualRequestHash !== hash) throw new BookingValidationError("requestKey", "Ключ уже использован для другой записи");
       return { bookingId: previous.id, status: previous.status };
+    }
+    if (input.resourceReservation) {
+      // Group EVENT / OFFER sessions are session-owned, not one EXCLUSIVE
+      // reservation for each attendee. Restrict this phase to individual PLACE
+      // appointments with an explicit unit and a full agreed time interval.
+      if (input.publicationType !== PublicationType.PLACE || input.offerSlot ||
+          input.status !== BookingStatus.CONFIRMED) {
+        throw new BookingValidationError("resourceReservation", "Ресурс можно занять только для подтверждённой индивидуальной записи на место");
+      }
+      const { bookingUnitId, startsAt, endsAt } = input.resourceReservation;
+      const start = new Date(startsAt);
+      const end = new Date(endsAt);
+      const checkedAt = new Date();
+      if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+          start <= checkedAt || end <= start || end.getTime() - start.getTime() > 86_400_000) {
+        throw new BookingValidationError("resourceReservation", "Укажите будущий интервал не длиннее суток");
+      }
+
+      // Preserve the globally ordered row-lock protocol also used by
+      // reserveSlot, party confirmations and manual CalendarBlock writes.
+      if (!await lockBookingUnits(tx, context.businessId, [bookingUnitId])) {
+        throw new BookingValidationError("resourceReservation", "Ресурс не принадлежит вашему бизнесу");
+      }
+      await expireBookingUnitHolds(tx, [bookingUnitId]);
+      const unit = await tx.bookingUnit.findFirst({
+        where: {
+          id: bookingUnitId, businessId: context.businessId,
+          status: "ACTIVE", type: "EXCLUSIVE",
+        },
+        include: {
+          rules: true, exceptions: true,
+          blocks: true,
+          allocations: {
+            where: { status: { in: ["HELD", "CONFIRMED"] } },
+          },
+        },
+      });
+      if (!unit || (unit.placeId !== null && unit.placeId !== input.publicationId)) {
+        throw new BookingValidationError("resourceReservation", "Ресурс недоступен для выбранного места");
+      }
+      const date = getLocalDateKey(start, unit.timezone);
+      const time = formatHHMM(start, unit.timezone);
+      if ((input.requestedDate && getLocalDateKey(normalizeRequestedDate(input.requestedDate)!, unit.timezone) !== date) ||
+          (input.requestedTime && input.requestedTime !== time)) {
+        throw new BookingValidationError("resourceReservation", "Дата и время записи не соответствуют выбранному интервалу");
+      }
+      const availabilityUnit = {
+        id: unit.id, timezone: unit.timezone,
+        prepMinutes: unit.prepMinutes, cleanupMinutes: unit.cleanupMinutes,
+        stepMinutes: unit.stepMinutes, minDurationMinutes: unit.minDurationMinutes,
+        rules: unit.rules.map(({ weekday, startMinutes, endMinutes }) => ({ weekday, startMinutes, endMinutes })),
+        exceptions: unit.exceptions.map(({ date, kind, startMinutes, endMinutes }) => ({
+          date: date.toISOString().slice(0, 10), kind, startMinutes, endMinutes,
+        })),
+        blocks: unit.blocks.map(({ blockStart, blockEnd }) => ({ blockStart, blockEnd })),
+        allocations: unit.allocations.map(({ blockStart, blockEnd, status, expiresAt }) => ({
+          blockStart, blockEnd, status: status as "HELD" | "CONFIRMED", expiresAt,
+        })),
+      };
+      if (!isResourceWindowAvailable(availabilityUnit, start, end, new Date())) {
+        throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс занят или недоступен в выбранное время");
+      }
+
+      // The request, explicit physical window and allocation commit or roll
+      // back together. Never use CalendarBlock to impersonate a client booking.
+      const result = await createPublicationBooking({
+        ...input, requestedDate: date, requestedTime: time,
+      }, { ...context, tx, hash, status: input.status });
+      await tx.bookingRequest.update({
+        where: { id: result.bookingId }, data: { startsAt: start, endsAt: end },
+      });
+      try {
+        await tx.bookingAllocation.create({
+          data: {
+            bookingRequestId: result.bookingId, bookingUnitId: unit.id,
+            blockStart: new Date(start.getTime() - unit.prepMinutes * 60_000),
+            blockEnd: new Date(end.getTime() + unit.cleanupMinutes * 60_000),
+            status: "CONFIRMED",
+          },
+        });
+      } catch (error) {
+        if (isAllocationOverlapError(error)) {
+          throw new SlotReservationError("SLOT_UNAVAILABLE", "Время уже занято другим заказом");
+        }
+        throw error;
+      }
+      return result;
     }
     if (input.offerSlot && input.publicationType === PublicationType.OFFER) {
       const offer = await tx.offer.findFirst({
