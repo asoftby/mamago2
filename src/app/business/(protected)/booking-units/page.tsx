@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { BookingUnitManager } from "@/components/business/booking-units/BookingUnitManager";
+import { BookingUnitsGuide } from "@/components/business/booking-units/BookingUnitsGuide";
 
 export const metadata = { title: "Ресурсы и расписание | Кабинет партнёра" };
 
@@ -29,6 +30,7 @@ export default async function BusinessBookingUnitsPage() {
         title="Ресурсы и расписание"
         description="Настройте помещения и исполнителей, их рабочее время и закрытые даты. В конструкторе праздников можно подтвердить только доступный ресурс."
       />
+      <BookingUnitsGuide />
       <BookingUnitManager offers={offers} />
     </div>
   );
