@@ -39,6 +39,7 @@ export function PlaceLogoUploadTemp({
   const [saving, setSaving] = useState(false);
   const uploadedIds = useRef(new Set<string>());
   const busyRef = useRef(false);
+  const hasInteracted = useRef(false);
 
   useEffect(() => {
     if (!wizardSessionId || published) return;
@@ -46,7 +47,7 @@ export function PlaceLogoUploadTemp({
     void fetch("/api/business/temp-media?wizardSessionId=" + encodeURIComponent(wizardSessionId))
       .then(async (response) => response.ok ? response.json() : null)
       .then((payload: { media?: Array<{ id: string; url: string; kind: string }> } | null) => {
-        if (cancelled) return;
+        if (cancelled || hasInteracted.current) return;
         const item = payload?.media?.find((media) => media.kind === "PLACE_LOGO");
         if (!item) return;
         setRestored({ id: item.id, url: item.url });
@@ -70,6 +71,7 @@ export function PlaceLogoUploadTemp({
 
   const handleChange = async (next: MediaUploadItem | MediaUploadItem[] | null) => {
     if (busyRef.current) return;
+    hasInteracted.current = true;
     const item = !Array.isArray(next) ? next : next[0] ?? null;
     if (item?.id === value?.id) return;
     busyRef.current = true;
