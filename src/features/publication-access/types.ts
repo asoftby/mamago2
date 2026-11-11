@@ -21,6 +21,8 @@ export type PublicationAccessTimeSlot = {
 
 export type PublicationAccess = {
   method: PublicationAccessMethod;
+  /** Event prebooking: default to mamaGo; legacy phone/link are explicit external actions. */
+  prebookingChannel?: "internal" | "phone" | "link";
   ticketUrl?: string;
   externalUrl?: string;
   phone?: string;
