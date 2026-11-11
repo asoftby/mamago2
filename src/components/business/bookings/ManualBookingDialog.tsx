@@ -147,7 +147,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   }, [scheduledOffer, publicationId, offerDate, offerKey, details, hasGroups, groupId]);
 
   useEffect(() => {
-    if (type !== "PLACE" || !publicationId) return;
+    if (type !== "PLACE" || !publicationId || !reservePlaceResource) return;
     const controller = new AbortController();
     setPlaceResourceError("");
     fetch(endpoint + "?" + new URLSearchParams({ type: "PLACE", placeId: publicationId }), {
@@ -163,7 +163,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
       if (!controller.signal.aborted) setPlaceResourceError("Не удалось загрузить ресурсы. Повторите выбор места.");
     });
     return () => controller.abort();
-  }, [type, publicationId]);
+  }, [type, publicationId, reservePlaceResource]);
 
   const needsResourcePicker = unitIds.length > 1;
   useEffect(() => {
@@ -344,10 +344,11 @@ export function ManualBookingDialog({ onClose, onCreated }: {
                       required={reservePlaceResource} value={placeTime} onChange={(event) => setPlaceTime(event.target.value)} />
                   </label>
                 </div>
-                {placeUnits === undefined && !placeResourceError
+                {placeUnits === undefined && reservePlaceResource && !placeResourceError
                   ? <p role="status" className="text-xs text-stone-500">Загружаем доступные ресурсы…</p> : null}
-                {placeResourceError ? <p role="alert" className="text-sm text-destructive">{placeResourceError}</p> : null}
-                {placeUnits && placeUnits.length > 0 && bookingStatus === "CONFIRMED" ? (
+                {placeResourceError && reservePlaceResource
+                  ? <p role="alert" className="text-sm text-destructive">{placeResourceError}</p> : null}
+                {bookingStatus === "CONFIRMED" ? (
                   <label className="flex items-start gap-3 rounded-xl border border-stone-200 p-3 text-sm">
                     <input type="checkbox" className="mt-1 size-4 shrink-0 accent-orange-500"
                       checked={reservePlaceResource} onChange={(event) => setReservePlaceResource(event.target.checked)} />
@@ -359,10 +360,10 @@ export function ManualBookingDialog({ onClose, onCreated }: {
                     </span>
                   </label>
                 ) : null}
-                {placeUnits?.length === 0 ? (
-                  <p className="text-xs leading-5 text-stone-600">
-                    Ресурсов пока нет. Добавить зал или исполнителя можно в разделе «Ресурсы и расписание».
-                    Пока запись не блокирует время автоматически.
+                {reservePlaceResource && placeUnits?.length === 0 ? (
+                  <p role="alert" className="text-xs leading-5 text-stone-600">
+                    Для этого места нет доступных ресурсов. Создайте исполнителя или зал в разделе
+                    «Ресурсы и расписание» либо снимите выбор «Занять время», чтобы добавить заявку без блокировки.
                   </p>
                 ) : null}
                 {reservePlaceResource && bookingStatus === "CONFIRMED" ? (
