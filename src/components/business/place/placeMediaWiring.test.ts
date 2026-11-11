@@ -23,6 +23,8 @@ assert.match(gallery, /mode="multiple"/);
 assert.match(gallery, /allowReorder/);
 assert.match(gallery, /reorderSavedPlaceGallery/);
 assert.match(gallery, /removeSavedPlaceImage/);
+assert.match(gallery, /newlyAttachedIds/);
+assert.match(gallery, /Promise\.allSettled\(newlyAttachedIds\.map\(/, "partial library selection must not leave invisible session images");
 assert.match(step, /const isMediaEditable = isEditable && data\.status !== "PUBLISHED"/);
 assert.match(step, /isEditable=\{isMediaEditable\}/, "Instagram import is gated alongside the picker");
 assert.match(adapter, /\/api\/business\/media-picker/, "shared business library source");
