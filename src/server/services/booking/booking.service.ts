@@ -459,16 +459,34 @@ export async function createManualBooking(
         throw new BookingValidationError("resourceReservation", "Ресурс не принадлежит вашему бизнесу");
       }
       await expireBookingUnitHolds(tx, [bookingUnitId]);
+      // All existing resource editors enforce prep/cleanup <= 240 minutes.
+      // Query only windows that can overlap this booking's occupied interval.
+      // BookingUnit, CalendarBlock and BookingAllocation have matching indexes;
+      // loading a unit's entire historical occupancy would grow unbounded.
+      const occupancyFrom = new Date(start.getTime() - 240 * 60_000);
+      const occupancyTo = new Date(end.getTime() + 240 * 60_000);
+      const exceptionFrom = new Date(Date.UTC(
+        start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() - 2,
+      ));
+      const exceptionTo = new Date(Date.UTC(
+        end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() + 2,
+      ));
       const unit = await tx.bookingUnit.findFirst({
         where: {
           id: bookingUnitId, businessId: context.businessId,
           status: "ACTIVE", type: "EXCLUSIVE",
         },
         include: {
-          rules: true, exceptions: true,
-          blocks: true,
+          rules: true,
+          exceptions: { where: { date: { gte: exceptionFrom, lte: exceptionTo } } },
+          blocks: {
+            where: { blockStart: { lt: occupancyTo }, blockEnd: { gt: occupancyFrom } },
+          },
           allocations: {
-            where: { status: { in: ["HELD", "CONFIRMED"] } },
+            where: {
+              status: { in: ["HELD", "CONFIRMED"] },
+              blockStart: { lt: occupancyTo }, blockEnd: { gt: occupancyFrom },
+            },
           },
         },
       });
