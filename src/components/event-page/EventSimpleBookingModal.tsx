@@ -76,6 +76,7 @@ export function EventSimpleBookingModal({
   const slots = useMemo(() => booking.slots ?? [], [booking.slots]);
   // «Оставить заявку»: заявка на участие без выбора времени — другие слова, чем у записи на слот.
   const isRequest = booking.label === "Оставить заявку";
+  const isPrebooking = booking.label === "Предварительная запись";
   const dateGroups = useMemo(() => groupSlotsByDate(slots), [slots]);
 
   const [phase, setPhase]       = useState<Phase>("form");
@@ -142,14 +143,14 @@ export function EventSimpleBookingModal({
   const submitting = phase === "submitting";
   const summary = selectedDate
     ? `${selectedDate.dow.toLowerCase()}, ${selectedDate.d} ${selectedDate.m}${selectedSlot?.startTime ? ` · ${slotTimeLabel(selectedSlot)}` : ""}`
-    : (isRequest ? "Без выбора времени" : (eventCategory ?? "Запись на событие"));
+    : (isRequest || isPrebooking ? "Без выбора времени" : (eventCategory ?? "Запись на событие"));
 
   return (
     <RequestSheetFrame
       open={open}
       onOpenChange={handleClose}
       ticket={{ title: eventTitle, imageUrl: eventImageUrl ?? null, venue: eventVenue ?? null, priceLabel: priceLabel ?? null }}
-      heading={phase === "success" ? <>Заявка отправлена</> : isRequest ? <>Оставить заявку</> : <>Записаться на событие</>}
+      heading={phase === "success" ? <>Заявка отправлена</> : isRequest ? <>Оставить заявку</> : isPrebooking ? <>Предварительная запись</> : <>Записаться на событие</>}
     >
       {phase === "success" ? (
         <RsSuccess
@@ -202,7 +203,7 @@ export function EventSimpleBookingModal({
           <RsConfirmBar
             summary={summary}
             label={selectedSlot ? "выбрано" : isRequest ? "заявка на участие" : "запись"}
-            actionLabel={isRequest ? "Отправить заявку" : "Записаться"}
+            actionLabel={isRequest || isPrebooking ? "Отправить заявку" : "Записаться"}
             onAction={() => void handleSubmit(onSubmit)()}
             busy={submitting}
             disabled={!valid}
