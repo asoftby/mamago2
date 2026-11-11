@@ -12,6 +12,22 @@ test("explicit Mini App intent launches signed Telegram auth with original desti
   });
 });
 
+test("business booking Mini App button uses a distinct Business Bot launcher", () => {
+  assert.deepEqual(createTelegramLinkButton(
+    "Открыть и подтвердить",
+    "https://dev.mamago.by/business/bookings?tab=action&kind=standard&request=booking-123",
+    "https://dev.mamago.by",
+    "mini_app",
+    "notification_booking_created",
+    "/telegram/business/open",
+  ), {
+    text: "Открыть и подтвердить",
+    web_app: {
+      url: "https://dev.mamago.by/telegram/business/open?next=%2Fbusiness%2Fbookings%3Ftab%3Daction%26kind%3Dstandard%26request%3Dbooking-123",
+    },
+  });
+});
+
 test("browser intent keeps a shareable canonical URL and adds first-party Telegram attribution", () => {
   assert.deepEqual(createTelegramLinkButton(
     "Читать", "https://mamago.by/minsk/blog/article?sort=recent#gallery", "https://mamago.by",
@@ -47,7 +63,7 @@ test("external URLs and non-HTTPS Mini App targets are never rewritten", () => {
 test("malicious and auth-loop next targets never redirect outside mamaGo", () => {
   for (const next of [
     "//attacker.example", "/\\attacker.example", "/%5cattacker.example",
-    "https://attacker.example", "/api/auth/logout", "/telegram/open",
+    "https://attacker.example", "/api/auth/logout", "/telegram/open", "/telegram/business/open",
     "/login", "/%2f%2fattacker.example",
   ]) {
     assert.equal(getSafeTelegramReturnPath(next), "/me/plan", next);
@@ -55,7 +71,7 @@ test("malicious and auth-loop next targets never redirect outside mamaGo", () =>
   assert.equal(getSafeTelegramReturnPath("/me/plan?date=2026-10-15"), "/me/plan?date=2026-10-15");
 });
 
-test("notification registry declares Mini App ONLY for explicitly personal user destinations", () => {
+test("notification registry declares Mini App only for explicit user and business-booking destinations", () => {
   for (const type of [
     "SYSTEM", "REMINDER", "PLAN_TOMORROW_DIGEST",
     "BOOKING_CONFIRMED", "BOOKING_CANCELLED", "BOOKING_COMPLETED", "BOOKING_FEEDBACK_REQUEST",
@@ -67,9 +83,11 @@ test("notification registry declares Mini App ONLY for explicitly personal user 
   for (const type of [
     "WELCOME", "NEWS", "ANNOUNCEMENT", "PLACE_APPROVED",
     "ACTIVITY_APPROVED", "OFFER_APPROVED", "BUSINESS_VERIFIED",
-    "BOOKING_CREATED", "BOOKING_STALE", "BOOKING_NEEDS_ATTENTION",
+    "BOOKING_STALE", "BOOKING_NEEDS_ATTENTION",
     "ADMIN_MODERATION_ITEM_CREATED",
   ]) {
     assert.notEqual(NOTIFICATION_REGISTRY[type]?.telegramOpenIntent, "mini_app", type);
   }
+  assert.equal(NOTIFICATION_REGISTRY.BOOKING_CREATED.telegramOpenIntent, "mini_app");
+  assert.equal(NOTIFICATION_REGISTRY.BOOKING_CREATED.audience, "BUSINESS");
 });
