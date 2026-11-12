@@ -13,21 +13,20 @@ import {
   journalTypeFilterHref,
   type JournalTypeFilter,
 } from "@/lib/journal/journalCardMeta";
-import { JournalFeedGridCard, JournalFeedRow, JournalMainCard, JournalMobileCard, JournalNewsCard } from "./JournalCards";
-import { JournalCollectionsCarousel } from "./JournalCollectionsCarousel";
+import { JournalMainCard, JournalNewsCard } from "./JournalCards";
+import { JournalFeedCards } from "./JournalFeedCards";
 
 const NEWS_CARD_SHELL = "shrink-0 snap-start w-[33.6vw] min-w-[112px] max-w-[160px] lg:w-[16%] lg:max-w-none";
 
 /**
- * Страница журнала: H1 + подзаголовок → «Главное» → «Breaking News» → «Подборки mamaGo»
- * → «Свежие материалы». Каждый пустой блок скрыт целиком. Чипы рубрик — в layout.
+ * Страница журнала: H1 + подзаголовок → «Breaking News» → «Главное»
+ * → «Свежие материалы» (статьи и подборки вместе). Чипы рубрик — в layout.
  */
 export function JournalPageView({
   title,
   subtitle,
   main,
   news,
-  collections,
   feed,
   typeFilter,
   newsArchive = false,
@@ -39,7 +38,6 @@ export function JournalPageView({
   subtitle: string;
   main: CityHomeJournalArticle | null;
   news: CityHomeJournalArticle[];
-  collections: CityHomeJournalArticle[];
   feed: CityHomeJournalArticle[];
   typeFilter: JournalTypeFilter | null;
   newsArchive?: boolean;  /** Путь страницы (с query рубрики/темы, без type/page): «Все →» и «Смотреть все →» добавляют `?type=`. */
@@ -64,7 +62,7 @@ export function JournalPageView({
     return () => { window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); window.removeEventListener("storage", refresh); };
   }, []);
   const displayedNews = typeFilter === "BREAKING_NEWS" && !newsArchive ? orderBreakingNewsBySeen(feed, seenNewsIds) : feed;
-  const empty = !main && news.length === 0 && collections.length === 0 && feed.length === 0;
+  const empty = !main && news.length === 0 && feed.length === 0;
 
   return (
     <div className="site-wrap space-y-10 px-4 pb-16 pt-6 sm:space-y-14 sm:px-7 sm:pt-10">
@@ -91,20 +89,6 @@ export function JournalPageView({
         )}
         {intro}
       </header>
-
-      {main ? (
-        <section aria-label="Главное">
-          <AnalyticsCardViewTracker
-            entityType="ARTICLE"
-            entityId={main.id}
-            vertical="CITY"
-            citySlug={citySlug}
-            meta={{ section: "journal", block: "main", position: 0 }}
-          >
-            <JournalMainCard article={main} saveStatus={saveStatuses[main.id]} />
-          </AnalyticsCardViewTracker>
-        </section>
-      ) : null}
 
       {news.length > 0 ? (
         <section aria-labelledby="journal-news-title" className="space-y-4">
@@ -140,11 +124,19 @@ export function JournalPageView({
         </section>
       ) : null}
 
-      <JournalCollectionsCarousel
-        collections={collections}
-        allHref={typeHref("COLLECTION")}
-        citySlug={citySlug}
-      />
+      {main ? (
+        <section aria-label="Главное">
+          <AnalyticsCardViewTracker
+            entityType="ARTICLE"
+            entityId={main.id}
+            vertical="CITY"
+            citySlug={citySlug}
+            meta={{ section: "journal", block: "main", position: 0 }}
+          >
+            <JournalMainCard article={main} saveStatus={saveStatuses[main.id]} />
+          </AnalyticsCardViewTracker>
+        </section>
+      ) : null}
 
       {typeFilter === "BREAKING_NEWS" ? (
         <section aria-label={newsArchive ? "Архив Breaking News" : "Актуальные Breaking News"}>
@@ -174,79 +166,26 @@ export function JournalPageView({
 
       {typeFilter !== "BREAKING_NEWS" && feed.length > 0 ? (
         <section aria-labelledby="journal-feed-title" className="space-y-2">
-          <h2 id="journal-feed-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
-            {typeFilter ? "Все материалы" : "Свежие материалы"}
-          </h2>
-          <div className="flex flex-col gap-12 pt-5 md:hidden">
-            {feed.map((article, index) => (
-              <AnalyticsCardViewTracker
-                key={article.id}
-                entityType="ARTICLE"
-                entityId={article.id}
-                vertical="CITY"
-                citySlug={citySlug}
-                meta={{ section: "journal", block: "feed-mobile", position: index + 1 }}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="journal-feed-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
+              {typeFilter ? "Все материалы" : "Свежие материалы"}
+            </h2>
+            {!typeFilter && (
+              <Link
+                href={typeHref("ARTICLE")}
+                className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap text-sm font-semibold text-brand-ink hover:underline"
               >
-                <JournalMobileCard article={article} index={index + 1} saveStatus={saveStatuses[article.id]} />
-              </AnalyticsCardViewTracker>
-            ))}
+                Все статьи и обзоры →
+              </Link>
+            )}
           </div>
-          <div className="hidden border-b border-border md:block lg:hidden">
-            {feed.map((article, index) => (
-              <AnalyticsCardViewTracker
-                key={article.id}
-                entityType="ARTICLE"
-                entityId={article.id}
-                vertical="CITY"
-                citySlug={citySlug}
-                meta={{ section: "journal", block: "feed", position: index + 1 }}
-              >
-                <JournalFeedRow
-                  article={article}
-                  index={index + 1}
-                  saveStatus={saveStatuses[article.id]}
-                  typeHref={
-                    article.publicationType === "BREAKING_NEWS"
-                      ? typeHref("BREAKING_NEWS")
-                      : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
-                        ? typeHref("COLLECTION")
-                        : null
-                  }
-                />
-              </AnalyticsCardViewTracker>
-            ))}
-          </div>
-          <div className="hidden grid-cols-4 gap-x-6 gap-y-12 pt-4 lg:grid">
-            {feed.map((article, index) => (
-              <AnalyticsCardViewTracker
-                key={article.id}
-                entityType="ARTICLE"
-                entityId={article.id}
-                vertical="CITY"
-                citySlug={citySlug}
-                meta={{ section: "journal", block: "feed-grid", position: index + 1 }}
-              >
-                <JournalFeedGridCard
-                  article={article}
-                  index={index + 1}
-                  saveStatus={saveStatuses[article.id]}
-                  typeHref={
-                    article.publicationType === "BREAKING_NEWS"
-                      ? typeHref("BREAKING_NEWS")
-                      : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
-                        ? typeHref("COLLECTION")
-                        : null
-                  }
-                />
-              </AnalyticsCardViewTracker>
-            ))}
-          </div>
-          <Link
-            href={typeHref("BREAKING_NEWS")}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink hover:underline"
-          >
-            Все новости →
-          </Link>
+          <JournalFeedCards
+            articles={feed}
+            saveStatuses={saveStatuses}
+            citySlug={citySlug}
+            blogHref={basePath}
+            typeFilter={typeFilter}
+          />
         </section>
       ) : null}
 

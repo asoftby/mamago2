@@ -4,6 +4,7 @@
 import type { OfferFormData, OfferWizardVariant } from "./types";
 import { getStepsForOfferType, getV2StepMembers } from "./offerWizardSteps.config";
 import { getScheduleMissingFields } from "@/lib/offers/offerSchedule";
+import { getClassScheduleMissingFields } from "@/lib/offers/offerClassSchedule";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete, isValidPhone, isValidUrl } from "./contacts";
@@ -253,6 +254,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
   const warnings: string[] = [];
   const isCampOffer = data.offerWizardType === "CAMP";
   const isRegularClass = data.productType === "REGULAR_ACTIVITY";
+  const nonNumericPackagePrice = data.productType === "PARTY_PACKAGE" && ["ON_REQUEST", "FREE"].includes(data.partyPriceMode ?? "");
   const groupTariffs = data.schedule.classSchedule.groups.flatMap((group) => group.tariffs ?? []);
   if (isRegularClass && groupTariffs.length === 0) {
     pricingErrors.push("Добавьте хотя бы один тариф в расписание группы");
@@ -265,7 +267,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
     pricingErrors.push("Выберите режим ценообразования");
   }
 
-  if (!isCampOffer && !isRegularClass && data.pricingMode === "single") {
+  if (!isCampOffer && !isRegularClass && !nonNumericPackagePrice && data.pricingMode === "single") {
     if (!data.singlePrice || data.singlePrice.trim().length === 0) {
       pricingErrors.push("Укажите цену");
     }
@@ -325,7 +327,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
     (isCampOffer ||
       (isRegularClass && pricingErrors.length === 0) ||
       (data.pricingMode &&
-        ((data.pricingMode === "single" && data.singlePrice.trim()) ||
+        ((data.pricingMode === "single" && (nonNumericPackagePrice || data.singlePrice.trim())) ||
          (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
           data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim()))))) &&
     (!requireLegacyAction || (
@@ -539,6 +541,11 @@ export function validateForSubmit(
       case "price":
         result = validateStep5(data, variant !== "v2");
         break;
+      case "classSchedule": {
+        const missing = getClassScheduleMissingFields(data.schedule.classSchedule, data.productType, data.classDuration);
+        result = { isValid: missing.length === 0, isComplete: missing.length === 0, errors: missing, warnings: [] };
+        break;
+      }
       case "openingHours":
       case "bookingMethod": {
         const missing = getScheduleMissingFields(data.schedule, data.productType).filter((field) =>

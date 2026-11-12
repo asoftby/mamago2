@@ -469,7 +469,7 @@ function DiscoveryDesktopSearchControl({
   });
 
   const whoPrimaryLine = useMemo(() => {
-    if (ageMode === "free" && showChildrenPreset) {
+    if (ageMode === "free" && showChildrenPreset && formDisplayFilters.age.length === 0) {
       return "Свободный поиск";
     }
     return formatWhoHeaderSummary({
@@ -533,46 +533,25 @@ function DiscoveryDesktopSearchControl({
   };
 
   /**
-   * Toggle persona selection - same logic as in My Plan
+   * FamilyPersonaContext owns the person selection. Copy its derived age
+   * facet into the kuda session synchronously, before any route navigation:
+   * setDraft's URL write is debounced and the home route has no kuda scope.
    */
   const togglePersona = (personaId: string) => {
-    if (!family?.setSelectedPersonaIds) return;
-    
-    const isSelected = family.selectedPersonaIds.includes(personaId);
-    
-    if (isSelected) {
-      // Deselect persona
-      const newIds = family.selectedPersonaIds.filter((id) => id !== personaId);
-      family.setSelectedPersonaIds(newIds);
-      
-      // If no personas left, clear age filters (enters free search mode)
-      if (newIds.length === 0) {
-        actions.setDraft({ age: [], profile: null });
-      } else {
-        // Sync age filters based on remaining personas
-        const newAudience = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
-        actions.setDraft({ age: newAudience, profile: newIds.join(",") });
-      }
-    } else {
-      // Select persona (exits free search mode automatically)
-      const newIds = [...family.selectedPersonaIds, personaId];
-      family.setSelectedPersonaIds(newIds);
-      
-      // Sync age filters based on new personas
-      const newAudience = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
-      actions.setDraft({ age: newAudience, profile: newIds.join(",") });
-    }
+    if (!family?.setSelectedPersonaIds || family.loading) return;
+    const newIds = family.selectedPersonaIds.includes(personaId)
+      ? family.selectedPersonaIds.filter(id => id !== personaId)
+      : [...family.selectedPersonaIds, personaId];
+    family.setSelectedPersonaIds(newIds);
+    const age = mapPlanParticipantsToAudience(newIds, family.personas);
+    actions.persistPersonaAudience(age);
+    actions.setDraft({ age, profile: null });
   };
 
-  /**
-   * Toggle free search mode - clears all persona selections
-   */
   const handleSelectFreeMode = () => {
-    if (!family?.setSelectedPersonaIds) return;
-    
-    // Switch to free mode: clear all selections via FamilyPersonaContext
+    if (!family?.setSelectedPersonaIds || family.loading) return;
     family.setSelectedPersonaIds([]);
-    // Clear age filters
+    actions.persistPersonaAudience([]);
     actions.setDraft({ age: [], profile: null });
   };
 

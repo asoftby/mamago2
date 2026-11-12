@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { AgePolicy, ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
@@ -262,6 +263,12 @@ export async function POST(request: NextRequest) {
         scheduleMode: ScheduleMode.MULTI_DATE,
         schedulingKind: requestedSchedulingKind,
         scheduleJson: scheduleJsonWithOrganizer as Prisma.InputJsonValue,
+        ...(deriveEventRequestBookingColumns({
+          participationMode: scheduleJsonWithOrganizer.participationMode,
+          scheduleJson: scheduleJsonWithOrganizer,
+          current: { bookingEnabled: false, bookingMode: null },
+          hasBusiness: Boolean(resolvedBusinessId),
+        }) ?? {}),
         
         // Event category (leaf: subcategory if selected, otherwise root)
         eventCategoryId:
@@ -311,10 +318,9 @@ export async function POST(request: NextRequest) {
     });
     perf.mark("write");
 
-    await replaceActivitySessionsFromScheduleJson({
-      prisma,
-      activityId: event.id,
-      scheduleJson: event.scheduleJson,
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Activity" WHERE "id" = ${event.id} FOR UPDATE`;
+      await replaceActivitySessionsFromScheduleJson({ prisma: tx, activityId: event.id, scheduleJson: event.scheduleJson });
     });
     perf.mark("schedule-sync");
     await syncActivityNextOccurrenceAt({ prisma, activityId: event.id });

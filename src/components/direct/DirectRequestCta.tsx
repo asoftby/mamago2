@@ -9,7 +9,10 @@ type Props = {
   publicationTitle: string;
   brandName: string;
   className?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  bookingIntent?: boolean;
 };
 
 /**
@@ -29,8 +32,16 @@ export function DirectRequestCta({
   brandName,
   className,
   children,
+  open: controlledOpen,
+  onOpenChange,
+  bookingIntent = false,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next);
+    else setLocalOpen(next);
+  };
   const [initialValues, setInitialValues] = useState<
     { comment: string; date?: string; childAge?: string; guestsCount?: string } | undefined
   >(undefined);
@@ -54,9 +65,11 @@ export function DirectRequestCta({
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
-        {children}
-      </button>
+      {children && (
+        <button type="button" className={className} onClick={() => setOpen(true)}>
+          {children}
+        </button>
+      )}
       <DirectRequestModal
         open={open}
         onOpenChange={setOpen}
@@ -64,6 +77,7 @@ export function DirectRequestCta({
         publicationTitle={publicationTitle}
         brandName={brandName}
         initialValues={initialValues}
+        bookingIntent={bookingIntent}
       />
     </>
   );

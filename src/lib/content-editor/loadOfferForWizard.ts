@@ -10,6 +10,8 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
     include: {
+      components: { where: { archivedAt: null }, orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: { id: true, title: true, category: true, isOptional: true, removalPolicy: true, removalCreditByn: true } },
       place: {
         select: {
           id: true,
@@ -80,9 +82,13 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
         select: { id: true, payload: true, changedFields: true },
       });
 
+  const components = offer.components.map(row => ({
+    ...row, removalCreditByn: row.removalCreditByn?.toFixed(2) ?? null,
+  }));
+  const wizardBase = { ...offer, components, packageComponentsBaseline: components };
   let offerForWizard = pendingRevision
-    ? applyRevisionToOffer(offer, pendingRevision.payload as OfferRevisionPayload)
-    : offer;
+    ? applyRevisionToOffer(wizardBase, pendingRevision.payload as OfferRevisionPayload)
+    : wizardBase;
 
   // Ожидающая смена места: форме нужны данные нового места (название, город), а не только placeId.
   const pendingPlaceId = (pendingRevision?.payload as OfferRevisionPayload | undefined)?.placeId;

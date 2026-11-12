@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/** Resting bottom of the plan pill (`12px + safe-area`). */
+const PLAN_BOTTOM_PX = 12;
+/** Beta tip sits 10px above the 56px plan capsule → 12 + 56 + 6 = 74. */
+const BETA_ABOVE_PLAN_PX = 74;
+/** How far the tip slides down when the plan tucks away (stays on-screen). */
+const BETA_TUCK_DELTA_PX = BETA_ABOVE_PLAN_PX - PLAN_BOTTOM_PX;
+
 const STORAGE_KEY = "beta-tip-dismissed";
 
 function useBetaTipVisible() {
@@ -76,19 +83,33 @@ function BetaTipContent({
 }
 
 /**
- * Мобильный баннер — фиксирован над нижним меню.
- * При скролле вниз опускается к низу экрана, но остаётся видимым (меню уезжает за край).
+ * Мобильный баннер над «Мой план».
+ * `tucked` — тот же scroll-сигнал, что у пилюли: опускается к низу, но остаётся видимым.
  */
-export function BetaTipMobile() {
+export function BetaTipMobile({
+  tucked = false,
+  dockAbovePlan = true,
+}: {
+  tucked?: boolean;
+  /** When false (no plan pill), sit near the bottom edge instead of above the pill. */
+  dockAbovePlan?: boolean;
+}) {
   const { visible, dismiss } = useBetaTipVisible();
 
   if (!visible) return null;
 
+  const restingBottom = dockAbovePlan ? BETA_ABOVE_PLAN_PX : PLAN_BOTTOM_PX;
+
   return (
     <div
-      className="pointer-events-none fixed z-50 left-3 right-3 lg:hidden"
-      /* 10px над нижней панелью высотой 64px */
-      style={{ bottom: "calc(74px + env(safe-area-inset-bottom, 0px))" }}
+      className="pointer-events-none fixed z-50 left-3 right-3 transition-transform duration-[220ms] ease-out motion-reduce:transition-none lg:hidden"
+      style={{
+        bottom: `calc(${restingBottom}px + env(safe-area-inset-bottom, 0px))`,
+        transform:
+          tucked && dockAbovePlan
+            ? `translate3d(0, ${BETA_TUCK_DELTA_PX}px, 0)`
+            : "translate3d(0, 0, 0)",
+      }}
     >
       <BetaTipContent variant="mobile" onDismiss={dismiss} />
     </div>

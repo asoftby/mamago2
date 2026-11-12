@@ -8,10 +8,10 @@ import { BuilderProgress } from "../BuilderProgress";
 type BuilderHook = BirthdayBuilderWithGate;
 
 const BUDGET_OPTIONS = [
-  { value: "up300" as const, emoji: "💚", label: <>До 300 <BelarusianRubleIcon size="text" /></> },
-  { value: "300-600" as const, emoji: "💛", label: <>300–600 <BelarusianRubleIcon size="text" /></> },
-  { value: "600-1000" as const, emoji: "🧡", label: <>600–1000 <BelarusianRubleIcon size="text" /></> },
-  { value: "1000plus" as const, emoji: "💎", label: <>1000+ <BelarusianRubleIcon size="text" /></> },
+  { value: "up300" as const, emoji: "💚", label: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>До 300</span><BelarusianRubleIcon size="text" /></span> },
+  { value: "300-600" as const, emoji: "💛", label: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>300–600</span><BelarusianRubleIcon size="text" /></span> },
+  { value: "600-1000" as const, emoji: "🧡", label: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>600–1000</span><BelarusianRubleIcon size="text" /></span> },
+  { value: "1000plus" as const, emoji: "💎", label: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>1000</span><span className="inline-flex items-center"><BelarusianRubleIcon size="text" /></span><span>и выше</span></span> },
 ];
 
 export function StepBudget({ builder }: { builder: BuilderHook }) {

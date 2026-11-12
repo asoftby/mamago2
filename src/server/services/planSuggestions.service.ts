@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
-import { activityInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, resolveTerritoryScope, resolveCountryScopeForTerritory } from "@/server/territory/territoryScope";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
@@ -87,7 +87,7 @@ function nextDateKey(dateIso: string): string {
 }
 
 /** [день, день+1) в Europe/Minsk для `date` вида "YYYY-MM-DD" — не локальное время процесса. */
-function zonedDayRange(dateIso: string, timeZone: string): { start: Date; end: Date } {
+export function zonedDayRange(dateIso: string, timeZone: string): { start: Date; end: Date } {
   const start = fromZonedTime(`${dateIso}T00:00:00`, timeZone);
   const end = fromZonedTime(`${nextDateKey(dateIso)}T00:00:00`, timeZone);
   return { start, end };
@@ -120,6 +120,7 @@ const suggestionActivitySelect = {
   type: true,
   coverImageUrl: true,
   ageLabel: true,
+  cityId: true,
   eventCategory: { select: { id: true, nameRu: true } },
   priceFrom: true,
   priceTo: true,
@@ -136,7 +137,7 @@ const suggestionActivitySelect = {
       shortAddress: true,
       formattedAddr: true,
       customAddress: true,
-      city: { select: { name: true } },
+      city: { select: { name: true, slug: true } },
     },
   },
   venue: {
@@ -148,7 +149,7 @@ const suggestionActivitySelect = {
           shortAddress: true,
           formattedAddr: true,
           customAddress: true,
-          city: { select: { name: true } },
+          city: { select: { name: true, slug: true } },
         },
       },
     },
@@ -209,6 +210,8 @@ export type PlanSuggestionsInput = {
    * unbounded query. This does not change scoring or signal interpretation.
    */
   exhaustiveCandidatePool?: boolean;
+  /** Homepage only: bounded extra-region candidate fill when local options are scarce. */
+  homeGeoFallback?: boolean;
   /** Server-resolved canonical ChildInterest.interestSlug values. Never client supplied. */
   profileInterestSlugs?: string[];
   /** Compact, server-resolved subject outcome affinity. Never client supplied. */
@@ -230,6 +233,25 @@ export function confirmedPlanOccurrencesWhere(
       ] },
     ],
   };
+}
+
+/**
+ * HOME's personalized 30-day selector needs every eligible local candidate
+ * before its age/interest ranking. A silent first-120 SQL cut makes valid
+ * events invisible to the selector, regardless of how well they match.
+ * Keep normal interactive suggestions bounded; remote fallback is separately
+ * bounded to avoid a country-wide scan.
+ */
+export function planSuggestionCandidateTake(input: {
+  exhaustiveCandidatePool: boolean;
+  homeGeoFallback: boolean;
+  externalGeo: boolean;
+  take: number;
+}): number | undefined {
+  if (input.externalGeo) return 24;
+  if (input.exhaustiveCandidatePool) return undefined;
+  if (input.homeGeoFallback) return 120;
+  return Math.min(80, Math.max(input.take * 5, 24));
 }
 
 /**
@@ -282,9 +304,10 @@ export async function rankPlanSuggestionsForCity(
         }]
     : [];
 
+  const localGeoWhere = scope ? activityInTerritoryScopeWhere(scope.territoryIds) : activityInCityWhere(city.id);
   const baseAnd: Prisma.ActivityWhereInput[] = [
     { type: ActivityType.EVENT },
-    scope ? activityInTerritoryScopeWhere(scope.territoryIds) : activityInCityWhere(city.id),
+    localGeoWhere,
     ...pubParts,
     ...scheduleFilterAnd,
     ...(exclude.length > 0 ? [{ id: { notIn: exclude } }] : []),
@@ -312,18 +335,29 @@ export async function rankPlanSuggestionsForCity(
     format: string;
   };
 
-  async function fetchCandidateRows(withAgePreference: boolean): Promise<Row[]> {
+  const candidateTake = (externalGeoWhere?: Prisma.ActivityWhereInput) => planSuggestionCandidateTake({
+    exhaustiveCandidatePool, homeGeoFallback: input.homeGeoFallback === true,
+    externalGeo: Boolean(externalGeoWhere), take,
+  });
+
+  async function fetchCandidateRows(
+    withAgePreference: boolean,
+    externalGeoWhere?: Prisma.ActivityWhereInput,
+  ): Promise<Row[]> {
     const agePart =
       withAgePreference && ageFilterAnd.length > 0 ? ageFilterAnd : [];
     const where: Prisma.ActivityWhereInput = {
-      AND: [...baseAnd, ...agePart],
+      AND: [{ type: ActivityType.EVENT }, externalGeoWhere ?? localGeoWhere,
+        ...baseAnd.slice(2), ...agePart,
+        ...(externalGeoWhere && scope ? [{ NOT: activityInExactTerritoryScopeWhere(scope.territoryIds) }] : [])],
     };
+    const limit = candidateTake(externalGeoWhere);
     return (await prisma.activity.findMany({
       where,
-      ...(exhaustiveCandidatePool
-        ? {}
-        : { take: Math.min(80, Math.max(take * 5, 24)) }),
-      orderBy: [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],
+      ...(limit === undefined ? {} : { take: limit }),
+      orderBy: input.homeGeoFallback
+        ? [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]
+        : [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],
       select: {
         ...suggestionActivitySelect,
         nextOccurrenceAt: true,
@@ -344,6 +378,14 @@ export async function rankPlanSuggestionsForCity(
     rows = await fetchCandidateRows(false);
   }
 
+  const localIds = new Set(rows.map(row => row.id));
+  if (input.homeGeoFallback && scope && rows.length < 12) {
+    const country = await resolveCountryScopeForTerritory(scope);
+    if (country?.type === "COUNTRY") {
+      const external = await fetchCandidateRows(false, activityInTerritoryScopeWhere(country.territoryIds));
+      rows = [...rows, ...external.filter(row => !localIds.has(row.id))];
+    }
+  }
   const candidateCount = rows.length;
   const scoreMap = await getEventEngagementScores(rows.map((row) => row.id));
 
@@ -358,8 +400,8 @@ export async function rankPlanSuggestionsForCity(
   });
 
   rows.sort((a, b) => {
-    const scoreA = scoreRow(a).score;
-    const scoreB = scoreRow(b).score;
+    const scoreA = scoreRow(a).score - (input.homeGeoFallback && !localIds.has(a.id) ? 20 : 0);
+    const scoreB = scoreRow(b).score - (input.homeGeoFallback && !localIds.has(b.id) ? 20 : 0);
     if (scoreA !== scoreB) return scoreB - scoreA;
     const timeA = a.nextOccurrenceAt?.getTime() ?? a.createdAt.getTime();
     const timeB = b.nextOccurrenceAt?.getTime() ?? b.createdAt.getTime();
@@ -389,11 +431,12 @@ export async function rankPlanSuggestionsForCity(
       ...interestSignal.interestReasonCodes,
       ...interestSignal.experienceReasonCodes,
       "FRESHNESS_TIE_BREAK",
+      ...(input.homeGeoFallback && !localIds.has(row.id) ? ["DISTANT_ORGANIC_FALLBACK"] : []),
     ];
 
     return {
       activity,
-      score: interestSignal.score,
+      score: interestSignal.score - (input.homeGeoFallback && !localIds.has(row.id) ? 20 : 0),
       scoreBreakdown: {
         engagementScore,
         interestMatchCount,

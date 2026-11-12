@@ -21,7 +21,10 @@ assert.doesNotMatch(me, /Date\.now\(\)/);
 // #818 D1: order status banner, cancel only without confirmations, expired offers explained.
 assert.match(page, /cancelBlocker: partyCancelBlocker\(party\)/);
 assert.match(page, /version: party.version/);
-assert.match(me, /NEEDS_ALTERNATIVE: "Основной исполнитель не подтвердил праздник/);
+// The same state also follows a parent rejection; do not attribute it only to the provider.
+assert.match(me, /NEEDS_ALTERNATIVE: "Основная услуга не подтверждена\. Можно выбрать другой вариант или отменить праздник\./);
+assert.match(me, /Отклонить предложение/);
+assert.match(me, /quote\.version, "reject"/);
 assert.match(me, /\/cancel`/);
 assert.match(me, /body: JSON\.stringify\(\{ version: party\.version \}\)/);
 assert.match(me, /party\.cancelBlocker \? \(/);

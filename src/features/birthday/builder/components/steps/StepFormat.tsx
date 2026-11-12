@@ -12,11 +12,11 @@ const FORMATS: { key: PlaceType; icon: string; title: string; sub: string }[] = 
   { key: "OUTDOOR", icon: "🌳", title: "На природе", sub: "Загородный формат" },
 ];
 
-const BUDGETS: { key: BirthdayBudgetGroup; icon: string; title: ReactNode }[] = [
-  { key: "up300", icon: "💚", title: <>До 300 <BelarusianRubleIcon size="text" /></> },
-  { key: "300-600", icon: "💛", title: <>300–600 <BelarusianRubleIcon size="text" /></> },
-  { key: "600-1000", icon: "🧡", title: <>600–1000 <BelarusianRubleIcon size="text" /></> },
-  { key: "1000plus", icon: "💎", title: <>1000+ <BelarusianRubleIcon size="text" /></> },
+const BUDGETS: { key: BirthdayBudgetGroup; icon: string; title: ReactNode; sub: string }[] = [
+  { key: "up300", icon: "💚", title: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>До 300</span><BelarusianRubleIcon size="text" /></span>, sub: "Рассмотрим варианты немного дороже" },
+  { key: "300-600", icon: "💛", title: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>300–600</span><BelarusianRubleIcon size="text" /></span>, sub: "Допустим небольшое отклонение от бюджета" },
+  { key: "600-1000", icon: "🧡", title: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>600–1000</span><BelarusianRubleIcon size="text" /></span>, sub: "Покажем варианты рядом с вашим бюджетом" },
+  { key: "1000plus", icon: "💎", title: <span className="inline-flex items-center gap-[0.18em] whitespace-nowrap"><span>1000</span><span className="inline-flex items-center"><BelarusianRubleIcon size="text" /></span><span>и выше</span></span>, sub: "Бюджет без верхнего ограничения" },
 ];
 
 function CheckIcon({ c = "#fff" }: { c?: string }) {
@@ -50,6 +50,7 @@ function OptionRow({
         alignItems: "center",
         gap: 16,
         padding: "18px 20px",
+        minHeight: 82,
         borderRadius: 16,
         textAlign: "left",
         cursor: "pointer",
@@ -145,9 +146,13 @@ export function StepFormat({ builder }: Props) {
               textTransform: "uppercase",
               color: "rgba(20,18,16,.55)",
               marginBottom: 12,
+              minHeight: 56,
             }}
           >
             Формат праздника
+            <p style={{ fontFamily: "var(--font-sans, ui-sans-serif, system-ui)", fontSize: 12, lineHeight: 1.4, letterSpacing: "normal", textTransform: "none", margin: "5px 0 0", color: "rgba(20,18,16,.55)" }}>
+              Выберите удобное место для праздника. Остальное поможем организовать.
+            </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {FORMATS.map((f) => (
@@ -173,9 +178,13 @@ export function StepFormat({ builder }: Props) {
               textTransform: "uppercase",
               color: "rgba(20,18,16,.55)",
               marginBottom: 12,
+              minHeight: 56,
             }}
           >
             Бюджет
+            <p style={{ fontFamily: "var(--font-sans, ui-sans-serif, system-ui)", fontSize: 12, lineHeight: 1.4, letterSpacing: "normal", textTransform: "none", margin: "5px 0 0", color: "rgba(20,18,16,.55)" }}>
+              Укажите примерный бюджет. Покажем подходящие варианты, даже если стоимость немного отличается.
+            </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {BUDGETS.map((b) => (
@@ -183,6 +192,7 @@ export function StepFormat({ builder }: Props) {
                 key={b.key}
                 icon={b.icon}
                 title={b.title}
+                sub={b.sub}
                 selected={budgetGroup === b.key}
                 onClick={() => setBasics({ budgetGroup: b.key })}
               />

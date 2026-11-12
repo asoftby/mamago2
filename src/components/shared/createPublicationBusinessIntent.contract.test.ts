@@ -8,8 +8,8 @@ const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.ts
 
 test("business creation distinguishes the place profile from its visit offer", () => {
   for (const label of [
-    "Мероприятие",
-    "Добавить место",
+    "Событие",
+    "Место",
     "Предложение о посещении",
     "Занятия и кружки",
     "Дни рождения и услуги",
@@ -20,7 +20,8 @@ test("business creation distinguishes the place profile from its visit offer", (
   assert.match(menu, /id: "visit-place",[\s\S]*?href: "\/editor\/place\/new"/);
   assert.match(menu, /id: "place-offer",[\s\S]*?href: "\/editor\/offer\/new\?creationIntent=place"/);
   assert.ok(menu.includes('publicationMode === "full"'));
-  assert.ok(menu.includes(": BUSINESS_INTENTS"));
+  assert.ok(menu.includes("? BUSINESS_INTENTS"));
+  assert.match(menu, /BUSINESS_INTENTS\.filter\(\(item\) => item\.id === "dated-event" \|\| item\.id === "visit-place"\)/);
   assert.ok(menu.includes("currentSurfaceReturnTo"));
 });
 
@@ -30,8 +31,8 @@ test("place creation stays available but is visually separated after offer inten
   assert.ok(businessStart >= 0 && businessEnd > businessStart);
   const intents = menu.slice(businessStart, businessEnd);
   assert.ok(intents.indexOf('id: "visit-place"') > intents.indexOf('id: "camps"'));
-  assert.match(intents, /id: "visit-place",[\s\S]*?label: "Добавить место"/);
-  assert.match(menu, /item\.id === "visit-place" &&/);
+  assert.match(intents, /id: "visit-place",[\s\S]*?label: "Место"/);
+  assert.match(menu, /item\.id === "visit-place" && publicationMode === "full" &&/);
   assert.match(menu, /role="separator"/);
   assert.match(menu, /aria-label=\{publicationMode === "business" \? "Добавить"/);
 });
@@ -49,22 +50,15 @@ test("place visit offer uses the existing OFFER model and editor", () => {
   assert.match(wizard, /if \(mode !== "edit" \|\| !offer \|\| initialStepNumber == null \|\| initialStepNumber < 1\) \{[\s\S]*?return "type";/);
 });
 
-test("subtype questions stay available for classes and parties", () => {
-  assert.ok(wizard.includes('creationIntent === "classes" && ('));
-  assert.ok(wizard.includes('creationIntent === "parties" && ('));
-  // Legacy V1 keeps subtype reclassification after step 1 for existing drafts.
-  assert.ok(wizard.includes('<OfferSubtypeClarifier group="classes"'));
-  assert.ok(wizard.includes('<OfferSubtypeClarifier group="parties"'));
-  // V2 already offers those subtype choices on step 1, so step 2 must not ask again.
-  assert.ok(!wizard.includes("<OfferSubtypeClarifier group={creationIntent}"));
+test("V2 subtype questions are selected once on step one for classes and parties", () => {
+  assert.match(wizard, /const variant: OfferWizardVariant = activeOfferWizardVariant\(\);/);
+  assert.ok(!wizard.includes("<OfferSubtypeClarifier"),
+    "Universal V2 must not repeat class or party subtype questions on later steps");
   const typeStep = readFileSync("src/components/business/wizard/offer/steps/Step1Type.tsx", "utf8");
-  assert.ok(typeStep.includes("activeCategory.options.map"), "V2 subtype options remain on step 1");
-  const clarifier = readFileSync("src/components/business/wizard/offer/components/OfferSubtypeClarifier.tsx", "utf8");
-  for (const type of ["ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "PARTY_SERVICE", "PARTY_PACKAGE"]) {
-    assert.ok(clarifier.includes(type));
-  }
-  assert.ok(clarifier.includes("...getOfferTypeSelection(item.type)"));
-  assert.ok(!clarifier.includes("categoryIds: []"));
+  assert.ok(typeStep.includes("activeCategory.options.map"), "Subtype options remain on V2 step one");
+  assert.ok(typeStep.includes("getOfferTypeSelection"), "Selecting subtype updates the offer product type");
+  assert.ok(wizard.includes('creationIntent === "classes" ? "REGULAR_ACTIVITY"'));
+  assert.ok(wizard.includes('creationIntent === "parties" ? "PARTY_SERVICE"'));
 });
 
 test("business creation cards have equal height and two-line descriptions, without technical captions", () => {

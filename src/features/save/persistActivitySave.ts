@@ -26,6 +26,7 @@ export async function persistActivitySave(
       body: JSON.stringify({
         activityId: meta.activityId,
         date: result.dateISO,
+              ...(result.selectedPersonaIds ? { selectedPersonaIds: result.selectedPersonaIds } : {}),
         ...homePlanAttributionFields(meta.planAttribution),
         ...(result.visibility ? { visibility: result.visibility } : {}),
         title: meta.title,

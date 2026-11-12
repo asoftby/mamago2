@@ -222,6 +222,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
             body: JSON.stringify({
               activityId: data.id,
               date: result.dateISO,
+              ...(result.selectedPersonaIds ? { selectedPersonaIds: result.selectedPersonaIds } : {}),
               activitySessionId: result.timeSlotId ?? null,
               title: data.title,
               coverImageUrl: data.media.posterUrl,

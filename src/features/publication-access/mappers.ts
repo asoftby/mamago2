@@ -13,6 +13,7 @@ function normalizeMethod(value: unknown): PublicationAccessMethod | undefined {
     value === "ticket" ||
     value === "timeslots" ||
     value === "prebooking" ||
+    value === "request" ||
     value === "external" ||
     value === "contact"
   ) {

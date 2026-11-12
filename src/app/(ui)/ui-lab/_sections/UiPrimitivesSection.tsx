@@ -1,6 +1,9 @@
 "use client";
 
+import { PartyPackageBrief } from "@/components/birthday/PartyPackageBrief";
 import React from "react";
+import { PackageComponentsEditor } from "@/components/business/wizard/offer/components/PackageComponentsEditor";
+import type { PackageComponentFormRow } from "@/components/business/wizard/offer/types";
 import { DemoSection } from "../_components/DemoSection";
 import { InventoryGrid } from "../_components/InventoryGrid";
 import { RenderSafe } from "../_components/RenderSafe";
@@ -85,6 +88,21 @@ function ChipsRowLabDemo() {
   );
 }
 
+function PackageRulesPreview() {
+  const [rows, setRows] = React.useState<PackageComponentFormRow[]>([
+    { title: "Площадка", category: "VENUE", removalPolicy: "REQUIRED", removalCreditByn: null },
+    { title: "Торт", category: "CAKE", removalPolicy: "REMOVABLE_NO_REFUND", removalCreditByn: null },
+    { title: "Декор", category: "DECOR", removalPolicy: "REMOVABLE_FIXED_CREDIT", removalCreditByn: "50.00" },
+    { title: "Шоу", category: "SHOW", removalPolicy: "REMOVABLE_QUOTE_REQUIRED", removalCreditByn: null },
+    { title: "Старое условие", category: "OTHER", removalPolicy: null, removalCreditByn: null },
+  ]);
+  const [disabled, setDisabled] = React.useState(false);
+  return <div className="space-y-3">
+    <Button variant="outline" onClick={() => setDisabled(value => !value)}>Режим {disabled ? "просмотра" : "редактирования"}</Button>
+    <PackageComponentsEditor rows={rows} disabled={disabled} onChange={setRows} />
+  </div>;
+}
+
 export function UiPrimitivesSection() {
   return (
     <DemoSection
@@ -93,6 +111,18 @@ export function UiPrimitivesSection() {
       description="Core building blocks from src/components/ui"
     >
       <InventoryGrid>
+        <RenderSafe title="Правила компонентов пакета" file="src/components/business/wizard/offer/components/PackageComponentsEditor.tsx">
+          <PackageRulesPreview />
+          <PartyPackageBrief scope={{ kind: "PARTY_PACKAGE_CHANGE", orderId: "preview", draftVersion: 1,
+            packageId: "package", packageTitle: "Пакет праздника", originalPrice: { mode: "EXACT", amountByn: "500.00" },
+            requestedPrice: { mode: "ON_REQUEST", amountByn: null },
+            components: [
+              { itemId: "kept", snapshot: { title: "Зал", category: "VENUE" }, action: "KEPT", creditByn: "0.00", requiresQuote: false, replacementItemId: null },
+              { itemId: "removed", snapshot: { title: "Декор", category: "DECOR" }, action: "REMOVED", creditByn: "50.00", requiresQuote: false, replacementItemId: null },
+              { itemId: "replaced", snapshot: { title: "Шоу", category: "SHOW" }, action: "REPLACED", creditByn: "0.00", requiresQuote: true, replacementItemId: "other" },
+            ], standalone: [{ itemId: "other", offerId: "other", businessId: "other", title: "Другой исполнитель", price: { mode: "FROM", amountByn: "180.00" } }],
+          }} />
+        </RenderSafe>
         <RenderSafe title="Button" file="src/components/ui/button.tsx">
           <div className="flex gap-2 flex-wrap">
             <Button>Default</Button>

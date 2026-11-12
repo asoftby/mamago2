@@ -3,6 +3,7 @@ import {
   Clock3,
   ExternalLink,
   Info,
+  ListChecks,
   PhoneCall,
   Ticket,
 } from "lucide-react";
@@ -44,6 +45,13 @@ export const ACCESS_METHOD_CONFIG: Record<
     supportsPhone: true,
     supportsExternalUrl: true,
     icon: CalendarCheck2,
+  },
+  request: {
+    title: "Оставить заявку",
+    description:
+      "Пользователь оставит заявку на участие, а вы свяжетесь и уточните детали. Подходит для разовых активностей с предварительной записью",
+    publicButtonLabel: "Оставить заявку",
+    icon: ListChecks,
   },
   external: {
     title: "Перейти на сайт",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import {
   nextResponseFromDirectAccessError,
   requireDirectThreadAccess,
@@ -18,7 +19,7 @@ import {
  * whichever side the caller is on — see directConversation.service.ts.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -35,7 +36,13 @@ export async function GET(
   }
   const currentUser = user!;
 
-  const resolved = await resolveViewerRoleForThread(currentUser.id, thread);
+  const asBusiness = new URL(request.url).searchParams.get("as") === "business";
+  if (asBusiness && !(await canAccessBusiness(currentUser.id, thread.businessId))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const resolved = asBusiness
+    ? { businessId: thread.businessId, customerUserId: thread.customerUserId, viewerRole: "BUSINESS" as const }
+    : await resolveViewerRoleForThread(currentUser.id, thread);
   if (!resolved) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

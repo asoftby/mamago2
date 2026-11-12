@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const listSource = readFileSync("src/server/article/listCityHomeArticles.ts", "utf8");
+const journalCategoriesSource = readFileSync("src/server/article/cityBlogCategories.ts", "utf8");
 const cacheSource = readFileSync("src/server/article/publicArticleCache.ts", "utf8");
 const createRoute = readFileSync("src/app/api/admin/articles/route.ts", "utf8");
 const updateRoute = readFileSync("src/app/api/admin/articles/[id]/route.ts", "utf8");
@@ -26,14 +27,20 @@ const articleDetailData = readFileSync("src/lib/article/articleMvpRenderData.ts"
 assert.match(listSource, /unstable_cache/);
 assert.match(
   listSource,
-  /\["public-article-list:city", city\.id, city\.slug, city\.regionId \?\? ""\]/,
+  /\["public-article-list:city(?::[^\"]+)?", city\.id, city\.slug, city\.regionId \?\? ""\]/,
   "city cache key must include every geography dimension that shapes membership or hrefs",
 );
 assert.match(listSource, /\["public-article-list:national"\]/);
 assert.match(listSource, /PUBLIC_ARTICLE_LIST_CACHE_TAG/);
+assert.match(journalCategoriesSource, /unstable_cache/);
+assert.match(journalCategoriesSource, /\["journal-nav-categories-v1", city\.id, city\.slug, city\.regionId \?\? ""\]/);
+assert.match(journalCategoriesSource, /revalidate: 300/);
+assert.match(journalCategoriesSource, /tags: \[PUBLIC_ARTICLE_LIST_CACHE_TAG, PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG\]/);
+assert.match(journalCategoriesSource, /SEO_ISOLATED_TEST_DB === "true"/);
+assert.match(journalCategoriesSource, /Promise\.all\(\[prisma\.article\.findFirst/);
 assert.match(listSource, /PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG/);
 assert.match(listSource, /PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS/);
-assert.match(cacheSource, /PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS = 60 \* 60/);
+assert.match(cacheSource, /PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS = 300/);
 assert.match(
   cacheSource,
   /PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG = "event-step1-categories"/,

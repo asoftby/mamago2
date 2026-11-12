@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInAnyOfCitiesWhere, activityInExactCitiesWhere } from "@/server/discovery/activityInCityWhere";
-import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, resolveTerritoryScope, resolveCountryScopeForTerritory } from "@/server/territory/territoryScope";
 import { resolveTerritoryBySlug } from "@/server/territory/resolveTerritory";
 import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
 import { readCrossRegionEligibility } from "@/server/discovery/crossRegionFamilySignal";
@@ -13,6 +13,7 @@ import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
+import { activeOccasionWhere } from "@/lib/discovery/occasionUtils";
 import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
 import {
   getWeatherRankingBoost,
@@ -122,6 +123,8 @@ export async function getKudaDiscoveryFeed(
     nearby?: boolean;
     eventFilters?: EventRuntimeFilters;
     explicitTerritorySlug?: string | null;
+    /** Homepage only: when local options are scarce, add bounded organic candidates from Belarus. */
+    homeGeoFallback?: boolean;
     weather?: {
       scenario: HomeWeatherScenario;
       timeOfDay: TimeOfDay;
@@ -167,7 +170,7 @@ export async function getKudaDiscoveryFeed(
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
       occasionLinks: {
-        where: { occasion: { isActive: true, type: { in: [OccasionType.HOLIDAY, OccasionType.SEASON] } } },
+        where: { occasion: { ...activeOccasionWhere(now), type: { in: [OccasionType.HOLIDAY, OccasionType.SEASON] } } },
         select: { occasionId: true },
       },
       boosts: {
@@ -265,7 +268,39 @@ export async function getKudaDiscoveryFeed(
 
   // Compose within temporal relevance bands; no irrelevant replacement or candidate loss.
   const composed = options?.onlyIds ? cards : composePromotedCards(cards, card => String(Math.floor((temporalById.get(card.id) ?? 0) / 10)));
-  const selected = options?.allCandidates ? composed : composed.slice(0, take);
+  let selected: ActivityMock[] = options?.allCandidates ? composed : composed.slice(0, take);
+  // Do not broaden strict catalog geographic filters or exact-ID hydration.
+  // Only the automatic HOME preview can fill missing local slots. External
+  // candidates are ordered after local ones and never bypass visibility/date.
+  if (options?.homeGeoFallback && !options.onlyIds && !options.explicitTerritorySlug &&
+      !options.allCandidates && !options.nearby && selected.length < Math.min(10, take)) {
+    const homeScope = await resolveTerritoryScope(citySlug);
+    const countryScope = homeScope ? await resolveCountryScopeForTerritory(homeScope) : null;
+    if (homeScope && countryScope && countryScope.type === "COUNTRY") {
+      const country = await buildKudaDiscoveryWhere(cityId, countryScope.slug, {
+        format: options.format ?? null,
+        eventFilters: runtimeFilters,
+        explicitTerritorySlug: countryScope.slug,
+      });
+      const others = await prisma.activity.findMany({
+        where: { AND: [country.where, { NOT: activityInExactTerritoryScopeWhere(homeScope.territoryIds) }] },
+        orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { id: "asc" }],
+        take: 24, select: { id: true },
+      });
+      if (others.length) {
+        const supplements = await getKudaDiscoveryFeed(cityId, countryScope.slug, null, {
+          onlyIds: others.map(row => row.id),
+          explicitTerritorySlug: countryScope.slug,
+          eventFilters: runtimeFilters,
+          hydrateImages: options.hydrateImages,
+          take: Math.min(10, take) - selected.length,
+        });
+        const existingIds = new Set(selected.map(card => card.id));
+        selected = [...selected, ...supplements.filter(card => !existingIds.has(card.id))]
+          .slice(0, Math.min(10, take));
+      }
+    }
+  }
   if (!options?.rankOnly && !options?.onlyIds) await recordDiscoveryExposures(selected, cityId, citySlug, "kuda", currentUserId);
   const result = options?.hydrateImages === false ? selected : await withImageDimensions(selected, (card) => card.image);
   perf.mark("mapSort");

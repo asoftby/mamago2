@@ -2,6 +2,7 @@
 
 import { toast } from "@/lib/toast";
 import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
+import { applyGuestDayScenarioAndAnnounce } from "@/lib/my-plan/applyGuestDayScenario";
 import type { AuthEntryPoint, PendingPostAuthAction } from "./types";
 import { getPostAuthContext, clearPostAuthAction, clearPostAuthContext } from "./storage";
 import { executePendingPostAuthAction } from "./executePendingAction";
@@ -91,6 +92,15 @@ export async function runPostAuthPipeline(
     }
   } catch (e) {
     console.error("[post-auth] guest my-plan migration failed", e);
+  }
+
+  // A day the guest built with «Собрать день» and saved before signing in: saved now, once. A rejection is told to the
+  // user; a passing failure keeps the draft for the next time.
+  try {
+    const guestDay = await applyGuestDayScenarioAndAnnounce();
+    if (guestDay.kind === "saved") trackPostAuthEvent("pending_action_executed", { source });
+  } catch (e) {
+    console.error("[post-auth] guest day scenario save failed", e);
   }
 
   if (pendingActionExecutor || ctx?.pendingAction) {

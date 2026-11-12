@@ -1,5 +1,4 @@
 import type { Prisma } from "@prisma/client";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 /**
  * Continuous reader must never append expired or future Breaking News.
@@ -8,7 +7,7 @@ import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
  */
 export function activeBreakingNewsContinuationWhere(now: Date): Prisma.ArticleWhereInput {
   return {
-    subtitle: BREAKING_NEWS_SUBTITLE,
+    publicationType: "BREAKING_NEWS",
     expiresAt: { gt: now },
     publishedAt: { lte: now },
   };

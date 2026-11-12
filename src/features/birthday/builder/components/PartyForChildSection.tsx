@@ -254,6 +254,34 @@ function PartyForChildSectionInner({
   );
 
   const [children, setChildren] = useState<ApiChild[]>([]);
+  const [adults, setAdults] = useState<Array<{userId: string; displayName: string | null; isMe: boolean}>>([]);
+  const [freeOpen, setFreeOpen] = useState(false);
+  const [freeName, setFreeName] = useState("");
+  const [freeAge, setFreeAge] = useState("");
+  const [allInterestsOpen, setAllInterestsOpen] = useState(false);
+  const [adultLoading, setAdultLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/family", { credentials: "same-origin", cache: "no-store" })
+        .then(async (res) => res.ok ? res.json() : null).catch(() => null),
+      fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" })
+        .then(async (res) => res.ok ? res.json() : null).catch(() => null),
+    ])
+      .then(([data, me]) => {
+        if (cancelled) return;
+        const familyAdults: Array<{userId: string; displayName: string | null; isMe: boolean}> =
+          Array.isArray(data?.family?.adults) ? data.family.adults : [];
+        if (me?.id && !familyAdults.some((adult) => adult.userId === me.id)) {
+          familyAdults.unshift({ userId: me.id, displayName: me.displayName ?? null, isMe: true });
+        }
+        setAdults(familyAdults);
+      })
+      .catch(() => { if (!cancelled) setAdults([]); })
+      .finally(() => { if (!cancelled) setAdultLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -367,7 +395,7 @@ function PartyForChildSectionInner({
   /** Один ребёнок в профиле — сразу в сценарии и в selected-state карточки */
   useEffect(() => {
     if (loadingChildren || !isLoggedIn) return;
-    if (children.length !== 1) return;
+    if (children.length !== 1 || adults.length > 0 || adultLoading) return;
     if (partyForChild) return;
     if (didAutoSelectSingleProfileChildRef.current) return;
     const only = children[0];
@@ -378,6 +406,8 @@ function PartyForChildSectionInner({
     loadingChildren,
     isLoggedIn,
     children,
+    adults.length,
+    adultLoading,
     partyForChild,
     handleSelectChild,
   ]);
@@ -707,6 +737,53 @@ function PartyForChildSectionInner({
     setBirthDate(`${y}-${m}-${day}`);
   }, []);
 
+
+  const selectAdult = useCallback((adult: {userId: string; displayName: string | null; isMe: boolean}) => {
+    appliedAgeForChildKey.current = null;
+    setPartyForChild({
+      profileChildId: null,
+      profileAdultId: adult.userId,
+      recipientType: "adult",
+      name: adult.isMe ? "Я" : (adult.displayName?.trim() || "Взрослый"),
+      ageLabel: "Взрослый",
+      birthDateIso: "",
+      interestSlugs: [],
+    });
+    setBasics({ ageGroup: null, selectedAgeLabel: null, selectedAgeSignalId: null });
+  }, [setPartyForChild, setBasics]);
+
+  const selectFree = useCallback(() => {
+    const years = freeAge.trim() === "" ? null : Number(freeAge);
+    if (years !== null && (!Number.isInteger(years) || years < 0 || years > 110)) {
+      toast.error("Укажите возраст от 0 до 110 лет");
+      return;
+    }
+    // Возраст неизвестного гостя не превращаем в фальшивую дату рождения.
+    const birthDateIso = "";
+    setPartyForChild({
+      profileChildId: null,
+      recipientType: "guest",
+      statedAgeYears: years,
+      name: freeName.trim() || "Гость",
+      ageLabel: years == null ? "Возраст не указан" : formatYearsRu(years),
+      birthDateIso,
+      interestSlugs: [],
+    });
+    setBasics({ ageGroup: null, selectedAgeLabel: null, selectedAgeSignalId: null });
+    setFreeOpen(false);
+  }, [freeAge, freeName, setPartyForChild, setBasics]);
+
+  const toggleScenarioInterest = useCallback((slug: string) => {
+    const current = state.quiz.partyForChild;
+    if (!current) return;
+    setPartyForChild({
+      ...current,
+      interestSlugs: current.interestSlugs.includes(slug)
+        ? current.interestSlugs.filter((value) => value !== slug)
+        : [...current.interestSlugs, slug],
+    });
+  }, [state.quiz.partyForChild, setPartyForChild]);
+
   const showSavedProfileChildren =
     !loadingChildren && isLoggedIn && children.length > 0;
 
@@ -718,11 +795,27 @@ function PartyForChildSectionInner({
             Для кого праздник?
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Это поможет точнее подобрать возраст и интересы — можно пропустить и
-            выбрать ниже
+            Выберите члена семьи или укажите другого человека. Интересы можно изменить для этого праздника.
           </p>
         </div>
 
+
+        {adults.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {adults.map((adult) => {
+              const selected = partyForChild?.profileAdultId === adult.userId;
+              return (
+                <button key={adult.userId} type="button" onClick={() => selectAdult(adult)}
+                  aria-pressed={selected}
+                  className={cn("rounded-2xl border px-4 py-3 text-left text-sm transition-colors",
+                    selected ? "border-[#EF8759] bg-[#FFF7F3]" : "border-zinc-200 hover:bg-zinc-50")}>
+                  <span className="font-semibold">{adult.isMe ? "Я" : (adult.displayName || "Взрослый")}</span>
+                  <span className="block text-xs text-muted-foreground">Взрослый</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         {showSavedProfileChildren && (
           <div className="space-y-2">
             {children.map((c) => (
@@ -763,6 +856,63 @@ function PartyForChildSectionInner({
           >
             + Указать ребёнка
           </button>
+        )}
+
+        <button type="button" onClick={() => setFreeOpen((value) => !value)}
+          className="w-full rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-sm font-semibold text-left hover:border-[#EF8759]">
+          + Другой человек · свободный выбор
+        </button>
+        {freeOpen && (
+          <div className="rounded-xl border border-zinc-200 p-3 space-y-3">
+            <label className="block text-xs font-medium">Имя (необязательно)
+              <input value={freeName} onChange={(e) => setFreeName(e.target.value)}
+                placeholder="Имя именинника" className="mt-1 w-full rounded-lg border p-2 text-sm" />
+            </label>
+            <label className="block text-xs font-medium">Возраст на дату праздника (необязательно)
+              <input type="number" min={0} max={110} value={freeAge} onChange={(e) => setFreeAge(e.target.value)}
+                placeholder="Возраст" className="mt-1 w-full rounded-lg border p-2 text-sm" />
+            </label>
+            <button type="button" onClick={selectFree}
+              className="rounded-full bg-[#141210] px-5 py-2 text-sm font-semibold text-white">Выбрать</button>
+          </div>
+        )}
+        {partyForChild && (
+          <section className="mt-5 space-y-3" aria-label="Интересы для праздника">
+            <div>
+              <h3 className="text-sm font-semibold">Интересы именинника</h3>
+              <p className="text-xs text-muted-foreground">Из профиля, если заполнены. Изменения действуют только для этого праздника.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {partyForChild.interestSlugs.map((slug) => (
+                <button key={slug} type="button" onClick={() => toggleScenarioInterest(slug)}
+                  className="rounded-full border border-[#EF8759] bg-orange-50 px-3 py-2 text-xs font-medium">
+                  {SYSTEM_INTERESTS.find((item) => item.slug === slug)?.label ?? slug} ×
+                </button>
+              ))}
+              {partyForChild.interestSlugs.length === 0 && (
+                <span className="text-xs text-muted-foreground">Пока не выбраны</span>
+              )}
+            </div>
+            <button type="button" onClick={() => setAllInterestsOpen((value) => !value)}
+              className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium">
+              {allInterestsOpen ? "Скрыть интересы" : "Все интересы"}
+            </button>
+            {allInterestsOpen && (
+              <div className="flex flex-wrap gap-2">
+                {SYSTEM_INTERESTS.map((interest) => {
+                  const selected = partyForChild.interestSlugs.includes(interest.slug);
+                  return (
+                    <button key={interest.slug} type="button" aria-pressed={selected}
+                      onClick={() => toggleScenarioInterest(interest.slug)}
+                      className={cn("rounded-full border px-3 py-2 text-xs font-medium",
+                        selected ? "border-[#EF8759] bg-orange-50" : "border-zinc-200")}>
+                      {interest.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         )}
       </div>
 

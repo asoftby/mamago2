@@ -24,13 +24,17 @@ export async function GET(request: NextRequest) {
     if (!validBuckets.has(bucketValue) || !validKinds.has(kindValue)) {
       return NextResponse.json({ error: "Invalid filter" }, { status: 400 });
     }
+    const requestId = params.get("request") ?? undefined;
+    if (requestId !== undefined && (!requestId || requestId.length > 128)) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const limitValue = params.get("limit");
     const limit = limitValue === null ? 100 : Number(limitValue);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       return NextResponse.json({ error: "Invalid limit" }, { status: 400 });
     }
     const result = await getBusinessInbox({
-      businessId: business.id,
+      businessId: business.id, requestId,
       bucket: bucketValue as BookingBucket,
       kind: kindValue as BusinessInboxKind,
       limit,

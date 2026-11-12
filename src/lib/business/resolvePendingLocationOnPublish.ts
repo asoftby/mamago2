@@ -11,7 +11,8 @@
  */
 
 import { Prisma, EventVenueKind, LocationSource, PlaceKind, ContentStatus } from "@prisma/client";
-import { extractStreetName, normalizePlaceName } from "@/lib/slug/slugUtils";
+import { normalizePlaceName } from "@/lib/slug/slugUtils";
+import { deriveShortAddress } from "@/lib/place/placeAddressLabel";
 
 export type PendingLocationMode =
   | "EXISTING_PLACE"
@@ -277,7 +278,7 @@ export async function resolvePendingLocationOnPublish(
     }
 
     // Создаём новый Place
-    const shortAddress = extractStreetName(address ?? "");
+    const shortAddress = deriveShortAddress(address);
     const createRequestId = `event-publish-${activityId}-${Date.now()}`;
 
     const newPlace = await tx.place.create({

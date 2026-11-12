@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Copyright } from "lucide-react";
 import { CookieSettingsFooterLink } from "@/components/shell/CookieSettingsFooterLink";
 import { FooterLogoLink } from "@/components/shell/FooterLogoLink";
 import { FooterSocialLinks } from "@/components/shell/FooterSocialLinks";
@@ -42,7 +43,7 @@ export function PublicFooter({ withStickyCtaClearance = false, withPlanStickyCle
             ? "pb-[calc(120px+env(safe-area-inset-bottom))] md:pb-[120px]"
             : withStickyCtaClearance
               ? cn(STICKY_CTA_FOOTER_PAD, "lg:pb-16")
-              : "pb-4 md:pb-16",
+              : "pb-4 md:pb-[105px]",
         )}
       >
         <nav aria-label="Футер" className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
@@ -104,8 +105,9 @@ export function PublicFooter({ withStickyCtaClearance = false, withPlanStickyCle
               <FooterSocialLinks />
             </div>
           </div>
-          <p className={cn("w-full text-center", FOOTER_META_TEXT_CLASS)}>
-            © {currentYear} made in Belarus with 🧡
+          <p className={cn("flex w-full items-center justify-center gap-1 text-center", FOOTER_META_TEXT_CLASS)}>
+            <Copyright aria-label="©" className="size-[12.92px] shrink-0" strokeWidth={2} />
+            <span>{currentYear} made in Belarus with 🧡</span>
           </p>
         </div>
       </Container>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Star, MessageSquare, Edit, Trash, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { Badge } from "@/components/ui/badge";
 import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
 import Link from "next/link";
@@ -149,17 +150,15 @@ export default function BusinessReviewsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Отзывы</h1>
-        <p className="text-gray-600 mt-2">
-          Управляйте отзывами клиентов и отвечайте на них
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Отзывы"
+        description="Управляйте отзывами клиентов и отвечайте на них"
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Всего отзывов</p>
@@ -169,7 +168,7 @@ export default function BusinessReviewsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Средний рейтинг</p>
@@ -183,7 +182,7 @@ export default function BusinessReviewsPage() {
           </div>
         </div>
 
-        <div className="col-span-2 rounded-lg border border-gray-200 bg-white p-4 sm:p-6 md:col-span-1">
+        <div className="col-span-2 rounded-2xl border border-stone-200 bg-white p-4 sm:p-6 md:col-span-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Без ответа</p>
@@ -195,7 +194,7 @@ export default function BusinessReviewsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -256,7 +255,7 @@ export default function BusinessReviewsPage() {
 
       {/* Empty State */}
       {!loading && reviews.length === 0 && (
-        <div className="bg-gray-50 rounded-lg p-12 text-center">
+        <div className="rounded-2xl border border-stone-200 bg-white p-12 text-center">
           <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 text-lg">Отзывов пока нет</p>
           <p className="text-gray-500 text-sm mt-2">
@@ -271,7 +270,7 @@ export default function BusinessReviewsPage() {
           {reviews.map((review) => (
             <div
               key={review.id}
-              className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 sm:p-6"
+              className="space-y-4 rounded-2xl border border-stone-200 bg-white p-4 sm:p-6"
             >
               {/* Header */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

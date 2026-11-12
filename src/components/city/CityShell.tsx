@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Prisma } from "@prisma/client";
+import { PartyCategory, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { listPublicCitySelectorOptions } from "@/server/city/publicCitySelector";
@@ -13,6 +13,7 @@ import { getClassesListingPage } from "@/server/discovery/classesListingPage";
 import { getBirthdayDiscoveryPage } from "@/server/discovery/birthdayDiscoveryFeed";
 import {
   listDiscoveryClassChips,
+  listPopulatedDiscoveryClassChips,
   resolveDiscoveryClassChipSlug,
 } from "@/server/discovery/classChips";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
@@ -33,7 +34,7 @@ import {
 import type { ActivityMock } from "@/types/activity";
 import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
 import type { EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
-import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
+import { getActivePublicOccasions } from "@/lib/discovery/occasions";
 
 export type BudgetConfig = { max: number; step: number } | null;
 
@@ -87,18 +88,20 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
   let classesPagination: { page: number; totalPages: number; total: number } | undefined;
   let birthdayPagination: { page: number; totalPages: number; total: number } | undefined;
   let classChips = undefined;
-  let activeClassChipSlug = undefined;
+  let activeClassChipSlug: string | undefined;
   let budgetConfig: BudgetConfig = null;
   let alternativeEventFilters: EventRuntimeFilters | null = null;
-  const halloweenEnabled = intent === "kuda"
-    ? await isHalloweenOccasionActive()
-    : false;
+  const activeOccasions = intent === "kuda" ? await getActivePublicOccasions() : [];
+  const activeOccasionSlugs = new Set(activeOccasions.map((occasion) => occasion.slug));
 
   if (intent === "birthday") {
     // Only published party-specific offers approved for this section.
     const rawPage = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page;
     const requestedPage = Number(rawPage);
-    const result = await getBirthdayDiscoveryPage(city.id, city.slug, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+    const requestedCategory = Array.isArray(searchParams.category) ? searchParams.category[0] : searchParams.category;
+    const partyCategory = requestedCategory && Object.values(PartyCategory).includes(requestedCategory as PartyCategory)
+      ? requestedCategory as PartyCategory : null;
+    const result = await getBirthdayDiscoveryPage(city.id, city.slug, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1, 24, partyCategory);
     if (result.page > result.totalPages && result.total > 0) notFound();
     discoveryActivities = result.activities;
     birthdayPagination = { page: result.page, totalPages: result.totalPages, total: result.total };
@@ -113,7 +116,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
     // candidate query to this city's territory; pagination keeps that scope.
     const explicitTerritorySlug = (Array.isArray(searchParams.explore) ? searchParams.explore[0] : searchParams.explore) === "1" ? citySlug : null;
     const urlParams = toUrlSearchParams(searchParams);
-    const eventFilters = buildKudaEventFilters(urlParams, halloweenEnabled);
+    const eventFilters = buildKudaEventFilters(urlParams, activeOccasionSlugs);
     alternativeEventFilters = { ...eventFilters, districtId: null, metroId: null };
     const listing = await loadKudaListingPage({
       cityId: city.id,
@@ -121,7 +124,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
       userId: user?.id ?? null,
       searchParams: urlParams,
       page: parseListingPage(searchParams.page),
-      halloweenEnabled,
+      activeOccasionSlugs,
       explicitTerritorySlug,
     });
     // A page past the end of a non-empty result set does not exist.
@@ -172,9 +175,15 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
             return Number.isFinite(value) && value >= 0 ? value : null;
           })();
 
-    classChips = await listDiscoveryClassChips();
-    activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, classChips);
-    const chipTitleBySlug = new Map(classChips.map((chip) => [chip.slug, chip.title]));
+    const configuredClassChips = await listDiscoveryClassChips();
+    activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, configuredClassChips);
+    classChips = await listPopulatedDiscoveryClassChips(city.id, city.slug, configuredClassChips);
+    // A stale admin default without public offers must not open an empty
+    // category on the bare /classes route. Explicit deep links still work.
+    if (!requestedChip && !classChips.some((chip) => chip.slug === activeClassChipSlug)) {
+      activeClassChipSlug = "all";
+    }
+    const chipTitleBySlug = new Map(configuredClassChips.map((chip) => [chip.slug, chip.title]));
     const rawPage = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page;
     const requestedPage = Number(rawPage);
     const listing = await getClassesListingPage(city.id, city.slug, {
@@ -276,8 +285,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
       pageTitleOverride={pageTitleOverride}
-      weekendPlannerEnabled={intent === "kuda" && user?.role === "ADMIN"}
-      halloweenEnabled={halloweenEnabled}
+      activeOccasions={activeOccasions}
       kudaListing={kudaListing}
       implicitFilters={implicitFilters}
     />

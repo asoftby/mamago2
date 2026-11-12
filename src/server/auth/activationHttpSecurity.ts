@@ -23,11 +23,24 @@ export async function readSizeLimitedJson(
 // (getTrustedClientIp) — the single canonical helper for the whole app.
 // Do not re-implement IP extraction here.
 
+/**
+ * The minimum-response-time calculation is intentionally pure so both the
+ * eligible and unknown-account paths can be verified without runner scheduling
+ * noise (which makes wall-clock response equality assertions flaky).
+ */
+export function remainingGenericResponseDelayMs(
+  startedAt: number,
+  now: number,
+  floorMs = 200,
+): number {
+  return Math.max(0, floorMs - (now - startedAt));
+}
+
 export async function waitForGenericResponseFloor(
   startedAt: number,
   floorMs = 200,
 ): Promise<void> {
-  const remaining = floorMs - (performance.now() - startedAt);
+  const remaining = remainingGenericResponseDelayMs(startedAt, performance.now(), floorMs);
   if (remaining > 0) {
     await new Promise((resolve) => setTimeout(resolve, remaining));
   }

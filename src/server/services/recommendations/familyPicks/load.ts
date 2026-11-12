@@ -1,3 +1,4 @@
+import { canonicalPublicActivityPath } from "@/lib/business/eventPublicLink";
 import { parseSafeOpaqueId } from "@/lib/decision/identifiers";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { AnalyticsEntityType, RecommendationSurface } from "@prisma/client";
@@ -42,6 +43,7 @@ import {
   type PersonalShowWindow,
   collectUpcomingOccurrences,
   resolveShowWindow,
+  minskDateKey,
   type ShowWindow,
 } from "./window";
 
@@ -378,10 +380,63 @@ type PersonalExtras = {
   _count: { sessions: number };
 };
 
+/** An old plan visit must never suppress a future session of the same event. */
+export function upcomingPlanBlocksFamilyPick(
+  row: { date: string | null; startsAt: Date | null; childId: string | null; assigneeUserId: string | null },
+  selection: PersonalFamilySelection, actorId: string, now: Date,
+): boolean {
+  if (row.date !== null && row.date < minskDateKey(now)) return false;
+  if (row.date === null && row.startsAt !== null && row.startsAt.getTime() < now.getTime()) return false;
+  // A child-specific visit of a sibling is not already planned for the chosen child.
+  if (row.childId) {
+    if (selection.mode === "CHILD") return row.childId === selection.selectedChildId;
+    if (selection.mode === "PERSONAS") return selection.selectedChildIds.includes(row.childId);
+  }
+  // Adult-assigned plan items do not suppress a child's individual feed.
+  if (row.assigneeUserId) {
+    if (selection.mode === "CHILD") return false;
+    if (selection.mode === "PERSONAS") return selection.includeAdult && row.assigneeUserId === actorId;
+  }
+  // Legacy unassigned plans are shared, and remain conservative for future dates.
+  return true;
+}
+
+export type PlannedActivityExclusions = {
+  excludedActivityIds: string[];
+  plannedDatesByActivity: Record<string, string[]>;
+};
+
+/** Deduplicate a booked session/day, not every future session of its event. */
+export function partitionPlannedFamilyPickExclusions(
+  rows: readonly { activityId: string | null; date: string | null; startsAt: Date | null; childId: string | null; assigneeUserId: string | null }[],
+  selection: PersonalFamilySelection, userId: string, now: Date,
+): PlannedActivityExclusions {
+  const excludedActivityIds = new Set<string>();
+  const plannedDatesByActivity: Record<string, string[]> = {};
+  for (const row of rows) {
+    if (!row.activityId || !upcomingPlanBlocksFamilyPick(row, selection, userId, now)) continue;
+    const day = row.date ?? (row.startsAt ? minskDateKey(row.startsAt) : null);
+    if (!day) {
+      // A truly undated intention has no session to distinguish: remain conservative.
+      excludedActivityIds.add(row.activityId);
+    } else {
+      (plannedDatesByActivity[row.activityId] ??= []).push(day);
+    }
+  }
+  return { excludedActivityIds: [...excludedActivityIds], plannedDatesByActivity };
+}
+
+export function excludePlannedFamilyPickDates(
+  activityId: string, occurrences: readonly Date[], plannedDatesByActivity: Readonly<Record<string, readonly string[]>>,
+): Date[] {
+  const blocked = new Set(plannedDatesByActivity[activityId] ?? []);
+  return occurrences.filter(date => !blocked.has(minskDateKey(date)));
+}
+
 type PersonalLoadDependencies = {
   loadProfile: typeof loadFamilyPicksProfile;
   rank: typeof rankPlanSuggestionsForCity;
-  loadExcluded: (userId: string, now: Date, selection: PersonalFamilySelection) => Promise<string[]>;
+  loadExcluded: (userId: string, now: Date, selection: PersonalFamilySelection) => Promise<PlannedActivityExclusions>;
   loadAffinity: typeof resolveSelectedExperienceAffinity;
   loadExtras: (ids: string[], now: Date, range: { start: Date; end: Date }) => Promise<PersonalExtras[]>;
 };
@@ -390,8 +445,17 @@ const personalDependencies: PersonalLoadDependencies = {
   rank: rankPlanSuggestionsForCity,
   loadAffinity: resolveSelectedExperienceAffinity,
   loadExcluded: async (userId, now, selection) => {
+    const today = minskDateKey(now);
     const [planned, dismissed] = await Promise.all([
-      prisma.planItem.findMany({ where: { ...(await activePlanScopeFor(userId)), activityId: { not: null } }, select: { activityId: true } }),
+      prisma.planItem.findMany({
+        where: {
+          ...(await activePlanScopeFor(userId)), activityId: { not: null },
+          // A historic visit is an experience signal, not an upcoming booking.
+          // Date-only plans use Minsk local calendar days, not the server TZ.
+          OR: [{ date: { gte: today } }, { date: null }],
+        },
+        select: { activityId: true, date: true, startsAt: true, childId: true, assigneeUserId: true },
+      }),
       // HOME dismissal is scoped to the account AND optional owned child.
       // Legacy dismissals with no child remain account-wide.
       prisma.userEvent.findMany({ where: {
@@ -399,17 +463,20 @@ const personalDependencies: PersonalLoadDependencies = {
         createdAt: { gte: new Date(now.getTime() - DEFAULT_FAMILY_PICKS_CONFIG.dismissCooldownDays * 86_400_000) },
       }, orderBy: { createdAt: "desc" }, take: 2000, select: { entityId: true, meta: true } }),
     ]);
-    return [
-      ...planned.flatMap(row => row.activityId ? [row.activityId] : []),
+    const plannedExclusions = partitionPlannedFamilyPickExclusions(planned, selection, userId, now);
+    return {
+      excludedActivityIds: [...plannedExclusions.excludedActivityIds,
       ...dismissed.flatMap(row => {
         if (!row.entityId) return [];
         const meta = row.meta && typeof row.meta === "object" && !Array.isArray(row.meta) ? row.meta : {};
         const childScope = typeof meta.homeSelectedChildId === "string" ? meta.homeSelectedChildId : null;
         // All-family selection does not inherit individual child rejections.
-        if (childScope && (selection.mode !== "CHILD" || childScope !== selection.selectedChildId)) return [];
+        if (childScope && !(selection.mode === "CHILD" && childScope === selection.selectedChildId)
+          && !(selection.mode === "PERSONAS" && selection.selectedChildIds.includes(childScope))) return [];
         return [row.entityId];
-      }),
-    ];
+      })],
+      plannedDatesByActivity: plannedExclusions.plannedDatesByActivity,
+    };
   },
   loadExtras: (ids, now, range) => prisma.activity.findMany({
     // Recheck visibility at hydration, not only at shared candidate generation.
@@ -432,6 +499,7 @@ export async function loadPersonalFamilyPicks(input: {
   userId: string | null;
   citySlug: string;
   selection: PersonalFamilySelection;
+  manualAgeRanges?: string[];
   /** Trusted same-request server snapshot only; never deserialize from an HTTP body. */
   serverProfile?: FamilyPicksProfile;
   excludeActivityIds?: string[];
@@ -441,13 +509,16 @@ export async function loadPersonalFamilyPicks(input: {
   const profile = input.serverProfile ?? await deps.loadProfile(input.userId);
   if (profile.userId !== input.userId) throw new FamilyPicksSelectionUnavailableError();
   const selection = input.selection;
-  if (selection.mode !== "ALL_FAMILY" && (selection.mode !== "CHILD"
-    || !parseSafeOpaqueId(selection.selectedChildId)
-    || !profile.children.some(child => child.id === selection.selectedChildId))) {
+  const allowed = new Set(profile.children.map(child => child.id));
+  if ((selection.mode === "CHILD" && (!parseSafeOpaqueId(selection.selectedChildId)
+      || !allowed.has(selection.selectedChildId)))
+    || (selection.mode === "PERSONAS" && (!selection.includeAdult && selection.selectedChildIds.length === 0
+      || selection.selectedChildIds.some(id => !parseSafeOpaqueId(id) || !allowed.has(id))))) {
     throw new FamilyPicksSelectionUnavailableError();
   }
   let candidateCount = 0;
   let cardExtras = new Map<string, PersonalExtras>();
+  let citySlugById = new Map<string, string>();
   const response = (window: PersonalShowWindow, items: PersonalFamilyPick[], suggestions: RankedPlanSuggestion[], sharedAlgorithmVersion: string | null) => {
     const byId = new Map(suggestions.map(suggestion => [suggestion.activity.id, suggestion]));
     return {
@@ -460,7 +531,15 @@ export async function loadPersonalFamilyPicks(input: {
       runId: null,
       items: items.map(pick => ({
         id: pick.candidate.id, title: byId.get(pick.candidate.id)!.activity.title,
-        href: `/${input.citySlug}/events/${byId.get(pick.candidate.id)!.activity.slug ?? pick.candidate.id}`,
+        href: canonicalPublicActivityPath({
+          activityId: pick.candidate.id,
+          activitySlug: byId.get(pick.candidate.id)!.activity.slug,
+          activityCitySlug: citySlugById.get(byId.get(pick.candidate.id)!.activity.cityId ?? ""),
+          placeCitySlug: byId.get(pick.candidate.id)!.activity.place?.city?.slug,
+          venueCitySlug: byId.get(pick.candidate.id)!.activity.venue?.place?.city?.slug,
+          cityField: input.citySlug,
+        }),
+        physicalCitySlug: citySlugById.get(byId.get(pick.candidate.id)!.activity.cityId ?? "") ?? input.citySlug,
         imageUrl: byId.get(pick.candidate.id)!.activity.coverImageUrl ?? null,
         categoryName: byId.get(pick.candidate.id)!.activity.eventCategory?.nameRu ?? null,
         agePolicy: pick.candidate.agePolicy, ageMinMonths: pick.candidate.ageMinMonths, ageMaxMonths: pick.candidate.ageMaxMonths,
@@ -469,21 +548,28 @@ export async function loadPersonalFamilyPicks(input: {
         priceTo: cardExtras.get(pick.candidate.id)?.priceTo ?? null,
         currency: cardExtras.get(pick.candidate.id)?.currency ?? null,
         startsAt: pick.startsAt.toISOString(), matchedChildIds: pick.matchedChildIds,
+        // Badge evidence is disabled in the portable build until a reviewed,
+        // independently deployable signal provider is available. Age alone is
+        // never sufficient to claim that an activity suits a specific child.
+        matchBadgeChildIds: [] as string[],
         allChildrenMatch: pick.allChildrenMatch, position: pick.position,
         score: pick.candidate.sharedScore, exposureId: null,
       })),
     };
   };
   if (profile.audience !== "personalized" || !profile.userId) {
-    return response(resolvePersonalShowWindow(now, 7), [], [], null);
+    return response(resolvePersonalShowWindow(now, 30), [], [], null);
   }
   const selectedChildren = selection.mode === "CHILD"
-    ? profile.children.filter(child => child.id === selection.selectedChildId) : profile.children;
+    ? profile.children.filter(child => child.id === selection.selectedChildId)
+    : selection.mode === "PERSONAS"
+      ? profile.children.filter(child => selection.selectedChildIds.includes(child.id))
+      : selection.mode === "DISCOVERY" ? [] : profile.children;
   const subjects: Subject[] = selectedChildren.map(child => ({ kind: "child", refId: child.id, source: "profile" }));
   const [storedExcluded, experienceAffinity] = await Promise.all([
     deps.loadExcluded(profile.userId, now, selection), deps.loadAffinity({ userId: profile.userId, subjects, now }),
   ]);
-  const excluded = [...new Set([...storedExcluded, ...(input.excludeActivityIds ?? [])])];
+  const excluded = [...new Set([...storedExcluded.excludedActivityIds, ...(input.excludeActivityIds ?? [])])];
   let lastAlgorithmVersion: string | null = null;
   for (const horizon of PERSONAL_FAMILY_PICKS_POLICY.horizons) {
     const window = resolvePersonalShowWindow(now, horizon);
@@ -491,6 +577,7 @@ export async function loadPersonalFamilyPicks(input: {
     const batch = await deps.rank({
       citySlug: input.citySlug, excludeActivityIds: excluded, dateFrom: window.dateFrom, dateTo: window.dateTo,
       exhaustiveCandidatePool: true,
+      homeGeoFallback: selection.mode === "DISCOVERY" || selection.mode === "PERSONAS",
       profileInterestSlugs: [...new Set(selectedChildren.flatMap(child => child.systemInterests.map(interest => interest.interestSlug)))],
       experienceAffinity,
     });
@@ -499,6 +586,14 @@ export async function loadPersonalFamilyPicks(input: {
     const extras = batch.suggestions.length ? await deps.loadExtras(batch.suggestions.map(s => s.activity.id), now, range) : [];
     const byId = new Map(extras.map(extra => [extra.id, extra]));
     cardExtras = byId;
+    // Resolve physical city only if cards reference a different city. One
+    // small batched lookup, no N+1 query and no guessing from the home region.
+    const cityIds = [...new Set(batch.suggestions.map(s => s.activity.cityId).filter(
+      (id): id is string => typeof id === "string" && id.length > 0))];
+    if (cityIds.length > 0) {
+      const cities = await prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, slug: true } });
+      citySlugById = new Map(cities.map(c => [c.id, c.slug]));
+    }
     const candidates: PersonalFamilyCandidate[] = batch.suggestions.flatMap(suggestion => {
       const extra = byId.get(suggestion.activity.id);
       if (!extra || excluded.includes(extra.id)) return [];
@@ -506,14 +601,20 @@ export async function loadPersonalFamilyPicks(input: {
         id: extra.id, categoryId: suggestion.activity.eventCategory?.id ?? null, businessId: extra.businessId,
         agePolicy: extra.agePolicy, ageMinMonths: extra.ageMinMonths, ageMaxMonths: extra.ageMaxMonths,
         sharedScore: suggestion.score,
-        occurrences: collectConfirmedOccurrences({
+        occurrences: excludePlannedFamilyPickDates(extra.id, collectConfirmedOccurrences({
           sessions: extra.sessions, hasStoredSessions: extra._count.sessions > 0,
           nextOccurrenceAt: extra.nextOccurrenceAt, rangeStart: range.start, rangeEnd: range.end, now,
-        }),
+        }), storedExcluded.plannedDatesByActivity),
       }];
     });
-    const items = selectPersonalFamilyPicks(candidates, profile.children, selection);
-    if (items.length || horizon === 30) return response(window, items, batch.suggestions, lastAlgorithmVersion);
+    const items = selectPersonalFamilyPicks(candidates, profile.children, selection, input.manualAgeRanges);
+    const activeAudience = selection.mode === "PERSONAS" ||
+      (selection.mode === "DISCOVERY" && (input.manualAgeRanges?.length ?? 0) > 0);
+    // Do not stop at 7 days merely because irrelevant child events exist.
+    // Search the 30-day horizon for actual audience matches before falling back.
+    if (horizon === 30 || (items.length > 0 && (!activeAudience || items.some(item => item.targetFit)))) {
+      return response(window, items, batch.suggestions, lastAlgorithmVersion);
+    }
   }
   throw new Error("unreachable_family_picks_horizon");
 }

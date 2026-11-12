@@ -84,5 +84,5 @@ export const PERSONAL_FAMILY_PICKS_POLICY = {
   version: "family-picks-confirmed-v3",
   resultCount: 10,
   orFillThreshold: 4,
-  horizons: [7, 30],
+  horizons: [30],
 } as const;

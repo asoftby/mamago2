@@ -8,7 +8,6 @@ import { PublicOfferContent } from "./PublicOfferContent";
 import { PUBLICATION_PAGE_CLASS } from "@/components/publication-page/PublicationPageLayout";
 import { Container } from "@/components/ui/Container";
 import { OfferHero } from "./OfferHero";
-import Link from "next/link";
 import { OfferEditorialInsights } from "./OfferEditorialInsights";
 import { OfferSchedule } from "./OfferSchedule";
 import { OfferReviews } from "./OfferReviews";
@@ -26,7 +25,6 @@ import {
 } from "@/components/activity/SaveToPlanModal";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
-import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
 import { CallModal } from "@/components/shared/CallModal";
 import { FaqSection } from "@/components/public/FaqSection";
@@ -37,6 +35,7 @@ import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { shouldFetchOwnSaveStatus } from "@/features/save/saveStatusFetchGuard";
 import { parsePriceData } from "@/lib/priceItems";
+import { RelatedOffersCarousel } from "./RelatedOffersCarousel";
 
 export interface OfferDirectCtaInfo {
   offerId: string;
@@ -133,14 +132,19 @@ export function OfferPageView({
   const [planItemId, setPlanItemId] = useState<string | null>(null);
   const [bookingShift, setBookingShift] = useState<ShiftCtaContext | null>(null);
   const [classBookingOpen, setClassBookingOpen] = useState(false);
+  const [classRequestOpen, setClassRequestOpen] = useState(false);
+  const isClassOffer = data.productType === "REGULAR_ACTIVITY" ||
+    data.productType === "ONE_TIME_ACTIVITY" || data.offerType === "REGULAR";
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isIdeaSaved, setIsIdeaSaved] = useState(false);
+  const [inBirthdaySaved, setInBirthdaySaved] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
 
   const loadIdeaStatus = useCallback(async () => {
     if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
       setIsIdeaSaved(false);
+      setInBirthdaySaved(false);
       setLocalSave(null);
       setPlanItemId(null);
       return;
@@ -152,6 +156,7 @@ export function OfferPageView({
       if (!res.ok) return;
       const json = await res.json();
       setIsIdeaSaved(Boolean(json.isIdea));
+      setInBirthdaySaved(Boolean(json.inBirthday));
       setPlanItemId(typeof json.planItemId === "string" ? json.planItemId : null);
       setLocalSave(json.inPlan ? { kind: "plan", dateISO: json.planDate ?? null } : null);
     } catch {
@@ -251,6 +256,10 @@ export function OfferPageView({
       if (url && typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
       return;
     }
+    if (isClassOffer && direct) {
+      setClassRequestOpen(true);
+      return;
+    }
     if (onPrimary) {
       onPrimary();
       return;
@@ -268,8 +277,10 @@ export function OfferPageView({
     const phone = data.cta.phone?.replace(/[^\d+]/g, "");
     if (phone && typeof window !== "undefined") {
       window.location.href = `tel:${phone}`;
+      return;
     }
-  }, [data.citySlug, data.cta.phone, data.cta.phones, data.hasPrimaryAction, data.classSlotBookingEnabled, data.id, data.resolvedCta, onPrimary, openBookingForShift, shiftOptions]);
+    toast.error("Организатор пока не подключил приём заявок. Попробуйте связаться с ним позже.");
+  }, [data.citySlug, data.cta.phone, data.cta.phones, data.hasPrimaryAction, data.classSlotBookingEnabled, data.id, data.resolvedCta, direct, isClassOffer, onPrimary, openBookingForShift, shiftOptions]);
 
   const handleStickyPrimary = useCallback(() => {
     // Sticky bar renders a real external anchor; the browser follows it.
@@ -367,7 +378,7 @@ export function OfferPageView({
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ offerId: data.id, date: result.dateISO }),
+      body: JSON.stringify({ offerId: data.id, date: result.dateISO, selectedPersonaIds: result.selectedPersonaIds }),
     }).then(async (response) => {
       if (!response.ok) throw new Error("offer_plan_save_failed");
       setLocalSave({ kind: "plan", dateISO: result.dateISO });
@@ -377,12 +388,12 @@ export function OfferPageView({
     }).catch(() => toast.error("Не удалось добавить предложение в «Мой план»"));
   }, [data.id, planItemId, loadIdeaStatus]);
 
-  const isSaved = isIdeaSaved || Boolean(localSave);
+  const isSaved = isIdeaSaved || Boolean(localSave) || inBirthdaySaved;
   useRegisterHeaderSaveAction(isSaved, handleSave, data.title, { entityNoun: "предложением" });
   const isPlanSaved = localSave?.kind === "plan";
   const planDate = localSave?.kind === "plan" ? localSave.dateISO ?? null : null;
 
-  const directSlot = direct && data.offerType !== "REGULAR" && !data.classSlotBookingEnabled &&
+  const directSlot = direct && !isClassOffer && data.offerType !== "REGULAR" && !data.classSlotBookingEnabled &&
     data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" ? (
       <DirectRequestCta
         publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
@@ -496,27 +507,7 @@ export function OfferPageView({
         {placeBlock}
 
         {otherOffers.length > 0 && (
-          <section aria-labelledby="other-business-offers-title" className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
-            <h2 id="other-business-offers-title" className="mb-5 font-editorial text-2xl md:text-3xl">
-              Другие наши предложения
-            </h2>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {otherOffers.map((item) => (
-                <Link key={item.id} href={item.href} className="group min-w-0 overflow-hidden rounded-2xl border border-border bg-background transition-shadow hover:shadow-md">
-                  <div className="aspect-[4/3] overflow-hidden bg-muted">
-                    {item.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
-                    ) : null}
-                  </div>
-                  <div className="space-y-2 p-3">
-                    <h3 className="line-clamp-2 text-sm font-medium text-foreground">{item.title}</h3>
-                    {item.price && <p className="text-sm text-muted-foreground">{item.price}</p>}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
+          <RelatedOffersCarousel offers={otherOffers} citySlug={data.citySlug} />
         )}
 
         {data.hasPrimaryAction !== false && data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
@@ -537,11 +528,22 @@ export function OfferPageView({
         isPlanned={isSaved}
       />
 
+      {isClassOffer && direct && (
+        <DirectRequestCta
+          publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
+          publicationTitle={direct.publicationTitle}
+          brandName={direct.brandName}
+          open={classRequestOpen}
+          onOpenChange={setClassRequestOpen}
+          bookingIntent
+        />
+      )}
       <ClassBookingOverlay
         open={classBookingOpen}
         onOpenChange={setClassBookingOpen}
         offerId={data.id}
         offerTitle={data.title}
+        onRequestInstead={isClassOffer && direct ? () => { setClassBookingOpen(false); setClassRequestOpen(true); } : undefined}
         tariffs={parsePriceData(data.pricing.rawPriceItems).items}
       />
 
@@ -560,10 +562,14 @@ export function OfferPageView({
         open={saveModalOpen}
         onOpenChange={(open) => {
           setSaveModalOpen(open);
-          if (!open) setSaveTargetShift(null);
+          if (!open) {
+            setSaveTargetShift(null);
+            void loadIdeaStatus();
+          }
         }}
         scenario={saveScenario}
         collectionTarget={{ offerId: data.id }}
+        birthdayOfferId={data.id}
         onConfirm={handleSavePersist}
         isIdea={isIdeaSaved}
         inPlan={isPlanSaved}

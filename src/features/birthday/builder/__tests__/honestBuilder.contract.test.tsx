@@ -89,7 +89,8 @@ const submissionFlow: PartyFlowState = {
   draft: null, pending: null, key: null, submitted: false,
 };
 const reviewProps = {
-  offers: [offer, cake], citySlug: "minsk", dateIso: null,
+  offers: [offer, cake], candidates: [animator], ownerId: null, selectedBaseId: offer.id,
+  onCompositionSaved: () => {}, citySlug: "minsk", dateIso: null,
   quizDateKey: "2026-11-20", maxBudget: null as number | null, timeStart: "12:30", timeEnd: "16:00",
   venueMode: "VENUE" as const, childName: null, childBirthDateIso: null, authenticated: true,
   authLoading: false, requestLogin: () => {},
@@ -104,6 +105,9 @@ assert.match(review, /Отправить заявку основному исп�
 assert.doesNotMatch(review, /Забронировано/);
 assert.match(review, /окончательная сумма пока неизвестна/);
 assert.doesNotMatch(review, /выше выбранного бюджета/);
+const restoringReview = renderToStaticMarkup(createElement(StepReview, { ...reviewProps, ownerId: "parent" }));
+assert.match(restoringReview, /Восстанавливаем черновик/);
+assert.match(restoringReview, /<button type="submit"[^>]*disabled=""/);
 // 350 + 400 = 750 BYN against a 600 BYN budget: warn, but keep the submit button enabled.
 const overBudgetReview = renderToStaticMarkup(createElement(StepReview, {
   ...reviewProps, offers: [offer, { ...animator, priceFrom: 400 }], maxBudget: 600,
@@ -130,7 +134,7 @@ for (const forbidden of ["MOCK_PRICES", "buildMockScenarioTimeline", "buildSubmi
 assert.doesNotMatch(shell, /maxBudget: offer\.currency/);
 assert.match(shell, /const submissionFlowRef = useRef<PartyFlowState>/);
 assert.match(shell, /flowStateRef=\{submissionFlowRef\}/);
-assert.match(shell, /backDisabled=\{submissionBusy \|\| submissionSent\}/);
+assert.match(shell, /backDisabled=\{submissionBusy \|\| submissionSent \|\| reviewLocked\}/);
 assert.match(shell, /disabled=\{submissionBusy\}/);
 
 void (async () => {

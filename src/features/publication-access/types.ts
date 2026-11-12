@@ -7,6 +7,7 @@ export type PublicationAccessMethod =
   | "ticket"
   | "timeslots"
   | "prebooking"
+  | "request"
   | "external"
   | "contact";
 

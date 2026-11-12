@@ -21,6 +21,7 @@ import {
 import { parseActivityFormatQuery, serializeActivityFormatQuery } from "@/domain/activities/activity-format";
 import {
   defaultFilters,
+  mergeCatalogPersonaAge,
   parseAppliedFromUrl,
   resetListingPage,
   type DiscoveryFilters,
@@ -295,7 +296,7 @@ export function serializeAppliedToSearchParams(
   params.delete("dateFrom");
   params.delete("dateTo");
 
-  if (next.whenPreset) params.set("preset", next.whenPreset);
+  if (next.whenPreset) params.set("preset", next.whenPreset.toLowerCase());
   else params.delete("preset");
 
   if (next.age.length > 0) params.set("age", next.age.join(","));
@@ -305,7 +306,7 @@ export function serializeAppliedToSearchParams(
   else params.delete("category");
   if (next.genres.length > 0) params.set("genre", next.genres.join(","));
   else params.delete("genre");
-  if (next.occasionSlug === "halloween") params.set("occasion", next.occasionSlug);
+  if (next.occasionSlug && /^[a-z0-9-]{1,80}$/.test(next.occasionSlug)) params.set("occasion", next.occasionSlug);
   else params.delete("occasion");
   // Legacy persona identifiers must never be exposed in shareable URLs.
   params.delete("profile");
@@ -373,7 +374,10 @@ export function getModalFilterCount(filters: DiscoveryFilters): number {
 export function useDiscoveryFilters() {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const rawSearchParams = useSearchParams();
+  // Next can return null in hybrid/SSR contexts before router search state exists.
+  const searchParams = useMemo(() => rawSearchParams ??
+    (new URLSearchParams() as unknown as ReadonlyURLSearchParams), [rawSearchParams]);
   const optionalCity = useOptionalCity();
   const hasMounted = useSyncExternalStore(
     () => () => {},
@@ -573,6 +577,16 @@ export function useDiscoveryFilters() {
     () => ({
       /** @deprecated Кнопки Go больше нет — оставлено для совместимости */
       apply: () => {},
+      /**
+       * An explicit family-chip change must survive immediate navigation from
+       * the city homepage to the events catalog. Home has no discovery intent,
+       * so its debounced URL update would otherwise never update kuda's saved
+       * filters. Persist only the age facet; preserve catalog-specific choices.
+       */
+      persistPersonaAudience: (age: string[]) => {
+        const previous = loadDiscoveryFiltersSession(cityForSession, "kuda") ?? defaultFilters;
+        saveDiscoveryFiltersSession(cityForSession, "kuda", mergeCatalogPersonaAge(previous, age));
+      },
       /** Немедленная запись в URL (реактивные фильтры), с дебаунсом 150мс */
       setDraft: patchFilters,
       resetAll: () => {

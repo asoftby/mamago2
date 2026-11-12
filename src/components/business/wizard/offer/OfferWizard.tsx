@@ -36,7 +36,6 @@ import type { OfferFormData, OfferWizardMode, OfferWizardStepKey, OfferWizardVar
 import { describeContentColumns } from "@/lib/offers/offerPublishedEditGate";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { getOfferTypeSelection } from "./offerTypeChoices";
-import { OfferSubtypeClarifier } from "./components/OfferSubtypeClarifier";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
   getStepsForOfferType,
@@ -96,6 +95,8 @@ function activeOfferWizardVariant(): OfferWizardVariant {
 interface OfferWizardProps {
   mode: OfferWizardMode;
   offer?: Offer & {
+    components?: Parameters<typeof mapOfferToFormData>[0]["components"];
+    packageComponentsBaseline?: Parameters<typeof mapOfferToFormData>[0]["packageComponentsBaseline"];
     place?: {
       id: string;
       title: string;
@@ -616,9 +617,13 @@ export function OfferWizard({
 
       if (offerId) {
         const payload = buildOfferUpdatePayload(formData, {
-          ...(mode === "edit" && canDirectPublish ? { status: "PUBLISHED" as const } : {}),
+          // Saving a DRAFT must never publish it, including for ADMIN/MODERATOR.
+          // Existing published offers retain their direct-edit behavior.
+          ...(mode === "edit" && canDirectPublish && offer?.status !== "DRAFT"
+            ? { status: "PUBLISHED" as const } : {}),
           wizardCompletedSteps: completedSteps,
           includeSchedule: variant === "v2" && scheduleChanged,
+          preserveClassPricingDraft: offer?.status === "DRAFT",
           previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
           previousClassDuration: (JSON.parse(baselineFormJson) as OfferFormData).classDuration,
         });
@@ -632,6 +637,7 @@ export function OfferWizard({
         const saved = await parseOfferMutationResponse<{
           updatedAt?: string;
           operationalVersion?: string;
+          packageComponentsState?: { rows: import("./types").PackageComponentFormRow[]; baseline: import("./types").PackageComponentFormRow[] };
           moderationNotice?: { message: string };
         }>(response, {
           fallbackMessage: "Failed to update draft",
@@ -645,7 +651,12 @@ export function OfferWizard({
         // Контентные правки опубликованного предложения сервер сохранил как ревизию (ждёт модерации),
         // операционные применил сразу — форма считается сохранённой.
         if (saved?.moderationNotice?.message) toast.info(saved.moderationNotice.message);
-        setBaselineFormJson(JSON.stringify(formData));
+        const savedForm = saved?.packageComponentsState ? {
+          ...formData, packageComponents: saved.packageComponentsState.rows,
+          packageComponentsBaseline: saved.packageComponentsState.baseline,
+        } : formData;
+        if (savedForm !== formData) setFormData(savedForm);
+        setBaselineFormJson(JSON.stringify(savedForm));
         draft.markClean();
       } else {
         if (!placeId) {
@@ -800,6 +811,7 @@ export function OfferWizard({
       });
 
       const submitted = await parseOfferMutationResponse<{
+        packageComponentsState?: { rows: import("./types").PackageComponentFormRow[]; baseline: import("./types").PackageComponentFormRow[] };
         updatedAt?: string;
         operationalVersion?: string;
         moderationNotice?: { message: string };
@@ -814,7 +826,12 @@ export function OfferWizard({
       if (submitted?.operationalVersion) setOperationalVersion(submitted.operationalVersion);
       if (submitted?.moderationNotice?.message) toast.info(submitted.moderationNotice.message);
       const revisionSentToModeration = Boolean(submitted?.moderationNotice);
-      setBaselineFormJson(JSON.stringify(formData));
+      const submittedForm = submitted?.packageComponentsState ? {
+        ...formData, packageComponents: submitted.packageComponentsState.rows,
+        packageComponentsBaseline: submitted.packageComponentsState.baseline,
+      } : formData;
+      if (submittedForm !== formData) setFormData(submittedForm);
+      setBaselineFormJson(JSON.stringify(submittedForm));
       draft.markClean();
       showSuccessModal({
         kind: "offer",
@@ -875,24 +892,9 @@ export function OfferWizard({
         case "type":
           return <Step1Type {...commonProps} showCategories={variant === "v2"} />;
         case "placements":
-          return (
-            <div className="space-y-6">
-              {variant === "v1" && mode === "create" && creationIntent === "parties" && (
-                <OfferSubtypeClarifier group="parties" data={formData} onChange={handleChange} />
-              )}
-              <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} v2={variant === "v2"} />
-            </div>
-          );
+          return <Step2Placements {...commonProps} showAdditionalPlacements={false} v2 />;
         case "details":
-          return (
-            <div className="space-y-6">
-              {variant === "v1" && mode === "create" &&
-                creationIntent === "classes" && (
-                  <OfferSubtypeClarifier group="classes" data={formData} onChange={handleChange} />
-                )}
-              <Step2Information {...commonProps} v2={variant === "v2"} />
-            </div>
-          );
+          return <Step2Information {...commonProps} v2 />;
         case "photo":
           return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
         case "conditions":
@@ -912,7 +914,7 @@ export function OfferWizard({
                       <p className="text-sm text-muted-foreground">
                         Если у вас одна цена без допуслуг, можно сразу продолжить.
                       </p>
-                      <Button type="button" variant="outline" onClick={() => setAdvancedServicesOpen(true)}>
+                      <Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal" onClick={() => setAdvancedServicesOpen(true)}>
                         Настроить дополнительные услуги и цены (необязательно)
                       </Button>
                     </>

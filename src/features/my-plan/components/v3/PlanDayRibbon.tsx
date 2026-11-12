@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addDays,
   dayOfMonth,
   diffDays,
-  monthGenitive,
   monthName,
   monthShort,
   todayKey,
@@ -15,7 +14,7 @@ import {
   type DateKey,
 } from "@/lib/date/dateKey";
 import { ownerColor } from "@/features/plan-calendar/lib/ownerColor";
-import { usePlanDayCounts } from "@/features/plan-calendar/usePlanDayCounts";
+import { usePlanDayCounts, usePlanScenarioDays } from "@/features/plan-calendar/usePlanDayCounts";
 import { cn } from "@/lib/utils";
 import { PLAN_FOCUS } from "./planChipStyles";
 
@@ -33,19 +32,16 @@ function capitalize(word: string): string {
 /**
  * Лента дней «Мой план» v3: месяц-заголовок, кнопка «Сегодня», горизонтальная лента плиток
  * (28 дней от сегодня; если выбран прошедший день — от него) с цветными точками людей и
- * строка «Весь месяц».
+ * компактная иконка месячного просмотра рядом с «Сегодня».
  */
 export function PlanDayRibbon({
   value,
   onChange,
   onOpenMonth,
-  monthEnd,
 }: {
   value: DateKey;
   onChange: (date: DateKey) => void;
   onOpenMonth: () => void;
-  /** Последний день выбранного месяца: «до 30 ноября». */
-  monthEnd: DateKey;
 }) {
   const [today, setToday] = useState<DateKey>(() => todayKey());
   useEffect(() => {
@@ -59,6 +55,8 @@ export function PlanDayRibbon({
   const to = value > last ? addDays(value, 6) : last;
   const days = useMemo(() => Array.from({ length: diffDays(from, to) + 1 }, (_, i) => addDays(from, i)), [from, to]);
   const markers = usePlanDayCounts({ from, to });
+  // Days saved as «День от mamaGo» (flag on): from the same cached chunks, no extra request.
+  const savedDays = usePlanScenarioDays({ from, to });
 
   const stripRef = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ left: true, right: false });
@@ -90,6 +88,19 @@ export function PlanDayRibbon({
         <span className="text-[18px] font-normal tracking-[-.01em] text-[var(--mp-tx)]" aria-live="polite">
           {month} <span className="mp-font-display font-normal text-[var(--mp-tx2)]">{yearOf(value)}</span>
         </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            aria-label="Показать весь месяц"
+            title="Весь месяц"
+            onClick={onOpenMonth}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-chip-on-line)] hover:bg-[var(--mp-chip-on-bg)] hover:text-[var(--mp-chip-on-tx)]",
+              PLAN_FOCUS,
+            )}
+          >
+            <CalendarDays className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden />
+          </button>
         <button
           type="button"
           disabled={value === today}
@@ -102,6 +113,7 @@ export function PlanDayRibbon({
         >
           Сегодня
         </button>
+        </div>
       </div>
 
       <div className="relative -mx-[18px]">
@@ -121,6 +133,7 @@ export function PlanDayRibbon({
             const selected = day === value;
             const isToday = day === today;
             const owners = markers[day] ?? [];
+            const saved = savedDays[day];
             return (
               <button
                 key={day}
@@ -131,7 +144,7 @@ export function PlanDayRibbon({
                 data-day={day}
                 onClick={() => onChange(day)}
                 className={cn(
-                  "flex h-[92px] w-[76px] shrink-0 snap-start flex-col items-center justify-center gap-[3px] rounded-[20px] border transition-colors",
+                  "relative flex h-[92px] w-[76px] shrink-0 snap-start flex-col items-center justify-center gap-[3px] rounded-[20px] border transition-colors",
                   selected
                     ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
                     : isToday
@@ -140,6 +153,12 @@ export function PlanDayRibbon({
                   PLAN_FOCUS,
                 )}
               >
+                {saved ? (
+                  <>
+                    <span aria-hidden className="absolute right-2.5 top-2 text-[11px] leading-none text-[var(--mp-ac)]">✦</span>
+                    <span className="sr-only">день от mamaGo, {saved.count} мест</span>
+                  </>
+                ) : null}
                 <span className="mp-font-meta text-[10px] uppercase tracking-[.1em] text-[var(--mp-tx2)]">
                   {weekdayShort(day)}
                 </span>
@@ -166,23 +185,6 @@ export function PlanDayRibbon({
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={onOpenMonth}
-        className={cn(
-          "group mt-3 flex min-h-[62px] w-full items-center gap-3 rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] py-0 pl-3.5 pr-4 text-left",
-          PLAN_FOCUS,
-        )}
-      >
-        <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
-          <CalendarDays className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-        </span>
-        <span className="flex-1 text-[15px] font-semibold text-[var(--mp-tx)]">Весь месяц</span>
-        <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">
-          до {dayOfMonth(monthEnd)} {monthGenitive(monthEnd)}
-        </span>
-        <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--primary-hover)]" strokeWidth={1.8} aria-hidden />
-      </button>
     </div>
   );
 }

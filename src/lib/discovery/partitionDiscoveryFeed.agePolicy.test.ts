@@ -198,3 +198,15 @@ test("popular secondary remains available for child persona contexts", () => {
   assert.deepEqual(result.secondary.map((item) => item.id), ["saved"]);
   assert.equal(result.secondaryHeading, "Популярное у других семей");
 });
+
+test("manual 18+ never exposes child events through secondary layer", () => {
+  const filters = { ...defaultFilters, age: ["18+"] };
+  const candidates = [
+    activity("child", "SPECIFIC", 0, 2),
+    activity("teen", "SPECIFIC", 16, 18),
+    activity("adult", "ADULT_ONLY", 18, 99),
+  ];
+  const feed = partitionDiscoveryFeed(filters, candidates);
+  assert.deepEqual(feed.primary.map(item => item.id), ["adult"]);
+  assert.deepEqual(feed.secondary, []);
+});

@@ -183,7 +183,7 @@ export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, cit
     <section aria-label="Продолжение Breaking News" className="bg-white pb-14">
       {articles.map((article) => (
         <section key={article.articleId} data-news-continuation={article.articleId} className="border-t border-border/60 pt-8">
-          <BreakingNewsView {...article} />
+          <BreakingNewsView {...article} showBreakingTicker={false} />
         </section>
       ))}
       {loadingList || loadingArticle ? (

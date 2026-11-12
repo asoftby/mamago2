@@ -101,8 +101,8 @@ interface CityDiscoveryShellProps {
   budgetConfig?: BudgetConfig;
   /** SEO-specific visible heading for dedicated discovery hubs. */
   pageTitleOverride?: string;
-  weekendPlannerEnabled?: boolean;
-  halloweenEnabled?: boolean;
+  /** Active in the period configured by the admin, independent of the chosen event dates. */
+  activeOccasions?: Array<{ slug: string; name: string }>;
   /** Afisha («kuda»): server-paginated masonry listing. */
   kudaListing?: KudaListingProps;
   /** Route-implied filters (category hub) — part of the effective client filters. */
@@ -122,8 +122,7 @@ export function CityDiscoveryShell({
   activeClassChipSlug,
   budgetConfig,
   pageTitleOverride,
-  weekendPlannerEnabled = false,
-  halloweenEnabled = false,
+  activeOccasions = [],
   kudaListing,
   implicitFilters,
 }: CityDiscoveryShellProps) {
@@ -234,18 +233,8 @@ export function CityDiscoveryShell({
           <H1 className={DISCOVERY_TITLE_CLASS}><CityTitle title={pageTitle} citySlug={city} /></H1>
           {filterButton}
         </div>
-        {intent === "kuda" && weekendPlannerEnabled ? (
-          <section className="flex flex-col gap-4 rounded-3xl border border-emerald-100 bg-[#effaf4] p-5 sm:flex-row sm:items-center sm:justify-between" aria-label="Подбор выходного">
-            <div>
-              <span className="text-xs font-medium uppercase tracking-wide text-emerald-700">Тест для администратора</span>
-              <h2 className="mt-1 font-serif text-2xl font-semibold text-slate-900">Соберём ваш выходной?</h2>
-              <p className="mt-1 max-w-md text-sm text-slate-600">Подберём реальные места и события с учётом интересов семьи и ваших планов.</p>
-            </div>
-            <Link href={`/${city}/weekend`} className="inline-flex shrink-0 justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">Подобрать мой выходной →</Link>
-          </section>
-        ) : null}
-        {intent === "kuda" ? <EventQuickFilters halloweenEnabled={halloweenEnabled} /> : null}
-        {intent === "classes" && classChips && activeClassChipSlug ? (
+        {intent === "kuda" ? <EventQuickFilters activeOccasions={activeOccasions} /> : null}
+        {intent === "classes" && classChips && classChips.length > 0 && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
         <DiscoveryActivitiesGrid

@@ -1,9 +1,7 @@
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { formatCardAge } from "@/lib/discovery/formatCardAge";
 import type { PersonalShowWindow } from "@/server/services/recommendations/familyPicks/window";
 
-export function homeFamilyPicksEnabled(env: Record<string, string | undefined> = process.env) {
-  return env.HOME_FAMILY_PICKS_V2 === "1";
-}
 export type HomeFamilyContext = {
   actorId: string | null;
   signature: string;
@@ -39,8 +37,13 @@ export function homeSelectionLabel(context: HomeFamilyContext, selected: string 
 export function homeAgeLabel(input: { agePolicy: string; ageMinMonths: number | null; ageMaxMonths: number | null }) {
   if (input.agePolicy === "UNRESTRICTED") return "Для всех возрастов";
   const min = input.ageMinMonths, max = input.ageMaxMonths;
+  // Public event cards must share the same age wording as catalog event cards.
+  // Preserve precise month labels for non-whole-year boundaries.
+  if (min != null && min % 12 === 0 && (max == null || max % 12 === 0)) {
+    return formatCardAge(min / 12, max == null ? null : max / 12) ?? "Возраст уточняется";
+  }
   const age = (months: number) => months % 12 === 0 ? String(months / 12) : `${months} мес.`;
-  if (min != null && max != null) return min === max ? age(min) : `${age(min)}–${age(max)}`;
+  if (min != null && max != null) return `${age(min)}–${age(max)}`;
   if (min != null) return `${age(min)}+`;
   if (max != null) return `До ${age(max)}`;
   return "Возраст уточняется";

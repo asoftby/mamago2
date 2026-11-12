@@ -60,6 +60,56 @@ export function emptyClassGroup(): ClassSessionGroup {
   return { id: newClassScheduleId(), days: [], time: "17:00", seats: "" };
 }
 
+/** Create an editable pricing group before the schedule step in Offer Wizard V2.
+ * Do not synthesize days, slots, or capacity: those must be set on Schedule.
+ */
+export function addClassGroupForPricing(form: ClassScheduleForm): ClassScheduleForm {
+  if (form.groups.length >= 30) return form;
+  const group = emptyClassGroup();
+  return {
+    ...form,
+    groups: [...form.groups, {
+      ...group,
+      tariffs: [{
+        id: newClassScheduleId(), title: "", price: "", unit: "занятие",
+        periodDays: null, visitsCount: 1,
+      }],
+    }],
+  };
+}
+
+/** Draft-only class pricing groups may have no schedule yet. Never turn them
+ * into availability slots just to save a draft.
+ */
+const classPricingDraftGroupSchema = z.object({
+  id: z.string().min(1).max(128),
+  // Drafts are intentionally more permissive than publication checks.
+  // The user may save a group mid-edit, including temporarily invalid fields.
+  title: z.string().max(4096).optional(),
+  days: z.array(z.number().finite()).max(7),
+  time: z.string().max(32),
+  seats: z.string().max(4096),
+  tariffs: z.array(z.object({
+    id: z.string().min(1).max(128),
+    title: z.string().max(4096),
+    price: z.string().max(4096),
+    unit: z.string().max(4096),
+    periodDays: z.number().finite().nullable().optional(),
+    visitsCount: z.number().finite().nullable().optional(),
+  })).max(12).optional(),
+  period: z.object({
+    from: z.string().max(32).nullable(),
+    to: z.string().max(32).nullable(),
+  }).nullable().optional(),
+});
+
+export function classPricingDraftFromDetails(details: unknown): ClassSessionGroup[] | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const raw = (details as Record<string, unknown>).classPricingDraft;
+  const parsed = z.array(classPricingDraftGroupSchema).max(30).safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
 export function emptyClassDate(): ClassDateSession {
   return { id: newClassScheduleId(), date: "", time: "12:00", seats: "" };
 }
@@ -231,6 +281,12 @@ export function getClassScheduleMissingFields(
   if (productType === "REGULAR_ACTIVITY") {
     const valid = form.groups.filter((group) => group.days.length > 0 && TIME_RE.test(group.time));
     if (valid.length === 0) missing.push("Дни и время занятий");
+    // Every priced group must survive serialization. Otherwise publication
+    // silently drops tariffs belonging to unscheduled groups.
+    if (form.groups.some((group) =>
+      (group.tariffs?.length ?? 0) > 0 &&
+      (group.days.length === 0 || !TIME_RE.test(group.time))
+    )) missing.push("Расписание для каждой группы с тарифами");
     if (duration !== null && valid.some((group) => (timeToMinutes(group.time) ?? 0) + duration > 1440)) {
       missing.push("Занятие заканчивается после полуночи");
     }

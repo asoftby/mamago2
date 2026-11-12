@@ -17,8 +17,9 @@ export type OwnerWizardEditStep = {
   label: string;
 };
 
+/** Canonical owner-edit action, using the event publication control as the visual standard. */
 const triggerClassName =
-  "border-black bg-black text-white shadow-none hover:bg-neutral-900 hover:text-white [&_svg]:text-white";
+  "h-14 w-full rounded-full border-black bg-black text-white shadow-none hover:bg-neutral-900 hover:text-white [&_svg]:text-white";
 
 const contentClassName =
   "w-[var(--radix-popover-trigger-width)] min-w-0 max-h-[min(70vh,420px)] overflow-y-auto border-border bg-popover p-0 font-mono text-popover-foreground shadow-md";

@@ -119,7 +119,7 @@ export function breakingNewsStateToArticleSaveInput(
 }
 
 export function isBreakingNewsSnapshot(snapshot: ArticleEditorSnapshot): boolean {
-  return snapshot.publicationType === "BREAKING_NEWS" || snapshot.subtitle === BREAKING_NEWS_SUBTITLE;
+  return snapshot.publicationType === "BREAKING_NEWS";
 }
 
 export function parseBreakingNewsFromSnapshot(snapshot: ArticleEditorSnapshot): BreakingNewsFormState {

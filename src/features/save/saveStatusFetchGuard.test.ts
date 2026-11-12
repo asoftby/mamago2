@@ -9,7 +9,7 @@
  * Run: npx tsx src/features/save/saveStatusFetchGuard.test.ts
  */
 import assert from "node:assert/strict";
-import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "./saveStatusFetchGuard";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose, shouldFetchEventPlanDates } from "./saveStatusFetchGuard";
 
 // ── Guest never triggers the account-specific status fetch ─────────────────
 assert.equal(
@@ -47,3 +47,9 @@ assert.equal(
 );
 
 console.log("saveStatusFetchGuard.test.ts: OK");
+
+// Offers must never fetch /api/save/available-plan-dates?activityId=<offerId>.
+assert.equal(shouldFetchEventPlanDates("offer-123"), false, "offer save must not fetch event dates");
+assert.equal(shouldFetchEventPlanDates(), true, "event save keeps fetching session dates");
+assert.equal(shouldFetchEventPlanDates(undefined), true);
+assert.equal(shouldFetchEventPlanDates(null), true);

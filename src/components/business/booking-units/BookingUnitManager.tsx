@@ -38,6 +38,7 @@ const numberProps = { type: "number", min: 0, step: 1 } as const;
 export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
   const [units, setUnits] = useState<UnitSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -45,15 +46,23 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
   const [form, setForm] = useState<UnitForm | null>(null);
 
   async function reload() {
-    const data = await getJson<{ units: UnitSummary[] }>(API);
-    setUnits(data.units);
+    setLoading(true);
+    setListError("");
+    try {
+      const data = await getJson<{ units: UnitSummary[] }>(API);
+      setUnits(data.units);
+    } catch {
+      setListError("Не удалось загрузить список ресурсов");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     let alive = true;
     getJson<{ units: UnitSummary[] }>(API)
       .then(data => { if (alive) setUnits(data.units); })
-      .catch(err => { if (alive) setError(err instanceof Error ? err.message : "Ошибка загрузки"); })
+      .catch(() => { if (alive) setListError("Не удалось загрузить список ресурсов"); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
@@ -108,8 +117,8 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form || busy) return;
-    if (form.rules.length === 0 || form.offerIds.length === 0) {
-      setError("Выберите хотя бы одно предложение и добавьте рабочий интервал");
+    if (form.rules.length === 0) {
+      setError("Добавьте хотя бы один рабочий интервал");
       return;
     }
     setBusy(true);
@@ -141,14 +150,20 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-stone-950">Мои ресурсы</h2>
-              <p className="mt-1 text-sm text-stone-600">Площадки, комнаты и исполнители, доступные для бронирования праздников.</p>
+              <p className="mt-1 text-sm text-stone-600">Площадки, комнаты и исполнители для детских праздников.</p>
             </div>
-            <Button onClick={createUnit} disabled={busy || offers.length === 0}><Plus /> Добавить ресурс</Button>
+            <Button onClick={createUnit} disabled={busy || loading}><Plus /> Добавить ресурс</Button>
           </div>
-          {loading ? <p className="text-sm text-stone-600">Загрузка ресурсов…</p> : null}
-          {!loading && units.length === 0 ? (
+          {loading ? <p role="status" className="text-sm text-stone-600">Загрузка ресурсов…</p> : null}
+          {listError ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p role="alert" className="text-sm text-danger">{listError}</p>
+              <Button variant="outline" size="sm" onClick={() => void reload()}>Повторить</Button>
+            </div>
+          ) : null}
+          {!loading && !listError && units.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-300 p-6 text-sm text-stone-600">
-              Ресурсов пока нет. Добавьте первый ресурс и привяжите к нему предложение для детского праздника.
+              Ресурсов пока нет. Добавьте первый ресурс и настройте его рабочее время.
             </div>
           ) : null}
           <div className="grid gap-3 md:grid-cols-2">
@@ -156,20 +171,18 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
               <div key={unit.id} className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-stone-950">{unit.name}</h3>
+                    <h3 className="break-words font-semibold text-stone-950">{unit.name}</h3>
                     <p className="mt-1 text-xs text-stone-600">{unit.status === "ACTIVE" ? "Активен" : "Выключен"} · Услуг: {unit.offers.length} · Интервалов: {unit.rules.length}</p>
+                    {unit.offers.length === 0 ? <p className="mt-1 text-xs text-muted-foreground">Без предложений · клиентская запись недоступна</p> : null}
                     {unit.capacity ? <p className="mt-1 text-xs text-stone-600">Вместимость: {unit.capacity}</p> : null}
                   </div>
-                  <Button variant="outline" size="sm" disabled={busy} onClick={() => void editUnit(unit.id)}>
+                  <Button variant="outline" size="sm" disabled={busy || loading} onClick={() => void editUnit(unit.id)}>
                     <Pencil /> Изменить
                   </Button>
                 </div>
               </div>
             ))}
           </div>
-          {!loading && offers.length === 0 ? (
-            <p className="text-sm text-stone-600">Для создания ресурса сначала добавьте предложение категории «Детский праздник» и привяжите его к своему месту.</p>
-          ) : null}
         </BusinessSurfaceCard>
       ) : (
         <>
@@ -217,19 +230,21 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
 
           <BusinessSurfaceCard className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold">Предложения</h3>
-              <p className="mt-1 text-sm text-stone-600">Выберите услуги, для которых доступен этот ресурс.</p>
+              <h3 className="text-lg font-semibold">Предложения (необязательно)</h3>
+              <p className="mt-1 text-sm text-stone-600">Связать предложение можно позже. Пока у ресурса нет связанных предложений, клиенты не смогут на него записаться.</p>
             </div>
-            <div className="grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2">
-              {offers.map(offer => (
-                <label key={offer.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 p-3 text-sm">
-                  <input type="checkbox" className="mt-1 size-4 accent-primary" checked={form.offerIds.includes(offer.id)} onChange={event => patch({
-                    offerIds: event.target.checked ? [...form.offerIds, offer.id] : form.offerIds.filter(id => id !== offer.id),
-                  })} />
-                  <span>{offer.title}<span className="block text-xs text-stone-500">{offer.status}</span></span>
-                </label>
-              ))}
-            </div>
+            {offers.length === 0 ? <p className="text-sm text-muted-foreground">Нет предложений для привязки.</p> : (
+              <div className="grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2">
+                {offers.map(offer => (
+                  <label key={offer.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 p-3 text-sm">
+                    <input type="checkbox" className="mt-1 size-4 accent-primary" checked={form.offerIds.includes(offer.id)} onChange={event => patch({
+                      offerIds: event.target.checked ? [...form.offerIds, offer.id] : form.offerIds.filter(id => id !== offer.id),
+                    })} />
+                    <span>{offer.title}<span className="block text-xs text-stone-500">{offer.status}</span></span>
+                  </label>
+                ))}
+              </div>
+            )}
           </BusinessSurfaceCard>
 
           <BusinessSurfaceCard className="space-y-4">

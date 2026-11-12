@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { stripHtml } from "@/lib/search/sanitizeSearchText";
@@ -46,10 +45,7 @@ export async function listBreakingNewsArticles(
     where: {
       ...getPublicPublishedArticleWhere(),
       AND: [notExpiredJournalPublicationWhere(now), { OR: [{ cityContext: citySlug }, { cityContext: null }] }],
-      OR: [
-        { publicationType: "BREAKING_NEWS" },
-        { subtitle: BREAKING_NEWS_SUBTITLE },
-      ],
+      publicationType: "BREAKING_NEWS",
       publishedAt: { not: null, lte: now },
     },
     orderBy: { publishedAt: "desc" },

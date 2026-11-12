@@ -1,3 +1,4 @@
+import { PackageComponentsError } from "@/server/offers/packageComponents";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 import {
@@ -39,6 +40,7 @@ export async function POST(
         : await rejectOfferRevision(id, auth.id, auth.role, comment);
     return NextResponse.json({ success: true, action, offerId: result.offerId });
   } catch (error) {
+    if (error instanceof PackageComponentsError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof OfferRevisionError) {
       const status = error.code === "NOT_FOUND" ? 404 : 409;
       return NextResponse.json({ error: error.message, code: error.code }, { status });

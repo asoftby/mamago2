@@ -164,4 +164,20 @@ assert.deepEqual(businessPublished.openAction, {
 });
 assert.equal(businessPublished.listAction?.href, "/business/publications/offers");
 
+// ── Breaking News: exact titles by the real outcome ──────────────────────────
+const bn = (outcome: "draft_saved" | "published" | "changes_published" | "changes_saved" | "submitted") =>
+  resolveContentSuccessState({ kind: "breaking-news", surface: "admin", outcome, id: "bn-1", slug: "x", citySlug: "minsk", geoScope: "CITY" });
+assert.equal(bn("draft_saved")?.title, "Черновик сохранён");
+assert.equal(bn("published")?.title, "Новость опубликована");
+assert.equal(bn("changes_published")?.title, "Изменения сохранены");
+assert.equal(bn("changes_saved")?.title, "Изменения сохранены");
+assert.equal(bn("submitted")?.title, "Новость отправлена на модерацию");
+// «changes_saved» (e.g. saving a PENDING item) must not claim publication or offer a public link.
+assert.doesNotMatch(bn("changes_saved")!.description, /доступн|модерац/i);
+assert.notEqual(bn("changes_saved")?.openAction?.label, "Смотреть публикацию");
+// Other kinds keep their wording.
+const offerSubmitted = resolveContentSuccessState({ kind: "offer", surface: "admin", outcome: "submitted", id: "o" });
+assert.equal(offerSubmitted?.title, "Отправлено на модерацию");
+assert.equal(resolveContentSuccessState({ kind: "offer", surface: "admin", outcome: "draft_saved", id: "o" })?.title, "Черновик сохранен");
+
 console.log("content success resolver tests: OK");

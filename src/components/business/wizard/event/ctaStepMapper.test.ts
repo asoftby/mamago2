@@ -392,7 +392,7 @@ const formPatchContact = mapCtaStepValueToEventFormPatch(mappedSharedContact, {
 assert.equal(formPatchContact.publicationAccess?.method, "contact");
 assert.equal(formPatchContact.publicationAccess?.externalUrl, "https://business.example.com");
 assert.equal(formPatchContact.publicationAccess?.phone, "+375291110001");
-assert.equal(formPatchContact.participationMode, "walk-in");
+assert.equal(formPatchContact.participationMode, "request");
 assert.equal(formPatchContact.ctaStepDraft?.requestLabelKind, "REQUEST");
 
 const roundtripContactForm = {

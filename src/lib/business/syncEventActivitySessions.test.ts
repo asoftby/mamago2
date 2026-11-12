@@ -23,7 +23,10 @@ type FakeSession = {
 };
 
 function makeFakePrisma(existingSessions: FakeSession[]) {
-  const normalizedSessions = existingSessions.map((session) => ({
+  const normalizedSessions = existingSessions.map((session, index) => ({
+    id: `session-${index}`,
+    title: null,
+    withdrawnAt: null,
     startsAt: session.startsAt ?? new Date("2026-10-01T07:00:00.000Z"),
     source: session.source,
     buyUrl: session.buyUrl ?? null,
@@ -41,6 +44,7 @@ function makeFakePrisma(existingSessions: FakeSession[]) {
   const prisma = {
     activitySession: {
       findMany: async () => normalizedSessions,
+      updateMany: async () => ({ count: 0 }),
       deleteMany: async (args: { where: unknown }) => {
         calls.deleteManyCalled = true;
         calls.deleteManyWhere = args.where;
@@ -83,8 +87,8 @@ async function testProceedsNormallyWhenNoSessionHasSource() {
   });
 
   assert.deepEqual(result, { count: 1, skipped: false });
-  assert.equal(calls.deleteManyCalled, true);
-  assert.equal(calls.createManyCalled, true);
+  assert.equal(calls.deleteManyCalled, false);
+  assert.equal(calls.createManyCalled, false);
 }
 
 async function testProceedsNormallyWhenNoSessionsExistYet() {
@@ -97,12 +101,12 @@ async function testProceedsNormallyWhenNoSessionsExistYet() {
   });
 
   assert.deepEqual(result, { count: 1, skipped: false });
-  assert.equal(calls.deleteManyCalled, true);
+  assert.equal(calls.deleteManyCalled, false);
   assert.equal(calls.createManyCalled, true);
 }
 
 async function testDeleteIsScopedToSourceNull() {
-  const { prisma, calls } = makeFakePrisma([{ source: null }]);
+  const { prisma, calls } = makeFakePrisma([{ source: null, startsAt: new Date("2026-10-02T07:00:00Z") }]);
 
   await replaceActivitySessionsFromScheduleJson({
     prisma: prisma as never,
@@ -113,6 +117,9 @@ async function testDeleteIsScopedToSourceNull() {
   assert.deepEqual(calls.deleteManyWhere, {
     activityId: "activity-race",
     source: null,
+    id: { in: ["session-0"] },
+    bookingRequests: { none: {} },
+    allocations: { none: {} },
   });
 }
 
@@ -134,16 +141,8 @@ async function testPreservesTicketMetadataForUnchangedInstant() {
     scheduleJson: SIMPLE_SCHEDULE,
   });
 
-  assert.deepEqual(calls.createManyData, [
-    {
-      activityId: "activity-manual",
-      startsAt: new Date("2026-10-01T07:00:00.000Z"),
-      buyUrl: "https://tickets.example/session-1",
-      priceMinCents: 1200,
-      priceMaxCents: 1800,
-      isSaleOpen: true,
-    },
-  ]);
+  assert.equal(calls.deleteManyCalled, false);
+  assert.equal(calls.createManyCalled, false);
 }
 
 async function testDoesNotMoveTicketMetadataToChangedInstant() {

@@ -45,12 +45,12 @@ export class HeroGreetingErrorBoundary extends React.Component<
         data-hero-weather-scenario={model.weatherScenario}
       >
         {fallbackSummary ? (
-          <p className="flex items-center gap-3 text-sm font-medium tracking-tight text-neutral-600 sm:text-[15px] [text-wrap:balance]">
+          <p className="flex items-center gap-2 text-sm font-medium leading-snug tracking-tight text-neutral-600 sm:text-[15px] [text-wrap:balance]">
             <HeroMoodIcon
               scenario={model.weatherScenario}
               timeOfDay={model.timeOfDay}
               maxTemperatureC={model.maxTemperatureC}
-              size={56}
+              size={36}
             />
             <span className="min-w-0 whitespace-pre-wrap">{fallbackSummary}</span>
           </p>

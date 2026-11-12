@@ -27,13 +27,20 @@ export const updatePartyDraftSchema = z.object({
   budgetByn: z.number().nonnegative().max(1_000_000).nullable().optional(),
   contactName: z.string().max(120).nullable().optional(),
   contactPhone: z.string().max(40).nullable().optional(),
+  packageChange: z.object({
+    itemId: z.string().min(1).max(128),
+    replacementOfferId: z.string().min(1).max(128).optional(),
+    undo: z.literal(true).optional(),
+  }).strict().refine(change => !change.undo || !change.replacementOfferId).optional(),
   anchorOfferId: z.string().min(1).nullable().optional(),
+  /** Комментарий родителя к основной услуге: уходит бизнесу как customerComment заявки. */
+  anchorNote: z.string().trim().max(500).nullable().optional(),
   addonOfferIds: z.array(z.string().min(1)).max(15).optional(),
   addonCategories: z.array(z.nativeEnum(PartyCategory)).max(15).refine(
     values => new Set(values).size === values.length,
     "Категории услуг не должны повторяться",
   ).optional(),
-}).strict().refine(
+}).strict().refine(value => !value.packageChange || value.anchorOfferId === undefined).refine(
   (value) => (value.anchorOfferId === undefined) === (value.addonOfferIds === undefined && value.addonCategories === undefined),
   "Передайте основную и дополнительные услуги вместе",
 );

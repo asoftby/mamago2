@@ -23,6 +23,7 @@ import {
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
 import { Button } from "@/components/ui/button";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { PublicationPriceDisplay } from "@/components/shared/PublicationPriceDisplay";
 import { cn } from "@/lib/utils";
 
 export interface PublicOfferHeroProps {
@@ -122,21 +123,13 @@ export function PublicOfferHero({
                     </div>
                   )}
                   {priceLabel && (
-                    <div>
-                      <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
-                        Стоимость
-                      </p>
-                      <p className="font-pt-serif text-[40px] leading-tight tracking-[-1px] text-text-main">
-                        {renderCurrencyText(priceLabel, { iconSize: "sm" })}
-                      </p>
-                      {data.pricing.oldPrice &&
-                        publicOfferShowsPaidPrices(data.pricing) && (
-                          <p className="text-sm text-text-muted line-through">
-                            {renderCurrencyText(data.pricing.oldPrice, {
-                              iconSize: "sm",
-                            })}
-                          </p>
-                        )}
+                    <div className="ml-auto shrink-0 text-right">
+                      <PublicationPriceDisplay label={priceLabel} />
+                      {data.pricing.oldPrice && publicOfferShowsPaidPrices(data.pricing) && (
+                        <p className="text-right text-sm text-text-muted line-through">
+                          {renderCurrencyText(data.pricing.oldPrice, { iconSize: "sm" })}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -184,7 +177,7 @@ export function PublicOfferHero({
               <ShareModal open={shareOpen} onOpenChange={setShareOpen} url={typeof window !== "undefined" ? window.location.href : ""} title={data.title} entityNoun="предложением" />
               {directSlot && <div className="mt-3">{directSlot}</div>}
               {ownerEditSlot && (
-                <SidebarCardTopSection>{ownerEditSlot}</SidebarCardTopSection>
+                <SidebarCardTopSection mt={20} pt={20}>{ownerEditSlot}</SidebarCardTopSection>
               )}
               <SidebarCardTopSection>
                 <div className="flex items-center justify-between gap-3">

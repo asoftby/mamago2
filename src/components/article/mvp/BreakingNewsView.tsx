@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { markBreakingNewsSeen } from "@/features/stories/lib/seen";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { PublicationTagChips } from "@/components/article/PublicationTagChips";
+import { PublicationTagLinks } from "@/components/article/PublicationTagLinks";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleInfoCard } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
@@ -834,6 +834,8 @@ export interface BreakingNewsViewProps {
   citySlug?: string | null;
   articleHref: string;
   coverImageUrl?: string | null;
+  /** The ticker belongs to the opening article, never to appended news. */
+  showBreakingTicker?: boolean;
 }
 
 export function BreakingNewsView({
@@ -849,6 +851,7 @@ export function BreakingNewsView({
   citySlug,
   articleHref,
   coverImageUrl,
+  showBreakingTicker = true,
 }: BreakingNewsViewProps) {
   useEffect(() => {
     if (draftWatermark) return;
@@ -884,8 +887,8 @@ export function BreakingNewsView({
         opacity: .055, mixBlendMode: "multiply",
       }} aria-hidden />
 
-      {/* Breaking ticker */}
-      <Marquee items={marqueeItems} />
+      {/* One ticker immediately below the journal navigation, only for the opening article. */}
+      {showBreakingTicker ? <Marquee items={marqueeItems} /> : null}
 
       {draftWatermark && (
         <div className="mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6">
@@ -909,13 +912,6 @@ export function BreakingNewsView({
         citySlug={citySlug}
         coverImageUrl={coverImageUrl}
       />
-      {tags.length > 0 ? (
-        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
-          <div className="pb-6">
-            <PublicationTagChips tags={tags} citySlug={citySlug} />
-          </div>
-        </div>
-      ) : null}
       {galleryBlock ? (
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           <ArticleGallery images={galleryBlock.images} presentation={galleryBlock.presentation} caption={galleryBlock.caption} />
@@ -944,6 +940,12 @@ export function BreakingNewsView({
           entityType={activityBlock.entityType}
           entityId={activityBlock.entityId}
         />
+      )}
+
+      {tags.length > 0 && (
+        <div className="mx-auto w-full max-w-3xl px-4 pt-8 pb-4 sm:px-6">
+          <PublicationTagLinks tags={tags} citySlug={citySlug} />
+        </div>
       )}
 
       {!draftWatermark && (

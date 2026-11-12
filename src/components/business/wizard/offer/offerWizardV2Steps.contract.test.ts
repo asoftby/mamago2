@@ -9,6 +9,9 @@ const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
 {
   // новый мастер: ровно 6 шагов в нужном порядке; составные — about/services/schedule/terms
   assert.deepEqual(V2_STEPS.map((s) => s.key), V2_KEYS);
+  const stepConfig = readFileSync("src/components/business/wizard/offer/offerWizardSteps.config.ts", "utf8");
+  assert.match(stepConfig, /if \(variant === "v2"\) return getV2StepsForProductType\(productType\);\s*if \(!type\) return \[\];/,
+    "V2 has six steps even when no offer type is selected");
   assert.deepEqual([...V2_STEP_KEYS], ["about", "services", "schedule", "terms"]);
   assert.ok(isV2CompositeStepKey("about"));
   assert.ok(!isV2CompositeStepKey("type"));

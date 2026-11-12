@@ -1,3 +1,4 @@
+import { parseQuickFilterPreset } from "@/features/filters/discovery/quickFilterPresets";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
@@ -7,6 +8,7 @@ import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { buildKudaDiscoveryWhere } from "@/server/discovery/kudaDiscoveryFeed";
 import { matchesPublicFreePrice, resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
+import { publicDiscoveryOccasionWhere } from "@/lib/discovery/occasionUtils";
 
 /**
  * Availability facets for Kuda: every visible option corresponds to at least
@@ -18,6 +20,7 @@ export async function GET(request: NextRequest) {
   const city = await findCityBySlug(p.get("city") ?? "minsk");
   if (!city) return NextResponse.json({ error: "CITY_NOT_FOUND" }, { status: 404 });
 
+  const now = new Date();
   const explicitTerritorySlug = p.get("explore") === "1" ? city.slug : null;
   const preset = p.get("preset");
   const { where } = await buildKudaDiscoveryWhere(city.id, city.slug, {
@@ -25,7 +28,7 @@ export async function GET(request: NextRequest) {
     eventFilters: {
       categorySlugs: [], genreSlugs: [], occasionSlug: null,
       dateRange: resolveEventDateRange({
-        preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null,
+        preset: parseQuickFilterPreset(preset),
         from: p.get("from"), to: p.get("to"),
       }),
       free: false, priceMin: null, priceMax: null,
@@ -42,8 +45,8 @@ export async function GET(request: NextRequest) {
       priceMode: true, priceFrom: true, priceText: true,
       ageTags: true, ageMinMonths: true, ageMaxMonths: true, agePolicy: true,
       occasionLinks: {
-        where: { occasion: { isActive: true } },
-        select: { occasion: { select: { slug: true } } },
+        where: { occasion: publicDiscoveryOccasionWhere(now) },
+        select: { occasion: { select: { slug: true, name: true, sortOrder: true } } },
       },
     },
   });
@@ -79,7 +82,7 @@ export async function GET(request: NextRequest) {
     if (except !== "genre" && genreFilters.length && !genreFilters.some(slug => row.genreSlugs.includes(slug))) return false;
     if (except !== "format" && format && row.format !== format) return false;
     if (except !== "age" && !allowedForAge(row, ageFilters)) return false;
-    if (except !== "occasion" && occasion === "halloween" && !row.occasionLinks.some(link => link.occasion.slug === "halloween")) return false;
+    if (except !== "occasion" && occasion && !row.occasionLinks.some(link => link.occasion.slug === occasion)) return false;
     if (except !== "price") {
       if (free && !matchesPublicFreePrice(row)) return false;
       if (!free && (hasPriceMin || hasPriceMax) && (
@@ -96,10 +99,16 @@ export async function GET(request: NextRequest) {
   const genres = [...new Set(facetRows("genre").flatMap(row => row.genreSlugs))];
   const formats = [...new Set(facetRows("format").map(row => row.format))];
   const ages = AGE_GROUPS.filter(group => facetRows("age").some(row => allowedForAge(row, [group.value]))).map(group => group.value);
-  const occasions = [...new Set(facetRows("occasion").flatMap(row => row.occasionLinks.map(link => link.occasion.slug)))];
+  const optionsBySlug = new Map(facetRows("occasion")
+    .flatMap(row => row.occasionLinks.map(link => link.occasion))
+    .map(occasion => [occasion.slug, occasion]));
+  const occasionOptions = [...optionsBySlug.values()]
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ru"))
+    .map(({ slug, name }) => ({ slug, name }));
+  const occasions = occasionOptions.map(({ slug }) => slug);
 
   return NextResponse.json({
-    categories, genres, formats, ages, occasions,
+    categories, genres, formats, ages, occasions, occasionOptions,
     freeAvailable: facetRows("price").some(matchesPublicFreePrice),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

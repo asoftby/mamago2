@@ -1,60 +1,94 @@
 "use client";
 
-import { useState } from "react";
-import { RequisitesEmptyState } from "@/components/business/billing/RequisitesEmptyState";
-import { RequisitesCard } from "@/components/business/billing/RequisitesCard";
-import { RequisitesEditModal } from "@/components/business/billing/RequisitesEditModal";
-import type { BillingProfile, BillingProfileFormData } from "@/types/billing";
-import { mockBillingProfile } from "@/services/billing/mock";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
+type PayerType = "LEGAL_ENTITY" | "SOLE_PROPRIETOR" | "SELF_EMPLOYED";
+type Form = {
+  payerType: PayerType; legalName: string; unp: string; legalAddress: string;
+  bankName: string; bankCode: string; bankAccount: string;
+  contactName: string; contactEmail: string; contactPhone: string;
+  signatoryName: string; signatoryPosition: string; signatoryBasis: string;
+};
+const empty: Form = {
+  payerType: "LEGAL_ENTITY", legalName: "", unp: "", legalAddress: "",
+  bankName: "", bankCode: "", bankAccount: "", contactName: "", contactEmail: "",
+  contactPhone: "", signatoryName: "", signatoryPosition: "", signatoryBasis: "",
+};
+const fields: { name: keyof Omit<Form, "payerType">; label: string }[] = [
+  { name: "legalName", label: "Юридическое название / ФИО" },
+  { name: "unp", label: "УНП" },
+  { name: "legalAddress", label: "Юридический адрес" },
+  { name: "bankName", label: "Банк" },
+  { name: "bankCode", label: "БИК" },
+  { name: "bankAccount", label: "Расчётный счёт" },
+  { name: "contactName", label: "Контактное лицо" },
+  { name: "contactEmail", label: "Email для документов" },
+  { name: "contactPhone", label: "Телефон" },
+  { name: "signatoryName", label: "ФИО подписанта" },
+  { name: "signatoryPosition", label: "Должность" },
+  { name: "signatoryBasis", label: "Основание полномочий" },
+];
 export default function BillingRequisitesPage() {
-  // TODO: Fetch real billing profile from database when backend is ready
-  // For now, use mock data (returns null = empty state)
-  const [profile, setProfile] = useState<BillingProfile | null>(
-    mockBillingProfile()
-  );
-  const [showEditModal, setShowEditModal] = useState(false);
-
-  const handleFillRequisites = () => {
-    setShowEditModal(true);
-  };
-
-  const handleSaveRequisites = (data: BillingProfileFormData) => {
-    // TODO: Save to database when backend is ready
-    console.log("Saving requisites:", data);
-
-    // For now, create a mock profile
-    const newProfile: BillingProfile = {
-      id: "mock-profile-1",
-      businessId: "mock-business-1",
-      ...data,
-      completeness: "complete", // TODO: Calculate based on filled fields
-      isVerified: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setProfile(newProfile);
-    setShowEditModal(false);
-  };
-
+  const [form, setForm] = useState<Form>(empty);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/business/billing/payer-profile", { cache: "no-store" })
+      .then(async response => {
+        if (!response.ok) throw new Error("Не удалось загрузить реквизиты");
+        return response.json();
+      })
+      .then(({ profile }) => {
+        if (active && profile) setForm({ ...empty, ...Object.fromEntries(Object.keys(empty).map(key => [key, profile[key] ?? ""])) } as Form);
+      })
+      .catch(() => { if (active) setError("Не удалось загрузить реквизиты. Обновите страницу."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true); setError(null);
+    try {
+      const response = await fetch("/api/business/billing/payer-profile", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, unp: form.unp || undefined, legalAddress: form.legalAddress || undefined }),
+      });
+      if (!response.ok) throw new Error("Проверьте реквизиты и повторите сохранение");
+      toast.success("Реквизиты сохранены");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка сохранения");
+    } finally { setSaving(false); }
+  }
   return (
-    <div>
-      {profile ? (
-        <RequisitesCard
-          profile={profile}
-          onEdit={() => setShowEditModal(true)}
-        />
-      ) : (
-        <RequisitesEmptyState onFillRequisites={handleFillRequisites} />
-      )}
-
-      {showEditModal && (
-        <RequisitesEditModal
-          profile={profile || undefined}
-          onClose={() => setShowEditModal(false)}
-          onSave={handleSaveRequisites}
-        />
+    <div className="space-y-6">
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Реквизиты для документов"
+        description="Данные плательщика для счетов и актов. Изменения не затрагивают публичный профиль компании."
+      />
+      {loading ? <p role="status">Загрузка реквизитов…</p> : (
+        <form onSubmit={save} className="max-w-3xl space-y-5 rounded-2xl border border-stone-200 bg-white p-5">
+          <label className="block text-sm font-medium">Тип плательщика
+            <select value={form.payerType} onChange={e => setForm(prev => ({ ...prev, payerType: e.target.value as PayerType }))} className="mt-1 block w-full rounded-lg border border-stone-300 p-2">
+              <option value="LEGAL_ENTITY">Юридическое лицо</option><option value="SOLE_PROPRIETOR">ИП</option><option value="SELF_EMPLOYED">Самозанятый</option>
+            </select>
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {fields.map(field => {
+              const required = field.name === "legalName" || (field.name === "unp" && form.payerType !== "SELF_EMPLOYED") || (field.name === "legalAddress" && form.payerType === "LEGAL_ENTITY");
+              return <label key={field.name} className="block text-sm font-medium">{field.label}{required ? " *" : ""}
+                <input className="mt-1 block w-full rounded-lg border border-stone-300 p-2" value={form[field.name]} onChange={e => setForm(prev => ({ ...prev, [field.name]: e.target.value }))} required={required} maxLength={field.name === "legalAddress" ? 500 : 250} type={field.name === "contactEmail" ? "email" : "text"} />
+              </label>;
+            })}
+          </div>
+          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+          <button type="submit" disabled={saving} className="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? "Сохранение…" : "Сохранить реквизиты"}</button>
+        </form>
       )}
     </div>
   );

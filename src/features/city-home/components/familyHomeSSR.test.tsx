@@ -22,10 +22,10 @@ test("guest afisha has no age chips or extra registration flow", () => {
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" />
   </AuthProvider></AppRouterContext.Provider>);
   assert.match(html, /Куда пойти с ребёнком в Минске/);
-  assert.match(html, /На этой неделе/);
+  assert.doesNotMatch(html, /На этой неделе|На ближайшие 7 дней/);
   assert.doesNotMatch(html, /Выберите возраст|Возраст ребёнка|3–5 лет|Для кого:|Добавить ребёнка/);
-  assert.match(html, /Пока нет опубликованных событий/);
-  assert.match(html, /Еще варианты/);
+  assert.match(html, /Событий пока нет/);
+  assert.doesNotMatch(html, /По вашему запросу мы ничего не нашли|Больше под ваш запрос/);
   assert.match(html, /Куда пойти/);
   assert.doesNotMatch(html, /Для вашей семьи|child_000|Зарегистрируйтесь/);
 });
@@ -36,15 +36,15 @@ test("guest events use a uniform poster height without cropping and have one fin
     <CityHomeGeneralEvents activities={[event] as never} citySlug="minsk" />
   </AuthProvider></AppRouterContext.Provider>);
   assert.match(html, /aspect-ratio:2\/3/);
-  assert.match(html, /Еще варианты/);
-  assert.equal((html.match(/Еще варианты/g) ?? []).length, 1);
+  assert.match(html, /Ещё варианты/);
+  assert.equal((html.match(/Ещё варианты/g) ?? []).length, 1);
 });
 
 test("public fallback is labeled as nearest events, not this week", () => {
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={null}>
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" periodLabel="Ближайшие события" />
   </AuthProvider></AppRouterContext.Provider>);
-  assert.match(html, /Ближайшие события/);
+  assert.doesNotMatch(html, /На ближайшие 7 дней/);
   assert.doesNotMatch(html, /На этой неделе/);
 });
 
@@ -52,8 +52,8 @@ test("logged-in no-child state shows add-child action, but never age filters", (
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" authenticated />
   </AuthProvider></AppRouterContext.Provider>);
-  assert.match(html, /События, которые подходят вам/);
-  assert.match(html, /На этой неделе/);
+  assert.match(html, /События, которые подходят вашей семье/);
+  assert.doesNotMatch(html, /На этой неделе|На ближайшие 7 дней/);
   assert.match(html, /Добавить ребёнка/);
   assert.doesNotMatch(html, /Возраст ребёнка|3–5 лет|Выберите возраст/);
 });
@@ -89,63 +89,48 @@ for (const count of [1, 2, 3, 5, 7]) {
     const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
       <CityHomeFamilyPicks citySlug="minsk" initialContext={context} />
     </AuthProvider></AppRouterContext.Provider>);
-    assert.match(html, /События, которые подходят вам/);
-    assert.match(html, /На ближайшие 7 дней/, "loading state must describe the rolling personal window");
-    assert.doesNotMatch(html, /На этой неделе/, "rolling 7 days can cross calendar weeks");
+    assert.match(html, /События, которые подходят вашей семье/);
+    assert.doesNotMatch(html, /На ближайшие 7 дней/, "the visible heading must not impose a 7-day window");
     assert.match(html, /aria-busy="true"/);
     assert.match(html, /Подбираем события/);
-    assert.equal((html.match(/aria-pressed=/g) ?? []).length, count + 1);
-    assert.match(html, /\+ Ребёнок/);
-    assert.match(html, /Для кого:/);
-    assert.match(html, /Для всех/);
-    assert.match(html, /Ребёнок 0/);
-    assert.match(html, />Я</);
+    assert.doesNotMatch(html, /Для кого:|Для всех|aria-pressed|>Я</);
     assert.doesNotMatch(html, /Куда пойти с ребёнком|Зарегистрируйтесь|mg_family_picks_dismissed/);
   });
 }
 
-test("family chips display youngest children, then active adult, then me", () => {
-  const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02",
-    policyVersion: "v2", audience: "personalized", selectedChildId: null, preferenceVersion: null, selectionPersistence: "account",
-    children: [
-      { id: "old", name: "Таисия", ageMonths: 96, hasBirthDate: true, ageFilter: ["7-9"] },
-      { id: "young", name: "Степан", ageMonths: 50, hasBirthDate: true, ageFilter: ["3-5"] },
-    ],
-    adults: [{ name: "Таня", isMe: false }],
-  };
-  const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
-    <CityHomeFamilyPicks citySlug="minsk" initialContext={context} />
-  </AuthProvider></AppRouterContext.Provider>);
-  for (const fragment of [">Для всех<", ">Степан<", ">Таисия<", ">Таня<", ">Я<"]) {
-    assert.ok(html.includes(fragment), fragment);
-  }
-  assert.ok(html.indexOf(">Степан<") < html.indexOf(">Таисия<"));
-  assert.ok(html.indexOf(">Таисия<") < html.indexOf(">Таня<"));
-  assert.ok(html.indexOf(">Таня<") < html.indexOf(">Я<"));
-  assert.match(html, /age=18%2B/, "adult chip leads to real adult catalog, not a fake per-adult feed");
-});
-
 for (const count of [0, 1, 2, 7, 8, 10, 11]) {
-  test(`real ready HTML with ${count} events has one final catalog CTA and one save per visible event`, () => {
+  test(`real ready HTML with ${count} events has one final poster card and no extra actions`, () => {
     const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02", policyVersion: "v2", audience: "personalized", selectedChildId: null, preferenceVersion: null, selectionPersistence: "account",
       children: [{ id: "child_0001", name: "Аня", hasBirthDate: true, ageFilter: ["3-5"] }] };
-    const data = { context, window: { horizonDays: 30, dateFrom: "2030-11-02", dateTo: "2030-12-01" }, runId: "run_123", policyVersion: "family-picks-confirmed-v3", sharedAlgorithmVersion: "test", candidateCount: count, selection: { mode: "ALL_FAMILY" }, status: count ? "READY" : "EMPTY", items: Array.from({ length: count }, (_, i) => ({
+    const data = { context, window: { horizonDays: 30, dateFrom: "2030-11-02", dateTo: "2030-12-01" }, runId: "run_123", policyVersion: "family-picks-confirmed-v3", sharedAlgorithmVersion: "test", candidateCount: count, hasCatalogEvents: count > 0, selection: { mode: "ALL_FAMILY" }, status: count ? "READY" : "EMPTY", items: Array.from({ length: count }, (_, i) => ({
       id: `event_${i}`, title: `Тестовое событие ${i}`, href: `/minsk/events/event_${i}`, imageUrl: null, imageWidth: 600, imageHeight: 900,
       categoryName: "Театр", agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 168, priceMode: i % 2 ? "RANGE" : "FREE", priceFrom: 10, priceTo: 20, currency: "BYN",
       startsAt: "2030-11-02T22:30:00Z", allChildrenMatch: i === 0, matchedChildIds: ["child_0001"], exposureId: `exposure_${i}`, position: i + 1, score: 1,
     })) } as import("@/server/services/recommendations/familyPicks/delivery").HomeFamilyDelivery;
     const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
-      <FamilyHomeResults data={data} context={context} citySlug="minsk" selected={null} impressed={new Set()} onImpression={() => {}} onDismiss={() => {}} onSave={() => {}} />
+      <FamilyHomeResults data={data} context={context} citySlug="minsk" impressed={new Set()} onImpression={() => {}} />
     </AuthProvider></AppRouterContext.Provider>);
     const visible = Math.min(count, 10);
-    assert.equal((html.match(/>В мой план</g) ?? []).length, visible);
-    assert.equal((html.match(/>Не подходит</g) ?? []).length, visible);
-    assert.equal((html.match(/Еще варианты</g) ?? []).length, 1);
-    assert.ok(html.lastIndexOf("Еще варианты") > html.lastIndexOf("Не подходит"));
+    assert.doesNotMatch(html, /В мой план|Не подходит/);
+    assert.equal((html.match(/Сохранить в план или в идеи/g) ?? []).length, visible);
+    assert.equal((html.match(/data-masonry-media=/g) ?? []).length, visible);
+    assert.equal((html.match(/Ещё варианты</g) ?? []).length, count ? 1 : 0);
+    if (count) assert.ok(html.lastIndexOf("Ещё варианты") > html.lastIndexOf("Тестовое событие"));
     assert.doesNotMatch(html, /child_0001|profile=|kids=/);
-    if (!count) assert.match(html, /30 дней нет подтверждённых событий/);
-    else { assert.match(html, /3–14 · 3 ноя./); assert.match(html, /Бесплатно/); assert.match(html, /Подходит всем/);
+    if (!count) assert.match(html, /Пока нет опубликованных событий/);
+    else { assert.match(html, /3–14 лет · 3 ноя./); assert.match(html, /Бесплатно/); assert.doesNotMatch(html, /Подходит Ане/);
       assert.match(html, /aspect-ratio:2\/3/); }
-    if (count > 1) { assert.match(html, /Подходит: Аня/); assert.match(html, /от 10/); }
+    if (count > 1) { assert.doesNotMatch(html, /Подходит Ане/); assert.match(html, /от 10/); }
+    if (count === 7) {
+      const htmlWithAlternatives = renderToStaticMarkup(
+        <AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
+          <FamilyHomeResults data={data} context={context} citySlug="minsk" impressed={new Set()} onImpression={() => {}}
+            audienceSections={{ primary: data.items.slice(0, 1), alternatives: data.items.slice(1), active: true }} />
+        </AuthProvider></AppRouterContext.Provider>,
+      );
+      assert.equal((htmlWithAlternatives.match(/data-masonry-media=/g) ?? []).length, 7);
+      assert.doesNotMatch(htmlWithAlternatives, /Больше под ваш запрос|Справа — другие|По выбранным параметрам/);
+      assert.equal((htmlWithAlternatives.match(/Ещё варианты</g) ?? []).length, 1);
+    }
   });
 }

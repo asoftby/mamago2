@@ -58,8 +58,8 @@ export function journalBlockWheres(input: {
   }
   if (input.mainId) feedParts.push({ id: { not: input.mainId } });
   return {
-    /** «Главное»: самый свежий featured любого типа. */
-    main: scoped({ featured: true }),
+    /** «Главное»: featured статья или подборка, но не Breaking News. */
+    main: scoped({ AND: [{ featured: true }, { publicationType: { not: "BREAKING_NEWS" } }] }),
     /** «Новости»: только актуальные BREAKING_NEWS (expiresAt > now). */
     news: scoped({ AND: [{ publicationType: "BREAKING_NEWS" }, notExpiredJournalPublicationWhere(now)] }),
     /** «Подборки mamaGo». */

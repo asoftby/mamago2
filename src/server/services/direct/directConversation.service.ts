@@ -163,8 +163,10 @@ async function getCustomerSideItems(userId: string): Promise<UnifiedConversation
 }
 
 /** Business-side groups: every business this user represents, grouped by which customer messaged them. */
-async function getBusinessSideItems(userId: string): Promise<UnifiedConversationListItem[]> {
-  const businessIds = await getBusinessIdsUserCanAccess(userId);
+async function getBusinessSideItems(userId: string, selectedBusinessId?: string): Promise<UnifiedConversationListItem[]> {
+  const permittedBusinessIds = await getBusinessIdsUserCanAccess(userId);
+  if (selectedBusinessId && !permittedBusinessIds.includes(selectedBusinessId)) return [];
+  const businessIds = selectedBusinessId ? [selectedBusinessId] : permittedBusinessIds;
   if (businessIds.length === 0) return [];
 
   const threads = await prisma.directThread.findMany({
@@ -206,6 +208,40 @@ async function getBusinessSideItems(userId: string): Promise<UnifiedConversation
     });
   }
   return items;
+}
+
+/** Personal-profile inbox: only conversations where this user is the customer.
+ * Business replies are available via getBusinessConversationsForUser instead.
+ */
+export async function getCustomerConversationsForUser(
+  userId: string,
+): Promise<UnifiedConversationListItem[]> {
+  return getCustomerSideItems(userId);
+}
+
+/** Single counter contract for both personal and business inboxes. */
+export function countConversationsByTab(
+  items: UnifiedConversationListItem[],
+): Record<ConversationTab, number> {
+  const counts: Record<ConversationTab, number> = {
+    ALL: items.length,
+    ACTIVE: 0,
+    WAITING: 0,
+    COMPLETED: 0,
+    ARCHIVE: 0,
+  };
+  for (const item of items) counts[item.tab] += 1;
+  return counts;
+}
+
+/** Only client conversations for the selected, authorized business cabinet.
+ * Never query or combine this user's personal customer conversations here.
+ */
+export async function getBusinessConversationsForUser(
+  userId: string,
+  businessId: string,
+): Promise<UnifiedConversationListItem[]> {
+  return getBusinessSideItems(userId, businessId);
 }
 
 /** Parses "D-10253" or "10253" into a numeric threadNumber for search. */

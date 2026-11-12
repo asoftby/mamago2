@@ -1,12 +1,34 @@
 export type PartyDraft = { id: string; version: number };
+export type PartyReviewDraft = PartyDraft & {
+  status: string;
+  eventDate: string | null;
+  childAge: number | null;
+  childName: string | null;
+  items: Array<{
+    id: string; role: string; offerId: string | null; category: string;
+    packageComponentSnapshot?: { title?: string; removalPolicy?: string | null; removalCreditByn?: string | null } | null;
+    packageComponentChange?: { requiresQuote: boolean; replacementOfferId?: string | null } | null;
+    offerPriceSnapshot?: string | null;
+  }>;
+  estimate?: {
+    minimumByn: number;
+    exactByn: number;
+    fromByn: number;
+    unknownCount: number;
+    lines: Array<{ offerId: string | null; mode: "EXACT" | "FROM" | "ON_REQUEST"; amount: number | null }>;
+  };
+};
 export type PartySubmission = PartyDraft & { fingerprint: string };
 export type PartyFlowState = {
   draft: PartyDraft | null;
   pending: PartySubmission | null;
   key: string | null;
   submitted: boolean;
+  scope?: string;
+  rememberDraft?: (id: string) => void;
 };
 export type PartySubmissionInput = {
+  preservePackageComposition?: boolean;
   citySlug: string;
   venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   eventDate: string;
@@ -25,6 +47,12 @@ export type PartySubmissionInput = {
 };
 export type PartyRequest = <T>(url: string, method: string, body?: object, key?: string) => Promise<T>;
 
+export class PartyRequestError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
+
 export async function partyRequest<T>(url: string, method: string, body?: object, key?: string): Promise<T> {
   const response = await fetch(url, {
     method, credentials: "same-origin",
@@ -32,7 +60,7 @@ export async function partyRequest<T>(url: string, method: string, body?: object
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось отправить заявку");
+  if (!response.ok) throw new PartyRequestError(response.status, typeof data.error === "string" ? data.error : "Не удалось отправить заявку");
   return data as T;
 }
 
@@ -41,12 +69,33 @@ export function submittedPartyId(state: PartyFlowState): string | null {
   return state.pending?.id ?? state.draft?.id ?? null;
 }
 
+export async function saveBirthdayComposition(
+  state: PartyFlowState,
+  input: Pick<PartySubmissionInput, "citySlug" | "venueMode" | "anchorOfferId" | "addonOfferIds" | "addonCategories">,
+  request: PartyRequest = partyRequest,
+  recipient?: { eventDate: string; childName: string | null; childAge: number | null },
+): Promise<PartyReviewDraft> {
+  if (state.pending || state.submitted) throw new Error("Сначала уточните результат отправки заявки");
+  const { citySlug, venueMode, ...selection } = input;
+  if (!state.draft) {
+    state.draft = await request<PartyDraft>("/api/parent/parties", "POST", { citySlug, venueMode });
+    state.rememberDraft?.(state.draft.id);
+  }
+  const path = "/api/parent/parties/" + state.draft.id;
+  const updated = await request<PartyReviewDraft>(path, "PATCH", {
+    version: state.draft.version, venueMode, ...selection, ...recipient,
+  });
+  state.draft = updated;
+  return updated;
+}
+
 export async function submitBirthdayParty(
   state: PartyFlowState, input: PartySubmissionInput, request: PartyRequest = partyRequest,
 ): Promise<void> {
   if (state.submitted) return;
   const fingerprint = JSON.stringify(input);
-  const { citySlug, venueMode, ...updates } = input;
+  const { citySlug, venueMode, preservePackageComposition, anchorOfferId, addonOfferIds, addonCategories, ...details } = input;
+  const updates = preservePackageComposition ? details : { ...details, anchorOfferId, addonOfferIds, addonCategories };
 
   // A failed HTTP response can mean the submit actually succeeded.
   // If the parent edited the form, check the order before rewriting the draft.
@@ -61,11 +110,12 @@ export async function submitBirthdayParty(
   try {
     if (!state.draft) {
       state.draft = await request<PartyDraft>("/api/parent/parties", "POST", { citySlug, venueMode });
+      state.rememberDraft?.(state.draft.id);
     }
     const draft = state.draft;
     if (!state.pending) {
       const updated = await request<PartyDraft>("/api/parent/parties/" + draft.id, "PATCH",
-        { version: draft.version, ...updates });
+        { version: draft.version, venueMode, ...updates });
       state.draft = { id: draft.id, version: updated.version };
       state.pending = { id: draft.id, version: updated.version, fingerprint };
       state.key = crypto.randomUUID().replace(/-/g, "");
@@ -74,6 +124,12 @@ export async function submitBirthdayParty(
       { version: state.pending.version }, state.key!);
     state.submitted = true;
   } catch (cause) {
+    if (state.pending && cause instanceof PartyRequestError && [409, 422].includes(cause.status)) {
+      // A definitive rejection invalidates this submit attempt and its version.
+      state.pending = null;
+      state.key = null;
+      if (cause.status === 422) throw cause;
+    }
     // A PATCH may commit while its HTTP response is lost; reconcile CAS version.
     if (state.draft && !state.pending) {
       try {

@@ -106,15 +106,6 @@ export default async function EditorEditOfferPage({
   });
   const ctaStepEnabled = isOfferCtaStepFeatureEnabled(process.env);
 
-  // Флаг нового мастера — у бизнеса, которому принадлежит редактируемое предложение (место), а не у
-  // бизнеса пользователя: менеджер чужого бизнеса и владелец нескольких бизнесов видят мастер своего оффера.
-  const offerBusiness = offer.place?.ownerBusinessId
-    ? await prisma.business.findUnique({
-        where: { id: offer.place.ownerBusinessId },
-        select: { features: true },
-      })
-    : null;
-
   return (
     <ContentEditorChrome
       title="Новое предложение"

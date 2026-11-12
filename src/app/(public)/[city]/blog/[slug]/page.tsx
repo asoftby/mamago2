@@ -25,7 +25,6 @@ import { BreakingNewsLazyNext } from "@/components/journal/BreakingNewsLazyNext"
 import { BlogArticleSectionSync } from "../../../blog/BlogArticleSectionSync";
 import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
   incrementPublishedArticleViews,
   shouldCountPublishedArticleViewRequest,
@@ -75,7 +74,7 @@ export async function generateMetadata({ params }: PageProps) {
     await resolveCityArticlePublicRoute(slug, city),
   );
 
-  const mvp = await loadArticleMvpBySlugPublic(route.canonicalSlug, city.id);
+  const mvp = await loadArticleMvpBySlugPublic(route.canonicalSlug, city.id, { hydrateDynamicAfisha: false });
   if (!mvp) notFound();
 
   const article = await prisma.article.findFirst({
@@ -164,7 +163,7 @@ export default async function CityArticlePage({ params }: PageProps) {
     slug: articleRow.slug,
   });
   const editHref = canEdit
-    ? mvp.subtitle === BREAKING_NEWS_SUBTITLE
+    ? mvp.publicationType === "BREAKING_NEWS"
       ? `/admin/content/publications/new?type=news&id=${mvp.id}&returnTo=${encodeURIComponent(canonicalPath)}`
       : `/admin/content/articles/${mvp.id}/edit?returnTo=${encodeURIComponent(canonicalPath)}`
     : undefined;
@@ -188,7 +187,7 @@ export default async function CityArticlePage({ params }: PageProps) {
           publisherName: "mamaGo",
           articleSection: mvp.categoryLabel,
           keywords: mvp.tags.map((tag) => tag.title),
-          isNews: mvp.subtitle === BREAKING_NEWS_SUBTITLE,
+          isNews: mvp.publicationType === "BREAKING_NEWS",
           publicBaseUrl: publicBase,
         });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
@@ -200,7 +199,7 @@ export default async function CityArticlePage({ params }: PageProps) {
     publicBase,
   );
 
-  if (mvp.subtitle === BREAKING_NEWS_SUBTITLE) {
+  if (mvp.publicationType === "BREAKING_NEWS") {
     return (
       <>
         <BlogArticleSectionSync slug={articleRow.category?.slug ?? null} />
@@ -240,6 +239,7 @@ export default async function CityArticlePage({ params }: PageProps) {
     <ArticleMvpView
       title={mvp.title}
       subtitle={mvp.subtitle}
+        publicationType={mvp.publicationType}
       excerpt={mvp.excerpt}
       publishedAt={mvp.publishedAt}
       blocks={mvp.blocks}
@@ -289,6 +289,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       cityId: city.id,
       citySlug: city.slug,
       documentTitle: articleRow.seoTitle?.trim() || `${mvp.title} — mamaGo`,
+      publicationType: mvp.publicationType,
     });
     const { blocks: _blocks, ...seedWithoutBlocks } = seed;
     void _blocks;

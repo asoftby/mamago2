@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import {
+  addClassGroupForPricing,
+  classPricingDraftFromDetails,
   buildClassScheduleInput,
   classScheduleInputSchema,
   defaultClassSchedule,
@@ -210,3 +212,81 @@ const sameTimeGroups = groupsFromRules([
   { classGroupId: "grp-002", weekday: 1, startMinutes: 1020, capacity: 12 },
 ]);
 assert.deepEqual(sameTimeGroups.groups.map((g) => g.id), ["grp-001", "grp-002"]);
+
+// V2: business staff must create a group + editable tariff at step 3,
+// before the step-4 schedule. The helper must never fabricate availability.
+const initialPricing = defaultClassSchedule();
+const pricingGroup = addClassGroupForPricing(initialPricing);
+assert.equal(initialPricing.groups.length, 0);
+assert.equal(pricingGroup.groups.length, 1);
+assert.deepEqual(pricingGroup.groups[0].days, []);
+assert.equal(pricingGroup.groups[0].time, "17:00");
+assert.equal(pricingGroup.groups[0].seats, "");
+assert.equal(pricingGroup.groups[0].tariffs?.length, 1);
+assert.equal(pricingGroup.groups[0].tariffs?.[0]?.price, "");
+assert.equal(pricingGroup.groups[0].tariffs?.[0]?.title, "");
+assert.equal(addClassGroupForPricing(pricingGroup).groups.length, 2);
+const atLimit = { ...pricingGroup, groups: Array.from({ length: 30 }, (_, i) => ({ ...pricingGroup.groups[0], id: `group-${i}` })) };
+assert.equal(addClassGroupForPricing(atLimit), atLimit, "Never exceed 30 groups");
+console.log("V2 group-before-tariff progression fixtures passed");
+
+// A numeric price must not block a fully configured regular-class schedule.
+for (const [price, valid] of [
+  ["120", true], ["120.50", true], ["120,50", true],
+  ["0", true], ["120.555", false], ["-1", false], ["abc", false],
+] as const) {
+  const form = defaultClassSchedule();
+  form.groups = [{
+    id: "priced-group", days: [1], time: "17:00", seats: "8",
+    tariffs: [{ id: "tariff-1", title: "Абонемент", price, unit: "занятие", periodDays: null, visitsCount: 1 }],
+  }];
+  const problems = getClassScheduleMissingFields(form, "REGULAR_ACTIVITY", "60");
+  assert.equal(!problems.includes("Стоимость тарифа в BYN"), valid, `price=${price}`);
+}
+console.log("Regular activity tariff prices match PostgreSQL input validation");
+
+const pricingOnly = addClassGroupForPricing(defaultClassSchedule());
+pricingOnly.groups[0]!.tariffs![0]!.title = "Абонемент";
+pricingOnly.groups[0]!.tariffs![0]!.price = "120";
+const persistedPricingDraft = classPricingDraftFromDetails({ classPricingDraft: pricingOnly.groups });
+assert.deepEqual(persistedPricingDraft, pricingOnly.groups,
+  "Unscheduled pricing group and tariff survive serialized details");
+assert.equal(classPricingDraftFromDetails({ duration: "60" }), null);
+assert.equal(classPricingDraftFromDetails({ classPricingDraft: [{ id: 123, days: [8] }] }), null,
+  "Structurally malformed persisted draft is not trusted");
+assert.equal(classPricingDraftFromDetails({ classPricingDraft: [] })?.length, 0);
+console.log("Unscheduled class group draft roundtrip checks passed");
+
+const incompletePricingGroup = addClassGroupForPricing(defaultClassSchedule());
+incompletePricingGroup.groups[0]!.tariffs![0]!.title = "Временный тариф";
+incompletePricingGroup.groups[0]!.tariffs![0]!.price = "120";
+incompletePricingGroup.groups[0]!.tariffs![0]!.periodDays = 0;
+incompletePricingGroup.groups[0]!.tariffs![0]!.visitsCount = -2;
+const draftWithInvalidFields = classPricingDraftFromDetails({
+  classPricingDraft: JSON.parse(JSON.stringify(incompletePricingGroup.groups)),
+});
+assert.deepEqual(draftWithInvalidFields, incompletePricingGroup.groups,
+  "Unfinished numeric fields remain editable after draft save/reopen");
+
+
+// The editor may contain multiple priced groups. Publishing must not silently
+// drop a group whose schedule has not been filled in yet.
+const oneScheduledOneUnscheduled = defaultClassSchedule();
+oneScheduledOneUnscheduled.groups = [
+  { id: "scheduled", days: [1], time: "17:00", seats: "8",
+    tariffs: [{ id: "t1", title: "Абонемент", price: "120", unit: "занятие", periodDays: 30 }] },
+  { id: "unscheduled", days: [], time: "18:00", seats: "8",
+    tariffs: [{ id: "t2", title: "Абонемент", price: "100", unit: "занятие", periodDays: 30 }] },
+];
+assert.ok(
+  getClassScheduleMissingFields(oneScheduledOneUnscheduled, "REGULAR_ACTIVITY", "60")
+    .includes("Расписание для каждой группы с тарифами"),
+  "A priced unscheduled group must block publication even if another group is scheduled",
+);
+oneScheduledOneUnscheduled.groups[1]!.days = [3];
+assert.ok(
+  !getClassScheduleMissingFields(oneScheduledOneUnscheduled, "REGULAR_ACTIVITY", "60")
+    .includes("Расписание для каждой группы с тарифами"),
+  "Completing the second group's schedule unblocks publication",
+);
+console.log("All priced groups require schedules before publication");

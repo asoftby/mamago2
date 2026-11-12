@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -27,15 +28,28 @@ import {
 import { appendMyPlanOpenToHref } from "@/lib/my-plan/myPlanOpenIntent";
 import { buildAuthUrl } from "@/lib/auth/redirectTo";
 import { getOrCreateAnonymousId } from "@/lib/anonymous/clientAnonymousId";
-import { RecommendationCard } from "./RecommendationCard";
+import { PlanPickCard } from "./PlanPickCard";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanScreenHead } from "./v3/PlanScreenHead";
 import type { PlanItemWithActivity } from "../types/event";
 import type { MyPlanIdea } from "../hooks/useMyPlan";
 import { normalizePlanSuggestions } from "../lib/planSuggestions";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { formatActivityAddressLine } from "../lib/formatActivityAddress";
+import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
+import {
+  appendSuggestionBatch,
+  canGoBackSuggestionBatch,
+  currentSuggestionBatch,
+  emptySuggestionBatchHistory,
+  goBackSuggestionBatch,
+  type SuggestionBatchHistory,
+} from "../lib/suggestionBatchHistory";
 import type { MyPlanGuestPanelPhase } from "./guestMyPlanTypes";
 
 type GuestSlot = GuestPlanSlot;
+type GuestScenarioRow = { slot: GuestSlot; activity: NonNullable<MyPlanIdea["activity"]> };
 
 const KID_AGE_GROUPS = AGE_GROUPS.filter((g) => g.value !== "18+");
 
@@ -152,9 +166,10 @@ export function GuestMyPlanPanel({
   const [interests, setInterests] = useState<string[]>([]);
   const [showInterests, setShowInterests] = useState(false);
 
-  const [scenarioSlots, setScenarioSlots] = useState<
-    Array<{ slot: GuestSlot; activity: NonNullable<MyPlanIdea["activity"]> }>
-  >([]);
+  const [scenarioSlots, setScenarioSlots] = useState<GuestScenarioRow[]>([]);
+  const [batchHistory, setBatchHistory] = useState<SuggestionBatchHistory<GuestScenarioRow>>(
+    () => emptySuggestionBatchHistory(),
+  );
   const [committedBySlot, setCommittedBySlot] = useState<
     Partial<Record<GuestSlot, PlanItemWithActivity>>
   >({});
@@ -165,6 +180,8 @@ export function GuestMyPlanPanel({
   const scenarioGenerationInFlightRef = useRef(false);
   /** Restored empty drafts retry once; a real failed/empty response never loops. */
   const scenarioRequestAttemptedRef = useRef(false);
+  /** All activity ids shown this session — forward fetch must not repeat them after going back. */
+  const shownGuestActivityIdsRef = useRef<Set<string>>(new Set());
 
   /** Остаток подборок с сервера (null — ещё не было успешного ответа) */
   const [guestRemainingGenerations, setGuestRemainingGenerations] = useState<
@@ -175,9 +192,16 @@ export function GuestMyPlanPanel({
 
   const scenarioSlotsRef = useRef(scenarioSlots);
   scenarioSlotsRef.current = scenarioSlots;
+  const batchHistoryRef = useRef(batchHistory);
+  batchHistoryRef.current = batchHistory;
   const committedRef = useRef(committedBySlot);
   committedRef.current = committedBySlot;
   const restoreDoneRef = useRef(false);
+
+  const clearBatchHistory = useCallback(() => {
+    shownGuestActivityIdsRef.current = new Set();
+    setBatchHistory(emptySuggestionBatchHistory());
+  }, []);
 
   const resolvedTargetDate = useMemo(() => {
     if (whenChoice === "today") return todayIso;
@@ -203,6 +227,7 @@ export function GuestMyPlanPanel({
       setFormatChoice("any");
       setInterests([]);
       setScenarioSlots([]);
+      clearBatchHistory();
       setCommittedBySlot({});
       setGuestRemainingGenerations(null);
       setGuestQuotaBlocked(false);
@@ -280,6 +305,12 @@ export function GuestMyPlanPanel({
         }
         setScenarioSlots(validated);
         setCommittedBySlot(validatedChosen);
+        if (validated.length > 0) {
+          for (const row of validated) shownGuestActivityIdsRef.current.add(row.activity.id);
+          setBatchHistory(appendSuggestionBatch(emptySuggestionBatchHistory(), validated, MAX_SUGGESTION_BATCHES));
+        } else {
+          clearBatchHistory();
+        }
         if (draft.phase === "engaged" && Object.keys(validatedChosen).length > 0) setPhase("engaged");
       } catch {
         if (active) {
@@ -294,7 +325,7 @@ export function GuestMyPlanPanel({
       }
     })();
     return () => { active = false; };
-  }, [citySlug, setSelectedPlanDate, todayIso]);
+  }, [citySlug, clearBatchHistory, setSelectedPlanDate, todayIso]);
 
   useEffect(() => {
     if (!restoreDoneRef.current) return;
@@ -374,11 +405,9 @@ export function GuestMyPlanPanel({
       }
       setLoadingScenario(true);
       try {
-        const exclude: string[] = [];
-        for (const row of scenarioSlotsRef.current)
-          exclude.push(row.activity.id);
+        const exclude = new Set<string>(shownGuestActivityIdsRef.current);
         for (const item of Object.values(committedRef.current)) {
-          if (item?.activityId) exclude.push(item.activityId);
+          if (item?.activityId) exclude.add(item.activityId);
         }
 
         const anonymousId = getOrCreateAnonymousId();
@@ -391,7 +420,7 @@ export function GuestMyPlanPanel({
             city: citySlug,
             date: resolvedTargetDate,
             ...(whenChoice === "weekend" ? { dateTo: addDaysIso(resolvedTargetDate, 1) } : {}),
-            exclude,
+            exclude: [...exclude],
             ageRanges: whoKey === "me" ? ["18+"] : whoKey === "kids" ? kidRanges.slice().sort() : [],
             ...(interests.length > 0 ? { interests } : {}),
           }),
@@ -437,6 +466,8 @@ export function GuestMyPlanPanel({
         const merged = normalizePlanSuggestions(raw, 6);
         const distributed = distributeActivitiesToSlots(merged.slice(0, 6));
 
+        for (const row of distributed) shownGuestActivityIdsRef.current.add(row.activity.id);
+        setBatchHistory((prev) => appendSuggestionBatch(prev, distributed, MAX_SUGGESTION_BATCHES));
         setScenarioSlots(distributed);
         setSelectedPlanDate(resolvedTargetDate);
         setPhase((p) => (p === "engaged" ? "engaged" : "generated"));
@@ -467,6 +498,14 @@ export function GuestMyPlanPanel({
     recordEngagement();
     void fetchScenario();
   }, [fetchScenario, recordEngagement]);
+
+  const handleShowPreviousBatch = useCallback(() => {
+    const next = goBackSuggestionBatch(batchHistoryRef.current);
+    if (next.index === batchHistoryRef.current.index) return;
+    const batch = currentSuggestionBatch(next);
+    setBatchHistory(next);
+    if (batch) setScenarioSlots(batch);
+  }, []);
 
   const handleAddScenarioToPlan = useCallback(
     async (slot: GuestSlot, activity: NonNullable<MyPlanIdea["activity"]>) => {
@@ -547,9 +586,16 @@ export function GuestMyPlanPanel({
       label: "Выходные",
       sub: (() => {
         const sat = upcomingSaturdayIso(todayIso);
+        const sun = addDaysIso(sat, 1);
         const [, m0, d0] = sat.split("-").map(Number);
-        const [, m1, d1] = addDaysIso(sat, 1).split("-").map(Number);
-        return m0 === m1 ? `сб–вс, ${d0}–${d1}` : `сб–вс`;
+        const [, m1, d1] = sun.split("-").map(Number);
+        const monthShort = (iso: string) =>
+          new Date(`${iso}T12:00:00`)
+            .toLocaleDateString("ru-RU", { month: "short" })
+            .replace(/\./g, "");
+        return m0 === m1
+          ? `сб–вс, ${d0}–${d1} ${monthShort(sat)}`
+          : `сб–вс, ${d0} ${monthShort(sat)} – ${d1} ${monthShort(sun)}`;
       })(),
     },
   ];
@@ -563,7 +609,7 @@ export function GuestMyPlanPanel({
     setGoAdult(key === "me");
     if (key !== "kids") setKidRanges([]);
   };
-  const summaryText = (() => {
+  const summaryParts = (() => {
     const who =
       whoKey === "kids"
         ? `С детьми ${KID_AGE_GROUPS.filter((g) => kidRanges.includes(g.value)).map((g) => g.label).join(", ")}`.trim()
@@ -572,21 +618,23 @@ export function GuestMyPlanPanel({
           : "С кем угодно";
     const w = WHEN_OPTIONS.find((o) => o.key === whenChoice)!;
     const it = interests.map((k) => getSystemInterestLabel(k).toLowerCase()).join(", ");
-    return `${who} · ${w.label}, ${w.sub}${it ? ` · ${it}` : ""}`;
+    return [who, `${w.label}, ${w.sub}`, ...(it ? [it] : [])];
   })();
   const quizValid = !(whoKey === "kids" && kidRanges.length === 0);
 
   useEffect(() => {
     if (!refetchForWeekend || whenChoice !== "weekend") return;
     setRefetchForWeekend(false);
+    clearBatchHistory();
     void fetchScenario({ showGeneratedShellFirst: true });
-  }, [refetchForWeekend, whenChoice, fetchScenario]);
+  }, [refetchForWeekend, whenChoice, fetchScenario, clearBatchHistory]);
 
   const runQuiz = () => {
     if (!guestCanGenerateMore) {
       setShowOut(true);
       return;
     }
+    clearBatchHistory();
     void fetchScenario({ showGeneratedShellFirst: true });
   };
 
@@ -611,17 +659,46 @@ export function GuestMyPlanPanel({
     </div>
   );
 
+  const guestPickFields = (activity: NonNullable<MyPlanIdea["activity"]>, item: PlanItemWithActivity) => {
+    const startsAt = item.startsAt ?? confirmedGuestStartsAt(activity);
+    const date = startsAt
+      ? startsAt.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Europe/Minsk" })
+      : null;
+    const time = startsAt
+      ? startsAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Minsk" })
+      : null;
+    const priceText = activity.priceText?.trim();
+    const price = priceText
+      ? normalizeUiCurrencyText(priceText)
+      : activity.priceFrom === 0
+        ? "Бесплатно"
+        : activity.priceFrom != null && !Number.isNaN(activity.priceFrom)
+          ? formatPriceFrom(activity.priceFrom)
+          : null;
+    return {
+      address: formatActivityAddressLine(activity),
+      date,
+      time,
+      price,
+    };
+  };
+
   const resultCards = scenarioSlots.map((row) => {
     const committed = committedList.find((c) => c.item.activityId === row.activity.id);
     const item = committed?.item ?? activityToPlanItem(resolvedTargetDate, row.slot, row.activity);
+    const fields = guestPickFields(row.activity, item);
     return (
-      <RecommendationCard
+      <PlanPickCard
         key={`${row.slot}-${row.activity.id}`}
-        item={item}
-        isInPlan={Boolean(committed)}
-        guestDraft
-        onAddToPlan={() => void handleAddScenarioToPlan(row.slot, row.activity)}
-        onRemoveFromPlan={() => committed && handleRemoveCommitted(committed.sk)}
+        title={row.activity.title}
+        coverImageUrl={row.activity.coverImageUrl}
+        address={fields.address}
+        date={fields.date}
+        time={fields.time}
+        price={fields.price}
+        inPlan={Boolean(committed)}
+        onAdd={() => void handleAddScenarioToPlan(row.slot, row.activity)}
+        onRemove={committed ? () => handleRemoveCommitted(committed.sk) : undefined}
       />
     );
   });
@@ -684,8 +761,8 @@ export function GuestMyPlanPanel({
                     on ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]" : "border-[var(--mp-line)] bg-[var(--mp-card)] hover:border-[var(--mp-line-strong)]",
                   )}
                 >
-                  <b className="text-[15px] font-bold">{o.label}</b>
-                  <span className={cn("mt-0.5 text-[12.5px]", on ? "text-white/80" : "text-[var(--mp-tx2)]")}>{o.sub}</span>
+                  <b className="text-[15px] font-bold text-[var(--mp-tx)]">{o.label}</b>
+                  <span className="mt-0.5 text-[12.5px] text-[var(--mp-tx)]">{o.sub}</span>
                 </button>
               );
             })}
@@ -694,7 +771,7 @@ export function GuestMyPlanPanel({
         <div>
           <button type="button" aria-expanded={showInterests}
             onClick={() => setShowInterests((prev) => !prev)}
-            className="min-h-11 text-left text-sm font-semibold text-[var(--mp-ac-dark)]">
+            className="min-h-11 text-left text-sm font-normal text-[var(--mp-tx)] underline underline-offset-2">
             {showInterests ? "Скрыть интересы" : interests.length > 0 ? `Интересы выбраны: ${interests.length} · Изменить` : "Уточнить по интересам (необязательно)"}
           </button>
           {showInterests ? (
@@ -730,7 +807,14 @@ export function GuestMyPlanPanel({
     body = (
       <>
         <div className="mb-[18px] flex items-center gap-2 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-2 pl-3.5 pr-1">
-          <span className="flex-1 text-[13.5px] leading-[1.4] text-[var(--mp-tx2)]">{summaryText}</span>
+          <span className="flex-1 text-[13.5px] leading-[1.4] text-[var(--mp-tx)]">
+            {summaryParts.map((part, i) => (
+              <Fragment key={`${i}-${part}`}>
+                {i > 0 ? <span className="text-[var(--mp-tx2)]"> · </span> : null}
+                {part}
+              </Fragment>
+            ))}
+          </span>
           <button type="button" onClick={() => setPhase("onboarding")} className="min-h-11 rounded-xl px-3 text-sm font-bold text-[var(--mp-ac-dark)]">
             Изменить
           </button>
@@ -747,12 +831,24 @@ export function GuestMyPlanPanel({
               Нашли {scenarioSlots.length} {scenarioSlots.length === 1 ? "вариант" : scenarioSlots.length < 5 ? "варианта" : "вариантов"}
             </h3>
             <div className="space-y-2.5">{resultCards}</div>
-            {guestCanGenerateMore ? (
-              <button type="button" className={cn(quietBtn, "mt-2")} disabled={loadingScenario} onClick={handleRegenerate}>
-                <Repeat2 className="h-[17px] w-[17px]" aria-hidden />
-                Показать другие варианты
-              </button>
-            ) : null}
+            <div className="mt-2 flex flex-col gap-1">
+              {canGoBackSuggestionBatch(batchHistory) ? (
+                <button
+                  type="button"
+                  className={quietBtn}
+                  disabled={loadingScenario}
+                  onClick={handleShowPreviousBatch}
+                >
+                  К прошлым вариантам
+                </button>
+              ) : null}
+              {guestCanGenerateMore ? (
+                <button type="button" className={quietBtn} disabled={loadingScenario} onClick={handleRegenerate}>
+                  <Repeat2 className="h-[17px] w-[17px]" aria-hidden />
+                  Показать другие варианты
+                </button>
+              ) : null}
+            </div>
           </>
         )}
       </>
@@ -833,7 +929,9 @@ export function GuestMyPlanPanel({
                 <div className="line-clamp-2 text-[15px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">
                   {item.title || item.activity?.title}
                 </div>
-                <div className="mt-0.5 text-[13px] text-[var(--mp-tx2)]">{summaryDateLine(item)}</div>
+                <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline text-[13px] text-[var(--mp-tx2)]">
+                  {summaryDateLine(item)}
+                </div>
               </div>
               <button
                 type="button"
@@ -866,14 +964,38 @@ export function GuestMyPlanPanel({
         {benefit(<Users className="h-5 w-5" aria-hidden />, "Точнее — запомним возраст детей")}
         {benefit(<Bell className="h-5 w-5" aria-hidden />, <>Напомним о&nbsp;событиях вовремя</>)}
         {benefit(<Monitor className="h-5 w-5" aria-hidden />, <>Один план для семьи на&nbsp;телефоне и&nbsp;компьютере</>)}
-        <div className="mt-[18px] flex items-start gap-2.5 rounded-[14px] bg-[var(--mp-soft)] px-3.5 py-3 text-[13.5px] leading-[1.45] text-[var(--mp-tx2)]">
+        <button
+          type="button"
+          onClick={() => {
+            setShowOut(false);
+            if (committedCount > 0) setPhase("engaged");
+            else if (scenarioSlots.length > 0) setPhase("generated");
+            else setPhase("onboarding");
+          }}
+          className="mt-[18px] flex w-full items-start gap-2.5 rounded-[14px] bg-[var(--mp-soft)] px-3.5 py-3 text-left text-[13.5px] leading-[1.45] text-[var(--mp-tx2)] transition-colors hover:bg-[var(--mp-soft)]/80"
+        >
           <Repeat2 className="mt-px h-[18px] w-[18px] shrink-0" aria-hidden />
           <span>
-            {committedCount > 0
-              ? `Ваш план (${committedCount} ${committedCount === 1 ? "событие" : committedCount < 5 ? "события" : "событий"}) перенесётся в аккаунт.`
-              : "Всё выбранное перенесётся в аккаунт."}
+            {committedCount > 0 ? (
+              <>
+                Ваш план (
+                {committedCount}{" "}
+                {committedCount === 1 ? "событие" : committedCount < 5 ? "события" : "событий"}
+                ) перенесётся в аккаунт.{" "}
+                <span className="font-semibold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+                  Открыть сохранённый подбор
+                </span>
+              </>
+            ) : (
+              <>
+                Всё выбранное перенесётся в аккаунт.{" "}
+                <span className="font-semibold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+                  Открыть подбор
+                </span>
+              </>
+            )}
           </span>
-        </div>
+        </button>
       </>
     );
     footer = (
@@ -923,14 +1045,51 @@ export function GuestMyPlanPanel({
   );
 }
 
-function summaryDateLine(item: PlanItemWithActivity): string {
+function summaryDateLine(item: PlanItemWithActivity): React.ReactNode {
   const src = item.startsAt ?? (item.date ? new Date(`${item.date}T12:00:00`) : null);
-  if (!src) return "";
+  if (!src) return null;
   const d = src instanceof Date ? src : new Date(src);
-  if (Number.isNaN(d.getTime())) return "";
-  const day = d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Minsk" }).replace(/\./g, "");
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d
+    .toLocaleDateString("ru-RU", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      timeZone: "Europe/Minsk",
+    })
+    .replace(/\./g, "");
   const time = item.startsAt
-    ? item.startsAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Minsk" })
+    ? item.startsAt.toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Minsk",
+      })
     : "время уточняется";
-  return [day, time, item.activity?.ageLabel].filter(Boolean).join(" · ");
+  const activity = item.activity;
+  const priceText = activity?.priceText?.trim();
+  const price = priceText
+    ? normalizeUiCurrencyText(priceText)
+    : activity?.priceFrom === 0
+      ? "Бесплатно"
+      : activity?.priceFrom != null && !Number.isNaN(activity.priceFrom)
+        ? formatPriceFrom(activity.priceFrom)
+        : null;
+  const parts: React.ReactNode[] = [day, time];
+  if (price) {
+    parts.push(
+      price === "Бесплатно" ? (
+        price
+      ) : (
+        <span key="price" className="inline-flex items-baseline gap-[0.15em]">
+          {renderCurrencyText(price, { iconSize: "sm" })}
+        </span>
+      ),
+    );
+  }
+  return parts.map((part, i) => (
+    <span key={i} className="inline-flex min-w-0 items-baseline">
+      {i > 0 ? <span className="mx-1.5 shrink-0" aria-hidden>·</span> : null}
+      {part}
+    </span>
+  ));
 }

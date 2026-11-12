@@ -165,6 +165,7 @@ export function Step5Pricing({
   if (data.offerWizardType === "CAMP" && hideCta) {
     return (
       <p className="text-sm text-muted-foreground">
+
         Цена лагеря задаётся в сменах — на шаге «Расписание».
       </p>
     );
@@ -196,12 +197,14 @@ export function Step5Pricing({
     );
   }
 
+  const nonNumericPackagePrice = data.productType === "PARTY_PACKAGE" && ["ON_REQUEST", "FREE"].includes(data.partyPriceMode ?? "");
   const hasPriceCaption = isRichTextMeaningful(data.priceCaption);
   const hasPromotionDetails = isRichTextMeaningful(data.promotionDetails);
 
   const handlePricingModeChange = (pricingMode: "single" | "multiple") => {
     onChange({
       pricingMode,
+      ...(data.productType === "PARTY_PACKAGE" && pricingMode === "single" ? { partyPriceMode: "EXACT" as const } : {}),
       singlePrice: "",
       priceCaption: "",
       pricingOptions: [],
@@ -245,6 +248,18 @@ export function Step5Pricing({
 
   return (
     <div className="space-y-8">
+      {data.productType === "PARTY_PACKAGE" && data.pricingMode !== "multiple" && <label className="grid min-w-0 gap-2 text-sm">
+        Как задана цена пакета
+        <select value={data.partyPriceMode ?? "EXACT"} disabled={!isEditable}
+          onChange={event => onChange({ partyPriceMode: event.target.value as OfferFormData["partyPriceMode"],
+            ...(["ON_REQUEST", "FREE"].includes(event.target.value) ? { singlePrice: "" } : {}) })}
+          className="w-full min-w-0 rounded-md border bg-background p-2 text-base">
+          <option value="EXACT">Точная цена</option><option value="FROM">Цена от</option>
+          <option value="ON_REQUEST">Цена по запросу</option><option value="FREE">Бесплатно</option>
+          {data.partyPriceMode && !["EXACT", "FROM", "ON_REQUEST", "FREE"].includes(data.partyPriceMode) &&
+            <option value={data.partyPriceMode}>Цена требует уточнения</option>}
+        </select>
+      </label>}
       <div>
         <h2 className="text-xl font-semibold mb-2">Стоимость и участие</h2>
         <p className="text-muted-foreground">
@@ -274,7 +289,7 @@ export function Step5Pricing({
         />
       </div>
 
-      {data.pricingMode === "single" && (
+      {data.pricingMode === "single" && !nonNumericPackagePrice && (
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2 md:col-span-2">
@@ -315,6 +330,9 @@ export function Step5Pricing({
         </div>
       )}
 
+      {data.pricingMode === "single" && nonNumericPackagePrice && <p className="text-sm text-muted-foreground">
+        {data.partyPriceMode === "FREE" ? "Участие бесплатно. Числовая цена не требуется." : "Стоимость будет согласована с клиентом. Числовая цена не требуется."}
+      </p>}
       {data.pricingMode === "multiple" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -451,7 +469,7 @@ export function Step5Pricing({
         <div className="bg-gray-50 border rounded-lg p-4">
           <h4 className="font-medium mb-3">Превью цен</h4>
           <div className="space-y-2">
-            {data.pricingMode === "single" && (
+            {data.pricingMode === "single" && !nonNumericPackagePrice && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-4">
                   <span>Стоимость</span>

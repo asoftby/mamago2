@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, homePeriodLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
-import { FamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
+import { FamilyHomeCache, getSharedFamilyHomeCache, clearSharedFamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 
 const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02", policyVersion: "v2", audience: "personalized",
@@ -36,7 +36,11 @@ test("catalog is explicit canonical OR, round trips; no identity in URL", () => 
 });
 
 test("full age ranges and Minsk plan date", () => {
-  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 168 }), "3–14");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 168 }), "3–14 лет");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 0, ageMaxMonths: 12 }), "0–1 год");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 12, ageMaxMonths: 36 }), "1–3 года");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 192 }), "3–16 лет");
+  assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: 216 }), "3+");
   assert.equal(homeAgeLabel({ agePolicy: "SPECIFIC", ageMinMonths: 36, ageMaxMonths: null }), "3+");
   assert.equal(minskPlanDate("2030-11-02T22:30:00Z"), "2030-11-03");
 });
@@ -58,6 +62,66 @@ test("cache hits retain run; no cross-account, TTL or profile leak", () => {
   cache.set(context, "minsk", null, delivery());
   assert.equal(cache.get({ ...context, actorId: "account_b" }, "minsk", null), null);
   assert.equal(cache.get(context, "minsk", null), null, "wrong actor cancels all prior entries");
+});
+
+test("remount reuses tab-local recommendations without re-clearing restored dismissals", () => {
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = {};
+  try {
+    clearSharedFamilyHomeCache();
+    const first = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+    first.set(context, "minsk", "personas:[]:ages:[]", delivery());
+    first.dismiss("event_a", 9_999_999_999_999);
+    first.set(context, "minsk", "personas:[]:ages:[]", delivery());
+    const remounted = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+    assert.equal(remounted, first);
+    remounted.dismiss("event_a", 9_999_999_999_999);
+    assert.equal(remounted.get(context, "minsk", "personas:[]:ages:[]")?.runId, "same_run");
+    assert.deepEqual(remounted.get(context, "minsk", "personas:[]:ages:[]")?.items, [{ id: "event_b" }]);
+    const other = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_b");
+    assert.notEqual(other, first);
+    assert.equal(first.get(context, "minsk", "personas:[]:ages:[]"), null);
+    clearSharedFamilyHomeCache();
+    assert.notEqual(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_b"), other);
+  } finally {
+    clearSharedFamilyHomeCache();
+    if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});
+
+test("mounted refresh reattaches the replacement shared cache before request", () => {
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = {};
+  try {
+    clearSharedFamilyHomeCache();
+    const mounted = { current: getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a") };
+    const stale = mounted.current;
+    stale.begin();
+    clearSharedFamilyHomeCache();
+    mounted.current = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+    mounted.current.set(context, "minsk", null, delivery());
+    assert.notEqual(mounted.current, stale);
+    assert.equal(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a"), mounted.current);
+    assert.equal(getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a").get(context, "minsk", null)?.runId, "same_run");
+  } finally {
+    clearSharedFamilyHomeCache();
+    if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});
+
+test("SSR never shares private recommendation caches", () => {
+  const first = getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+  assert.notEqual(first, getSharedFamilyHomeCache<ReturnType<typeof delivery>>("account_a"));
+});
+
+test("null start time does not poison cache expiration", () => {
+  const cache = new FamilyHomeCache<{ items: { id: string; startsAt: string | null }[]; window: { horizonDays: 7 } }>("account_a");
+  const value = { items: [{ id: "a", startsAt: null }], window: { horizonDays: 7 as const } };
+  cache.set(context, "minsk", null, value, 1_000);
+  assert.deepEqual(cache.get(context, "minsk", null, 1_001), value);
+  assert.equal(cache.get(context, "minsk", null, 121_001), null);
 });
 
 test("expired occurrence invalidates cache before the ordinary TTL", () => {
@@ -161,32 +225,41 @@ test("newly queued dismissals are sent while an earlier write is pending", async
   assert.ok(records.every(record => record.saved));
 });
 
-test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty states", () => {
+test("UI contract: one save control, poster, keyboard/ARIA, and truthful empty/error states", () => {
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
-  assert.equal((ui.match(/<SaveHeart /g) ?? []).length, 1);
-  assert.ok(ui.includes("<FamilyActivationEditChildBirthOverlay"), "birth-only editor must preserve existing interests");
-  assert.match(ui, /attempt < 2/);
-  assert.match(ui, /error\.message === "home_409"/);
-  assert.match(ui, /deliveryScopeMatches/);
-  assert.match(ui, /const deadline = setTimeout/);
-  assert.match(ui, /clearTimeout\(deadline\)/);
-  assert.match(ui, /setData\(null\)/);
-  assert.match(ui, /keepalive: body.action === "dismiss"/, "dismissal request should survive page navigation");
-  assert.match(ui, /if \(dismissFlushActive.current \|\| !allowedActor.current\) return/, "dismissal writes must be serialized");
-  assert.match(ui, /await drainPendingHomeDismissals\(/, "retryable failures must not block other dismissals");
-  assert.match(ui, /void flushDismissals\(\);\s*void load\(\{ keepCurrent: true \}\)/,
-    "persist user rejection before fetching replacement recommendations");
-  assert.doesNotMatch(ui, /AddParticipantModal/);
-  assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
-  for (const expected of ['framing="fixed"', 'coverRatio="2/3"', 'coverFit="cover"', 'aria-pressed', 'Для кого:', 'homeChildrenYoungestFirst', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'HomeMoreEventsCard', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
+  assert.ok(ui.includes("homeRecommendationLabel"));
+  assert.doesNotMatch(ui, /Не удалось обновить\. Повторить/, "failed background refresh must not add a technical CTA below loaded cards");
+  assert.doesNotMatch(ui, /Не удалось загрузить события\. Повторите попытку\./, "initial error avoids a misleading empty-state poster");
+  assert.match(ui, /state === "error" && !data[\s\S]*?<p role="alert"[^>]*>Не удалось загрузить события/, "initial failure renders an inline error, not an empty event card");
+  assert.doesNotMatch(ui, /SoftAudienceNotice|hasEvents=\{false\}/, "no explanatory poster is inserted into an organic feed");
+  assert.match(ui, /loadHomePublicFallback\(citySlug\)/, "a failed personalized API attempts a public catalog recovery");
+  assert.match(ui, /safeFallbackEvents\.length === 0[\s\S]*?В этой подборке пока нет подходящих событий/, "age-filtered public fallback must not claim the entire catalog is empty");
+  assert.match(ui, /safeFallbackEvents\.map/, "age-eligible recovered events are rendered as real poster cards");
+  assert.doesNotMatch(ui, /wasAuthorized && mounted\.current/, "auth resolution must not start a duplicate recommendation request");
+  assert.doesNotMatch(ui, /setTimeout\(\(\) => \{[\s\S]*?setState\("error"\)/, "component must not race request-level timeout with a second deadline");
+
+  assert.ok(ui.includes("hasCatalogEvents"));
+  assert.ok(!ui.includes("homeChipSelectEvent"));
+  assert.ok(ui.includes("stored.filter(entry => entry.selectedChildId == null)"));
+  assert.ok(ui.includes("Date.now() - lastCheckedAt.current < 60_000"));
+  assert.ok(ui.includes("visibilitychange"));
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
   assert.doesNotMatch(page, /CityHomeKudaSection|getKudaDiscoveryFeed|hasHomeContent|kudaPreviewPromise/);
   assert.match(page, /events.mode === "personal"/);
   assert.ok(page.indexOf("<StoriesSection cityId=") < page.indexOf('events.mode === "error"'),
     "stories must precede both public and personalized afisha");
   const general = readFileSync("src/features/city-home/components/CityHomeGeneralEvents.tsx", "utf8");
-  assert.match(general, /authenticated=|События, которые подходят вам/);
+  assert.match(general, /authenticated=|События, которые подходят вашей семье/);
   assert.doesNotMatch(general, /AGE_GROUPS|age_discovery_unavailable|\/api\/discovery\/events\/page/,
     "guest must not launch a second discovery request for age filters");
-  assert.doesNotMatch(general, /useFamilyPersona|useDiscoveryFilters|selectedPersona/);
+  assert.match(general, /useFamilyPersona/, "authenticated non-personalized users still honor global header selection");
+  assert.doesNotMatch(general, /useDiscoveryFilters|\/api\/discovery\/events\/page/);
+});
+
+test("shared EventCard retains home recommendation attribution on save", () => {
+  const card = readFileSync("src/components/events/EventCard.tsx", "utf8");
+  const home = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
+  assert.match(card, /planAttribution\?: HomePlanAttribution/);
+  assert.match(card, /planAttribution=\{saveMeta\.planAttribution\}/);
+  assert.match(home, /planAttribution: \{ planAddSource: "home-family-picks", recommendationExposureId: item\.exposureId \}/);
 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -201,6 +202,8 @@ export async function PATCH(
         cityId: true,
         nextOccurrenceAt: true,
         scheduleJson: true,
+        bookingEnabled: true,
+        bookingMode: true,
         eventCategoryId: true,
         organizerId: true,
         coverImageId: true,
@@ -245,7 +248,7 @@ export async function PATCH(
         },
         sessions: {
           orderBy: { startsAt: "asc" },
-          select: { startsAt: true, source: true, title: true },
+          select: { startsAt: true, source: true, title: true, withdrawnAt: true },
         },
       },
     });
@@ -540,6 +543,18 @@ export async function PATCH(
       updateData.scheduleJson = nextScheduleJson as Prisma.InputJsonValue;
     }
 
+    const requestBookingPatch = deriveEventRequestBookingColumns({
+      participationMode: nextScheduleJson.participationMode,
+      scheduleJson: nextScheduleJson,
+      previousParticipationMode: (existing.scheduleJson as Record<string, unknown> | null)?.participationMode,
+      current: { bookingEnabled: existing.bookingEnabled, bookingMode: existing.bookingMode },
+      hasBusiness: Boolean(nextBusinessId !== undefined ? nextBusinessId : existing.businessId),
+    });
+    if (requestBookingPatch) {
+      updateData.bookingEnabled = requestBookingPatch.bookingEnabled;
+      updateData.bookingMode = requestBookingPatch.bookingMode;
+    }
+
     if (
       typeof body.eventCategoryId === "string" &&
       body.eventCategoryId !== existing.eventCategoryId
@@ -640,34 +655,29 @@ export async function PATCH(
 
     const hasPrismaWrites = Object.keys(updateData).length > 0;
 
-    if (hasPrismaWrites) {
-      const activityUpdateStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-      saved = await prisma.activity.update({
-        where: { id },
-        data: updateData,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          slug: true,
-          coverImageId: true,
-        },
+    const sessionsSyncStarted = activitySessionsNeedResync && isServerSavePerfEnabled() ? performance.now() : 0;
+    const saveActivity = (db: Pick<Prisma.TransactionClient, "activity">) => db.activity.update({
+      where: { id },
+      data: updateData,
+      select: { id: true, title: true, status: true, slug: true, coverImageId: true },
+    });
+    const unchangedActivity = {
+      id: existing.id,
+      title: existing.title,
+      status: existing.status,
+      slug: existing.slug,
+      coverImageId: existing.coverImageId,
+    };
+    if (activitySessionsNeedResync) {
+      saved = await prisma.$transaction(async (tx) => {
+        // Both configuration and sessions become visible to booking together.
+        await tx.$queryRaw`SELECT "id" FROM "Activity" WHERE "id" = ${id} FOR UPDATE`;
+        const activity = hasPrismaWrites ? await saveActivity(tx) : unchangedActivity;
+        await replaceActivitySessionsFromScheduleJson({ prisma: tx, activityId: id, scheduleJson: nextScheduleJson });
+        return activity;
       });
-      if (isServerSavePerfEnabled()) {
-        console.info("[event-patch-timing] activity-update", {
-          activityId: id,
-          durationMs: Math.round(performance.now() - activityUpdateStarted),
-          hasPrismaWrites,
-        });
-      }
     } else {
-      saved = {
-        id: existing.id,
-        title: existing.title,
-        status: existing.status,
-        slug: existing.slug,
-        coverImageId: existing.coverImageId,
-      };
+      saved = hasPrismaWrites ? await saveActivity(prisma) : unchangedActivity;
     }
     perf.mark("prisma-update");
 
@@ -689,22 +699,7 @@ export async function PATCH(
       venueChanged ? await resolveEventRevalidationTargets(saved.id) : null;
 
     if (activitySessionsNeedResync) {
-      if (isServerSavePerfEnabled()) {
-        const beforeSyncState = await getActivityOccurrenceDebugState(saved.id);
-        console.info("[event-patch-debug] before sync", {
-          activityId: saved.id,
-          status: saved.status,
-          previousNextOccurrenceAt: existing.nextOccurrenceAt,
-          beforeSyncState,
-        });
-      }
-
-      const sessionsSyncStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-      await replaceActivitySessionsFromScheduleJson({
-        prisma,
-        activityId: saved.id,
-        scheduleJson: nextScheduleJson,
-      });
+      const sessionsSyncMs = sessionsSyncStarted ? Math.round(performance.now() - sessionsSyncStarted) : 0;
       perf.mark("schedule-sync");
       const syncedNextOccurrenceAt = await syncActivityNextOccurrenceAt({
         prisma,
@@ -715,7 +710,7 @@ export async function PATCH(
       if (isServerSavePerfEnabled()) {
         console.info("[event-patch-timing] activity-sessions-sync", {
           activityId: saved.id,
-          durationMs: Math.round(performance.now() - sessionsSyncStarted),
+          durationMs: sessionsSyncMs,
         });
         console.info("[event-patch-timing] next-occurrence-sync", {
           activityId: saved.id,

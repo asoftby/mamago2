@@ -26,9 +26,7 @@ import { cn } from "@/lib/utils";
 import type { ArticleEditorSnapshot, ArticleLinkedItemSnapshot } from "@/lib/article/articleAdminTypes";
 import { ArticleLinkedItemsEditor } from "@/components/admin/articles/ArticleLinkedItemsEditor";
 import {
-  BREAKING_NEWS_DEFAULT_TTL_DAYS,
   COLLECTION_MIN_ITEMS,
-  defaultBreakingNewsExpiresAt,
 } from "@/lib/journal/publicationType";
 import { geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 import {
@@ -59,6 +57,7 @@ import { usePublicationSlugField } from "@/hooks/usePublicationSlugField";
 import { PublicationSlugField } from "@/components/admin/publications/PublicationSlugField";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
+import { UnsavedPublicationChangesDialog } from "@/components/admin/publications/UnsavedPublicationChangesDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,6 +88,9 @@ function applySnapshot(setters: {
   setAuthorLabel: (v: string) => void;
   setCityContext: (v: string) => void;
   setCategoryId: (v: string | null) => void;
+  setOccasionId: (v: string | null) => void;
+  setReviewedSeasonStart: (v: string | null) => void;
+  setSeasonReviewRequested: (v: boolean) => void;
   setAdditionalCategoryIds: (v: string[]) => void;
   setAdditionalGeographyTargets: (v: ArticleGeographyTargetInput[]) => void;
   setTagIds: (v: string[]) => void;
@@ -117,6 +119,9 @@ function applySnapshot(setters: {
   setters.setAuthorLabel(snap.authorLabel ?? "");
   setters.setCityContext(snap.cityContext ?? "");
   setters.setCategoryId(snap.categoryId ?? null);
+  setters.setOccasionId(snap.occasionId ?? null);
+  setters.setReviewedSeasonStart(snap.seasonReviewedForStart ?? null);
+  setters.setSeasonReviewRequested(false);
   setters.setAdditionalCategoryIds(snap.additionalCategoryIds ?? []);
   setters.setAdditionalGeographyTargets(snap.additionalGeographyTargets ?? []);
   setters.setTagIds(snap.tagIds);
@@ -142,7 +147,6 @@ function applySnapshot(setters: {
 const PUBLICATION_TYPE_OPTIONS: Array<{ value: ArticlePublicationType; label: string; hint: string }> = [
   { value: "ARTICLE", label: "Статья", hint: "Обычный материал журнала, без бейджа." },
   { value: "COLLECTION", label: "Подборка", hint: `Бейдж «Подборка», блок «Подборки mamaGo». Минимум ${COLLECTION_MIN_ITEMS} элемента.` },
-  { value: "BREAKING_NEWS", label: "Новость", hint: `Бейдж «Новость», блок «Новости» до даты «Актуально до» (по умолчанию +${BREAKING_NEWS_DEFAULT_TTL_DAYS} дней).` },
 ];
 
 export function ArticleEditorClient({
@@ -184,6 +188,9 @@ export function ArticleEditorClient({
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial.categoryId ?? null);
+  const [occasionId, setOccasionId] = useState<string | null>(initial.occasionId ?? null);
+  const [reviewedSeasonStart, setReviewedSeasonStart] = useState<string | null>(initial.seasonReviewedForStart ?? null);
+  const [seasonReviewRequested, setSeasonReviewRequested] = useState(false);
   const [additionalCategoryIds, setAdditionalCategoryIds] = useState<string[]>(initial.additionalCategoryIds ?? []);
   const [additionalGeographyTargets, setAdditionalGeographyTargets] = useState<ArticleGeographyTargetInput[]>(initial.additionalGeographyTargets ?? []);
   const [tagIds, setTagIds] = useState<string[]>(initial.tagIds);
@@ -193,9 +200,14 @@ export function ArticleEditorClient({
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [regions, setRegions] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; label: string; slug: string }[]>([]);
+  const [occasions, setOccasions] = useState<Array<{
+    id: string; label: string; isActive: boolean; startsAt: string | null; endsAt: string | null;
+  }>>([]);
   const [discoveryTags, setDiscoveryTags] = useState<
-    { id: string; title: string; description: string | null; isActive: boolean }[]
+    { id: string; title: string; description: string | null; isActive: boolean; reviewStatus?: "APPROVED" | "PENDING" }[]
   >([]);
+  const [newTagTitle, setNewTagTitle] = useState("");
+  const [creatingTag, setCreatingTag] = useState(false);
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
   const [content, setContent] = useState<ArticleContentPayload>(initialArticleMedia.content);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
@@ -245,6 +257,8 @@ export function ArticleEditorClient({
         authorLabel,
         cityContext,
         categoryId,
+        occasionId,
+        seasonReviewRequested,
         additionalCategoryIds,
         additionalGeographyTargets,
         tagIds,
@@ -273,6 +287,8 @@ export function ArticleEditorClient({
       authorLabel,
       cityContext,
       categoryId,
+      occasionId,
+      seasonReviewRequested,
       additionalCategoryIds,
       additionalGeographyTargets,
       tagIds,
@@ -322,18 +338,20 @@ export function ArticleEditorClient({
       const selectedCategoryIds = [initial.categoryId, ...(initial.additionalCategoryIds ?? [])].filter(Boolean).join(",");
       const selectedCityIds = [initial.cityId, ...(initial.additionalGeographyTargets ?? []).filter((target) => target.type === "CITY").map((target) => target.cityId)].filter(Boolean).join(",");
       const selectedRegionIds = (initial.additionalGeographyTargets ?? []).filter((target) => target.type === "REGION").map((target) => target.regionId).join(",");
-      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}&selectedCityIds=${encodeURIComponent(selectedCityIds)}&selectedRegionIds=${encodeURIComponent(selectedRegionIds)}`);
+      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}&selectedCityIds=${encodeURIComponent(selectedCityIds)}&selectedRegionIds=${encodeURIComponent(selectedRegionIds)}&selectedOccasionId=${encodeURIComponent(initial.occasionId ?? "")}`);
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
         regions?: { id: string; name: string; slug: string }[];
         authors?: { id: string; label: string; email: string }[];
         categories?: { id: string; label: string; slug: string }[];
+        occasions?: { id: string; label: string; isActive: boolean; startsAt: string | null; endsAt: string | null }[];
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
       setRegions(data.regions ?? []);
       setCategories(data.categories ?? []);
+      setOccasions(data.occasions ?? []);
 
       const selectedIds = initial.tagIds.join(",");
       const tagsUrl = selectedIds
@@ -342,7 +360,7 @@ export function ArticleEditorClient({
       const tagsRes = await fetch(tagsUrl);
       if (!tagsRes.ok || cancelled) return;
       const tagsData = (await tagsRes.json().catch(() => null)) as
-        | { id: string; title: string; description: string | null; isActive: boolean }[]
+        | { id: string; title: string; description: string | null; isActive: boolean; reviewStatus?: "APPROVED" | "PENDING" }[]
         | null;
       if (!tagsData || cancelled) return;
       setDiscoveryTags(tagsData);
@@ -350,7 +368,7 @@ export function ArticleEditorClient({
     return () => {
       cancelled = true;
     };
-  }, [initial.categoryId, initial.additionalCategoryIds, initial.additionalGeographyTargets, initial.cityId, initial.tagIds]);
+  }, [initial.categoryId, initial.additionalCategoryIds, initial.additionalGeographyTargets, initial.cityId, initial.tagIds, initial.occasionId]);
 
   const {
     previewSlug,
@@ -367,6 +385,42 @@ export function ArticleEditorClient({
     emptyFallback: "article",
     slugHistorySupported: true,
   });
+
+  const trimmedNewTagTitle = newTagTitle.trim();
+  const tagSearchResults = trimmedNewTagTitle
+    ? discoveryTags.filter((tag) => tag.title.toLocaleLowerCase("ru").includes(trimmedNewTagTitle.toLocaleLowerCase("ru"))).slice(0, 5)
+    : [];
+  const matchingTag = trimmedNewTagTitle
+    ? discoveryTags.find((tag) => tag.title.toLocaleLowerCase("ru") === trimmedNewTagTitle.toLocaleLowerCase("ru"))
+    : undefined;
+
+  const createTagInline = async () => {
+    if (!trimmedNewTagTitle || matchingTag || creatingTag) return;
+    setCreatingTag(true);
+    try {
+      const response = await fetch("/api/admin/discovery-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmedNewTagTitle }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.id) {
+        toast.error(response.status === 409 ? "Такой тег уже есть в справочнике" : result?.error ?? "Не удалось создать тег");
+        return;
+      }
+      const created = result as { id: string; title: string; description: string | null; isActive: boolean; reviewStatus: "APPROVED" | "PENDING" };
+      setDiscoveryTags((current) => [...current, created]);
+      setTagIds((current) => current.includes(created.id) ? current : [...current, created.id]);
+      setNewTagTitle("");
+      toast.success(created.reviewStatus === "PENDING"
+        ? "Тег добавлен в черновик и отправлен на одобрение"
+        : "Тег создан и выбран");
+    } catch {
+      toast.error("Не удалось создать тег");
+    } finally {
+      setCreatingTag(false);
+    }
+  };
 
   const selectedCity = cities.find((c) => c.id === cityId) ?? null;
   const previewSeg = previewSlug;
@@ -398,6 +452,9 @@ export function ArticleEditorClient({
       setAuthorLabel,
       setCityContext,
       setCategoryId,
+      setOccasionId,
+      setReviewedSeasonStart,
+      setSeasonReviewRequested,
       setAdditionalCategoryIds,
       setAdditionalGeographyTargets,
       setTagIds,
@@ -486,6 +543,9 @@ export function ArticleEditorClient({
       authorUserId: authorUserId || null,
       cityContext: cityContext.trim() || null,
       categoryId,
+      occasionId,
+      seasonReviewRequested,
+      seasonReviewStartsAt: occasions.find((occasion) => occasion.id === occasionId)?.startsAt ?? null,
       additionalCategoryIds,
       additionalGeographyTargets,
       tagIds,
@@ -518,6 +578,9 @@ export function ArticleEditorClient({
       authorUserId,
       cityContext,
       categoryId,
+      occasionId,
+      seasonReviewRequested,
+      occasions,
       additionalCategoryIds,
       additionalGeographyTargets,
       tagIds,
@@ -754,6 +817,7 @@ export function ArticleEditorClient({
         toast.error(msg);
         return;
       }
+      const submitBody = (await res.json().catch(() => null)) as { status?: string } | null;
       const next = await fetchSnapshot(articleId);
       if (next) {
         applyEditorSnapshot(next);
@@ -761,7 +825,18 @@ export function ArticleEditorClient({
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
       }
-      showArticleSuccess("submitted", articleId, next, Boolean(initial.id.trim()));
+      // Исход — по статусу сервера (снапшот или тело ответа /submit), а не по нажатой кнопке.
+      const confirmedStatus = next?.status ?? submitBody?.status;
+      if (confirmedStatus !== "PUBLISHED" && confirmedStatus !== "PENDING") {
+        toast.error("Сервер не подтвердил публикацию или отправку на модерацию. Обновите страницу и проверьте статус.");
+        return;
+      }
+      showArticleSuccess(
+        confirmedStatus === "PUBLISHED" ? "published" : "submitted",
+        articleId,
+        next,
+        Boolean(initial.id.trim()),
+      );
       router.replace(`/admin/content/articles/${articleId}/edit`);
       router.refresh();
     } catch (e) {
@@ -1011,6 +1086,7 @@ export function ArticleEditorClient({
               <CardMultiSelect
                 placeholder="Выберите дополнительные категории"
                 values={additionalCategoryIds}
+                maxSelected={2}
                 onChange={(ids) => setAdditionalCategoryIds(ids.filter((id) => id !== categoryId))}
                 options={categories
                   .filter((category) => category.id !== categoryId)
@@ -1020,21 +1096,116 @@ export function ArticleEditorClient({
             </div>
           </div>
           <div className="space-y-2">
+            <Label htmlFor="article-occasion">Повод (необязательно)</Label>
+            <p className="text-xs text-muted-foreground">
+              Сезонные статьи используют даты повода из админки. После окончания сезона
+              они остаются доступны по URL, но опускаются ниже актуальных материалов.
+            </p>
+            {hydrated ? (
+              <Select
+                value={occasionId ?? "__none__"}
+                onValueChange={(value) => {
+                  setOccasionId(value === "__none__" ? null : value);
+                  setSeasonReviewRequested(false);
+                }}
+              >
+                <SelectTrigger id="article-occasion" className="w-full">
+                  <SelectValue placeholder="Постоянная статья (без повода)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Без повода — постоянная статья</SelectItem>
+                  {occasions.map((occasion) => (
+                    <SelectItem key={occasion.id} value={occasion.id}>
+                      {occasion.label}{!occasion.isActive ? " (неактивен)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : <div className="h-9 w-full animate-pulse rounded-md bg-muted/40" aria-hidden />}
+            {(() => {
+              const selected = occasions.find((occasion) => occasion.id === occasionId);
+              if (!selected) return null;
+              const needsReview = occasionId === initial.occasionId
+                && selected.startsAt !== null && selected.startsAt !== reviewedSeasonStart;
+              return (
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <p>Период: {selected.startsAt?.slice(0, 10) ?? "—"} — {selected.endsAt?.slice(0, 10) ?? "—"}</p>
+                  {needsReview ? (
+                    <div className="space-y-2">
+                      <p>Для текущего периода требуется редакционная проверка.</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={seasonReviewRequested ? "secondary" : "outline"}
+                        disabled={!selected.isActive}
+                        onClick={() => setSeasonReviewRequested(true)}
+                      >
+                        {seasonReviewRequested ? "Актуальность подтверждена (сохраните)" : "Подтвердить актуальность для сезона"}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="article-discovery-tags">Теги</Label>
             <p className="text-xs text-muted-foreground">
               Теги управляют подборками и SEO-страницами, но не зависят от города публикации.
             </p>
-            <div id="article-discovery-tags">
-              <CardMultiSelect
-                placeholder="Выберите теги"
-                values={tagIds}
-                onChange={setTagIds}
-                options={discoveryTags.map((tag) => ({
-                  value: tag.id,
-                  label: tag.isActive ? tag.title : `${tag.title} (выключен)`,
-                }))}
-                allowClear
+            <div className="space-y-2">
+              <Input
+                aria-label="Найти или создать тег"
+                placeholder="Найти или создать тег…"
+                value={newTagTitle}
+                maxLength={80}
+                onChange={(event) => setNewTagTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && trimmedNewTagTitle && !matchingTag) {
+                    event.preventDefault();
+                    void createTagInline();
+                  }
+                }}
               />
+              {trimmedNewTagTitle ? (
+                <div className="rounded-xl border border-border p-2 space-y-1" aria-label="Результаты поиска тегов">
+                  {tagSearchResults.map((tag) => (
+                    <Button
+                      key={tag.id}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setTagIds((current) => current.includes(tag.id) ? current : [...current, tag.id]);
+                        setNewTagTitle("");
+                      }}
+                    >
+                      {tag.title}{tag.reviewStatus === "PENDING" ? " (ожидает одобрения)" : ""}
+                    </Button>
+                  ))}
+                  {!matchingTag ? (
+                    <Button type="button" size="sm" variant="outline" disabled={creatingTag} onClick={() => void createTagInline()}>
+                      {creatingTag ? "Создаём…" : `+ Создать «${trimmedNewTagTitle}»`}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              <div id="article-discovery-tags">
+                <CardMultiSelect
+                  placeholder="Выберите теги"
+                  values={tagIds}
+                  onChange={setTagIds}
+                  options={discoveryTags.map((tag) => ({
+                    value: tag.id,
+                    label: tag.reviewStatus === "PENDING" ? `${tag.title} (ожидает одобрения)` : tag.isActive ? tag.title : `${tag.title} (выключен)`,
+                  }))}
+                  allowClear
+                />
+              </div>
+              {tagIds.length > 0 ? (
+                <p className="text-xs text-muted-foreground">Выбрано тегов: {tagIds.length}. Обычно достаточно 2–5 релевантных тем.</p>
+              ) : null}
             </div>
           </div>
           <PublicationSlugField
@@ -1234,7 +1405,7 @@ export function ArticleEditorClient({
           <div
             role="radiogroup"
             aria-label="Тип публикации"
-            className="grid gap-2 sm:grid-cols-3"
+            className="grid gap-2 sm:grid-cols-2"
           >
             {PUBLICATION_TYPE_OPTIONS.map((option) => (
               <button
@@ -1242,15 +1413,7 @@ export function ArticleEditorClient({
                 type="button"
                 role="radio"
                 aria-checked={publicationType === option.value}
-                onClick={() => {
-                  setPublicationType(option.value);
-                  if (option.value === "BREAKING_NEWS" && !expiresAtLocal) {
-                    const base = fromLocalDatetimeValue(publishedAtLocal);
-                    setExpiresAtLocal(toLocalDatetimeValue(
-                      defaultBreakingNewsExpiresAt(base ? new Date(base) : new Date()).toISOString(),
-                    ));
-                  }
-                }}
+                onClick={() => setPublicationType(option.value)}
                 className={cn(
                   "min-h-11 rounded-lg border px-3 py-2.5 text-left transition-colors",
                   publicationType === option.value
@@ -1390,22 +1553,12 @@ export function ArticleEditorClient({
         </div>
       ) : null}
 
-      <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
-        <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Несохранённые изменения</AlertDialogTitle>
-            <AlertDialogDescription>
-              Вы изменили статью. Уйти без сохранения? Несохранённые правки будут потеряны.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 [&_button]:min-h-11 sm:gap-0 sm:[&_button]:min-h-9">
-            <AlertDialogCancel type="button">Остаться</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={confirmLeave}>
-              Уйти без сохранения
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UnsavedPublicationChangesDialog
+        open={leaveDialogOpen}
+        onOpenChange={onLeaveDialogOpenChange}
+        onConfirmLeave={confirmLeave}
+        publicationName="статью"
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
