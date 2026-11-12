@@ -271,6 +271,34 @@ function isUnitFree(
   });
 }
 
+/**
+ * Validate a specifically selected individual resource interval.
+ *
+ * Reuses the same unitWindows / CLOSED-exception / block / allocation logic
+ * as ON_REQUEST_WINDOWS instead of inventing a manual-booking availability
+ * engine. Caller must hold the BookingUnit row lock and re-read under it.
+ */
+export function isResourceWindowAvailable(
+  unit: SlotSnapshot["units"][number],
+  start: Date,
+  end: Date,
+  now = new Date(),
+): boolean {
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+      start <= now || end <= start || end.getTime() - start.getTime() > DAY_MS) return false;
+  if (unit.minDurationMinutes !== null &&
+      end.getTime() - start.getTime() < unit.minDurationMinutes * MINUTE_MS) return false;
+  const first = shiftDateKey(dateKeyInZone(start, unit.timezone), -1);
+  const last = shiftDateKey(dateKeyInZone(end, unit.timezone), 1);
+  const windows: UtcInterval[] = [];
+  for (let date = first; date <= last; date = shiftDateKey(date, 1)) {
+    windows.push(...unitWindows(unit, date));
+  }
+  const merged = mergeWindows(windows);
+  if (!merged.some((window) => window.start <= start && window.end >= end)) return false;
+  return isUnitFree(unit, { start, end }, 0, now);
+}
+
 /** Pure calculation. reserveSlot must repeat these checks inside its transaction. */
 export function calculateSlots(
   snapshot: SlotSnapshot,
