@@ -262,6 +262,8 @@ jobs:
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
           pnpm exec tsx src/lib/discovery/partitionDiscoveryFeed.agePolicy.test.ts
           pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
+          pnpm exec tsx src/server/services/ranking/businessQualityBoost.test.ts
+          pnpm exec tsx src/components/business/events/boostBadgePolicy.test.ts
           pnpm exec tsx src/features/city-home/lib/personaRanking.test.ts
           pnpm exec tsx src/server/place/placeDetailPerf.test.ts
 
@@ -527,5 +529,6 @@ jobs:
           pnpm exec tsx src/server/discovery/crossRegionFamilySignal.integration.test.ts
           pnpm exec tsx src/lib/discovery/promotionComposition.test.ts
           pnpm exec tsx src/server/geo/boostRegionTargeting.test.ts
+          pnpm exec tsx src/server/services/promotion/dailyFreeBoost.service.test.ts
           pnpm exec tsx src/server/discovery/kudaListingHydration.test.ts
 
