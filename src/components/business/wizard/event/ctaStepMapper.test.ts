@@ -306,6 +306,11 @@ const reverseBookingRequestOnly = mapCtaStepValueToEventLegacy(bookingRequestOnl
 });
 assert.equal(reverseBookingRequestOnly.bookingEnabled, true);
 assert.equal(reverseBookingRequestOnly.bookingMode, "REQUEST_ONLY");
+assert.equal(reverseBookingRequestOnly.participationMode, "request");
+assert.equal(
+  mapCtaStepValueToEventFormPatch(bookingRequestOnly).participationMode,
+  "request",
+);
 assert.equal(reverseBookingRequestOnly.bookingPhone, "+375291112244");
 
 const reverseBookingDates = mapCtaStepValueToEventLegacy(bookingDates, {
@@ -313,12 +318,16 @@ const reverseBookingDates = mapCtaStepValueToEventLegacy(bookingDates, {
 });
 assert.equal(reverseBookingDates.bookingEnabled, true);
 assert.equal(reverseBookingDates.bookingMode, "USE_PUBLICATION_DATES");
+assert.equal(reverseBookingDates.participationMode, "time-slots");
+assert.equal(mapCtaStepValueToEventFormPatch(bookingDates).participationMode, "time-slots");
 
 const reverseBookingSlots = mapCtaStepValueToEventLegacy(bookingSlots, {
   id: "event-booking-slots",
 });
 assert.equal(reverseBookingSlots.bookingEnabled, true);
 assert.equal(reverseBookingSlots.bookingMode, "USE_PUBLICATION_SLOTS");
+assert.equal(reverseBookingSlots.participationMode, "time-slots");
+assert.equal(mapCtaStepValueToEventFormPatch(bookingSlots).participationMode, "time-slots");
 
 const formExternal = getDefaultFormData();
 formExternal.participationMode = "external-link";

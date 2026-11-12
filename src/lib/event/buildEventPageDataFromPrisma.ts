@@ -305,7 +305,7 @@ export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "sc
   return undefined;
 }
 
-function resolveSimpleBooking(
+export function resolveSimpleBooking(
   activityId: string,
   activity: ActivityForEventPageInput,
 ): EventPageData["cta"]["simpleBooking"] {
@@ -317,10 +317,17 @@ function resolveSimpleBooking(
     if (mode === "prebook" && getScheduleJsonString(activity, "prebookMethod") === "internal") {
       return { activityId, label: "Предварительная запись" };
     }
+    // Older enabled REQUEST_ONLY events have no participationMode; they still
+    // have a valid server-side request path and must not lose their CTA.
+    if (mode == null) return { activityId, label: "Оставить заявку" };
   }
-  if (mode !== "time-slots" && mode !== "simple-booking") return undefined;
 
-  const configured = getEventBookingSchedule(activity.scheduleJson);
+  const configured = getEventBookingSchedule(activity.scheduleJson, activity.bookingMode);
+  const legacyScheduledBooking =
+    (mode == null || mode === "walk-in") && configured.size > 0;
+  if (mode !== "time-slots" && mode !== "simple-booking" && !legacyScheduledBooking) {
+    return undefined;
+  }
   const now = new Date();
   if (activity.bookingMode === "USE_PUBLICATION_DATES") {
     const today = getLocalDateKey(now);
@@ -348,15 +355,18 @@ function resolveEventCanonicalCta(
   booking: EventPageData["cta"]["simpleBooking"],
 ) {
   const mode = getScheduleJsonString(activity, "participationMode");
-  const wizardBooking = mode === "request" || mode === "simple-booking" || mode === "time-slots" ||
+  const wizardBooking = Boolean(booking) || mode === "request" || mode === "simple-booking" || mode === "time-slots" ||
     (mode === "prebook" && getScheduleJsonString(activity, "prebookMethod") === "internal");
+  const canonicalMode = booking && (mode == null || mode === "walk-in")
+    ? (booking.slots ? "time-slots" : "request")
+    : mode;
   const primaryPhone = resolveActivityPhones(activity)[0]?.value;
 
   return resolveCanonicalCta({
     entityType: "EVENT",
     entity: {
       id: activity.id,
-      participationMode: wizardBooking && !booking ? "walk-in" : mode,
+      participationMode: wizardBooking && !booking ? "walk-in" : canonicalMode,
       bookingEnabled: wizardBooking ? Boolean(booking) : activity.bookingEnabled ?? null,
       bookingMode: activity.bookingMode ?? null,
       ticketLink: decorateStoredTicketLink(getScheduleJsonString(activity, "ticketLink")),
