@@ -115,7 +115,12 @@ export async function ensureEventBookingPlanItem(
     if (existing.bookingRequests.length === 0 && input.startsAt) {
       await tx.planItem.update({
         where: { id: existing.id },
-        data: { startsAt: input.startsAt },
+        // Moving a saved occurrence invalidates its previous end time.
+        // Clear it so the canonical event-duration fallback is used.
+        data: {
+          startsAt: input.startsAt,
+          ...(existing.startsAt?.getTime() !== input.startsAt.getTime() ? { endsAt: null } : {}),
+        },
       });
     }
     return existing.id;
