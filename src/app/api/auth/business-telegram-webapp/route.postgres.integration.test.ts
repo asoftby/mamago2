@@ -16,7 +16,7 @@ loader._load = function (request, ...args) {
 };
 
 async function main() {
-  const keys = ["APP_ENV", "NEXTAUTH_URL", "TELEGRAM_BUSINESS_BOT_TOKEN_DEV",
+  const keys = ["APP_ENV", "NEXTAUTH_URL", "AUTH_COOKIE_SECURE", "TELEGRAM_BUSINESS_BOT_TOKEN_DEV",
     "TELEGRAM_BUSINESS_BOT_USERNAME_DEV", "TELEGRAM_BUSINESS_WEBHOOK_SECRET_DEV",
     "TELEGRAM_BUSINESS_DELIVERY_ENABLED"] as const;
   const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
@@ -30,6 +30,7 @@ async function main() {
   try {
     process.env.APP_ENV = "dev";
     process.env.NEXTAUTH_URL = "https://dev.mamago.by";
+    process.env.AUTH_COOKIE_SECURE = "true"; // Explicit HTTPS DEV deployment policy.
     process.env.TELEGRAM_BUSINESS_BOT_TOKEN_DEV = token;
     process.env.TELEGRAM_BUSINESS_BOT_USERNAME_DEV = "synthetic_business_bot";
     process.env.TELEGRAM_BUSINESS_WEBHOOK_SECRET_DEV = "synthetic-webhook-secret";
