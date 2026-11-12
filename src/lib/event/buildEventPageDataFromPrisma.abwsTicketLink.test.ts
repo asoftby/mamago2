@@ -121,7 +121,7 @@ import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
 
   assert.equal(resolveSimpleBooking(legacy.id, {
     ...legacy,
-    scheduleJson: { ...legacy.scheduleJson, participationMode: null },
+    scheduleJson: { ...(legacy.scheduleJson as Record<string, unknown>), participationMode: null },
   })?.slots?.length, 1);
   assert.equal(resolveSimpleBooking(legacy.id, { ...legacy, bookingEnabled: false }), undefined);
   assert.equal(resolveSimpleBooking(legacy.id, { ...legacy, businessId: null }), undefined);
@@ -132,7 +132,7 @@ import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
   assert.equal(resolveSimpleBooking(legacy.id, {
     ...legacy,
     scheduleJson: {
-      ...legacy.scheduleJson,
+      ...(legacy.scheduleJson as Record<string, unknown>),
       ctaStepDraft: { legacyOrigin: "BOOKING", actionChoice: "DISCOVER", requestMode: "CALENDAR" },
     },
   }), undefined);
