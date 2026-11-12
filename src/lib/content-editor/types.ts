@@ -61,6 +61,21 @@ export function defaultNavForSurface(surface: ContentEditorSurface): ContentEdit
   return defaultEditorNav(surface, "place");
 }
 
+/**
+ * A returnTo captured on business.<host> is host-relative, e.g.
+ * /publications/events. The shared editor runs outside that host and must
+ * preserve the BUSINESS surface instead of redirecting to the public site.
+ */
+export function normalizeEditorReturnToPath(
+  surface: ContentEditorSurface,
+  returnTo: string,
+): string {
+  if (surface === "business" && /^\/publications(?:\/|[?#]|$)/.test(returnTo)) {
+    return `/business${returnTo}`;
+  }
+  return returnTo;
+}
+
 export function resolveEditorReturnDestination(params: {
   surface: ContentEditorSurface;
   entity: ContentEditorEntity;
@@ -70,7 +85,7 @@ export function resolveEditorReturnDestination(params: {
 }): string {
   // If returnTo is provided, use it
   if (params.returnTo?.trim()) {
-    const rawTarget = params.returnTo.trim();
+    const rawTarget = normalizeEditorReturnToPath(params.surface, params.returnTo.trim());
     
     // If it's an absolute URL or doesn't start with /, return as-is
     if (

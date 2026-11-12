@@ -9,6 +9,7 @@ import {
   editorEventEditHref,
   editorOfferEditHref,
   editorPlaceEditHref,
+  normalizeEditorReturnToPath,
 } from "@/lib/content-editor/types";
 import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
@@ -46,10 +47,14 @@ function resolveBrowserReturnTo(): string | null {
 }
 
 function resolveEffectiveReturnTo(payload: ContentSuccessPayload): string | null {
-  if (isInternalReturnTo(payload.returnTo)) {
-    return payload.returnTo;
-  }
-  return resolveBrowserReturnTo();
+  const returnTo = isInternalReturnTo(payload.returnTo)
+    ? payload.returnTo
+    : resolveBrowserReturnTo();
+  if (!returnTo) return null;
+  return normalizeEditorReturnToPath(
+    payload.surface === "admin" ? "admin" : "business",
+    returnTo,
+  );
 }
 
 function isPrivilegedContentRole(role: Role | null | undefined): boolean {

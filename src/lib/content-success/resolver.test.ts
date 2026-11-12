@@ -164,6 +164,47 @@ assert.deepEqual(businessPublished.openAction, {
 });
 assert.equal(businessPublished.listAction?.href, "/business/publications/offers");
 
+// Saving an event opened from the business publications list must not
+// offer the broken public /publications/events URL as a publication page.
+const businessEventDraft = resolveContentSuccessState({
+  kind: "event",
+  surface: "business",
+  outcome: "draft_saved",
+  id: "event-1",
+  role: "BUSINESS_OWNER",
+  returnTo: "/publications/events",
+});
+assert.ok(businessEventDraft);
+assert.equal(businessEventDraft.openAction, null);
+assert.deepEqual(businessEventDraft.listAction, {
+  label: "Вернуться к списку",
+  href: "/business/publications/events",
+});
+assert.equal(
+  businessEventDraft.continueEditingAction?.href,
+  "/editor/event/event-1/edit?returnTo=%2Fbusiness%2Fpublications%2Fevents",
+);
+
+// The alias may carry filters; keep them intact on return.
+assert.equal(resolveContentListHref({
+  kind: "event",
+  surface: "business",
+  outcome: "changes_saved",
+  id: "event-1",
+  returnTo: "/publications/events?status=published",
+}), "/business/publications/events?status=published");
+
+// Public-origin returnTo is different: actual publication detail remains public.
+const eventPublicDraft = resolveContentSuccessState({
+  kind: "event",
+  surface: "business",
+  outcome: "draft_saved",
+  id: "event-1",
+  returnTo: "/minsk/events/test-event",
+});
+assert.equal(eventPublicDraft?.openAction?.href, `${publicOrigin}/minsk/events/test-event`);
+assert.equal(eventPublicDraft?.listAction, null);
+
 // ── Breaking News: exact titles by the real outcome ──────────────────────────
 const bn = (outcome: "draft_saved" | "published" | "changes_published" | "changes_saved" | "submitted") =>
   resolveContentSuccessState({ kind: "breaking-news", surface: "admin", outcome, id: "bn-1", slug: "x", citySlug: "minsk", geoScope: "CITY" });

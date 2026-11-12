@@ -18,6 +18,8 @@ export type PublicSaver = {
 
 export interface PublicationSaveShareProps {
   isSaved: boolean;
+  /** Optional contextual status for a saved event (e.g. "В плане", "В идеях"). */
+  savedLabel?: string | null;
   publicationKind?: "event" | "offer" | "place";
   publicationId?: string;
   onSave: () => void;
@@ -33,6 +35,7 @@ export interface PublicationSaveShareProps {
 
 export function PublicationSaveShare({
   isSaved,
+  savedLabel,
   publicationKind,
   publicationId,
   onSave,
@@ -72,6 +75,7 @@ export function PublicationSaveShare({
     return () => window.removeEventListener("publication-save-changed", onUpdated);
   }, [publicationKind, publicationId, refresh]);
 
+  const saveActionLabel = isSaved ? (savedLabel || "Сохранено") : "Сохранить";
   const supplied = typeof saveCount === "number" && Number.isFinite(saveCount) ? saveCount : remoteCount;
   const total = typeof supplied === "number" && Number.isFinite(supplied)
     ? Math.max(0, Math.floor(supplied))
@@ -89,7 +93,7 @@ export function PublicationSaveShare({
             onClick={onSave}
             disabled={isSaving}
             aria-pressed={isSaved}
-            aria-label={isSaved ? "Сохранено" : "Сохранить публикацию"}
+            aria-label={isSaved ? saveActionLabel : "Сохранить публикацию"}
             className={cn(
               PUBLICATION_SAVE_ACTION_CLASS,
               isSaved && "border-[#E86A3A]/25 bg-[#FFE9DF] text-[#C2522A]",
@@ -97,7 +101,7 @@ export function PublicationSaveShare({
             )}
           >
             <Heart aria-hidden="true" className={cn("h-5 w-5 shrink-0", isSaved && "fill-current")} />
-            <span>{isSaved ? "Сохранено" : "Сохранить"}</span>
+            <span>{saveActionLabel}</span>
           </button>
         }
       />
