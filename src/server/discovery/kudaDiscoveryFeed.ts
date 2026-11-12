@@ -14,7 +14,7 @@ import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
 import { activeOccasionWhere } from "@/lib/discovery/occasionUtils";
-import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
+import { getBusinessQualityBoostMap, applyActivePublicationBoost, getPublicationBoostLevel } from "@/server/services/ranking/businessQualityBoost";
 import {
   getWeatherRankingBoost,
   type HomeWeatherScenario,
@@ -227,11 +227,11 @@ export async function getKudaDiscoveryFeed(
     const crossRegion = physicalCityId != null && !expandedCityIds.includes(physicalCityId);
     const applicableBoosts = a.boosts.filter(boost => isBoostForDiscoveryRegion(boost, displayRegionId, !crossRegion));
     const baseEngagement = (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0);
-    const isBoosted = applicableBoosts.length > 0;
+    const boostLevel = getPublicationBoostLevel(applicableBoosts);
     const qualityMultiplier = activityQualityBoost.get(a.id) ?? 1.0;
     const finalEngagement = applyActivePublicationBoost(
       baseEngagement,
-      isBoosted,
+      boostLevel,
       qualityMultiplier,
     );
 
