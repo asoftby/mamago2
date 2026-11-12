@@ -32,7 +32,7 @@ async function main() {
   await prisma.partyOutbox.update({ where: { id: event.id }, data: { createdAt: new Date(0) } });
   const originalFetch = globalThis.fetch;
   let attempts = 0;
-  const payloads: Array<{ reply_markup?: { inline_keyboard: Array<Array<{ url?: string }>> } }> = [];
+  const payloads: Array<{ reply_markup?: { inline_keyboard: Array<Array<{ url?: string; web_app?: { url: string } }>> } }> = [];
   globalThis.fetch = async (input, init) => {
     assert.equal(String(input), "https://api.telegram.org/botLOCAL_FAKE_TOKEN/sendMessage", "All external network calls are intercepted");
     attempts++; payloads.push(JSON.parse(String(init?.body)));
@@ -50,9 +50,11 @@ async function main() {
     assert.equal((await prisma.partyOrder.findUniqueOrThrow({ where: { id: created.id } })).status, "ANCHOR_PENDING");
     assert.equal(await retryFailedDelivery(telegram.id), true);
     assert.equal((await prisma.notificationDelivery.findUniqueOrThrow({ where: { id: telegram.id } })).status, "SENT");
-    const link = payloads[1].reply_markup?.inline_keyboard.flat().find(button => button.url)?.url;
-    assert.ok(link);
-    const destination = new URL(link);
+    const link = payloads[1].reply_markup?.inline_keyboard.flat().find(button => button.web_app)?.web_app?.url;
+    assert.ok(link, "business notification must open through signed Business Bot Mini App");
+    const launcher = new URL(link);
+    assert.equal(launcher.origin + launcher.pathname, "https://mamago.test/telegram/business/open");
+    const destination = new URL(launcher.searchParams.get("next") ?? "", "https://mamago.test");
     assert.equal(destination.origin + destination.pathname, "https://mamago.test/business/bookings");
     assert.equal(destination.searchParams.get("request"), sent.request.id);
     assert.equal(destination.searchParams.get("kind"), "party");
@@ -62,7 +64,7 @@ async function main() {
     await dispatchPartyOutbox(1);
     assert.equal(attempts, 2);
     assert.equal(await prisma.notification.count({ where: { id: notificationId } }), 1);
-    console.log("PASS mocked Telegram direct link, durable delivery failure/recovery and no duplicate notification/send");
+    console.log("PASS mocked Telegram Mini App link, durable delivery failure/recovery and no duplicate notification/send");
   } finally { globalThis.fetch = originalFetch; }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());

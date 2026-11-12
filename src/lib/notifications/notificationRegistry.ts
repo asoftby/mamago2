@@ -611,8 +611,9 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     description: "Поступила новая заявка на запись",
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "BOOKING",
-    ctaLabel: "Открыть заявки",
-    resolveHref: () => "/business/bookings",
+    ctaLabel: "Открыть и подтвердить",
+    telegramOpenIntent: "mini_app",
+    resolveHref: (n) => n.ctaAction || "/business/bookings",
     telegram: {
       enabledByDefault: true,
       template: "booking_created",
@@ -662,6 +663,27 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
   },
 
   // ── User Booking Lifecycle ──
+  BOOKING_SUBMITTED: {
+    type: "BOOKING_SUBMITTED",
+    audience: "USER",
+    surface: "USER",
+    groupId: "user_bookings",
+    label: "Заявка получена",
+    description: "Мы получили вашу заявку, она ожидает ответа организатора",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "BOOKING",
+    ctaLabel: "Мои записи",
+    telegramOpenIntent: "mini_app",
+    resolveHref: () => "/me/bookings",
+    telegram: {
+      enabledByDefault: true,
+      title: "Заявка получена",
+      body: "{{body}}",
+    },
+    importance: "HIGH",
+    category: "BOOKING",
+  },
+
   BOOKING_CONFIRMED: {
     type: "BOOKING_CONFIRMED",
     audience: "USER",

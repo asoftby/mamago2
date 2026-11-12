@@ -42,6 +42,8 @@ export interface CtaStepFormValue {
   externalUrl: string;
   instructions: string;
   requestLabelKind: CtaStepRequestLabelKind;
+  /** Preserves native mamaGo prebooking through the legacy/shared CTA adapter. */
+  nativePrebooking?: boolean;
   legacyOrigin: CtaStepLegacyOriginKind;
   fallback: CtaStepFallbackModel;
   calendarDays: CtaStepCalendarDay[];

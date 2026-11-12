@@ -1,257 +1,132 @@
-/**
- * Place Logo Upload (Wizard Session Mode)
- * Works without placeId - uploads to temp media storage
- */
-
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Upload, X, Loader2 } from "lucide-react";
-import { useImageUpload } from "@/hooks/useImageUpload";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
 import { toast } from "@/lib/toast";
 import {
-  MAX_IMAGE_FILE_SIZE_MB,
-  UPLOAD_IMAGE_ACCEPT,
-  validateUploadMimeType,
-} from "@/lib/uploads/uploadConfig";
+  attachAssetToPlaceWizard,
+  loadPlaceMediaLibraryPage,
+  removeWizardTempMedia,
+  uploadFilesToPlaceWizard,
+} from "./placeWizardMediaAdapter";
 
 interface PlaceLogoUploadTempProps {
   wizardSessionId: string;
   currentLogoUrl?: string | null;
+  currentLogoMediaId?: string | null;
+  placeId?: string;
+  published?: boolean;
   onUploadComplete?: (mediaId: string, url: string) => void;
+  onRemove?: () => void;
   disabled?: boolean;
+  /** Existing PlaceImage IDs are not TempMedia and must not be deleted here. */
+  isExistingPlaceImage?: boolean;
 }
 
+/** Place-specific persistence adapter; the picker UI itself lives in MediaUploadField. */
 export function PlaceLogoUploadTemp({
   wizardSessionId,
   currentLogoUrl,
+  currentLogoMediaId,
+  placeId,
+  published = false,
   onUploadComplete,
+  onRemove,
   disabled = false,
+  isExistingPlaceImage = false,
 }: PlaceLogoUploadTempProps) {
-  const [preview, setPreview] = useState<string | null>(currentLogoUrl || null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const hasRestoredTempMedia = useRef(false); // Track if temp media was restored (use ref to avoid re-renders)
+  const [restored, setRestored] = useState<MediaUploadItem | null>(null);
+  const [saving, setSaving] = useState(false);
+  const uploadedIds = useRef(new Set<string>());
+  const busyRef = useRef(false);
+  const hasInteracted = useRef(false);
 
-  const { uploadImage } = useImageUpload({
-    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
-    maxWidthOrHeight: 1024,
-    quality: 0.9,
-  });
-
-  // Load temp media from session on mount
   useEffect(() => {
-    const loadTempMedia = async () => {
-      if (!wizardSessionId) {
-        setIsLoadingSession(false);
-        if (currentLogoUrl) {
-          setPreview(currentLogoUrl);
+    if (!wizardSessionId || published) return;
+    let cancelled = false;
+    void fetch("/api/business/temp-media?wizardSessionId=" + encodeURIComponent(wizardSessionId))
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((payload: { media?: Array<{ id: string; url: string; kind: string }> } | null) => {
+        if (cancelled || hasInteracted.current) return;
+        const item = payload?.media?.find((media) => media.kind === "PLACE_LOGO");
+        if (!item) return;
+        setRestored({ id: item.id, url: item.url });
+        if (currentLogoMediaId !== item.id) onUploadComplete?.(item.id, item.url);
+      })
+      .catch(() => { /* The current draft still holds its image; allow manual retry. */ });
+    return () => { cancelled = true; };
+    // On session change only: callbacks and current data are intentionally not effect dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardSessionId, published]);
+
+  const value: MediaUploadItem | null = currentLogoUrl
+    ? { id: currentLogoMediaId || currentLogoUrl, url: currentLogoUrl }
+    : restored;
+
+  const uploadFiles = useCallback(async (files: File[]) => {
+    const uploaded = await uploadFilesToPlaceWizard(files, wizardSessionId, "PLACE_LOGO");
+    for (const item of uploaded) uploadedIds.current.add(item.id);
+    return uploaded;
+  }, [wizardSessionId]);
+
+  const handleChange = async (next: MediaUploadItem | MediaUploadItem[] | null) => {
+    if (busyRef.current) return;
+    hasInteracted.current = true;
+    const item = !Array.isArray(next) ? next : next[0] ?? null;
+    if (item?.id === value?.id) return;
+    busyRef.current = true;
+    setSaving(true);
+    try {
+      if (!item) {
+        if (value && isExistingPlaceImage) {
+          // A published Place must not be changed outside its moderated revision.
+          if (published || !placeId) {
+            toast.error("Для удаления этого логотипа требуется редактирование через ревизию");
+            return;
+          }
+          const response = await fetch(
+            "/api/business/places/" + encodeURIComponent(placeId) +
+              "/images/" + encodeURIComponent(value.id),
+            { method: "DELETE" },
+          );
+          if (!response.ok) throw new Error("Не удалось удалить логотип");
+        } else if (value) {
+          await removeWizardTempMedia(value.id);
         }
+        setRestored(null);
+        onRemove?.();
         return;
       }
-
-      try {
-        const response = await fetch(`/api/business/temp-media?wizardSessionId=${wizardSessionId}`);
-        if (response.ok) {
-          const { media } = await response.json();
-          const logoMedia = media.find((m: { kind: string; url: string; id: string }) => m.kind === "PLACE_LOGO");
-          
-          if (logoMedia) {
-            console.log("[PlaceLogoUploadTemp] Restored logo from session:", logoMedia.url);
-            setPreview(logoMedia.url);
-            hasRestoredTempMedia.current = true; // Mark that temp media was restored
-            // Don't call onUploadComplete here - it causes infinite loop
-            // onUploadComplete is only for new uploads, not for restoration
-          } else if (currentLogoUrl) {
-            console.log("[PlaceLogoUploadTemp] No temp logo, using current logo");
-            setPreview(currentLogoUrl);
-          }
-        }
-      } catch (error) {
-        console.error("[PlaceLogoUploadTemp] Failed to load temp media:", error);
-        if (currentLogoUrl) {
-          setPreview(currentLogoUrl);
-        }
-      } finally {
-        setIsLoadingSession(false);
-      }
-    };
-
-    loadTempMedia();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wizardSessionId]); // Only run when wizardSessionId changes
-
-  useEffect(() => {
-    if (currentLogoUrl && !isLoadingSession) {
-      setPreview(currentLogoUrl);
-    }
-  }, [currentLogoUrl, isLoadingSession]);
-
-  const handleFileSelect = async (file: File) => {
-    // Validate file type
-    if (!validateUploadMimeType(file)) {
-      toast.error("Пожалуйста, выберите изображение");
-      return;
-    }
-
-    setIsUploading(true);
-
-    try {
-      // Upload to CDN
-      const uploadedImage = await uploadImage(file);
-      
-      if (!uploadedImage) {
-        throw new Error("Failed to upload image");
-      }
-
-      // Save to temp media
-      const response = await fetch("/api/business/temp-media", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wizardSessionId,
-          url: uploadedImage.url,
-          width: uploadedImage.width,
-          height: uploadedImage.height,
-          blurhash: uploadedImage.blurhash,
-          mimeType: file.type,
-          sizeBytes: file.size,
-          kind: "PLACE_LOGO",
-          sortOrder: 0,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("[PlaceLogoUploadTemp] API error:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData,
-        });
-        throw new Error(errorData.message || errorData.error || `Failed to save logo (${response.status})`);
-      }
-
-      const { media } = await response.json();
-      
-      console.log("[PlaceLogoUploadTemp] Upload complete:", {
-        mediaId: media.id,
-        url: uploadedImage.url,
-        isRealUpload: true,
-        hasRestoredBefore: hasRestoredTempMedia.current,
-      });
-      
-      setPreview(uploadedImage.url);
-      
-      // This is a real upload (not restoration), so call onUploadComplete
-      if (onUploadComplete) {
-        console.log("[PlaceLogoUploadTemp] Calling onUploadComplete");
-        onUploadComplete(media.id, uploadedImage.url);
-      } else {
-        console.warn("[PlaceLogoUploadTemp] onUploadComplete is not defined!");
-      }
-      
-      toast.success("Логотип загружен");
+      const selected = uploadedIds.current.has(item.id)
+        ? item
+        : await attachAssetToPlaceWizard(item.id, wizardSessionId, "PLACE_LOGO");
+      uploadedIds.current.delete(item.id);
+      setRestored(selected);
+      onUploadComplete?.(selected.id, selected.url);
     } catch (error) {
-      console.error("Logo upload error:", error);
-      toast.error(error instanceof Error ? error.message : "Ошибка загрузки");
+      toast.error(error instanceof Error ? error.message : "Не удалось обновить логотип");
     } finally {
-      setIsUploading(false);
+      busyRef.current = false;
+      setSaving(false);
     }
-  };
-
-  const handleClick = () => {
-    if (disabled) return;
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = UPLOAD_IMAGE_ACCEPT;
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        handleFileSelect(file);
-      }
-    };
-    input.click();
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    if (isUploading || disabled) return;
-
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      handleFileSelect(file);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!isUploading && !disabled) {
-      setIsDragging(true);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleRemove = () => {
-    if (disabled) return;
-    setPreview(null);
-    // TODO: Call DELETE API to mark temp media as deleted
   };
 
   return (
-    <div
-      onClick={!isUploading && !disabled ? handleClick : undefined}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      className={`
-        border-2 border-dashed rounded-xl p-10 text-center cursor-pointer
-        transition-colors
-        ${isDragging ? "border-primary bg-primary/5" : "border-gray-300"}
-        ${isUploading || disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"}
-      `}
-    >
-      {isUploading ? (
-        <div className="space-y-3">
-          <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin" />
-          <p className="text-sm text-gray-600">Загрузка...</p>
-        </div>
-      ) : preview ? (
-        <div className="space-y-3">
-          <div className="relative inline-block">
-            <img
-              src={preview}
-              alt="Logo preview"
-              className="mx-auto h-32 w-32 object-cover rounded-lg"
-            />
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemove();
-              }}
-              className="absolute -top-2 -right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Нажмите или перетащите для замены
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <Upload className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="text-sm text-gray-600">
-            Перетащите логотип сюда или нажмите для загрузки
-          </p>
-        </div>
-      )}
-    </div>
+    <MediaUploadField
+      mode="single"
+      value={value}
+      onChange={(next) => { void handleChange(next); }}
+      disabled={disabled || saving || !wizardSessionId || published}
+      allowUpload
+      allowMediaLibrary
+      onUploadFiles={uploadFiles}
+      loadMediaLibraryPage={loadPlaceMediaLibraryPage}
+      uploadButtonLabel="Загрузить новое"
+      replaceButtonLabel="Загрузить новое"
+      singleEmptyHint="Выберите логотип из медиатеки или загрузите новый"
+      mediaLibraryDescription="Выберите логотип, который вы ранее загрузили в медиатеку."
+      entityType="PLACE"
+      context="logo"
+    />
   );
 }

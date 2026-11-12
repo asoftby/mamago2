@@ -22,6 +22,7 @@ export function getSafeTelegramReturnPath(value: string | null | undefined): str
       parsed.pathname.startsWith("/api/") ||
       parsed.pathname === "/api" ||
       parsed.pathname.startsWith("/telegram/open") ||
+      parsed.pathname.startsWith("/telegram/business/open") ||
       parsed.pathname.startsWith("/login") ||
       parsed.pathname.startsWith("/register")
     ) return "/me/plan";
@@ -37,6 +38,7 @@ export function createTelegramLinkButton(
   publicBaseUrl: string,
   intent: TelegramLinkOpenIntent,
   campaign?: string,
+  launcherPath: "/telegram/open" | "/telegram/business/open" = "/telegram/open",
 ): TelegramLinkButton {
   const fallback: TelegramLinkButton = { text, url: targetUrl };
   // Browser links retain shareable, canonical destinations. Attribute only
@@ -69,7 +71,7 @@ export function createTelegramLinkButton(
     // Do not silently change destinations for unsupported internal routes.
     if (next !== requestedPath) return fallback;
 
-    const launcher = new URL("/telegram/open", base);
+    const launcher = new URL(launcherPath, base);
     launcher.searchParams.set("next", next);
     return { text, web_app: { url: launcher.toString() } };
   } catch {

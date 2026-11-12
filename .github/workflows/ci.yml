@@ -170,6 +170,7 @@ jobs:
           pnpm exec tsx src/server/offers/bookingPrice.test.ts
           pnpm test:wishlist
           pnpm exec tsx src/server/offers/bookingDuration.test.ts
+          pnpm exec tsx src/components/business/bookings/manualPlaceReservation.test.ts
           pnpm exec tsx src/server/offers/slotIdempotency.test.ts
           pnpm exec tsx src/server/offers/bookingServices.contract.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
@@ -282,6 +283,9 @@ jobs:
           pnpm exec tsx src/components/business/wizard/place/placeSubcategorySelection.test.ts
           pnpm exec tsx src/components/business/wizard/place/steps/Step1Profile.test.tsx
           pnpm exec tsx src/components/business/wizard/place/steps/Step2Location.test.ts
+          pnpm exec tsx src/components/business/place/placeMediaWiring.test.ts
+          pnpm exec tsx src/components/business/place/placeWizardMediaAdapter.test.ts
+          pnpm exec tsx src/components/business/wizard/place/reconcileSavedPlaceMedia.test.ts
 
       - name: Place geo overrides regressions
         run: |
@@ -372,6 +376,7 @@ jobs:
           pnpm exec tsx src/lib/telegram/expandMiniApp.test.ts
           pnpm exec tsx src/lib/telegram/verifyWebAppInitData.test.ts
           pnpm exec tsx src/app/api/auth/telegram-webapp/route.test.ts
+          pnpm exec tsx src/app/api/auth/business-telegram-webapp/route.test.ts
           pnpm exec tsx src/lib/my-plan/planItemTimezoneRepair.test.ts
           bash -n scripts/deploy/run-prod-notification-jobs.sh
           bash -n scripts/deploy/install-prod-notification-cron.sh
@@ -456,6 +461,13 @@ jobs:
           pnpm test:decision-attribution-integration
           pnpm exec tsx src/app/api/analytics/events/route.test.ts
           pnpm exec tsx src/lib/analytics/impressionGate.test.ts
+
+      - name: Business Mini App signed authentication and live membership PostgreSQL
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/app/api/auth/business-telegram-webapp/route.postgres.integration.test.ts
 
       - name: Migrated-user activation HTTP and environment-gate PostgreSQL regressions
         env:

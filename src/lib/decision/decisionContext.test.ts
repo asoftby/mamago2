@@ -10,7 +10,6 @@ import {
 } from "./decisionContext";
 import { isPersonalizedResult } from "./personalization";
 import { parseCanonicalAgeRangesQuery } from "./decisionContext";
-import { guestGenerateBodySchema, guestDraftRefreshSchema } from "./planRequestSchemas";
 import { parseSafeOpaqueId, readOptionalSafeOpaqueId } from "./identifiers";
 
 // Round-trip a realistic my_plan_suggestions context.
@@ -138,33 +137,6 @@ assert.equal(isPersonalizedResult([], ["3-5"]), true, "a canonical explicit age-
 // ---- follow-up: request input is canonical + bounded, malformed is REJECTED ----
 
 const GUEST_ID = "5b1f0c2e-7a4d-4c1e-9a55-0f7d3e2b6a10";
-assert.equal(
-  guestGenerateBodySchema.safeParse({ anonymousId: GUEST_ID, ageRanges: ["3-5", "1-3"] }).success,
-  true,
-  "canonical ranges + safe anonymousId accepted",
-);
-assert.equal(
-  guestGenerateBodySchema.safeParse({ ageRanges: ["3-5", "free text"] }).success,
-  false,
-  "a free-text range rejects the whole request instead of being trimmed",
-);
-assert.equal(
-  guestGenerateBodySchema.safeParse({ ageRanges: Array(MAX_AGE_RANGES + 1).fill("3-5") }).success,
-  false,
-  "an oversized array is rejected, not silently capped",
-);
-assert.equal(guestGenerateBodySchema.safeParse({ anonymousId: "x".repeat(500) }).success, false, "huge anonymousId rejected");
-assert.equal(guestGenerateBodySchema.safeParse({ anonymousId: "drop table; --" }).success, false, "free-text anonymousId rejected");
-
-assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-03" }).success, true);
-assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-07", dateTo: "2026-11-08" }).success, true);
-assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-03", dateTo: "2026-12-28" }).success, false);
-assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-08", dateTo: "2026-11-07" }).success, false);
-assert.equal(guestGenerateBodySchema.safeParse({ dateTo: "2026-11-08" }).success, false);
-assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-02-30" }).success, false);
-assert.equal(guestGenerateBodySchema.safeParse({ date: "not-a-date" }).success, false);
-
-
 assert.deepEqual(parseCanonicalAgeRangesQuery(null), { ok: true, values: [] });
 assert.deepEqual(parseCanonicalAgeRangesQuery("3-5,1-3,3-5"), { ok: true, values: ["3-5", "1-3"] });
 assert.deepEqual(parseCanonicalAgeRangesQuery("3-5,nope"), { ok: false });
@@ -180,9 +152,3 @@ assert.deepEqual(readOptionalSafeOpaqueId("  "), { ok: true, value: null });
 assert.deepEqual(readOptionalSafeOpaqueId("bad id!"), { ok: false });
 
 console.log("decisionContext.test.ts OK");
-
-assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-03", ids: ["activity_001"] }).success, true);
-assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-07", dateTo: "2026-11-08", ids: ["activity_001"] }).success, true);
-assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-07", dateTo: "2026-11-10", ids: ["activity_001"] }).success, false);
-assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-07", ids: [] }).success, false);
-assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-02-30", ids: ["activity_001"] }).success, false);

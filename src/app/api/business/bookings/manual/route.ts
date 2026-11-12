@@ -34,7 +34,17 @@ const bodySchema = z.object({
     startsAt: z.iso.datetime(), endsAt: z.iso.datetime(),
     groupId: z.string().max(128).optional(), tariffId: z.string().max(128).optional(), unitId: z.string().max(128).optional(),
   }).optional(),
-}).refine((data) => (!data.offerSlot || data.publicationType === "OFFER") && (!data.requestedTime || data.requestedDate));
+  // Future manual individual appointments can explicitly reserve a physical
+  // resource; no inferred/automatic allocation for EVENT/group sessions.
+  resourceReservation: z.object({
+    bookingUnitId: z.string().min(1).max(128),
+    startsAt: z.iso.datetime({ offset: true }),
+    endsAt: z.iso.datetime({ offset: true }),
+  }).strict().optional(),
+}).refine((data) =>
+  (!data.offerSlot || data.publicationType === "OFFER") &&
+  (!data.resourceReservation || (data.publicationType === "PLACE" && !data.offerSlot && data.status === "CONFIRMED")) &&
+  (!data.requestedTime || data.requestedDate));
 const eventModes = ["REQUEST_ONLY", "USE_PUBLICATION_SLOTS", "USE_PUBLICATION_DATES"] as const;
 const privateHeaders = { "Cache-Control": "private, no-store" };
 
@@ -86,6 +96,33 @@ export async function GET(request: NextRequest) {
       return [{ id: session.id, date, time }];
     }) : [];
     return NextResponse.json({ mode: event.bookingMode, dates, slots }, { headers: privateHeaders });
+  }
+
+  const placeId = params.get("placeId");
+  if (type.data === "PLACE" && placeId) {
+    // Read-only options for a confirmed individual appointment.
+    // Publishing a place does not itself assign physical resources.
+    const place = await prisma.place.findFirst({
+      where: {
+        ...getPublicPublishedPlaceWhere(), id: placeId,
+        ownerBusinessId: business.id, bookingEnabled: true,
+      },
+      select: { id: true },
+    });
+    if (!place) return NextResponse.json({ error: "Место недоступно" }, { status: 404 });
+    const units = await prisma.bookingUnit.findMany({
+      where: {
+        businessId: business.id, status: "ACTIVE", type: "EXCLUSIVE",
+        OR: [{ placeId: null }, { placeId }],
+      },
+      select: {
+        id: true, name: true, timezone: true, minDurationMinutes: true,
+        prepMinutes: true, cleanupMinutes: true, stepMinutes: true,
+      },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      take: 100,
+    });
+    return NextResponse.json({ units }, { headers: privateHeaders });
   }
 
   const offerId = params.get("offerId");

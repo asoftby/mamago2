@@ -34,3 +34,36 @@ test("no business: request signup is never enabled and an earlier one is switche
   const slots = { bookingEnabled: true, bookingMode: BookingMode.USE_PUBLICATION_SLOTS };
   assert.equal(deriveEventRequestBookingColumns({ participationMode: "request", current: slots, hasBusiness: false }), null);
 });
+
+test("native event preliminary booking creates REQUEST_ONLY; legacy phone/link remain external", () => {
+  assert.deepEqual(deriveEventRequestBookingColumns({
+    participationMode: "prebook",
+    scheduleJson: { prebookMethod: "internal" },
+    current: off,
+    hasBusiness: true,
+  }), on);
+  assert.equal(deriveEventRequestBookingColumns({
+    participationMode: "prebook",
+    scheduleJson: { prebookMethod: "phone", prebookPhone: "+375291234567" },
+    current: off,
+    hasBusiness: true,
+  }), null);
+  assert.equal(deriveEventRequestBookingColumns({
+    participationMode: "prebook",
+    scheduleJson: { prebookMethod: "link", prebookUrl: "https://example.test" },
+    current: off,
+    hasBusiness: true,
+  }), null);
+  assert.equal(deriveEventRequestBookingColumns({
+    participationMode: "prebook",
+    scheduleJson: { prebookMethod: "internal" },
+    current: off,
+    hasBusiness: false,
+  }), null);
+  assert.deepEqual(deriveEventRequestBookingColumns({
+    participationMode: "prebook",
+    scheduleJson: { prebookMethod: "phone" },
+    current: on,
+    hasBusiness: true,
+  }), off);
+});

@@ -95,7 +95,7 @@ async function run() {
   const panel = readFileSync("src/features/my-plan/components/MyPlanPanelContent.tsx", "utf8");
   assert.match(panel, /if \(!open \|\| !isAuthenticated \|\| authMeLoading \|\| !dayScenarioEnabled\) return;\s*void applyGuestDayScenarioAndAnnounce\(\)/, "the full-page /login never runs the pipeline: the opened plan saves the waiting day");
   const pipeline = readFileSync("src/lib/post-auth/pipeline.ts", "utf8");
-  assert.match(pipeline, /await migrateGuestMyPlanAfterAuth\(\)[\s\S]*await applyGuestDayScenarioAndAnnounce\(\)[\s\S]*executePipelinePendingAction/, "the guest's day is saved right after the old guest plan, before the pending action");
+  assert.match(pipeline, /await applyGuestDayScenarioAndAnnounce\(\)[\s\S]*executePipelinePendingAction/, "the guest's day is saved before the pending action");
   const screen = readFileSync("src/features/my-plan/components/dayScenario/DayScenarioScreen.tsx", "utf8");
   assert.match(screen, /writeGuestDayScenarioDraft\(guestSaveDays[\s\S]*window\.location\.assign\(buildAuthUrl\(\{ redirectTo: appendMyPlanOpenToHref\(here\) \}\)\)/, "a guest's save stores the day, then goes to sign-in and comes back with My Plan open");
   assert.match(screen, /enabled: phase === "draft" && dates\.length > 0 && \(!isGuest \|\| guestId !== null\)/, "a guest's first build waits until the anonymous id has been asked for");

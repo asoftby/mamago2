@@ -14,7 +14,11 @@ import prisma from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
-import { reserveSlot } from "@/server/offers/reserveSlot";
+import { reserveSlot, SlotReservationError } from "@/server/offers/reserveSlot";
+import { isResourceWindowAvailable } from "@/server/offers/slotAvailability";
+import {
+  expireBookingUnitHolds, isAllocationOverlapError, lockBookingUnits,
+} from "@/server/services/booking/resourceAllocation";
 import { childScopeFor } from "@/server/family/familyAccess";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import {
@@ -23,8 +27,8 @@ import {
   Prisma,
   PublicationType,
 } from "@prisma/client";
-import { notifyBookingCreated } from "@/server/services/notification.service";
-import { resolveBookingPlanItem } from "@/server/family/planBooking.service";
+import { notifyBookingCreated, notifyUserBookingSubmitted } from "@/server/services/notification.service";
+import { ensureEventBookingPlanItem, resolveBookingPlanItem } from "@/server/family/planBooking.service";
 import { trackBookingCreated } from "@/server/analytics/trackBookingEvent";
 import {
   getPublicActivityDetailWhere,
@@ -182,7 +186,7 @@ async function createBookingWithInitialActivity(
   return transaction ? create(transaction) : prisma.$transaction(create);
 }
 
-function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): void {
+async function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): Promise<void> {
   void trackBookingCreated({
     userId: context.userId,
     bookingId: context.bookingId,
@@ -199,15 +203,13 @@ function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): v
       // Family Core M6: lets the "make private" rule see another adult's booking.
       ...(context.planItemId ? { planItemId: context.planItemId } : {}),
     },
-  });
+  }).catch((err) => console.error("[booking.service] analytics failed:", err));
 
-  if (!context.ownerUserId) {
-    return;
-  }
-
-  notifyBookingCreated({
+  const promises: Promise<unknown>[] = [];
+  if (context.ownerUserId) promises.push(notifyBookingCreated({
     ownerUserId: context.ownerUserId,
     bookingId: context.bookingId,
+    waitForDelivery: context.entityType === "EVENT",
     offerId: context.offerId ?? null,
     offerTitle: context.offerTitle ?? null,
     activityId: context.activityId ?? null,
@@ -221,9 +223,18 @@ function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): v
     customerName: context.customerName,
     childName: context.childName ?? null,
     childAge: context.childAge ?? null,
-  }).catch((err) =>
-    console.error("[booking.service] notifyBookingCreated failed:", err),
-  );
+  }).catch((err) => {
+    console.error("[booking.service] notifyBookingCreated failed:", { bookingId: context.bookingId, error: err });
+  }));
+
+  if (context.userId) promises.push(notifyUserBookingSubmitted({
+    userId: context.userId,
+    bookingId: context.bookingId,
+    publicationTitle: context.entityTitle,
+  }).catch((err) => {
+    console.error("[booking.service] notifyUserBookingSubmitted failed:", { bookingId: context.bookingId, error: err });
+  }));
+  await Promise.all(promises);
 }
 
 async function logBookingCreatedAudit(params: {
@@ -413,6 +424,8 @@ export const manualScheduledOfferWhere = {
 type ManualBookingInput = Omit<CreatePublicBookingInput, "userId" | "planItemId"> & {
   status: "NEW" | "CONFIRMED";
   offerSlot?: { startsAt: string; endsAt: string; groupId?: string; tariffId?: string; unitId?: string };
+  /** Only for an explicitly confirmed individual PLACE appointment, not a group session. */
+  resourceReservation?: { bookingUnitId: string; startsAt: string; endsAt: string };
 };
 
 export async function createManualBooking(
@@ -429,6 +442,111 @@ export async function createManualBooking(
     if (previous) {
       if (previous.manualRequestHash !== hash) throw new BookingValidationError("requestKey", "Ключ уже использован для другой записи");
       return { bookingId: previous.id, status: previous.status };
+    }
+    if (input.resourceReservation) {
+      // Group EVENT / OFFER sessions are session-owned, not one EXCLUSIVE
+      // reservation for each attendee. Restrict this phase to individual PLACE
+      // appointments with an explicit unit and a full agreed time interval.
+      if (input.publicationType !== PublicationType.PLACE || input.offerSlot ||
+          input.status !== BookingStatus.CONFIRMED) {
+        throw new BookingValidationError("resourceReservation", "Ресурс можно занять только для подтверждённой индивидуальной записи на место");
+      }
+      const { bookingUnitId, startsAt, endsAt } = input.resourceReservation;
+      const start = new Date(startsAt);
+      const end = new Date(endsAt);
+      const checkedAt = new Date();
+      if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+          start <= checkedAt || end <= start || end.getTime() - start.getTime() > 86_400_000) {
+        throw new BookingValidationError("resourceReservation", "Укажите будущий интервал не длиннее суток");
+      }
+
+      // Preserve the globally ordered row-lock protocol also used by
+      // reserveSlot, party confirmations and manual CalendarBlock writes.
+      if (!await lockBookingUnits(tx, context.businessId, [bookingUnitId])) {
+        throw new BookingValidationError("resourceReservation", "Ресурс не принадлежит вашему бизнесу");
+      }
+      await expireBookingUnitHolds(tx, [bookingUnitId]);
+      // All existing resource editors enforce prep/cleanup <= 240 minutes.
+      // Query only windows that can overlap this booking's occupied interval.
+      // BookingUnit, CalendarBlock and BookingAllocation have matching indexes;
+      // loading a unit's entire historical occupancy would grow unbounded.
+      const occupancyFrom = new Date(start.getTime() - 240 * 60_000);
+      const occupancyTo = new Date(end.getTime() + 240 * 60_000);
+      const exceptionFrom = new Date(Date.UTC(
+        start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() - 2,
+      ));
+      const exceptionTo = new Date(Date.UTC(
+        end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() + 2,
+      ));
+      const unit = await tx.bookingUnit.findFirst({
+        where: {
+          id: bookingUnitId, businessId: context.businessId,
+          status: "ACTIVE", type: "EXCLUSIVE",
+        },
+        include: {
+          rules: true,
+          exceptions: { where: { date: { gte: exceptionFrom, lte: exceptionTo } } },
+          blocks: {
+            where: { blockStart: { lt: occupancyTo }, blockEnd: { gt: occupancyFrom } },
+          },
+          allocations: {
+            where: {
+              status: { in: ["HELD", "CONFIRMED"] },
+              blockStart: { lt: occupancyTo }, blockEnd: { gt: occupancyFrom },
+            },
+          },
+        },
+      });
+      if (!unit || (unit.placeId !== null && unit.placeId !== input.publicationId)) {
+        throw new BookingValidationError("resourceReservation", "Ресурс недоступен для выбранного места");
+      }
+      const date = getLocalDateKey(start, unit.timezone);
+      const time = formatHHMM(start, unit.timezone);
+      if ((input.requestedDate && getLocalDateKey(normalizeRequestedDate(input.requestedDate)!, unit.timezone) !== date) ||
+          (input.requestedTime && input.requestedTime !== time)) {
+        throw new BookingValidationError("resourceReservation", "Дата и время записи не соответствуют выбранному интервалу");
+      }
+      const availabilityUnit = {
+        id: unit.id, timezone: unit.timezone,
+        prepMinutes: unit.prepMinutes, cleanupMinutes: unit.cleanupMinutes,
+        stepMinutes: unit.stepMinutes, minDurationMinutes: unit.minDurationMinutes,
+        rules: unit.rules.map(({ weekday, startMinutes, endMinutes }) => ({ weekday, startMinutes, endMinutes })),
+        exceptions: unit.exceptions.map(({ date, kind, startMinutes, endMinutes }) => ({
+          date: date.toISOString().slice(0, 10), kind, startMinutes, endMinutes,
+        })),
+        blocks: unit.blocks.map(({ blockStart, blockEnd }) => ({ blockStart, blockEnd })),
+        allocations: unit.allocations.map(({ blockStart, blockEnd, status, expiresAt }) => ({
+          blockStart, blockEnd, status: status as "HELD" | "CONFIRMED", expiresAt,
+        })),
+      };
+      if (!isResourceWindowAvailable(availabilityUnit, start, end, new Date())) {
+        throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс занят или недоступен в выбранное время");
+      }
+
+      // The request, explicit physical window and allocation commit or roll
+      // back together. Never use CalendarBlock to impersonate a client booking.
+      const result = await createPublicationBooking({
+        ...input, requestedDate: date, requestedTime: time,
+      }, { ...context, tx, hash, status: input.status });
+      await tx.bookingRequest.update({
+        where: { id: result.bookingId }, data: { startsAt: start, endsAt: end },
+      });
+      try {
+        await tx.bookingAllocation.create({
+          data: {
+            bookingRequestId: result.bookingId, bookingUnitId: unit.id,
+            blockStart: new Date(start.getTime() - unit.prepMinutes * 60_000),
+            blockEnd: new Date(end.getTime() + unit.cleanupMinutes * 60_000),
+            status: "CONFIRMED",
+          },
+        });
+      } catch (error) {
+        if (isAllocationOverlapError(error)) {
+          throw new SlotReservationError("SLOT_UNAVAILABLE", "Время уже занято другим заказом");
+        }
+        throw error;
+      }
+      return result;
     }
     if (input.offerSlot && input.publicationType === PublicationType.OFFER) {
       const offer = await tx.offer.findFirst({
@@ -477,7 +595,12 @@ async function createPublicationBooking(
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
 
-  const planLink = manual ? { planItemId: null, invalid: false } : await resolveBookingPlanItem({
+  // Event occurrences are auto-linked only after locking the Activity and
+  // resolving the persisted session date/time. An early day-only match would
+  // bypass ensureEventBookingPlanItem and preserve a stale saved time.
+  const planLink = manual || (input.publicationType === PublicationType.EVENT && !input.planItemId)
+    ? { planItemId: null, invalid: false }
+    : await resolveBookingPlanItem({
     userId: input.userId,
     planItemId: input.planItemId,
     publicationType: input.publicationType,
@@ -506,6 +629,7 @@ async function createPublicationBooking(
         select: {
           id: true,
           title: true,
+          coverImageUrl: true,
           cityId: true,
           placeId: true,
           bookingEnabled: true,
@@ -614,8 +738,18 @@ async function createPublicationBooking(
         }
       }
 
+      const linkedPlanItemId = manual ? null : await ensureEventBookingPlanItem(tx, {
+        userId: input.userId,
+        activityId: activity.id,
+        // An undated REQUEST_ONLY enquiry is not a planned event occurrence.
+        date: activity.bookingMode === BookingMode.REQUEST_ONLY ? null : date,
+        startsAt: slotStart ?? null,
+        title: activity.title,
+        coverImageUrl: activity.coverImageUrl,
+        linkedPlanItemId: planLink.planItemId,
+      });
       const result = await createBookingWithInitialActivity({
-        planItemId: planLink.planItemId ?? undefined,
+        planItemId: linkedPlanItemId ?? undefined,
         businessId: activity.businessId,
         userId: input.userId ?? undefined,
         publicationType: PublicationType.EVENT,
@@ -633,13 +767,13 @@ async function createPublicationBooking(
         status,
         ...source,
       }, tx, manual?.actorId);
-      return { activity: { ...activity, businessId: activity.businessId }, result };
+      return { activity: { ...activity, businessId: activity.businessId }, result, linkedPlanItemId };
     }
-    const { activity, result } = manual ? await createEvent(manual.tx) : await prisma.$transaction(createEvent);
+    const { activity, result, linkedPlanItemId } = manual ? await createEvent(manual.tx) : await prisma.$transaction(createEvent);
     if (manual) return result;
 
-    triggerBookingCreatedSideEffects({
-      planItemId: planLink.planItemId,
+    await triggerBookingCreatedSideEffects({
+      planItemId: linkedPlanItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
       entityType: "EVENT",

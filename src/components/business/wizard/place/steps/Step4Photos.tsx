@@ -23,22 +23,25 @@ export function Step4Photos({
   isEditable = true,
 }: Step4PhotosProps) {
   const logoImage = data.images.find((img) => img.kind === "LOGO");
-  const galleryImages = data.images.filter((img) => img.kind === "GALLERY");
-
   const hasLogo = !!(logoImage?.url || data.logoUrl);
+  const isMediaEditable = isEditable && data.status !== "PUBLISHED";
 
   // Convert PlaceImage[] to GalleryItem[]
   const initialGalleryItems: GalleryItem[] = useMemo(() =>
-    galleryImages.map((img) => ({
+    data.images
+      .filter((img) => img.kind === "GALLERY")
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((img) => ({
       id: img.id,
       url: img.url,
       width: img.width ?? undefined,
       height: img.height ?? undefined,
       blurhash: img.blurhash || undefined,
       status: "done" as const,
-      // Уже привязанные к месту фото — удаляются через /places/[id]/images, а не /temp-media.
-      source: "place" as const,
-    })), [galleryImages]
+      // A wizard may mix persisted PlaceImages with new TempMedia even in edit mode.
+      source: (!data.id || data.tempGalleryMediaIds?.includes(img.id))
+        ? "temp" as const : "place" as const,
+    })), [data.images, data.id, data.tempGalleryMediaIds]
   );
 
   const handleLogoUploadComplete = useCallback((mediaId: string, url: string) => {
@@ -58,6 +61,15 @@ export function Step4Photos({
       logoUrl: url,
       tempLogoMediaId: mediaId,
       images: [...withoutLogo, newLogo],
+    });
+  }, [onChange, data.images]);
+
+  const handleLogoRemove = useCallback(() => {
+    onChange({
+      logoImageId: null,
+      logoUrl: null,
+      tempLogoMediaId: null,
+      images: data.images.filter((img) => img.kind !== "LOGO"),
     });
   }, [onChange, data.images]);
 
@@ -90,12 +102,20 @@ export function Step4Photos({
         ...data.images.filter(img => img.kind !== "GALLERY"),
         ...newImages,
       ],
-      tempGalleryMediaIds: galleryItems.map(item => item.id),
+      tempGalleryMediaIds: galleryItems
+        .filter((item) => item.source !== "place")
+        .map((item) => item.id),
     });
   }, [onChange, data.images]);
 
   return (
     <div className="space-y-8">
+      {data.status === "PUBLISHED" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          Изображения опубликованного места сохраняются через ревизию.
+          Редактирование изображений временно недоступно до завершения безопасного переноса в ревизию.
+        </p>
+      ) : null}
       {/* Logo */}
       <div>
         <h3 className="font-medium mb-2">Логотип *</h3>
@@ -109,14 +129,19 @@ export function Step4Photos({
           wizardSessionId={wizardSessionId}
           hasLogo={hasLogo}
           onImportComplete={handleLogoUploadComplete}
-          isEditable={isEditable}
+          isEditable={isMediaEditable}
         />
 
         <PlaceLogoUploadTemp
           wizardSessionId={wizardSessionId || ""}
           currentLogoUrl={logoImage?.url || data.logoUrl || undefined}
+          currentLogoMediaId={logoImage?.id || data.logoImageId}
+          placeId={data.id}
+          published={data.status === "PUBLISHED"}
           onUploadComplete={handleLogoUploadComplete}
-          disabled={!isEditable}
+          onRemove={handleLogoRemove}
+          isExistingPlaceImage={Boolean(data.id && logoImage?.id && !data.tempLogoMediaId)}
+          disabled={!isMediaEditable}
         />
       </div>
 
@@ -124,14 +149,15 @@ export function Step4Photos({
       <div>
         <h3 className="font-medium mb-2">Фото места</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Первое фото используется как главное на странице места. Перетащите другое фото на первое место, чтобы сменить главное.
+          Первое фото используется как главное на странице места. Измените порядок фотографий, чтобы сменить главное.
         </p>
         <PlaceGalleryUploadTemp
           wizardSessionId={wizardSessionId || ""}
           placeId={data.id}
           initialImages={initialGalleryItems}
           onImagesChange={handleGalleryImagesChange}
-          disabled={!isEditable}
+          published={data.status === "PUBLISHED"}
+          disabled={!isMediaEditable}
         />
       </div>
 
@@ -143,7 +169,7 @@ export function Step4Photos({
           placeholder="Ссылка на Instagram Reels, YouTube или Shorts"
           value={reelsUrl}
           onChange={handleReelsUrlChange}
-          disabled={!isEditable}
+          disabled={!isMediaEditable}
           className={reelsUrlError ? "border-red-500" : ""}
         />
         {reelsUrlError ? <p className="text-xs text-red-500">{reelsUrlError}</p> : null}

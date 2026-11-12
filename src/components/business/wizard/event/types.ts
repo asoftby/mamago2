@@ -144,7 +144,7 @@ export interface EventFormData {
   ticketLink: string;
   /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */
   participationMode: "simple-booking" | "external-link" | "time-slots" | "walk-in" | "request" | "prebook";
-  prebookMethod: "phone" | "link" | null;
+  prebookMethod: "internal" | "phone" | "link" | null;
   prebookPhone: string;
   prebookUrl: string;
 

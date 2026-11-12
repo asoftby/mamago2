@@ -4683,8 +4683,10 @@ enum NotificationType {
   ADMIN_MODERATION_ITEM_CREATED
   NEWS
   ANNOUNCEMENT
-  /// Новая заявка на запись (лагерь, событие, место)
+  /// Новая заявка на запись (лагерь, событие, место) — бизнес
   BOOKING_CREATED
+  /// Клиентская заявка получена, ожидает решения бизнеса
+  BOOKING_SUBMITTED
   /// Заявка не обработана долгое время (NEW > 24ч)
   BOOKING_STALE
   /// Подтверждённая заявка без активности (CONFIRMED > 3 дней)

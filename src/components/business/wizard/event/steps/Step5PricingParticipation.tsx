@@ -109,6 +109,7 @@ function getPublicationAccessFromEvent(data: EventFormData): PublicationAccess {
   if (data.participationMode === "prebook") {
     return {
       method: "prebooking",
+      prebookingChannel: data.prebookMethod === "link" ? "link" : data.prebookMethod === "phone" ? "phone" : "internal",
       phone: data.prebookPhone,
       externalUrl: data.prebookUrl,
     };
@@ -151,7 +152,7 @@ function buildEventAccessPatch(access: PublicationAccess): Partial<EventFormData
       ctaStepDraft: null,
       publicationAccess: access,
       participationMode: "prebook",
-      prebookMethod: access.externalUrl?.trim() && !access.phone?.trim() ? "link" : "phone",
+      prebookMethod: access.prebookingChannel ?? (access.externalUrl?.trim() ? "link" : access.phone?.trim() ? "phone" : "internal"),
       prebookPhone: access.phone ?? "",
       prebookUrl: access.externalUrl ?? "",
     };
