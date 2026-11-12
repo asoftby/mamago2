@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BookingMode } from "@prisma/client";
 import { deriveEventRequestBookingColumns } from "./eventRequestBookingColumns";
+import { getEventBookingSchedule } from "./eventBookingSchedule";
 
 const off = { bookingEnabled: false, bookingMode: null };
 const on = { bookingEnabled: true, bookingMode: BookingMode.REQUEST_ONLY };
@@ -66,4 +67,50 @@ test("native event preliminary booking creates REQUEST_ONLY; legacy phone/link r
     current: on,
     hasBusiness: true,
   }), off);
+});
+
+
+test("enabled legacy booking calendars remain available without a participationMode", () => {
+  const timeSlots = {
+    dates: [{
+      isoDate: "2026-12-12",
+      slots: [{ startTime: "14:00", endTime: "15:00", capacity: 5 }],
+    }],
+  };
+  const legacyDraft = {
+    participationMode: "walk-in",
+    ctaStepDraft: {
+      legacyOrigin: "BOOKING",
+      actionChoice: "REQUEST",
+      requestMode: "CALENDAR",
+    },
+    timeSlots,
+  };
+  assert.equal(getEventBookingSchedule(legacyDraft).size, 0);
+  assert.equal(
+    getEventBookingSchedule(legacyDraft, BookingMode.USE_PUBLICATION_SLOTS).get("2026-12-12|14:00")?.capacity,
+    5,
+  );
+  assert.equal(
+    getEventBookingSchedule({ timeSlots }, BookingMode.USE_PUBLICATION_SLOTS).size,
+    1,
+  );
+  assert.equal(
+    getEventBookingSchedule(legacyDraft, BookingMode.REQUEST_ONLY).size,
+    0,
+  );
+  assert.equal(
+    getEventBookingSchedule({
+      ...legacyDraft,
+      ctaStepDraft: { ...legacyDraft.ctaStepDraft, actionChoice: "DISCOVER" },
+    }, BookingMode.USE_PUBLICATION_SLOTS).size,
+    0,
+  );
+  assert.equal(
+    getEventBookingSchedule({
+      ...legacyDraft,
+      participationMode: "external-link",
+    }, BookingMode.USE_PUBLICATION_SLOTS).size,
+    0,
+  );
 });
