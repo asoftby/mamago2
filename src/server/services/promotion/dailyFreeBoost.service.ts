@@ -17,6 +17,7 @@ export type FreeBoostCandidate = {
   id: string;
   title: string;
   publicationType: FreeBoostPublicationType;
+  activeBoostUntil: string | null;
 };
 
 export class DailyFreeBoostUnavailableError extends Error {
@@ -51,12 +52,21 @@ export async function getFreeBoostCandidates(params: {
           {
             OR: [
               { businessId: params.businessId },
-              { ownerUserId: params.userId },
+              { ownerUserId: params.userId, businessId: null },
             ],
           },
         ],
       },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        boosts: {
+          where: { startAt: { lte: now }, endAt: { gt: now } },
+          orderBy: { endAt: "desc" },
+          take: 1,
+          select: { endAt: true },
+        },
+      },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.offer.findMany({
@@ -67,25 +77,36 @@ export async function getFreeBoostCandidates(params: {
             place: {
               OR: [
                 { ownerBusinessId: params.businessId },
-                { createdByUserId: params.userId },
+                { createdByUserId: params.userId, ownerBusinessId: null },
               ],
             },
           },
         ],
       },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        boosts: {
+          where: { startAt: { lte: now }, endAt: { gt: now } },
+          orderBy: { endAt: "desc" },
+          take: 1,
+          select: { endAt: true },
+        },
+      },
       orderBy: { updatedAt: "desc" },
     }),
   ]);
 
   return [
-    ...events.map((event) => ({
+    ...events.map(({ boosts, ...event }) => ({
       ...event,
       publicationType: "EVENT" as const,
+      activeBoostUntil: boosts[0]?.endAt.toISOString() ?? null,
     })),
-    ...offers.map((offer) => ({
+    ...offers.map(({ boosts, ...offer }) => ({
       ...offer,
       publicationType: "OFFER" as const,
+      activeBoostUntil: boosts[0]?.endAt.toISOString() ?? null,
     })),
   ];
 }
