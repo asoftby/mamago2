@@ -660,11 +660,15 @@ async function createPublicationBooking(
       let capacity: number | undefined;
       let slotStart: Date | undefined;
       const schedule = activity.scheduleJson as Record<string, unknown> | null;
+      const configuredCalendar = getEventBookingSchedule(schedule, activity.bookingMode);
+      // The public CTA and the write path must validate the same stored
+      // slots, including legacy booking calendars with no participationMode.
       const wizardCalendar = schedule?.participationMode === "time-slots" ||
-        schedule?.participationMode === "simple-booking";
+        schedule?.participationMode === "simple-booking" ||
+        (activity.bookingMode !== BookingMode.REQUEST_ONLY && configuredCalendar.size > 0);
       if (wizardCalendar && activity.bookingMode === BookingMode.USE_PUBLICATION_DATES) {
         const dateKey = date?.toISOString().slice(0, 10) ?? "";
-        const day = getEventBookingSchedule(schedule).get(eventBookingSlotKey(dateKey, ""));
+        const day = configuredCalendar.get(eventBookingSlotKey(dateKey, ""));
         if (!day || dateKey < getLocalDateKey() || input.selectedSessionId || time) {
           throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
         }
@@ -697,7 +701,7 @@ async function createPublicationBooking(
         if (!session) throw new BookingValidationError("selectedSessionId", "Слот недоступен");
         const localDate = getLocalDateKey(session.startsAt);
         const localTime = formatHHMM(session.startsAt);
-        const slot = getEventBookingSchedule(schedule).get(eventBookingSlotKey(localDate, localTime));
+        const slot = configuredCalendar.get(eventBookingSlotKey(localDate, localTime));
         if (wizardCalendar && !slot) {
           throw new BookingValidationError("selectedSessionId", "Слот недоступен для записи");
         }
