@@ -13,6 +13,7 @@ import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose, shouldFetchEventPlanDates } from "@/features/save/saveStatusFetchGuard";
+import { getEventSaveStatusLabel } from "@/lib/event/eventSaveStatusLabel";
 
 type SaveHeartProps = {
   activityId: string;
@@ -78,6 +79,7 @@ export function SaveHeart({
   });
 
   const isSaved = saveStatus.isIdea || saveStatus.inPlan || saveStatus.inBirthday;
+  const specificSavedLabel = offerId ? null : getEventSaveStatusLabel(saveStatus);
   const normalizedEventPlanDateISO = normalizePlanDateISO(eventPlanDateISO);
 
   const checkSaveStatus = useCallback(async () => {
@@ -221,7 +223,7 @@ export function SaveHeart({
           )}
         >
           {triggerLabel === "Сохранить" ? <Heart aria-hidden="true" className={cn("h-5 w-5 shrink-0", isSaved && "fill-current")} /> : null}
-          {saveStatus.inPlan ? "Сохранено" : isSaved && triggerLabel === "Сохранить" ? "Сохранено" : triggerLabel}
+          {saveStatus.inPlan || (isSaved && triggerLabel === "Сохранить") ? (specificSavedLabel ?? "Сохранено") : triggerLabel}
         </button>
       ) : (
       <button
