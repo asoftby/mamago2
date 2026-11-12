@@ -124,11 +124,12 @@ export function HorizontalCardRow({
   return (
     <div className={cn("relative -mx-4 px-4 sm:mx-0 sm:px-0", padded && "pb-1")}>
       {headerTitle ? (
-        <div className="mb-[18px] flex min-h-11 flex-wrap items-center justify-between gap-3">
+        <div className="mb-[18px] flex min-h-11 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="min-w-0">{headerTitle}</div>
-          <div className="flex shrink-0 items-center gap-4">
+          {/* Mobile: link left, arrows at the right edge. Desktop: keep the pair together on the right. */}
+          <div className="flex w-full shrink-0 items-center justify-between gap-4 sm:w-auto sm:justify-end">
             {navLeading}
-            <div>{navigationControls}</div>
+            {navigationControls}
           </div>
         </div>
       ) : navLeading ? (

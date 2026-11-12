@@ -155,31 +155,26 @@ export function ManualBookingDialog({ onClose, onCreated }: {
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !inFlight.current) onClose(); }}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto p-4 sm:p-6" dismissible={!busy} showCloseButton={!busy}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto p-4 sm:max-w-xl sm:p-6" dismissible={!busy} showCloseButton={!busy}>
         <DialogHeader className="pr-10 text-left">
           <DialogTitle>Новая запись</DialogTitle>
-          <DialogDescription>Добавьте согласованную запись клиента или заявку на обработку.</DialogDescription>
+          <DialogDescription>
+            Выберите публикацию и укажите клиента. Запись с датой будет видна и в календаре.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit}>
-          <fieldset disabled={busy} className="grid gap-3">
-            <label className="grid gap-1 text-sm">Тип публикации
+          <fieldset disabled={busy} className="grid gap-4">
+            <h3 className="text-sm font-semibold text-stone-950">1. Что бронируем</h3>
+            <label className="grid gap-1 text-sm">Раздел
               <select className={selectClass} value={type} onChange={(e) => {
                 setType(e.target.value as Type); setPublicationId(""); setSearch(""); setQuery(""); setError("");
               }}>
                 <option value="EVENT">Событие</option>
                 <option value="PLACE">Место</option>
-                <option value="OFFER">Предложение</option>
+                <option value="OFFER">Занятие или услуга</option>
               </select>
             </label>
-            <div className="flex min-w-0 items-end gap-2">
-              <label className="grid min-w-0 flex-1 gap-1 text-sm">Поиск по названию
-                <Input className="min-h-11 text-base" value={query} onChange={(e) => setQuery(e.target.value)} maxLength={100} />
-              </label>
-              <Button type="button" variant="outline" className="min-h-11" onClick={() => {
-                if (query.trim() !== search) { setSearch(query.trim()); setPublicationId(""); setError(""); }
-              }}>Найти</Button>
-            </div>
-            <label className="grid gap-1 text-sm">Публикация
+            <label className="grid gap-1 text-sm">Выберите публикацию
               <select className={selectClass} required value={publicationId} onChange={(e) => {
                 setPublicationId(e.target.value); setOfferDate(""); setGroupId(""); setOfferChoiceIndex(""); setError("");
               }}>
@@ -187,6 +182,21 @@ export function ManualBookingDialog({ onClose, onCreated }: {
                 {items?.map(({ id, title }) => <option key={id} value={id}>{title}</option>)}
               </select>
             </label>
+            <details className="rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-3">
+              <summary className="cursor-pointer text-sm font-medium text-stone-700">
+                Не нашли нужное в списке? Поиск по названию
+              </summary>
+              <div className="mt-3">
+                <div className="flex min-w-0 items-end gap-2">
+                  <label className="grid min-w-0 flex-1 gap-1 text-sm">Название
+                    <Input className="min-h-11 text-base" value={query} onChange={(e) => setQuery(e.target.value)} maxLength={100} />
+                  </label>
+                  <Button type="button" variant="outline" className="min-h-11" onClick={() => {
+                  if (query.trim() !== search) { setSearch(query.trim()); setPublicationId(""); setError(""); }
+                  }}>Найти</Button>
+                </div>
+              </div>
+            </details>
             {type === "EVENT" && publicationId && !options && !error ? <p role="status">Загружаем расписание…</p> : null}
             {options?.mode === "USE_PUBLICATION_SLOTS" ? (
               <label className="grid gap-1 text-sm" key={publicationId}>Дата и время
@@ -249,22 +259,32 @@ export function ManualBookingDialog({ onClose, onCreated }: {
                 <label className="grid min-w-0 gap-1 text-sm">Время<Input type="time" name="time" className="min-h-11 text-base" /></label>
               </div>
             ) : null}
+            <h3 className="border-t border-stone-200 pt-4 text-sm font-semibold text-stone-950">2. Данные клиента</h3>
             <label className="grid gap-1 text-sm">Имя клиента<Input name="name" required minLength={2} maxLength={120} className="min-h-11 text-base" /></label>
             <label className="grid gap-1 text-sm">Телефон<Input name="phone" type="tel" required minLength={7} maxLength={20} className="min-h-11 text-base" /></label>
-            <label className="grid gap-1 text-sm">Email, необязательно<Input name="email" type="email" maxLength={254} className="min-h-11 text-base" /></label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="grid gap-1 text-sm">Взрослые<Input name="adults" type="number" min={0} max={100} defaultValue={1} required className="min-h-11 text-base" /></label>
-              <label className="grid gap-1 text-sm">Дети<Input name="children" type="number" min={0} max={100} defaultValue={0} required className="min-h-11 text-base" /></label>
-            </div>
-            <label className="grid gap-1 text-sm">Комментарий, необязательно<Textarea name="comment" maxLength={500} className="text-base" /></label>
-            <label className="grid gap-1 text-sm">Статус
+            <details className="rounded-xl border border-stone-200 px-3 py-3">
+              <summary className="cursor-pointer text-sm font-medium text-stone-700">
+                Дополнительно: email, участники, комментарий
+              </summary>
+              <div className="mt-3 grid gap-3">
+                <label className="grid gap-1 text-sm">Email, необязательно<Input name="email" type="email" maxLength={254} className="min-h-11 text-base" /></label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="grid gap-1 text-sm">Взрослые<Input name="adults" type="number" min={0} max={100} defaultValue={1} required className="min-h-11 text-base" /></label>
+                  <label className="grid gap-1 text-sm">Дети<Input name="children" type="number" min={0} max={100} defaultValue={0} required className="min-h-11 text-base" /></label>
+                </div>
+                <label className="grid gap-1 text-sm">Комментарий, необязательно<Textarea name="comment" maxLength={500} className="text-base" /></label>
+              </div>
+            </details>
+            <label className="grid gap-1 text-sm">Создать как
               <select className={selectClass} name="status" defaultValue="CONFIRMED">
                 <option value="CONFIRMED">Подтверждена</option>
-                <option value="NEW">Новая</option>
+                <option value="NEW">Требует подтверждения</option>
               </select>
             </label>
             {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-            <Button type="submit" className="min-h-11" disabled={!ready || busy}>{busy ? "Сохраняем…" : "Сохранить запись"}</Button>
+            <Button type="submit" className="min-h-11" disabled={!ready || busy}>
+              {busy ? "Сохраняем…" : "Добавить запись"}
+            </Button>
           </fieldset>
         </form>
       </DialogContent>

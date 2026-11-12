@@ -28,6 +28,7 @@ export async function listUserBirthdayParties(userId: string): Promise<UserBirth
       items: { select: {
         role: true, status: true, offer: { select: { title: true } },
       } },
+      savedOffers: { select: { offer: { select: { title: true } } } },
     },
   });
   return rows.map((row) => {
@@ -42,8 +43,11 @@ export async function listUserBirthdayParties(userId: string): Promise<UserBirth
       dateIso: row.eventDate?.toISOString().slice(0, 10) ?? null,
       timeStart: row.timeFrom,
       timeEnd: row.timeTo,
-      previewItems: row.items.filter((item) => item.role !== "INCLUDED")
-        .flatMap((item) => item.offer?.title ? [item.offer.title] : []).slice(0, 4),
+      previewItems: [
+        ...row.items.filter((item) => item.role !== "INCLUDED")
+          .flatMap((item) => item.offer?.title ? [item.offer.title] : []),
+        ...row.savedOffers.map((item) => item.offer.title),
+      ].slice(0, 4),
       selectedServiceCount: countable.length,
       confirmationCount: confirmed,
       confirmationTotal: countable.length,

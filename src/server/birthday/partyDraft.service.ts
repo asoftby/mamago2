@@ -37,6 +37,18 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
   const party = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
     include: {
+      savedOffers: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          offer: {
+            select: {
+              id: true, title: true, slug: true,
+              city: { select: { slug: true } },
+              place: { select: { city: { select: { slug: true } } } },
+            },
+          },
+        },
+      },
       items: {
         orderBy: { position: "asc" },
         include: {

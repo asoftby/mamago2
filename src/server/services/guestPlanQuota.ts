@@ -8,7 +8,7 @@ export function guestMaxLifetimeGenerations(): number {
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 1) return Math.min(Math.floor(n), 10_000);
   }
-  return 2;
+  return 3;
 }
 
 /** См. env GUEST_MAX_GENERATIONS_PER_MINUTE; без env — 60/мин. */

@@ -2786,6 +2786,7 @@ model Offer {
   boosts          Boost[]
   bookingRequests BookingRequest[]
   partyOrderItems PartyOrderItem[]
+  partySavedOffers PartySavedOffer[]
   bookingUnitOffers BookingUnitOffer[]
   offerPlanItems  PlanItem[]
   offerIdeas      OfferIdea[]
@@ -6036,6 +6037,7 @@ model PartyOrder {
   owner User @relation("PartyOrderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   family Family? @relation(fields: [familyId], references: [id], onDelete: SetNull)
   items PartyOrderItem[]
+  savedOffers PartySavedOffer[]
 
   @@index([ownerUserId, status])
   @@index([familyId])
@@ -6083,6 +6085,18 @@ model PartyOrderItem {
   @@index([offerId])
   @@index([businessId])
   @@index([parentItemId])
+}
+
+model PartySavedOffer {
+  id String @id @default(cuid())
+  partyOrderId String
+  offerId String
+  createdAt DateTime @default(now())
+  partyOrder PartyOrder @relation(fields: [partyOrderId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([partyOrderId, offerId])
+  @@index([offerId])
 }
 
 model PartyQuote {

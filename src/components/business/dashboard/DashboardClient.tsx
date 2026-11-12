@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
+import { shouldAutoOpenBusinessTour } from "@/lib/business/shouldAutoOpenBusinessTour";
 import Link from "next/link";
 import { CirclePlay } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -16,7 +17,10 @@ import { BusinessSectionHeader } from "@/components/business/sections/BusinessSe
 import { DashboardActionStack } from "@/components/business/dashboard/DashboardActionStack";
 import { DashboardPeriodSwitcher } from "@/components/business/dashboard/DashboardPeriodSwitcher";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
-import { BusinessOnboardingTour } from "@/components/business/dashboard/BusinessOnboardingTour";
+import {
+  BusinessOnboardingTour,
+  sendBusinessOnboardingAction,
+} from "@/components/business/dashboard/BusinessOnboardingTour";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
 import { BusinessTelegramStatusRow } from "@/components/business/notifications/BusinessTelegramStatusRow";
 import { DailyFreeBoostCard } from "@/components/business/dashboard/DailyFreeBoostCard";
@@ -458,10 +462,15 @@ interface DashboardClientProps {
 
 export function DashboardClient({ data, defaultPeriod = "week", verificationBanner }: DashboardClientProps) {
   const [period, setPeriod] = useState<DashboardPeriod>(defaultPeriod);
-  const [tourOpen, setTourOpen] = useState(() =>
-    data.onboarding.showLaunchpad && !data.onboarding.tourCompleted &&
-    !data.onboarding.tourSkipped && !data.onboarding.hasAny,
-  );
+  // First cabinet visit only. Persist immediately so a refresh cannot reopen the
+  // tour if `start` from the launchpad has not landed yet. Manual replay stays
+  // available via «Возможности кабинета».
+  const shouldAutoOpenTour = shouldAutoOpenBusinessTour(data.onboarding);
+  const [tourOpen, setTourOpen] = useState(shouldAutoOpenTour);
+  useEffect(() => {
+    if (!shouldAutoOpenTour) return;
+    void sendBusinessOnboardingAction("tour_skip");
+  }, [shouldAutoOpenTour]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

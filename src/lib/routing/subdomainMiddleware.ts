@@ -148,7 +148,18 @@ export function resolveSubdomainMiddlewareDecision(params: {
   const isLocalhost = isDevLocalHost(hostname);
 
   if (isLocalhost) {
-    // Dev LAN / localhost fallback: keep path as-is and treat as public surface.
+    // Public surface as-is, except the single-city default for `/`.
+    if (pathname === "/") {
+      return {
+        kind: "redirect",
+        location: buildSameHostLocation({
+          protocol,
+          host,
+          pathname: "/minsk",
+          search: "",
+        }),
+      };
+    }
     return { kind: "next" };
   }
 

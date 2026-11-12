@@ -39,7 +39,7 @@ const PRIORITY_COUNT = 4;
 /** The catalog preserves feed order without orphaned cards in middle columns. */
 function KudaListingRows({ items }: { items: Array<{ key: string; content: ReactNode }> }) {
   return (
-    <div className="grid grid-cols-2 items-start gap-x-5 gap-y-6 sm:grid-cols-3 sm:gap-x-6 md:grid-cols-4 lg:gap-x-8">
+    <div className="grid grid-cols-2 items-start gap-x-5 gap-y-10 sm:grid-cols-3 sm:gap-x-6 md:grid-cols-4 lg:gap-x-8">
       {items.map(({ key, content }) => (
         <div key={key} className="min-w-0">{content}</div>
       ))}
