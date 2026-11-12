@@ -35,3 +35,15 @@ export function requestOpenQuickAdd(dateISO: string) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(MY_PLAN_QUICK_ADD_EVENT, { detail: { date: dateISO } }));
 }
+
+/** Opens My Plan on a given screen (the «Куда пойти» entry of the day scenario). */
+export function requestOpenMyPlanScreen(landing: "dayScenario") {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(MY_PLAN_OPEN_EVENT, { detail: { landing } }));
+}
+
+/** The landing screen carried by an open request, if any. */
+export function landingFromOpenEvent(event: Event): "dayScenario" | null {
+  const detail = (event as CustomEvent<{ landing?: unknown } | undefined>).detail;
+  return detail?.landing === "dayScenario" ? "dayScenario" : null;
+}

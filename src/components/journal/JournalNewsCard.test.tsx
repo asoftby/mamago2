@@ -35,7 +35,7 @@ test("shared header contains the title, all link and separate navigation in norm
   assert.match(header, /href="\/blog\?type=news"/);
   assert.match(header, /Предыдущие публикации/);
   assert.match(header, /Следующие публикации/);
-  assert.match(header, /hidden sm:block/);
+  assert.doesNotMatch(header, /hidden sm:block/, "carousel controls stay available on mobile as well as desktop");
   assert.doesNotMatch(header, /lg:absolute|lg:-top|absolute right-0 -top/);
 });
 

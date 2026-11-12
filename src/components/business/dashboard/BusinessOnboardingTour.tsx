@@ -24,6 +24,42 @@ const STEPS = [
 type TourAction = "tour_complete" | "tour_skip";
 type SpotlightRect = { x: number; y: number; width: number; height: number };
 
+function firstVisibleTourTarget(selector: string): HTMLElement | undefined {
+  return Array.from(document.querySelectorAll<HTMLElement>(selector)).find(
+    (element) => element.getClientRects().length > 0,
+  );
+}
+
+/** Scroll spotlight targets into the viewport above the fixed tour card. */
+function scrollTourTargetsIntoView(elements: HTMLElement[]) {
+  if (elements.length === 0) return;
+
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const element of elements) {
+    const rect = element.getBoundingClientRect();
+    top = Math.min(top, rect.top);
+    bottom = Math.max(bottom, rect.bottom);
+  }
+
+  const paddingTop = 24;
+  // Keep room for the fixed tour dialog so highlights are not covered.
+  const dialogReserve = Math.min(300, Math.round(window.innerHeight * 0.42));
+  const safeBottom = window.innerHeight - dialogReserve;
+  if (top >= paddingTop && bottom <= safeBottom) return;
+
+  const absoluteTop = top + window.scrollY;
+  const absoluteBottom = bottom + window.scrollY;
+  const available = Math.max(120, safeBottom - paddingTop);
+  const unionHeight = absoluteBottom - absoluteTop;
+  const nextY =
+    unionHeight <= available
+      ? absoluteTop - paddingTop - (available - unionHeight) / 2
+      : absoluteTop - paddingTop;
+
+  window.scrollTo({ top: Math.max(0, nextY), behavior: "smooth" });
+}
+
 export async function sendBusinessOnboardingAction(action: "start" | "public_open" | TourAction) {
   try {
     const result = await fetch("/api/business/onboarding-progress", {
@@ -60,10 +96,16 @@ export function BusinessOnboardingTour({
 
   useEffect(() => {
     if (!open) return;
-    const target = index === 0 ? undefined : Array.from(
-      document.querySelectorAll<HTMLElement>(`[data-business-tour-target="${index === 1 ? "create-button" : "publications"}"]`),
-    ).find((element) => element.getClientRects().length > 0);
-    target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const selectors =
+      index === 0
+        ? []
+        : index === 1
+          ? ['[data-business-tour-target="create-header"]', '[data-business-tour-target="create-button"]']
+          : ['[data-business-tour-target="publications"]', '[data-business-tour-target="leads"]'];
+    const targets = selectors
+      .map((selector) => firstVisibleTourTarget(selector))
+      .filter((element): element is HTMLElement => Boolean(element));
+    scrollTourTargetsIntoView(targets);
 
     nextButton.current?.focus({ preventScroll: true });
 
@@ -91,8 +133,8 @@ export function BusinessOnboardingTour({
         : index === 1
           ? ['[data-business-tour-target="create-header"]', '[data-business-tour-target="create-button"]']
           : ['[data-business-tour-target="publications"]', '[data-business-tour-target="leads"]'];
-      const targets = selectors.map((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector))
-        .find((element) => element.getClientRects().length > 0))
+      const targets = selectors
+        .map((selector) => firstVisibleTourTarget(selector))
         .filter((element): element is HTMLElement => Boolean(element));
       setSpotlights(targets.map((element) => {
         const rect = element.getBoundingClientRect();
@@ -102,10 +144,13 @@ export function BusinessOnboardingTour({
     };
     const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(update); };
     schedule();
+    // Smooth scroll finishes after the first paint — refresh spotlights once settled.
+    const settled = window.setTimeout(schedule, 360);
     window.addEventListener("resize", schedule);
     window.addEventListener("scroll", schedule, true);
     return () => {
       cancelAnimationFrame(frame);
+      window.clearTimeout(settled);
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
     };

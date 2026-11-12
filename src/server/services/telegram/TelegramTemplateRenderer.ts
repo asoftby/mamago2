@@ -6,6 +6,7 @@ import type {
   NotificationAudience,
   NotificationType,
 } from "@prisma/client";
+import { resolveNotificationPageUrl } from "@/server/notifications/notification-action-resolver";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { createTelegramLinkButton } from "@/lib/telegram/webAppButton";
 import { getNotificationRegistryEntry } from "@/lib/notifications/notificationRegistry";
@@ -118,7 +119,11 @@ function buildReplyMarkup(
   
   // Получаем href из registry
   let href: string | null = null;
-  if (registryEntry.resolveHref) {
+  const metadata = notification.metadata;
+  const partyOutbox = metadata && typeof metadata === "object" && !Array.isArray(metadata) && metadata.source === "PARTY_OUTBOX";
+  if (partyOutbox && notification.actionUrl) {
+    href = resolveNotificationPageUrl(notification);
+  } else if (registryEntry.resolveHref) {
     try {
       href = registryEntry.resolveHref({
         entityType: notification.entityType ?? undefined,

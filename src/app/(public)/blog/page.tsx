@@ -77,7 +77,6 @@ export default async function BlogPage({
         subtitle="Вдохновение для семейных прогулок, событий и открытий."
         main={journal.main}
         news={journal.news}
-        collections={journal.collections}
         feed={journal.feed}
         typeFilter={typeFilter}
         newsArchive={newsArchive}

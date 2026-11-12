@@ -1,6 +1,7 @@
 export type PartyCategoryKey = "VENUE" | "ANIMATOR" | "SHOW" | "MASTER_CLASS" | "CAKE" | "FOOD" | "DECOR" | "PHOTO" | "PROGRAM" | "OTHER";
 export type BirthdayCatalogItem = {
   id: string;
+  slug?: string | null;
   title: string;
   productType: "PARTY_SERVICE" | "PARTY_PACKAGE";
   category: PartyCategoryKey | null;

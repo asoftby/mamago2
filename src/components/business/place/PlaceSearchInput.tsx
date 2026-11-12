@@ -1,11 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
-import { GoogleMapsService } from "@/services/googleMaps";
-import { toLegacyAddressComponents, type NewAddressComponent } from "@/services/googleMaps/toLegacyAddressComponents";
-import { placeAutocompleteWidgetStyles } from "@/services/googleMaps/placeAutocompleteWidgetStyle";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { AddressSuggestInput } from "@/components/address/AddressSuggestInput";
+import { shouldAdoptExternalValue } from "@/lib/address/addressSuggestions";
+import { toLegacyAddressComponents } from "@/services/googleMaps/toLegacyAddressComponents";
 
 interface PlaceSearchInputProps {
   onPlaceSelect: (data: {
@@ -21,233 +19,41 @@ interface PlaceSearchInputProps {
   initialValue?: string; // Initial address to display
 }
 
-type PlaceAutocompleteElementCtor = new () => HTMLElement & {
-  value?: string;
-  focus?: () => void;
-};
-
-type PlaceAutocompleteSelectionEvent = Event & {
-  placePrediction?: {
-    toPlace?: () => {
-      id?: string;
-      displayName?: string;
-      formattedAddress?: string;
-      location?: {
-        lat?: number | (() => number);
-        lng?: number | (() => number);
-      };
-      addressComponents?: NewAddressComponent[];
-      fetchFields?: (input: { fields: string[] }) => Promise<void>;
-    };
-  };
-  detail?: {
-    placePrediction?: {
-      toPlace?: () => {
-        id?: string;
-        displayName?: string;
-        formattedAddress?: string;
-        location?: {
-          lat?: number | (() => number);
-          lng?: number | (() => number);
-        };
-        addressComponents?: NewAddressComponent[];
-        fetchFields?: (input: { fields: string[] }) => Promise<void>;
-      };
-    };
-  };
-};
-
-const PLACE_SEARCH_WIDGET_CLASS = "mg-place-search-autocomplete-widget";
-
-function readCoordinate(value: number | (() => number) | undefined): number | null {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === "function") {
-    const resolved = value();
-    return Number.isFinite(resolved) ? resolved : null;
-  }
-  return null;
-}
-
+/**
+ * Поле адреса мастера места и блоков статьи. Тонкая обёртка над общим {@link AddressSuggestInput}.
+ * Выбор подсказки НЕ вызывает onInputChange (иначе редактор статьи сбросил бы только что
+ * полученные координаты как «ручной ввод»).
+ */
 export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initialValue }: PlaceSearchInputProps) {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const fallbackInputRef = useRef<HTMLInputElement>(null);
-  const widgetRef = useRef<(HTMLElement & { value?: string; focus?: () => void }) | null>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
-  const onPlaceSelectRef = useRef(onPlaceSelect);
-  const onInputChangeRef = useRef(onInputChange);
-  const [isWidgetReady, setIsWidgetReady] = useState(false);
+  const [value, setValue] = useState(initialValue ?? "");
+  const [previousInitialValue, setPreviousInitialValue] = useState(initialValue);
 
-  useEffect(() => {
-    onPlaceSelectRef.current = onPlaceSelect;
-  }, [onPlaceSelect]);
-
-  useEffect(() => {
-    onInputChangeRef.current = onInputChange;
-  }, [onInputChange]);
-
-  const initAutocomplete = useCallback(async () => {
-    if (widgetRef.current) return;
-
-    const host = hostRef.current;
-    if (!host) return;
-
-    try {
-      const placesLib = (await GoogleMapsService.getPlacesLibrary()) as google.maps.PlacesLibrary & {
-        PlaceAutocompleteElement?: PlaceAutocompleteElementCtor;
-      };
-
-      const PlaceAutocompleteElement = placesLib.PlaceAutocompleteElement;
-      if (!PlaceAutocompleteElement) return;
-
-      const widget = new PlaceAutocompleteElement();
-      widgetRef.current = widget;
-      let suppressInputChange = false;
-      let releaseSuppressionTimer: ReturnType<typeof setTimeout> | null = null;
-
-      widget.setAttribute("placeholder", "Адрес или название места");
-      widget.setAttribute("aria-label", "Адрес или название места");
-      // Worldwide address search: no country inclusion filter.
-      widget.setAttribute("requested-language", "ru");
-      widget.setAttribute("requested-region", "by");
-
-      if (disabled) {
-        widget.setAttribute("disabled", "");
-      }
-
-      if (initialValue) {
-        widget.value = initialValue;
-        widget.setAttribute("value", initialValue);
-      }
-
-      widget.classList.add(PLACE_SEARCH_WIDGET_CLASS);
-
-      const handleInput = () => {
-        if (suppressInputChange) return;
-        onInputChangeRef.current?.(widget.value ?? widget.getAttribute("value") ?? "");
-      };
-
-      const handlePlaceSelect = async (event: Event) => {
-        const selectEvent = event as PlaceAutocompleteSelectionEvent;
-        const prediction = selectEvent.placePrediction ?? selectEvent.detail?.placePrediction;
-
-        const place = prediction?.toPlace?.();
-        if (!place) return;
-
-        suppressInputChange = true;
-        if (releaseSuppressionTimer) clearTimeout(releaseSuppressionTimer);
-
-        try {
-          await place.fetchFields?.({
-            fields: ["id", "displayName", "formattedAddress", "location", "addressComponents"],
-          });
-
-          const lat = readCoordinate(place.location?.lat);
-          const lng = readCoordinate(place.location?.lng);
-          if (!place.id || lat === null || lng === null) return;
-
-          onPlaceSelectRef.current({
-            googlePlaceId: place.id,
-            placeName: place.displayName || place.formattedAddress || "",
-            lat,
-            lng,
-            formattedAddr: place.formattedAddress || "",
-            addressJson: toLegacyAddressComponents(place.addressComponents),
-          });
-        } catch (error) {
-          console.error("[PlaceSearchInput] Place fetch error:", error);
-        } finally {
-          releaseSuppressionTimer = setTimeout(() => {
-            suppressInputChange = false;
-            releaseSuppressionTimer = null;
-          }, 0);
-        }
-      };
-
-      widget.addEventListener("input", handleInput);
-      widget.addEventListener("change", handleInput);
-      widget.addEventListener("gmp-select", handlePlaceSelect);
-      widget.addEventListener("gmp-placeselect", handlePlaceSelect);
-
-      host.innerHTML = "";
-      host.appendChild(widget);
-      setIsWidgetReady(true);
-
-      cleanupRef.current = () => {
-        if (releaseSuppressionTimer) clearTimeout(releaseSuppressionTimer);
-        widget.removeEventListener("input", handleInput);
-        widget.removeEventListener("change", handleInput);
-        widget.removeEventListener("gmp-select", handlePlaceSelect);
-        widget.removeEventListener("gmp-placeselect", handlePlaceSelect);
-        if (host.contains(widget)) {
-          host.removeChild(widget);
-        }
-        widgetRef.current = null;
-        cleanupRef.current = null;
-        setIsWidgetReady(false);
-      };
-    } catch (err) {
-      console.error("[PlaceSearchInput] Init error:", err);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    initAutocomplete();
-    return () => {
-      cleanupRef.current?.();
-    };
-  }, [initAutocomplete]);
-
-  // Keep the widget's disabled attribute and value in sync with props after it mounts
-  useEffect(() => {
-    const widget = widgetRef.current;
-    if (!widget) return;
-    if (disabled) {
-      widget.setAttribute("disabled", "");
-    } else {
-      widget.removeAttribute("disabled");
-    }
-  }, [disabled]);
-
-  useEffect(() => {
-    const widget = widgetRef.current;
-    if (!widget || initialValue === undefined) return;
-    if (widget.value !== initialValue) {
-      widget.value = initialValue;
-    }
-  }, [initialValue]);
+  if (initialValue !== previousInitialValue) {
+    setPreviousInitialValue(initialValue);
+    if (shouldAdoptExternalValue(initialValue, value)) setValue(initialValue ?? "");
+  }
 
   return (
-    <div id="place-location-search" className="relative">
-      <style>{placeAutocompleteWidgetStyles(PLACE_SEARCH_WIDGET_CLASS)}</style>
-
-      {/* Google's widget renders its own search icon — our MapPin is only shown for the fallback input */}
-      {!isWidgetReady && (
-        <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
-      )}
-
-      <div ref={hostRef} className={cn("w-full", !isWidgetReady && "hidden")} />
-
-      {!isWidgetReady ? (
-        <input
-          ref={fallbackInputRef}
-          type="text"
-          placeholder="Адрес или название места"
-          disabled={disabled}
-          value={onInputChange ? initialValue ?? "" : undefined}
-          defaultValue={onInputChange ? undefined : initialValue}
-          onChange={(event) => onInputChange?.(event.target.value)}
-          autoComplete="off"
-          className={cn(
-            "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-10 w-full min-w-0 rounded-md border bg-white px-3 py-2 text-base leading-none shadow-xs outline-none md:text-sm dark:bg-input/30",
-            "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-            "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-            "pl-10",
-          )}
-        />
-      ) : null}
+    <div id="place-location-search">
+      <AddressSuggestInput
+        value={value}
+        disabled={disabled}
+        onValueChange={(next) => {
+          setValue(next);
+          onInputChange?.(next);
+        }}
+        onSelect={(place) => {
+          setValue(place.formattedAddress);
+          onPlaceSelect({
+            googlePlaceId: place.googlePlaceId,
+            placeName: place.displayName || place.formattedAddress,
+            lat: place.lat,
+            lng: place.lng,
+            formattedAddr: place.formattedAddress,
+            addressJson: toLegacyAddressComponents(place.addressComponents) as unknown as google.maps.GeocoderAddressComponent[],
+          });
+        }}
+      />
     </div>
   );
 }

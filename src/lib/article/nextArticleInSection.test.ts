@@ -5,7 +5,6 @@ import {
   MAX_NEXT_ARTICLE_EXCLUDE_IDS,
   NEXT_ARTICLE_ORDER_BY,
 } from "./nextArticleInSectionQuery";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 const now = new Date("2026-06-01T12:00:00.000Z");
 
@@ -42,11 +41,7 @@ const now = new Date("2026-06-01T12:00:00.000Z");
   assert.deepEqual(where.id, { notIn: ["a1", "a2"] });
   assert.deepEqual(where.publishedAt, { lte: now });
   assert.deepEqual(where.slug, { not: null });
-  assert.ok(Array.isArray(where.OR));
-  assert.deepEqual(where.OR, [
-    { subtitle: null },
-    { subtitle: { not: BREAKING_NEWS_SUBTITLE } },
-  ]);
+  assert.deepEqual(where.publicationType, { not: "BREAKING_NEWS" });
 }
 
 {

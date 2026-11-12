@@ -102,6 +102,10 @@ function getPublicationAccessFromEvent(data: EventFormData): PublicationAccess {
     };
   }
 
+  if (data.participationMode === "request") {
+    return { method: "request" };
+  }
+
   if (data.participationMode === "prebook") {
     return {
       method: "prebooking",
@@ -131,6 +135,14 @@ function buildEventAccessPatch(access: PublicationAccess): Partial<EventFormData
       publicationAccess: access,
       participationMode: "time-slots",
       timeSlots: buildEventTimeSlots(access.timeSlots),
+    };
+  }
+
+  if (access.method === "request") {
+    return {
+      ctaStepDraft: null,
+      publicationAccess: access,
+      participationMode: "request",
     };
   }
 
@@ -294,7 +306,7 @@ export function Step5PricingParticipation({
           entityType="event"
           value={publicationAccess}
           onChange={(value) => onChange(buildEventAccessPatch(value))}
-          allowedMethods={["details", "ticket", "timeslots", "prebooking"]}
+          allowedMethods={["details", "ticket", "timeslots", "prebooking", "request"]}
           disabled={!isEditable}
         />
       )}

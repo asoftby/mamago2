@@ -16,12 +16,18 @@ function isExplicitlyEnabled(value: string | undefined): boolean {
   return value?.trim().toLowerCase() === "true";
 }
 
+function isNotExplicitlyDisabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() !== "false";
+}
+
 export function getHomeSectionAvailability(
   env: HomeSectionFeatureEnv = process.env,
 ): Record<HomeSectionFeature, boolean> {
   return {
-    classes: isExplicitlyEnabled(env[HOME_SECTION_ENV_KEYS.classes]),
-    birthday: isExplicitlyEnabled(env[HOME_SECTION_ENV_KEYS.birthday]),
+    // Sections render only with published data, so absent flags should not hide them.
+    // Explicit false remains available as a kill switch.
+    classes: isNotExplicitlyDisabled(env[HOME_SECTION_ENV_KEYS.classes]),
+    birthday: isNotExplicitlyDisabled(env[HOME_SECTION_ENV_KEYS.birthday]),
     routes: isExplicitlyEnabled(env[HOME_SECTION_ENV_KEYS.routes]),
   };
 }

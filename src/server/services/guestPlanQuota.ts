@@ -2,13 +2,13 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-function guestMaxLifetimeGenerations(): number {
+export function guestMaxLifetimeGenerations(): number {
   const raw = process.env.GUEST_MAX_GENERATIONS;
   if (raw !== undefined && raw.trim() !== "") {
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 1) return Math.min(Math.floor(n), 10_000);
   }
-  return 2;
+  return 3;
 }
 
 /** См. env GUEST_MAX_GENERATIONS_PER_MINUTE; без env — 60/мин. */

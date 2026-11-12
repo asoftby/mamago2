@@ -22,6 +22,8 @@ assert.ok(lightboxSource.includes("onTouchStart={handleTouchStart}"));
 assert.ok(lightboxSource.includes("onTouchEnd={handleTouchEnd}"));
 assert.ok(!lightboxSource.includes("hidden md:flex items-center justify-center"));
 assert.ok(lightboxSource.includes('data-lightbox-slide="incoming"'));
+assert.ok(lightboxSource.includes('event.propertyName === "transform"'), 'finish only after the CSS transform completes');
+assert.ok(lightboxSource.includes("window.setTimeout(finishSlide, 380)"), "retain safe interrupted-transition fallback");
 assert.ok(lightboxSource.includes("prefers-reduced-motion: reduce"));
 assert.ok(lightboxSource.includes("if (total <= 1 || transition) return"));
 assert.ok(lightboxSource.includes('data-lightbox-dots'));

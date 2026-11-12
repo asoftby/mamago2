@@ -6,6 +6,7 @@
  */
 import { resolveHomeRequest } from "@/server/services/recommendations/familyPicks/homeRequest";
 import { NextRequest, NextResponse } from "next/server";
+import { isSameSiteBrowserOrigin } from "@/lib/security/isSameSiteBrowserOrigin";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { loadFamilyPicks } from "@/server/services/recommendations/familyPicks/load";
@@ -35,8 +36,14 @@ export async function GET(request: NextRequest) {
 /** v2 is explicit, private POST only; legacy GET remains backwards-compatible. */
 export async function POST(request: NextRequest) {
   try {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: "invalid_origin" }, { status: 403, headers });
+    // NextRequest.url can be the *internal* URL (localhost / reverse proxy),
+    // while the browser sends the public site's Origin. Compare against the
+    // inbound Host and the public protocol, retaining cross-site protection.
+    if (!isSameSiteBrowserOrigin({
+      origin: request.headers.get("origin"),
+      host: request.headers.get("host"),
+      protocol: request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol,
+    })) return NextResponse.json({ error: "invalid_origin" }, { status: 403, headers });
     const user = await getCurrentUser();
     const result = await resolveHomeRequest(await request.json(), user?.id ?? null, await getSessionRowIdFromCookies(), undefined, request.signal);
     return NextResponse.json(result.body, { status: result.status, headers });

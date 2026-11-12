@@ -92,10 +92,13 @@ async function main() {
     await db.activity.createMany({ data: activityIds.map((id, index) => ({ id, ownerUserId: user.id, cityId: city.id, title: `Synthetic ${index}`, shortDesc: "Disposable benchmark", type: "EVENT", status: "PUBLISHED", agePolicy: index < 100 ? "UNKNOWN" : "SPECIFIC", ageMinMonths: index < 100 ? null : 0, ageMaxMonths: index < 100 ? null : 216, ageTags: [], scheduleMode: "MULTI_DATE", nextOccurrenceAt: day(1), priceMode: "FREE" })) });
     await db.activitySession.createMany({ data: activityIds.map(id => ({ activityId: id, startsAt: day(1) })) });
     const prepared = await loadHomeContext(user.id);
-    const firstDelivery = await measure("800-candidate 7-day final delivery", () => deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...prepared, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }));
+    const signatureOnly = await loadHomeContext(user.id, undefined, { includeSelectionPreference: false });
+    assert.equal(signatureOnly.context.signature, prepared.context.signature, "final delivery validation must retain the complete signed ACL/profile fingerprint");
+    assert.equal(signatureOnly.context.selectedChildId, null, "signature-only path does not load the independent selection preference");
+    const firstDelivery = await measure("800-candidate 30-day final delivery", () => deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...prepared, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }));
     assert.equal(firstDelivery.items.length, 10);
     assert.equal(firstDelivery.candidateCount, 800);
-    assert.equal(firstDelivery.window.horizonDays, 7);
+    assert.equal(firstDelivery.window.horizonDays, 30);
     assert.ok(firstDelivery.runId);
     assert.ok(firstDelivery.items.every(item => item.exposureId));
     assert.equal(await db.recommendationRun.count({ where: { userId: user.id } }), 1);
@@ -107,12 +110,12 @@ async function main() {
     assert.equal(rejected.status, 200);
     assert.notEqual((await loadHomeContext(user.id)).context.signature, prepared.context.signature);
     await assert.rejects(deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...prepared, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }), /profile_changed/);
-    // Empty week must not create a run before the final 30-day pass.
+    // Confirmed events later in the 30-day window remain eligible.
     await db.activitySession.updateMany({ where: { activityId: { in: activityIds.slice(100) } }, data: { startsAt: day(20) } });
     await db.activity.updateMany({ where: { id: { in: activityIds.slice(100) } }, data: { nextOccurrenceAt: day(20) } });
     const expandedContext = await loadHomeContext(user.id);
     const beforeFallback = await db.recommendationRun.count({ where: { userId: user.id } });
-    const expanded = await measure("800-candidate 7-to-30 final delivery", () => deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...expandedContext, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }));
+    const expanded = await measure("800-candidate 30-day final delivery with later sessions", () => deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...expandedContext, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }));
     assert.equal(expanded.window.horizonDays, 30);
     assert.equal(expanded.items.length, 10);
     assert.equal(await db.recommendationRun.count({ where: { userId: user.id } }), beforeFallback + 1);
@@ -120,7 +123,7 @@ async function main() {
     const cache = new FamilyHomeCache<HomeFamilyDelivery>(user.id);
     let hits = 0;
     const beforeSwitch = await db.recommendationRun.count({ where: { userId: user.id } });
-    await measure("five chip switches, complete 7/30 pools", async () => {
+    await measure("five chip switches, complete 30-day pools", async () => {
       for (const selected of [null, first.id, second.id, null, first.id]) {
         const fresh = await loadHomeContext(user.id);
         let value = cache.get(fresh.context, city.slug, selected);

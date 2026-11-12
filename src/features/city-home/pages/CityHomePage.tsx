@@ -7,6 +7,8 @@ import { Container } from "@/components/ui/Container";
 import { StoriesSection } from "@/features/stories/components/StoriesSection";
 import { CityHomeFamilyPicks } from "@/features/city-home/components/CityHomeFamilyPicks";
 import { CityHomeBirthdayCta } from "@/features/city-home/components/CityHomeBirthdayCta";
+import { CityHomeBirthdayOffers } from "@/features/city-home/components/CityHomeBirthdayOffers";
+import { getPublicBirthdayCatalog } from "@/server/birthday/catalog.service";
 import { ActivationBannerHost } from "@/features/city-home/components/ActivationBannerHost";
 import { getFallbackHeroModel, getHeroContext } from "@/features/hero-weather/lib/get-hero-context";
 import { getCityCoordsBySlug, getDefaultBelarusFallbackCoords } from "@/features/hero-weather/lib/belarus-city-coordinates";
@@ -18,15 +20,19 @@ import {
 } from "@/features/city-home/components/CityHomeContentRows";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
-import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
+import { getCityNominativeName, getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
+import { listPopulatedCityBlogCategories } from "@/server/article/cityBlogCategories";
 import { listNearbyCities, type NearbyCity } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
+import { listPopulatedDiscoveryClassChips } from "@/server/discovery/classChips";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getHomeSectionAvailability } from "@/features/city-home/config/homeSectionAvailability";
+import { loadNearbyOnlyWhenEmpty } from "@/features/city-home/lib/loadNearbyOnlyWhenEmpty";
 
-const HOME_PERSONALIZATION_CANDIDATE_TAKE = 24;
+// Wider local candidate pool for audience ranking, without inflating the visible carousel.
+const HOME_PERSONALIZATION_CANDIDATE_TAKE = 96;
 
 export type CityHomePageCity = {
   id: string;
@@ -87,31 +93,34 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
   // Independent server work starts immediately; nothing here waits on the
   // external weather call (see HeroWeatherSection below).
   const userPromise = getCurrentUser();
-  const nearbyCitiesPromise: Promise<NearbyCity[]> =
-    sectionAvailability.classes || sectionAvailability.routes
-      ? listNearbyCities(city)
-      : Promise.resolve([]);
   const localRoutesPromise = sectionAvailability.routes
     ? listPublicRoutesByCity(city.id).catch(() => [])
     : Promise.resolve([]);
   const journalArticlesPromise = listCityHomeArticles(city);
+  const journalCategoriesPromise = listPopulatedCityBlogCategories(city).catch(() => []);
+  const birthdayOffersPromise = sectionAvailability.birthday
+    ? getPublicBirthdayCatalog(city.slug, 120).catch(() => [])
+    : Promise.resolve([]);
+  const classChipsPromise = sectionAvailability.classes ? listPopulatedDiscoveryClassChips(city.id, city.slug).catch(() => []) : Promise.resolve([]);
   const localClassesPromise = sectionAvailability.classes
-    ? getClassesDiscoveryFeed(city.id, city.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => [])
+    ? getClassesDiscoveryFeed(city.id, city.slug, {
+        take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"], homeGeoFallback: true,
+      }).catch(() => [])
     : Promise.resolve([]);
 
+  // Nearby candidates are a fallback, not another unconditional home feed.
+  // Share the city lookup when both local sections are empty.
+  let nearbyCitiesPromise: Promise<NearbyCity[]> | undefined;
+  const nearbyCities = () => nearbyCitiesPromise ??= listNearbyCities(city).catch(() => []);
   const nearbyRoutesPromise = sectionAvailability.routes
-    ? nearbyCitiesPromise.then((nearby) =>
-        listPublicRoutesByCityIds(nearby.map((c) => c.id)).catch(() => []),
-      )
+    ? loadNearbyOnlyWhenEmpty(localRoutesPromise, () => nearbyCities().then(nearby =>
+        nearby.length ? listPublicRoutesByCityIds(nearby.map(c => c.id)).catch(() => []) : []))
     : Promise.resolve([]);
   const nearbyClassesPromise = sectionAvailability.classes
-    ? nearbyCitiesPromise.then((nearby) =>
-        Promise.all(
-          nearby.map((nearbyCity) =>
-            getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => []),
-          ),
-        ).then((groups) => groups.flat()),
-      )
+    ? loadNearbyOnlyWhenEmpty(localClassesPromise, () => nearbyCities().then(nearby =>
+        Promise.all(nearby.map(nearbyCity => getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, {
+          take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"],
+        }).catch(() => []))).then(groups => groups.flat())))
     : Promise.resolve([]);
 
   const eventsPromise = userPromise.then(user => loadHomeEvents(user?.id ?? null, city.id, city.slug))
@@ -119,20 +128,22 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
 
   const [
     user,
-    ,
-    events,
     localRoutes,
     journalArticles,
+    journalCategories,
+    birthdayOffers,
     localClasses,
+    classChips,
     nearbyRoutes,
     nearbyClasses,
   ] = await Promise.all([
     userPromise,
-    nearbyCitiesPromise,
-    eventsPromise,
     localRoutesPromise,
     journalArticlesPromise,
+    journalCategoriesPromise,
+    birthdayOffersPromise,
     localClassesPromise,
+    classChipsPromise,
     nearbyRoutesPromise,
     nearbyClassesPromise,
   ]);
@@ -186,7 +197,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
 
   return (
     <div className="min-h-screen pb-20">
-      <Container className="space-y-10 pt-10">
+      <Container className="pt-[30px]">
         <Suspense fallback={<HeroGreetingShell initialModel={heroFallbackModel} />}>
           <HeroWeatherSection
             cityId={city.id}
@@ -199,30 +210,36 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           />
         </Suspense>
 
+        <div className="mt-[30px] space-y-[53px]">
         <StoriesSection cityId={city.id} citySlug={city.slug} />
 
-        <div className="px-1">
+        <div className="!mt-[30px] px-1 [&+*]:!mt-[30px]">
           <ActivationBannerHost />
         </div>
 
-        {events.mode === "error" ? <CityHomeSection title="Мероприятия для семьи"><p role="alert">Не удалось проверить профиль. Обновите страницу, чтобы повторить.</p></CityHomeSection> :
-          <HomeEventsBoundary key={`${events.actorId}:${city.slug}:${events.mode}`} actorId={events.actorId} citySlug={city.slug}>
-            {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={city.slug} initialContext={events.context} /> :
-              <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug}
-                periodLabel={events.periodLabel} authenticated={Boolean(user)}
-                hasChildren={events.hasChildren} incompleteChild={events.incompleteChild}
-                incompleteChildren={events.incompleteChildren} />}
-          </HomeEventsBoundary>}
+        <Suspense fallback={<CityHomeSection title={user
+          ? "События, которые подходят вашей семье"
+          : `Куда пойти с ребёнком ${getCityLocativePhrase(city.slug)}`}>
+          <div className="h-48 animate-pulse rounded-2xl bg-muted/30" role="status" aria-label="Загружаем события" />
+        </CityHomeSection>}>
+          <HomeEventsStream eventsPromise={eventsPromise} citySlug={city.slug} authenticated={Boolean(user)} />
+        </Suspense>
 
         {sectionAvailability.classes ? (
           <CityHomeClassesSection
             cityName={getCityNominativeName(city.slug)}
             activities={classesMode === "local" ? localClasses : nearbyClasses}
+            classChips={classChips.filter(chip => chip.isActive && chip.slug !== "all").map(chip => ({ slug: chip.slug, title: chip.title }))}
             mode={classesMode}
           />
         ) : null}
 
-        {sectionAvailability.birthday ? <CityHomeBirthdayCta /> : null}
+        {sectionAvailability.birthday && (birthdayOffers?.length ?? 0) > 0 ? (
+          <>
+            <CityHomeBirthdayCta />
+            <CityHomeBirthdayOffers offers={birthdayOffers ?? []} />
+          </>
+        ) : null}
 
         {sectionAvailability.routes ? (
           <CityHomeRoutesSection
@@ -231,8 +248,34 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           />
         ) : null}
 
-        <CityHomeJournalSection articles={journalArticles} />
+        <CityHomeJournalSection articles={journalArticles} categories={journalCategories} />
+        </div>
       </Container>
     </div>
+  );
+}
+
+
+/** Streaming boundary: sparse geography fallback must not block first paint of
+ * the header, Stories, article previews, or other independent home sections. */
+async function HomeEventsStream({
+  eventsPromise, citySlug, authenticated,
+}: {
+  eventsPromise: Promise<Awaited<ReturnType<typeof loadHomeEvents>> | { mode: "error"; actorId: null }>;
+  citySlug: string;
+  authenticated: boolean;
+}) {
+  const events = await eventsPromise;
+  return (
+    <>
+        {events.mode === "error" ? <CityHomeSection title="Мероприятия для семьи"><p role="alert">Не удалось проверить профиль. Обновите страницу, чтобы повторить.</p></CityHomeSection> :
+          <HomeEventsBoundary key={`${events.actorId}:${citySlug}:${events.mode}`} actorId={events.actorId} citySlug={citySlug}>
+            {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={citySlug} initialContext={events.context} /> :
+              <CityHomeGeneralEvents activities={events.activities} citySlug={citySlug}
+                periodLabel={events.periodLabel} authenticated={authenticated}
+                hasChildren={events.hasChildren} incompleteChild={events.incompleteChild}
+                incompleteChildren={events.incompleteChildren} />}
+          </HomeEventsBoundary>}
+    </>
   );
 }

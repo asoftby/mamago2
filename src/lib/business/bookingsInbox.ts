@@ -1,3 +1,4 @@
+import type { PackageChangeScope } from "@/lib/birthday/packageChangeScope";
 /**
  * Клиентский контракт единого входящего бизнеса (GET /api/business/bookings/inbox).
  * Сервер — источник истины для классификации; здесь только типы, разбор URL и подписи.
@@ -15,6 +16,8 @@ export type InboxPartyStage =
   | "DECLINED" | "EXPIRED" | "NOT_ACCEPTED" | "CANCELLED";
 
 export interface InboxItem {
+  source?: "MANUAL" | null;
+  packageScope?: PackageChangeScope | null;
   id: string;
   kind: "STANDARD" | "PARTY";
   status: string;

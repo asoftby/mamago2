@@ -1,6 +1,6 @@
 import "server-only";
 import {
-  BookingKind, BookingStatus, PartyItemRole, PartyItemStatus, type Prisma,
+  BookingKind, BookingStatus, PartyItemRole, PartyItemStatus, Prisma,
 } from "@prisma/client";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
@@ -32,8 +32,13 @@ export async function requestPartyAddonsAfterAnchor(
   const { order, anchorRequestId, now } = params;
   await tx.partyOrderItem.updateMany({
     where: { partyOrderId: order.id, role: PartyItemRole.INCLUDED,
-      status: PartyItemStatus.PLANNED },
+      status: PartyItemStatus.PLANNED, packageComponentChange: { equals: Prisma.DbNull } },
     data: { status: PartyItemStatus.CONFIRMED },
+  });
+  await tx.partyOrderItem.updateMany({
+    where: { partyOrderId: order.id, role: PartyItemRole.INCLUDED,
+      status: PartyItemStatus.PLANNED, packageComponentChange: { not: Prisma.DbNull } },
+    data: { status: PartyItemStatus.CANCELLED },
   });
   const addons = await tx.partyOrderItem.findMany({
     where: { partyOrderId: order.id, role: { in: [PartyItemRole.ADDON, PartyItemRole.STANDALONE] },

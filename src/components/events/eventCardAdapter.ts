@@ -5,6 +5,7 @@ import type { PublicationPriceMode } from "@prisma/client";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { ActivityMock } from "@/types/activity";
+import { formatCardAge } from "@/lib/discovery/formatCardAge";
 import type { EventCardProps } from "./EventCard";
 
 type EventListingSource = {
@@ -19,6 +20,7 @@ type EventListingSource = {
   format?: ActivityFormat | null;
   badge?: string | null;
   ageFrom?: number | null;
+  ageTo?: number | null;
   dateStart?: string | null;
   dateEnd?: string | null;
   workingHours?: string | null;
@@ -45,9 +47,9 @@ function buildCategoryLabel(
 }
 
 function buildMetaLabel(
-  source: Pick<EventListingSource, "ageFrom" | "dateStart" | "dateEnd" | "workingHours">,
+  source: Pick<EventListingSource, "ageFrom" | "ageTo" | "dateStart" | "dateEnd" | "workingHours">,
 ): string | undefined {
-  const age = typeof source.ageFrom === "number" ? `${source.ageFrom}+` : undefined;
+  const age = formatCardAge(source.ageFrom, source.ageTo);
   const date = source.dateStart
     ? formatRuShortDayMonthRange(source.dateStart, source.dateEnd ?? null)
     : source.workingHours ?? undefined;
@@ -92,6 +94,7 @@ export function activityMockToEventCard(
     format: activity.format,
     badge: activity.badge ?? null,
     ageFrom: activity.ageFrom,
+    ageTo: activity.ageTo,
     dateStart: activity.dateStart ?? null,
     dateEnd: activity.dateEnd ?? null,
     workingHours: activity.workingHours ?? null,

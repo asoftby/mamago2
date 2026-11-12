@@ -14,7 +14,7 @@
  * sending without retyping anything.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -101,10 +101,11 @@ type Props = {
   brandName: string;
   /** Pre-fill on resume-after-login. */
   initialValues?: Partial<FormValues>;
+  bookingIntent?: boolean;
 };
 
 export function DirectRequestModal({
-  open, onOpenChange, publicationRef, publicationTitle, brandName, initialValues,
+  open, onOpenChange, publicationRef, publicationTitle, brandName, initialValues, bookingIntent = false,
 }: Props) {
   const router = useRouter();
   const currentPath = useCurrentPath();
@@ -115,12 +116,23 @@ export function DirectRequestModal({
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      comment: initialValues?.comment ?? "",
+      comment: initialValues?.comment ?? (bookingIntent ? "Хочу записаться на занятие" : ""),
       date: initialValues?.date ?? "",
       childAge: initialValues?.childAge ?? "",
       guestsCount: initialValues?.guestsCount ?? "",
     },
   });
+
+  // Restore the draft after the login redirect; react-hook-form only reads
+  // defaultValues on first mount.
+  useEffect(() => {
+    if (initialValues) reset({
+      comment: initialValues.comment ?? (bookingIntent ? "Хочу записаться на занятие" : ""),
+      date: initialValues.date ?? "",
+      childAge: initialValues.childAge ?? "",
+      guestsCount: initialValues.guestsCount ?? "",
+    });
+  }, [initialValues, bookingIntent, reset]);
 
   async function onSubmit(values: FormValues) {
     setPhase("submitting");
@@ -218,7 +230,7 @@ export function DirectRequestModal({
       <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#F6F2EA", borderRadius: 24, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 22px 18px", borderBottom: "1px solid rgba(20,18,16,.10)", flexShrink: 0 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-            Отправить заявку
+            {bookingIntent ? "Запись на занятие" : "Отправить заявку"}
           </h2>
           <XBtn onClick={() => handleClose(false)} />
         </div>
@@ -237,7 +249,7 @@ export function DirectRequestModal({
             </div>
 
             <FieldWrap label="Комментарий" error={errors.comment?.message}>
-              <FieldTextarea id="dr-comment" placeholder="Что вас интересует, какие вопросы остались..." rows={4} {...register("comment")} />
+              <FieldTextarea id="dr-comment" placeholder={bookingIntent ? "Уточните пожелания по записи" : "Что вас интересует, какие вопросы остались..."} rows={4} {...register("comment")} />
             </FieldWrap>
 
             <FieldWrap label="Дата" labelSuffix="(необязательно)">

@@ -15,6 +15,7 @@ assert.equal(blank.rules.length, 5);
 assert.deepEqual(blank.rules.map(r => r.weekday), [1, 2, 3, 4, 5]);
 assert.equal(blank.status, "ACTIVE");
 assert.equal(blank.exceptions.length, 0);
+assert.deepEqual(toUnitPayload(blank).offerIds, []);
 const created = toUnitPayload({ ...blank, name: "Комната", capacity: "20", offerIds: ["o1"] });
 assert.equal(created.capacity, 20);
 assert.equal(created.prepMinutes, 0);
@@ -33,6 +34,8 @@ assert.equal(hydrated.expectedUpdatedAt, detail.updatedAt);
 assert.equal(hydrated.exceptions[0].date, "2026-11-15");
 assert.equal(hydrated.rules[0].endMinutes, 1440);
 const edited = toUnitPayload(hydrated);
+assert.deepEqual(edited.offerIds, ["o2"]);
+assert.deepEqual(toUnitPayload(fromUnitDetail({ ...detail, offers: [] })).offerIds, []);
 assert.equal(edited.status, "INACTIVE");
 assert.equal(edited.exceptions?.[0].kind, "CLOSED");
 

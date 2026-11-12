@@ -245,14 +245,18 @@ function ArticleGalleryLightbox({
     return () => cancelAnimationFrame(frame);
   }, [transition]);
 
+  const finishLightboxSlide = useCallback(() => {
+    if (!transition?.moving || transition.settling) return;
+    onIndexChange(transition.to);
+    setTransition((value) => value ? { ...value, settling: true } : null);
+  }, [onIndexChange, transition]);
+
   useEffect(() => {
     if (!transition?.moving || transition.settling) return;
-    const timer = window.setTimeout(() => {
-      onIndexChange(transition.to);
-      setTransition((value) => (value ? { ...value, settling: true } : null));
-    }, 260);
+    // transitionend is authoritative; this fallback covers interrupted CSS transitions.
+    const timer = window.setTimeout(finishLightboxSlide, 380);
     return () => window.clearTimeout(timer);
-  }, [onIndexChange, transition]);
+  }, [finishLightboxSlide, transition]);
 
   useEffect(() => {
     if (!transition?.settling) return;
@@ -406,12 +410,17 @@ function ArticleGalleryLightbox({
         className="relative flex h-[90dvh] w-[94vw] items-center justify-center overflow-hidden sm:w-[92vw]"
         data-article-lightbox-slide-viewport
       >
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          data-article-lightbox-slide="current"
-        >
-          {renderSlide(current)}
-        </div>
+        {/* One slide occupies each track position during motion. The committed
+            frame is only restored underneath the incoming slide while settling;
+            rendering it throughout the transition creates a ghost/stack effect. */}
+        {(!transition || transition.settling) ? (
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            data-article-lightbox-slide="current"
+          >
+            {renderSlide(current)}
+          </div>
+        ) : null}
 
         {transition ? (
           <>
@@ -428,6 +437,9 @@ function ArticleGalleryLightbox({
             </div>
             <div
               data-article-lightbox-slide="incoming"
+              onTransitionEnd={(event) => {
+                if (event.target === event.currentTarget && event.propertyName === "transform") finishLightboxSlide();
+              }}
               className="absolute inset-0 z-10 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
               style={{
                 transform: transition.moving
@@ -575,14 +587,17 @@ export function ArticleGallery({
     return () => cancelAnimationFrame(frame);
   }, [mobileTransition]);
 
+  const finishMobileSlide = useCallback(() => {
+    if (!mobileTransition?.moving) return;
+    setMobileIndex(mobileTransition.to);
+    setMobileTransition(null);
+  }, [mobileTransition]);
+
   useEffect(() => {
     if (!mobileTransition?.moving) return;
-    const timer = window.setTimeout(() => {
-      setMobileIndex(mobileTransition.to);
-      setMobileTransition(null);
-    }, 260);
+    const timer = window.setTimeout(finishMobileSlide, 380);
     return () => window.clearTimeout(timer);
-  }, [mobileTransition]);
+  }, [finishMobileSlide, mobileTransition]);
 
   function handleMobileTouchStart(e: React.TouchEvent) {
     setMobilePreloadReady(true);
@@ -745,8 +760,16 @@ export function ArticleGallery({
                 <div
                   key={images[index].id}
                   data-article-mobile-gallery-slide={state}
+                  onTransitionEnd={(event) => {
+                    if (event.target === event.currentTarget && event.propertyName === "transform" && index === mobileTransition?.to) finishMobileSlide();
+                  }}
                   aria-hidden={index !== mobileIndex}
-                  className="absolute inset-0 transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+                  className={cn(
+                    "absolute inset-0",
+                    // Transition the shared horizontal track only while moving.
+                    // Rebase it without animation after the active index commits.
+                    mobileTransition?.moving && "transition-transform duration-[260ms] ease-out motion-reduce:transition-none",
+                  )}
                   style={{ transform: `translateX(${offset}%)` }}
                 >
                   {renderMobileSlide(images[index], index, index === mobileIndex)}

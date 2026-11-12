@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { confirmedAgeMatchAt, selectPersonalFamilyPicks, type PersonalFamilyCandidate, type PersonalFamilyChild } from "./select";
 import { collectConfirmedOccurrences, resolvePersonalShowWindow } from "./window";
-import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError } from "./load";
+import { loadPersonalFamilyPicks, FamilyPicksSelectionUnavailableError, upcomingPlanBlocksFamilyPick, partitionPlannedFamilyPickExclusions, excludePlannedFamilyPickDates } from "./load";
 import { PLAN_SUGGESTION_ALGORITHM_VERSION, type RankedPlanSuggestion, type PlanSuggestionRankedBatch } from "@/server/services/planSuggestions.service";
 import { readFileSync } from "node:fs";
 
@@ -71,6 +71,78 @@ test("unknown DOB/event age never becomes MATCH, including unrestricted; individ
   assert.deepEqual(selectPersonalFamilyPicks([event("adult", { agePolicy: "ADULT_ONLY" })], children, all), []);
 });
 
+test("free global discovery keeps mismatched and adult events with no false child fit", () => {
+  const result = selectPersonalFamilyPicks([
+    event("adult-only", { agePolicy: "ADULT_ONLY", sharedScore: 30 }),
+    event("child", { ageMaxMonths: 90, sharedScore: 5 }),
+    event("older-only", { ageMinMonths: 240, ageMaxMonths: 360, sharedScore: 4 }),
+  ], children, { mode: "DISCOVERY" });
+  assert.deepEqual(result.map(item => item.candidate.id), ["adult-only", "child", "older-only"]);
+  assert.deepEqual(result.find(item => item.candidate.id === "adult-only")?.matchedChildIds, []);
+});
+
+test("manual 18+ choice ranks adult-compatible events first without hiding other events", () => {
+  const candidates = [
+    event("child", { ageMaxMonths: 120, sharedScore: 100 }),
+    event("adult", { agePolicy: "ADULT_ONLY", ageMinMonths: 216, ageMaxMonths: null, sharedScore: 1 }),
+    event("all-ages", { agePolicy: "UNRESTRICTED", ageMinMonths: null, ageMaxMonths: null, sharedScore: 2 }),
+  ];
+  const picks = selectPersonalFamilyPicks(candidates, children, { mode: "DISCOVERY" }, ["18+"]);
+  assert.deepEqual(picks.map(p => p.candidate.id), ["all-ages", "adult"]);
+  const childPicks = selectPersonalFamilyPicks(candidates, children, { mode: "DISCOVERY" }, ["3-5"]);
+  assert.equal(childPicks.at(-1)?.candidate.id, "adult");
+});
+
+test("strict adult-only header intent never returns child or teen events, including on repeats", () => {
+  const candidates = [
+    event("kid", { ageMinMonths: 0, ageMaxMonths: 120, sharedScore: 999 }),
+    event("teen", { ageMinMonths: 144, ageMaxMonths: 216 }),
+    event("adult", { agePolicy: "ADULT_ONLY", ageMinMonths: 216, ageMaxMonths: null }),
+    event("mixed", { ageMinMonths: 72, ageMaxMonths: 360 }),
+  ];
+  for (const selection of [{ mode: "DISCOVERY" } as const,
+    { mode: "PERSONAS", selectedChildIds: [] as string[], includeAdult: true } as const]) {
+    const result = selectPersonalFamilyPicks(candidates, children, selection,
+      selection.mode === "DISCOVERY" ? ["18+"] : []);
+    assert.deepEqual(result.map(item => item.candidate.id).sort(), ["adult", "mixed"]);
+  }
+});
+
+test("multi-persona global selection ranks verified child/adult fits first but never pretends a mismatch fits", () => {
+  const candidates = [
+    event("too-old", { ageMinMonths: 144, ageMaxMonths: 180, sharedScore: 100 }),
+    event("for-six", { ageMaxMonths: 90, sharedScore: 2 }),
+    event("adults", { agePolicy: "ADULT_ONLY", sharedScore: 3 }),
+  ];
+  const kidOnly = selectPersonalFamilyPicks(candidates, children, {
+    mode: "PERSONAS", selectedChildIds: [children[0]!.id], includeAdult: false,
+  });
+  assert.equal(kidOnly[0]?.candidate.id, "for-six");
+  assert.equal(kidOnly.at(-1)?.matchedChildIds.length, 0);
+  const adultAndKid = selectPersonalFamilyPicks(candidates, children, {
+    mode: "PERSONAS", selectedChildIds: [children[0]!.id], includeAdult: true,
+  });
+  assert.deepEqual(adultAndKid.slice(0, 2).map(item => item.candidate.id), ["adults", "for-six"]);
+});
+
+test("Nov 7 2026 cyberclass age 9–18 is ranked ahead of mismatches for a selected child", () => {
+  const taya = { id: "taya", birthDate: new Date("2016-06-15T00:00:00Z"), birthPrecision: "DAY" as const };
+  const saturday = new Date("2026-11-07T08:30:00Z");
+  const cyberclass = event("cyberclass-life", {
+    agePolicy: "SPECIFIC", ageMinMonths: 108, ageMaxMonths: 216,
+    occurrences: [saturday], sharedScore: 1,
+  });
+  const mismatch = event("not-for-taya", {
+    agePolicy: "SPECIFIC", ageMinMonths: 0, ageMaxMonths: 60,
+    occurrences: [saturday], sharedScore: 999,
+  });
+  const selection = { mode: "PERSONAS" as const, selectedChildIds: ["taya"], includeAdult: false };
+  const result = selectPersonalFamilyPicks([mismatch, cyberclass], [taya], selection);
+  assert.equal(result[0]?.candidate.id, "cyberclass-life");
+  assert.equal(result[0]?.targetFit, true);
+  assert.equal(result[0]?.startsAt.toISOString(), saturday.toISOString());
+});
+
 test("multiple sessions: card date and matching children are one consistent proof", () => {
   const child = { ...children[0]!, birthDate: new Date("2024-11-06Z") };
   const before = new Date("2030-11-04Z"), after = new Date("2030-11-07Z");
@@ -105,7 +177,7 @@ function fixture(dates: Date[]) {
     children: children.map(child => ({ ...child, name: null, birthDate: child.birthDate as Date, systemInterests: [] })) };
   return { calls, profile, deps: {
     loadProfile: async () => profile,
-    loadExcluded: async () => [],
+    loadExcluded: async () => ({ excludedActivityIds: [], plannedDatesByActivity: {} }),
     loadAffinity: async () => ({ subjects: [], outcomeEventCount: 0, horizonDays: 365 }),
     rank: async (input: { dateFrom?: string; dateTo?: string }): Promise<PlanSuggestionRankedBatch> => {
       calls.push(input.dateTo!);
@@ -120,9 +192,8 @@ for (const dates of [[], [at], [at, new Date("2030-11-04Z")], [new Date("2030-11
   test(`loader fallback for ${dates.length} dated candidates`, async () => {
     const f = fixture(dates);
     const result = await loadPersonalFamilyPicks({ userId: "account_a", citySlug: "minsk", selection: all, now }, f.deps);
-    const narrowHasMatches = dates.some(date => date < new Date("2030-11-09T00:00:00+03:00"));
-    assert.equal(f.calls.length, narrowHasMatches ? 1 : 2);
-    assert.equal(result.window.horizonDays, narrowHasMatches ? 7 : 30);
+    assert.equal(f.calls.length, 1);
+    assert.equal(result.window.horizonDays, 30);
     assert.equal(result.items.length, dates.length);
     assert.equal(result.runId, null);
     assert.ok(result.items.every(item => item.exposureId === null));
@@ -162,7 +233,7 @@ test("unknown-age week cannot suppress the 30-day confirmed-age search", async (
     ...f.deps,
     loadExtras: async () => (await f.deps.loadExtras()).map(extra => ({ ...extra, agePolicy: "UNKNOWN" as const })),
   });
-  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls.length, 1);
   assert.equal(result.window.horizonDays, 30);
   assert.equal(result.status, "EMPTY");
   assert.deepEqual(result.items, []);
@@ -175,4 +246,64 @@ test("mixed businesses/categories cannot displace AND or override shared relevan
     event("or", { sharedScore: 100, ageMaxMonths: 90, categoryId: "sport", businessId: "business_c" }),
   ], children, all);
   assert.deepEqual(result.map(pick => pick.candidate.id), ["and_a", "and_b", "or"]);
+});
+
+test("adult-only persona and manual 18+ retain open-ended 18+ and 21+ sessions", () => {
+  const candidates = [
+    event("adult18-open", { ageMinMonths: 216, ageMaxMonths: null }),
+    event("adult21-open", { ageMinMonths: 252, ageMaxMonths: null }),
+    event("child-only", { ageMinMonths: 36, ageMaxMonths: 144 }),
+    event("unknown", { agePolicy: "UNKNOWN", ageMinMonths: null, ageMaxMonths: null }),
+  ];
+  const expected = ["adult18-open", "adult21-open"];
+  const manual = selectPersonalFamilyPicks(candidates, children, { mode: "DISCOVERY" }, ["18+"]);
+  const adult = selectPersonalFamilyPicks(candidates, children, { mode: "PERSONAS", selectedChildIds: [], includeAdult: true });
+  assert.deepEqual(manual.map(item => item.candidate.id), expected);
+  assert.deepEqual(adult.map(item => item.candidate.id), expected);
+  assert.ok(manual.every(item => item.targetFit));
+  assert.ok(adult.every(item => item.targetFit));
+});
+
+test("past family visits do not exclude future sessions; future bookings respect audience", () => {
+  const now = new Date("2026-11-06T10:00:00+03:00");
+  const base = { date: "2026-10-27", startsAt: null, childId: null, assigneeUserId: null };
+  const forTaya = { mode: "PERSONAS" as const, selectedChildIds: ["taya"], includeAdult: false };
+  assert.equal(upcomingPlanBlocksFamilyPick(base, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-06" }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", childId: "stepa" }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", childId: "taya" }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: null, startsAt: new Date("2026-10-27T10:00:00Z") }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: null }, forTaya, "owner", now), true);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, forTaya, "owner", now), false);
+  assert.equal(upcomingPlanBlocksFamilyPick({ ...base, date: "2026-11-07", assigneeUserId: "owner" }, { ...forTaya, includeAdult: true }, "owner", now), true);
+});
+
+test("Cyberclass: planned Nov 9 session does not hide available Nov 7/8 sessions for Taya", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+  const selection = { mode: "CHILD" as const, selectedChildId: "taya" };
+  const plan = partitionPlannedFamilyPickExclusions([
+    { activityId: "cyberclass", date: "2026-10-14", startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "cyberclass", date: "2026-10-27", startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "cyberclass", date: "2026-11-09", startsAt: null, childId: null, assigneeUserId: null },
+  ], selection, "owner", now);
+  assert.deepEqual(plan.excludedActivityIds, []);
+  assert.deepEqual(plan.plannedDatesByActivity, { cyberclass: ["2026-11-09"] });
+  const sessions = [7, 8, 9].map(day => new Date(`2026-11-${String(day).padStart(2,"0")}T08:30:00Z`));
+  assert.deepEqual(excludePlannedFamilyPickDates("cyberclass", sessions, plan.plannedDatesByActivity), sessions.slice(0, 2));
+  const child = { id: "taya", birthDate: new Date("2015-01-01Z"), birthPrecision: "DAY" as const };
+  const picks = selectPersonalFamilyPicks([{ ...event("cyberclass", { ageMinMonths: 108, ageMaxMonths: 216 }), occurrences: sessions.slice(0, 2) }], [child], selection);
+  assert.equal(picks[0]?.candidate.id, "cyberclass");
+  assert.equal(picks[0]?.startsAt.toISOString(), sessions[0]!.toISOString());
+});
+
+test("undated plans still block entirely; sibling plans do not block Taya", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+  const selection = { mode: "CHILD" as const, selectedChildId: "taya" };
+  const plans = partitionPlannedFamilyPickExclusions([
+    { activityId: "undated", date: null, startsAt: null, childId: null, assigneeUserId: null },
+    { activityId: "sibling", date: "2026-11-07", startsAt: null, childId: "stepa", assigneeUserId: null },
+    { activityId: "taya-event", date: "2026-11-07", startsAt: null, childId: "taya", assigneeUserId: null },
+  ], selection, "owner", now);
+  assert.deepEqual(plans.excludedActivityIds, ["undated"]);
+  assert.deepEqual(plans.plannedDatesByActivity, { "taya-event": ["2026-11-07"] });
 });

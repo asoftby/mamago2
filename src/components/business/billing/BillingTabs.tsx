@@ -60,6 +60,9 @@ const tabs: Tab[] = [
 
 export function BillingTabs() {
   const pathname = usePathname();
+  const visibleTabs = process.env.NEXT_PUBLIC_BILLING_ENABLED === "true"
+    ? tabs
+    : tabs.filter((tab) => tab.href === BUSINESS_BILLING_REQUISITES_HREF);
 
   const isActive = (tab: Tab) => {
     // Exact match for root /business/billing
@@ -77,7 +80,7 @@ export function BillingTabs() {
   return (
     <div className="border-b border-stone-200 bg-white">
       <div className="flex gap-1 px-6 overflow-x-auto">
-        {tabs.map((tab) => {
+        {visibleTabs.map((tab) => {
           const active = isActive(tab);
           const Icon = tab.icon;
 

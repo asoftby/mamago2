@@ -207,12 +207,40 @@ export function ActivationBannerHost() {
   if (!menuUser) {
     if (guestDismissed) return null;
     return (
-      <div className="relative flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 pr-12">
-        <p className="text-sm text-foreground">Хотите готовый план на день?</p>
-        <button type="button" onClick={() => requestOpenMyPlan()} className="min-h-11 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground">
-          Собрать план дня
+      <div className="relative flex items-center gap-3 overflow-hidden rounded-2xl border border-brand/25 px-4 py-3 shadow-[0_1px_0_color-mix(in_srgb,var(--brand)_10%,transparent),0_12px_32px_-12px_color-mix(in_srgb,var(--brand)_35%,transparent)]">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 animate-mg-banner-gradient-flow"
+          style={{
+            backgroundImage:
+              "linear-gradient(115deg, color-mix(in srgb, var(--brand) 18%, white) 0%, color-mix(in srgb, var(--brand) 38%, white) 18%, color-mix(in srgb, var(--brand) 55%, white) 34%, color-mix(in srgb, #F2B8A0 55%, white) 48%, color-mix(in srgb, var(--brand) 48%, white) 62%, color-mix(in srgb, #FFD7A8 45%, white) 78%, color-mix(in srgb, var(--brand) 22%, white) 100%)",
+            backgroundSize: "240% 240%",
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-10 -top-12 size-44 rounded-full bg-[radial-gradient(circle_at_center,color-mix(in_srgb,var(--brand)_48%,transparent),transparent_68%)] blur-2xl animate-mg-banner-orb-drift"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-14 -right-8 size-48 rounded-full bg-[radial-gradient(circle_at_center,color-mix(in_srgb,#FFD7A8_70%,transparent),transparent_66%)] blur-2xl animate-mg-banner-orb-drift-reverse"
+        />
+        <p className="relative z-[1] min-w-0 flex-1 text-sm text-foreground">
+          Хотите готовый план на день?
+        </p>
+        <button
+          type="button"
+          onClick={() => requestOpenMyPlan()}
+          className="relative z-[1] shrink-0 min-h-11 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >
+          Хочу
         </button>
-        <button type="button" onClick={dismissGuest} aria-label="Скрыть подсказку" className="absolute right-3 top-3 p-2 text-muted-foreground">
+        <button
+          type="button"
+          onClick={dismissGuest}
+          aria-label="Скрыть подсказку"
+          className="relative z-[1] shrink-0 inline-flex size-9 items-center justify-center rounded-full text-brand-ink/70 transition-colors hover:bg-white/50 hover:text-brand-ink"
+        >
           <X className="h-4 w-4" aria-hidden />
         </button>
       </div>

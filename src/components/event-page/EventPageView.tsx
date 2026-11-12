@@ -435,6 +435,7 @@ export function EventPageView({
             body: JSON.stringify({
               activityId: data.id,
               date: result.dateISO,
+              ...(result.selectedPersonaIds ? { selectedPersonaIds: result.selectedPersonaIds } : {}),
               activitySessionId: result.timeSlotId ?? null,
               ...(result.visibility ? { visibility: result.visibility } : {}),
               title: data.title,
@@ -679,6 +680,7 @@ export function EventPageView({
             onSelect={setSelectedId}
             onPlan={handlePlan}
             onBook={hasSimpleBooking ? handleBook : undefined}
+            bookLabel={data.cta.simpleBooking?.label}
             isPlanned={saveStatus.inPlan}
             priceLabel={data.priceLabel}
             purchaseUrl={data.cta.purchaseUrl}
@@ -723,6 +725,7 @@ export function EventPageView({
         isPlanLoading={isSecondaryLoading}
         onPrimary={handleBuy}
         onBook={hasSimpleBooking ? handleBook : undefined}
+        bookLabel={data.cta.simpleBooking?.label}
         onPlan={handlePlan}
         hasPurchaseUrl={hasPurchaseUrl}
       />
@@ -732,9 +735,12 @@ export function EventPageView({
           open={bookingModalOpen}
           onOpenChange={setBookingModalOpen}
           eventTitle={data.title}
+          eventImageUrl={data.media?.posterUrl}
+          eventVenue={data.venue?.name}
           eventCategory={data.categoryLabel}
           priceLabel={data.priceLabel}
           booking={data.cta.simpleBooking}
+          initialSessionId={selectedId}
         />
       )}
       <SaveActivityFlowAdaptive

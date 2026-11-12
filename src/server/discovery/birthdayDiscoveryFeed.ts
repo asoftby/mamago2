@@ -1,5 +1,5 @@
 import { resolveTerritoryScope } from "@/server/territory/territoryScope";
-import { ActivityFormat, type AgePolicy, type PartyCategory, type PublicationPriceMode } from "@prisma/client";
+import { ActivityFormat, PartyCategory, type AgePolicy, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
@@ -69,11 +69,13 @@ export async function getBirthdayDiscoveryPage(
   citySlug: string,
   requestedPage: number,
   requestedPageSize = 24,
+  category?: PartyCategory | null,
 ) {
   const pageSize = Math.max(1, Math.min(60, Math.trunc(requestedPageSize) || 24));
   const page = Math.max(1, Math.trunc(requestedPage) || 1);
   const scope = await resolveTerritoryScope(citySlug);
-  const where = getPublicBirthdayOfferWhere(cityId, scope?.territoryIds);
+  const baseWhere = getPublicBirthdayOfferWhere(cityId, scope?.territoryIds);
+  const where = category ? { AND: [baseWhere, { productType: "PARTY_SERVICE" as const, category }] } : baseWhere;
   const [total, rows] = await prisma.$transaction([
     prisma.offer.count({ where }),
     prisma.offer.findMany({

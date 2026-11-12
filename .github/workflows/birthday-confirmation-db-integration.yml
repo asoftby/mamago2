@@ -2,7 +2,7 @@ name: Birthday confirmation DB integration
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "feat/birthday-package-business-rules-*"]
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
@@ -20,7 +20,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
   push:
-    branches: [dev]
+    branches: [dev, "feat/birthday-package-business-rules-*"]
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
@@ -108,6 +108,8 @@ jobs:
         run: pnpm exec tsx src/server/birthday/partyAvailabilityPreview.test.ts
       - name: Verify manual calendar block contracts
         run: pnpm exec tsx src/server/birthday/bookingUnitBlocks.test.ts
+      - name: Verify business booking units with and without offers
+        run: pnpm exec tsx src/app/api/business/booking-units/bookingUnits.postgres.integration.test.ts
       - name: Verify real quote acceptance and exclusive confirmation
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyConfirmation.postgres.integration.test.ts
       - name: Verify server closes offers not accepted in time
@@ -158,7 +160,13 @@ jobs:
         run: pnpm exec prisma migrate deploy
       - name: Seed isolated party fixtures
         run: pnpm exec tsx scripts/it/seedPartyIT.ts
+      - name: Verify package business rules and moderation
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/offers/packageComponents.integration.test.ts
+      - name: Verify changed-package quote and booking flow
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyPackageChange.integration.test.ts
       - name: Verify full party flow
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyFullFlow.integration.test.ts
       - name: Verify competing durable queue dispatch and replay
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyInviteDispatch.postgres.integration.test.ts
+      - name: Verify package-change notification failure and recovery with fake transport
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyPackageNotifications.integration.test.ts

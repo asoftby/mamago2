@@ -2,7 +2,6 @@ import type { ContentStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { PublicationStatus, PublicationType, type PublicationListRow } from "@/lib/publications/domain";
 import { cityNameFromSlug } from "@/lib/article/articleEditorBasics";
 
@@ -141,8 +140,8 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
         ? manual
         : authorLineFromUser(authorUserById.get(r.id));
     const coverId = coverImageIdById.get(r.id);
-    const usesNewsEditor = r.subtitle === BREAKING_NEWS_SUBTITLE;
-    const isBreakingNews = r.publicationType === "BREAKING_NEWS" || usesNewsEditor;
+    const isBreakingNews = r.publicationType === "BREAKING_NEWS";
+    const usesNewsEditor = isBreakingNews;
     const rawCityContext = cityContextById.get(r.id)?.trim() || "";
     const normalizedCityLabel = rawCityContext
       ? cityNameFromSlug(rawCityContext, cityCatalog) || rawCityContext

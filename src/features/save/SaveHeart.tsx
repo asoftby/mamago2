@@ -12,7 +12,7 @@ import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
-import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose, shouldFetchEventPlanDates } from "@/features/save/saveStatusFetchGuard";
 
 type SaveHeartProps = {
   activityId: string;
@@ -71,12 +71,13 @@ export function SaveHeart({
   const [saveStatus, setSaveStatus] = useState({
     isIdea: false,
     inPlan: false,
+    inBirthday: false,
     planDate: null as string | null,
     planStartsAt: null as string | null,
     planItemId: null as string | null,
   });
 
-  const isSaved = saveStatus.isIdea || saveStatus.inPlan;
+  const isSaved = saveStatus.isIdea || saveStatus.inPlan || saveStatus.inBirthday;
   const normalizedEventPlanDateISO = normalizePlanDateISO(eventPlanDateISO);
 
   const checkSaveStatus = useCallback(async () => {
@@ -84,6 +85,7 @@ export function SaveHeart({
       setSaveStatus({
         isIdea: false,
         inPlan: false,
+        inBirthday: false,
         planDate: null,
         planStartsAt: null,
         planItemId: null,
@@ -101,6 +103,7 @@ export function SaveHeart({
       setSaveStatus({
         isIdea: Boolean(data.isIdea),
         inPlan: Boolean(data.inPlan),
+        inBirthday: Boolean(data.inBirthday),
         planDate: data.planDate ?? null,
         planStartsAt: data.planStartsAt ?? null,
         planItemId: data.planItemId ?? null,
@@ -126,6 +129,9 @@ export function SaveHeart({
   }, [flowOpen, checkSaveStatus]);
 
   useEffect(() => {
+    // Offers are not Activities: this endpoint only handles event session dates.
+    // Avoid a useless API/DB request for every offer card (including guests).
+    if (!shouldFetchEventPlanDates(offerId)) return;
     let cancelled = false;
     const loadPlanDates = async () => {
       try {
@@ -144,7 +150,7 @@ export function SaveHeart({
     return () => {
       cancelled = true;
     };
-  }, [activityId]);
+  }, [activityId, offerId]);
 
   const handlePersist = useCallback(
     async (result: SaveToPlanResult) => {
@@ -214,7 +220,8 @@ export function SaveHeart({
             className,
           )}
         >
-          {saveStatus.inPlan ? "В плане" : triggerLabel}
+          {triggerLabel === "Сохранить" ? <Heart aria-hidden="true" className={cn("h-5 w-5 shrink-0", isSaved && "fill-current")} /> : null}
+          {saveStatus.inPlan ? "Сохранено" : isSaved && triggerLabel === "Сохранить" ? "Сохранено" : triggerLabel}
         </button>
       ) : (
       <button
@@ -246,6 +253,7 @@ export function SaveHeart({
         onOpenChange={setFlowOpen}
         isAuthenticated={isAuthenticated}
         collectionTarget={offerId ? { offerId } : { activityId }}
+        birthdayOfferId={offerId}
         scenario={{
           kind: "quickdate",
           title: activityTitle,

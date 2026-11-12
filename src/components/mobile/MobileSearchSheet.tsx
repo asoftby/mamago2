@@ -354,6 +354,7 @@ export function MobileSearchSheet({
         const newIds = family.selectedPersonaIds.filter((id) => id !== personaId);
         family.setSelectedPersonaIds(newIds);
         const ages = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
+        actions.persistPersonaAudience(ages);
         setSheetDraft(prev => ({ ...prev, age: ages, profile: null }));
         
         // If no personas left, clear age filters (enters free search mode)
@@ -365,10 +366,11 @@ export function MobileSearchSheet({
         const newIds = [...family.selectedPersonaIds, personaId];
         family.setSelectedPersonaIds(newIds);
         const ages = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
+        actions.persistPersonaAudience(ages);
         setSheetDraft(prev => ({ ...prev, age: ages, profile: null }));
       }
     },
-    [family],
+    [family, actions],
   );
 
   /**
@@ -379,9 +381,10 @@ export function MobileSearchSheet({
     
     // Switch to free mode: clear all selections via FamilyPersonaContext
     family.setSelectedPersonaIds([]);
-    // Clear age filters
-    setSheetDraft((prev) => ({ ...prev, age: [] }));
-  }, [family]);
+    // Persist before navigating: the mobile sheet draft is not yet committed.
+    actions.persistPersonaAudience([]);
+    setSheetDraft((prev) => ({ ...prev, age: [], profile: null }));
+  }, [family, actions]);
 
   const toggleChild = useCallback(
     (childId: string) => {

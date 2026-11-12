@@ -192,7 +192,9 @@ export function ArticleSaveHeart({
             : variant === "responsive"
               ? "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-white shadow-none transition-colors hover:border-foreground/30 sm:h-10 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
               : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 active:scale-95",
-          isSaved ? "text-primary" : "text-muted-foreground hover:text-primary",
+          variant === "responsive"
+            ? "text-foreground"
+            : isSaved ? "text-primary" : "text-muted-foreground hover:text-primary",
           isLoading && "cursor-not-allowed opacity-50",
           className,
         )}

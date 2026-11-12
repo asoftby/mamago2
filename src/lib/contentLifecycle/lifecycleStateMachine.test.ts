@@ -54,11 +54,8 @@ function testDraftArticleAdminActions() {
     status: "DRAFT",
   });
 
-  assert.deepEqual(statusIds(vm), [
-    "submitForModeration",
-    "publish",
-    "deleteDraft",
-  ]);
+  // Staff-only surface: no misleading "send to moderation" (the submit route publishes for staff).
+  assert.deepEqual(statusIds(vm), ["publish", "deleteDraft"]);
 }
 
 function testForbiddenTransitionsNeverResolved() {

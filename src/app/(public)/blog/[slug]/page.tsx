@@ -33,7 +33,6 @@ import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
 import { BreakingNewsLazyNext } from "@/components/journal/BreakingNewsLazyNext";
 import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
   incrementPublishedArticleViews,
   shouldCountPublishedArticleViewRequest,
@@ -373,7 +372,7 @@ export default async function ArticlePage({
             publisherName: "mamaGo",
             articleSection: mvp.categoryLabel,
             keywords: mvp.tags.map((tag) => tag.title),
-            isNews: mvp.subtitle === BREAKING_NEWS_SUBTITLE,
+            isNews: mvp.publicationType === "BREAKING_NEWS",
             publicBaseUrl: publicBase,
           });
     const breadcrumbJsonLd = buildBreadcrumbJsonLd(
@@ -387,7 +386,7 @@ export default async function ArticlePage({
     const editHref =
       canEditPublishedArticle
         ? (
-            mvp.subtitle === BREAKING_NEWS_SUBTITLE
+            mvp.publicationType === "BREAKING_NEWS"
               ? `/admin/content/publications/new?type=news&id=${mvp.id}&returnTo=${encodeURIComponent(canonicalPath)}`
               : `/admin/content/articles/${mvp.id}/edit?returnTo=${encodeURIComponent(canonicalPath)}`
           )
@@ -397,7 +396,7 @@ export default async function ArticlePage({
       await incrementPublishedArticleViews(mvp.id);
     }
 
-    if (mvp.subtitle === BREAKING_NEWS_SUBTITLE) {
+    if (mvp.publicationType === "BREAKING_NEWS") {
       return (
         <>
           <ArticleGeoLabelSync label={articleGeoLabel} />
@@ -429,6 +428,7 @@ export default async function ArticlePage({
       <ArticleMvpView
         title={mvp.title}
         subtitle={mvp.subtitle}
+        publicationType={mvp.publicationType}
         excerpt={mvp.excerpt}
         publishedAt={mvp.publishedAt}
         blocks={mvp.blocks}
@@ -476,6 +476,7 @@ export default async function ArticlePage({
         cityId: null,
         citySlug: null,
         documentTitle: schemaArticle?.seoTitle?.trim() || `${mvp.title} — mamaGo`,
+        publicationType: mvp.publicationType,
       });
       const { blocks: _blocks, ...seedWithoutBlocks } = seed;
       void _blocks;

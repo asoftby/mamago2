@@ -8,7 +8,7 @@ export const DEFAULT_ACCESS_METHODS_BY_ENTITY: Record<
   PublicationEntityType,
   PublicationAccessMethod[]
 > = {
-  event: ["details", "ticket", "timeslots", "prebooking"],
+  event: ["details", "ticket", "timeslots", "prebooking", "request"],
   offer: ["details", "timeslots", "prebooking", "external", "contact"],
   place: ["details", "external", "contact", "prebooking"],
   route: ["details", "ticket", "external", "contact"],

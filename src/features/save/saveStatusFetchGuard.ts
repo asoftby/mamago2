@@ -27,3 +27,8 @@ export function shouldRefetchAfterFlowClose(params: {
   if (params.flowOpen) return false;
   return params.hasOpenedOnce;
 }
+
+/** Only event/activity saves have session dates; offers have their own save flow. */
+export function shouldFetchEventPlanDates(offerId?: string | null): boolean {
+  return !offerId;
+}

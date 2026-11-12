@@ -7,6 +7,7 @@ import {
   MAX_INTEREST_MATCHES,
   PLAN_SUGGESTION_ALGORITHM_VERSION,
   confirmedPlanOccurrencesWhere,
+  planSuggestionCandidateTake,
 } from "./planSuggestions.service";
 
 const scienceEvent = { signals: { interests: ["science"] } };
@@ -65,3 +66,12 @@ assert.deepEqual(confirmed, {
 });
 
 console.log("planSuggestions.interests.test.ts: OK");
+
+// Regression: HOME with 30-day exhaustive ranking must not lose an eligible
+// future event merely because it occurs after the first 120 SQL rows.
+assert.equal(planSuggestionCandidateTake({ exhaustiveCandidatePool: true, homeGeoFallback: true, externalGeo: false, take: 10 }), undefined);
+assert.equal(planSuggestionCandidateTake({ exhaustiveCandidatePool: true, homeGeoFallback: false, externalGeo: false, take: 10 }), undefined);
+assert.equal(planSuggestionCandidateTake({ exhaustiveCandidatePool: true, homeGeoFallback: true, externalGeo: true, take: 10 }), 24);
+assert.equal(planSuggestionCandidateTake({ exhaustiveCandidatePool: false, homeGeoFallback: true, externalGeo: false, take: 10 }), 120);
+assert.equal(planSuggestionCandidateTake({ exhaustiveCandidatePool: false, homeGeoFallback: false, externalGeo: false, take: 3 }), 24);
+assert.equal(planSuggestionCandidateTake({ exhaustiveCandidatePool: false, homeGeoFallback: false, externalGeo: false, take: 30 }), 80);

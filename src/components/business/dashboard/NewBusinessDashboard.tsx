@@ -8,12 +8,15 @@ import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicatio
 import { BusinessInboxPreview } from "./BusinessInboxPreview";
 import { sendBusinessOnboardingAction } from "./BusinessOnboardingTour";
 import type { DashboardData } from "./DashboardClient";
+import { BUSINESS_OFFERS_ENABLED } from "@/lib/business/publicationAvailability";
 
 const TYPES = [
   { id: "place", label: "Место", description: "Центр, студия или площадка", Icon: MapPin, href: "/editor/place/new" },
   { id: "event", label: "Событие", description: "Мероприятие с датой и временем", Icon: CalendarDays, href: "/editor/event/new" },
   { id: "offer", label: "Предложение", description: "Услуга, занятие или лагерь", Icon: Tag, href: "/editor/offer/new" },
 ] as const;
+
+const VISIBLE_TYPES = BUSINESS_OFFERS_ENABLED ? TYPES : TYPES.filter((type) => type.id !== "offer");
 
 type Props = {
   data: Pick<DashboardData, "hrefs" | "inboxPreview" | "onboarding" | "onboardingPublicHref">;
@@ -23,7 +26,7 @@ export function NewBusinessDashboard({ data }: Props) {
   const { onboarding } = data;
   const [selected, setSelected] = useState<(typeof TYPES)[number]["id"]>("place");
   const [viewed, setViewed] = useState(false);
-  const chosen = TYPES.find((type) => type.id === selected) ?? TYPES[2];
+  const chosen = VISIBLE_TYPES.find((type) => type.id === selected) ?? VISIBLE_TYPES[0];
   const hasDraft = Boolean(onboarding.draft);
   const hasPending = Boolean(onboarding.pending);
   const hasLive = Boolean(onboarding.published);
@@ -48,11 +51,11 @@ export function NewBusinessDashboard({ data }: Props) {
       ? "Вы сделали важный шаг. Пока материалы проверяются, изучите возможности кабинета."
       : hasDraft
         ? "Мы сохранили ваш черновик. Вернитесь к нему, когда будете готовы."
-        : "Теперь вы можете размещать места, события и предложения для семей. Начните с подходящего формата — для создания первой публикации пополнять баланс не требуется.";
+        : "Теперь вы можете размещать места и события для семей. Начните с подходящего формата — для создания первой публикации пополнять баланс не требуется.";
 
   const steps = [
     { label: "Компания подтверждена", hint: "Документы одобрены — бизнес-инструменты доступны", complete: true },
-    { label: "Создана первая карточка", hint: "Место, событие или предложение", complete: onboarding.hasAny },
+    { label: "Создана первая карточка", hint: "Место или событие", complete: onboarding.hasAny },
     { label: "Первая карточка опубликована", hint: "После проверки и публикации", complete: hasLive },
     { label: "Проверен публичный результат", hint: "Откройте свою карточку как посетитель", complete: hasLive && isViewed },
   ];
@@ -106,8 +109,8 @@ export function NewBusinessDashboard({ data }: Props) {
             ) : (
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-stone-900">С чего хотите начать?</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {TYPES.map(({ id, label, description, Icon }) => (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {VISIBLE_TYPES.map(({ id, label, description, Icon }) => (
                     <button key={id} type="button" aria-pressed={selected === id} onClick={() => setSelected(id)} className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${selected === id ? "border-primary bg-primary/5" : "border-stone-200 hover:bg-stone-50"}`}>
                       <Icon className="mt-0.5 h-5 w-5 shrink-0 text-stone-600" />
                       <span>
@@ -194,7 +197,7 @@ export function NewBusinessDashboard({ data }: Props) {
           <div className="space-y-2">
             <BookOpen className="h-5 w-5 text-primary" />
             <p className="text-sm font-semibold text-stone-900">Размещайте публикации</p>
-            <p className="text-xs leading-relaxed text-stone-600">Расскажите о площадке, мероприятии или услуге. Следите за статусом модерации.</p>
+            <p className="text-xs leading-relaxed text-stone-600">Расскажите о площадке или мероприятии. Следите за статусом модерации.</p>
           </div>
           <div className="space-y-2">
             <BarChart3 className="h-5 w-5 text-primary" />

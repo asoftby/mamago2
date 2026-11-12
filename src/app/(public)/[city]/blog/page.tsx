@@ -88,7 +88,6 @@ export default async function CityBlogPage({ params, searchParams }: PageProps) 
         subtitle="Вдохновение для семейных прогулок, событий и открытий."
         main={journal.main}
         news={journal.news}
-        collections={journal.collections}
         feed={journal.feed}
         typeFilter={typeFilter}
         newsArchive={newsArchive}

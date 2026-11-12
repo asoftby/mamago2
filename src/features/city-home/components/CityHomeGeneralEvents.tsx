@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { CityHomeSection } from "./CityHomeSection";
+import { HomeEventsQuickChips } from "./HomeSectionQuickChips";
+import { HomeCarouselHeading, CityHomeAllLink } from "./SectionHeader";
 import { HorizontalCardRow } from "./HorizontalCardRow";
 import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { applyPersonaRanking } from "../lib/personaRanking";
 import type { ActivityMock } from "@/types/activity";
 
 const MAX_PREVIEW_EVENTS = 10;
@@ -18,31 +22,31 @@ const FamilyActivationEditChildBirthOverlay = dynamic(() => import("./FamilyActi
 
 /** Guests see the public afisha without age chips, registration prompts or additional filter requests. */
 export function CityHomeGeneralEvents({
-  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null, incompleteChildren = [], periodLabel = "На этой неделе",
+  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null,
 }: {
   activities: ActivityMock[]; citySlug: string; authenticated?: boolean; hasChildren?: boolean;
-  periodLabel?: "На этой неделе" | "Ближайшие события";
+  periodLabel?: "На ближайшие 30 дней" | "Ближайшие события";
   incompleteChild?: { id: string; name: string | null } | null;
   incompleteChildren?: { id: string; name: string | null }[];
 }) {
   const [addingChild, setAddingChild] = useState(false);
   const [editingChild, setEditingChild] = useState<{ id: string; name: string | null } | null>(null);
   const router = useRouter();
+  const family = useFamilyPersona();
+  const preview = useMemo(() => authenticated
+    ? applyPersonaRanking(activities, { personas: family?.personas ?? [],
+        selectedPersonaIds: family?.selectedPersonaIds ?? [] })
+    : activities, [authenticated, activities, family?.personas, family?.selectedPersonaIds]);
   const catalogHref = "/" + citySlug + "/events";
 
   return <CityHomeSection
-    title={authenticated ? "События, которые подходят вам" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
-    subtitle={periodLabel} reserveCarouselControls>
-    {authenticated && hasChildren && incompleteChildren.length > 0 && <div className="mb-4 flex flex-wrap items-center gap-2">
-      <span className="mr-1 text-sm text-muted-foreground">Для кого:</span>
-      <span className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-sm text-primary-foreground">Для всех</span>
-      {incompleteChildren.map(child => <button key={child.id} type="button"
-        aria-label={`Указать возраст: ${child.name?.trim() || "Ребёнок"}`}
-        onClick={() => setEditingChild(child)}
-        className="min-h-11 rounded-full border px-4 text-sm hover:border-primary hover:text-primary">
-        {child.name?.trim() || "Ребёнок"}
-      </button>)}
-    </div>}
+    title={authenticated ? "События, которые подходят вашей семье" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
+    hideHeader>
+    <HorizontalCardRow
+      headerTitle={<HomeCarouselHeading title={authenticated ? "События, которые подходят вашей семье" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}  />}
+      navLeading={<CityHomeAllLink href={catalogHref} label="[все события]" />}
+      underHeader={<>
+        <HomeEventsQuickChips citySlug={citySlug} />
     {authenticated && (!hasChildren || incompleteChild) && <div className="mb-4 flex flex-wrap items-center gap-3">
       <span className="text-sm text-muted-foreground">
         {incompleteChild ? "Укажите возраст ребёнка для персональной афиши." : "Добавьте ребёнка — персонализируем афишу."}
@@ -52,9 +56,10 @@ export function CityHomeGeneralEvents({
         {incompleteChild ? "Указать возраст" : "+ Добавить ребёнка"}
       </button>
     </div>}
-    {!activities.length && <p role="status" className="py-6 text-sm text-muted-foreground">Пока нет опубликованных событий. Загляните позже.</p>}
-    <HorizontalCardRow headerHasSubtitle>
-      {activities.slice(0, MAX_PREVIEW_EVENTS).map((activity, index) => (
+    {!preview.length && <p role="status" className="py-6 text-sm text-muted-foreground">Событий пока нет.</p>}
+      </>}
+    >
+      {preview.slice(0, MAX_PREVIEW_EVENTS).map((activity, index) => (
         <div key={activity.id} className={EVENT_CARD_SHELL + " flex flex-col"}>
           <AnalyticsCardViewTracker entityType="EVENT" entityId={activity.id} vertical="CITY" citySlug={citySlug}
             threshold={0.5} dwellMs={1000} meta={{ section: "afisha", exposureId: activity.exposureId ?? null }}>
@@ -63,7 +68,7 @@ export function CityHomeGeneralEvents({
           </AnalyticsCardViewTracker>
         </div>
       ))}
-      <HomeMoreEventsCard href={catalogHref} />
+      {preview.length > 0 && <HomeMoreEventsCard href={catalogHref} />}
     </HorizontalCardRow>
     {authenticated && <>
       <FamilyActivationAddChildOverlay open={addingChild} onOpenChange={setAddingChild}

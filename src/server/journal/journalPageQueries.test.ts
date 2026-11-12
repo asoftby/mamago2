@@ -6,28 +6,27 @@ const rubric = { categoryId: "rubric-1" };
 
 test("all blocks are filtered by the selected rubric", () => {
   const w = journalBlockWheres({ scopeWhere: rubric, typeFilter: null, mainId: "main-1" });
-  for (const where of [w.main, w.news, w.collections, w.feed]) {
+  for (const where of [w.main, w.news, w.feed]) {
     assert.deepEqual((where as { AND: unknown[] }).AND[0], rubric);
   }
 });
 
-test("main = featured of any type; news block only non-expired; collections by type", () => {
+test("Breaking News appears in its own block only; articles and collections share the feed", () => {
   const now = new Date("2026-10-27T12:00:00Z");
   const w = journalBlockWheres({ scopeWhere: null, typeFilter: null, mainId: null, now });
-  assert.deepEqual(w.main, { featured: true });
+  assert.deepEqual(w.main, { AND: [{ featured: true }, { publicationType: { not: "BREAKING_NEWS" } }] });
   assert.deepEqual(w.news, {
     AND: [
       { publicationType: "BREAKING_NEWS" },
       { OR: [{ publicationType: { not: "BREAKING_NEWS" } }, { publicationType: "BREAKING_NEWS", expiresAt: { gt: now } }] },
     ],
   });
-  assert.deepEqual(w.collections, { publicationType: "COLLECTION" });
-  assert.deepEqual(w.feed, {}, "feed keeps every type, expired news included (no expiry filter)");
+  assert.deepEqual(w.feed, { AND: [{ publicationType: { not: "BREAKING_NEWS" } }] });
 });
 
 test("main material is not duplicated in the feed", () => {
   const w = journalBlockWheres({ scopeWhere: null, typeFilter: null, mainId: "main-1" });
-  assert.deepEqual(w.feed, { AND: [{ id: { not: "main-1" } }] });
+  assert.deepEqual(w.feed, { AND: [{ publicationType: { not: "BREAKING_NEWS" } }, { id: { not: "main-1" } }] });
 });
 
 test("type filter (?type=) narrows only the feed", () => {

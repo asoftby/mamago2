@@ -184,7 +184,7 @@ export function OrderedMasonryGrid({
       data-masonry-columns={hydrated ? layout.columns : undefined}
       className={cn(
         "flex w-full min-w-0 items-start",
-        !hydrated && "gap-3 sm:grid sm:grid-cols-3 sm:gap-4 min-[1025px]:grid-cols-4 min-[1025px]:gap-5",
+        !hydrated && "gap-5 sm:grid sm:grid-cols-3 sm:gap-6 min-[1025px]:grid-cols-4 min-[1025px]:gap-8",
         className,
       )}
       style={hydrated ? { gap: config.gap } : undefined}
@@ -192,7 +192,7 @@ export function OrderedMasonryGrid({
       {layout.columnKeys.map((keys, columnIndex) => (
         <div
           key={`column-${columnIndex}`}
-          className={cn("flex min-w-0 flex-1 flex-col", !hydrated && "gap-3 sm:contents")}
+          className={cn("flex min-w-0 flex-1 flex-col", !hydrated && "gap-5 sm:contents")}
           style={hydrated ? { gap: config.gap } : undefined}
         >
           {keys.map((key) => {

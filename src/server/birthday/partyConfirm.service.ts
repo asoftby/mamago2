@@ -1,3 +1,5 @@
+import { isAllocationOverlapError } from "@/server/services/booking/resourceAllocation";
+import { lockPartyRequestGroup } from "./partyRequestLock";
 import "server-only";
 import {
   BookingKind, BookingStatus, PartyItemRole, PartyItemStatus,
@@ -7,7 +9,7 @@ import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
 import {
-  allocatePartyUnit, isAllocationOverlapError, lockAvailablePartyUnit, type PartyUnitWindow,
+  allocatePartyUnit, lockAvailablePartyUnit, type PartyUnitWindow,
 } from "./partyUnitAllocation";
 import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
 import { assertPartyConfirmationEnabled } from "./partyConfirmationFlag";
@@ -34,8 +36,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
   const dedupeKey = `party:${requestId}:confirmed:${idempotencyKey}`;
   try {
     return await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "BookingRequest"
-        WHERE "id" = ${requestId} FOR UPDATE`;
+      await lockPartyRequestGroup(tx, requestId);
       const now = new Date();
       const req = await tx.bookingRequest.findFirst({
         where: { id: requestId, businessId, kind: BookingKind.PARTY },

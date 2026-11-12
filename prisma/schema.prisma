@@ -122,6 +122,7 @@ model User {
   inboxItems                        InboxItem[]
   experiences                       Experience[]
   dayScenarios                      DayScenario[]
+  dayScenarioShares                 DayScenarioShare[]
   routes                            Route[]                          @relation("RouteAuthor")
   routeIdeas                        RouteIdea[]
   routeRatings                      RouteRating[]
@@ -403,6 +404,14 @@ enum PlanDecisionStatus {
   CANCELLED
 }
 
+/// Откуда время записи плана, собранной «Сценарием дня»: CONFIRMED — реальный сеанс события,
+/// SUGGESTED — время выбрал движок (по расписанию без сеанса или по часам работы места).
+/// null у всех записей, созданных не сценарием.
+enum PlanItemTimeType {
+  CONFIRMED
+  SUGGESTED
+}
+
 /// Family Core: семья (общий профиль детей и «Мой план»).
 model Family {
   id          String             @id @default(cuid())
@@ -413,6 +422,8 @@ model Family {
   updatedAt   DateTime           @updatedAt
   /// Закрытая семья (когда взрослых не осталось, B3/A2).
   archivedAt  DateTime?
+  /// «Сценарий дня»: предпочитаемый способ передвижения ('walk' | 'car'); null = не выбирали, читается как 'car'.
+  travelMode  String?
   memberships FamilyMembership[]
   children    Child[]
   planItems   PlanItem[]
@@ -680,7 +691,14 @@ model PlanItem {
   recurrenceSeries  PlanRecurrenceSeries? @relation(fields: [recurrenceSeriesId], references: [id], onDelete: SetNull)
   scenarioOverrides DayScenarioItemOverride[]
   requirements      PlanItemRequirement[]
+  /// «Сценарий дня»: сценарий, который создал запись (null = запись не из сценария).
+  scenarioId        String?
+  scenario          DayScenario?              @relation("DayScenarioPlanItems", fields: [scenarioId], references: [id], onDelete: SetNull)
+  timeType          PlanItemTimeType?
+  /// Закреплена пользователем: «Изменить день» её не переставляет.
+  pinned            Boolean                   @default(false)
 
+  @@index([scenarioId])
   @@index([userId, date])
   @@index([userId])
   @@index([activityId])
@@ -864,13 +882,38 @@ model DayScenario {
   lastSaveIdempotencyKey String?
   lastSaveRequestHash    Json?
   lastSaveResponse       Json?
+  /// Общий для дней одного сохранения («Сохранить выходные»: Сб и Вс). null = день сам по себе.
+  groupId                String?
+  /// 'ENGINE' — день собран движком «Сценария дня»; null — день редактора Task 7.
+  source                 String?
+  /// Время в пути между точками дня: [{ planItemId, mode, minutes, distanceM }].
+  legsJson               Json?
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
   user                   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   itemOverrides          DayScenarioItemOverride[]
+  planItems              PlanItem[]                @relation("DayScenarioPlanItems")
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([groupId])
+}
+
+/// «Поделиться» днём/выходными от mamaGo: отзываемая ссылка-возможность (capability URL, /d/[token]).
+/// Ссылка читает сценарий вживую: что в плане сейчас, то и видно. Без данных о владельце.
+model DayScenarioShare {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  /// День, с которого поделились (для выходных — любой из двух).
+  date      String
+  /// Не null: делимся всей группой (Сб+Вс); null: одним днём.
+  groupId   String?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
 /// Сценарий-специфичная организация одного PlanItem внутри Сценария дня —
@@ -1049,6 +1092,7 @@ model Occasion {
   updatedAt   DateTime     @updatedAt
 
   activityLinks ActivityOccasion[]
+  articles Article[] @relation("ArticleOccasion")
 
   @@index([sortOrder])
   @@index([type, sortOrder])
@@ -1568,6 +1612,7 @@ model ActivitySession {
   title           String?          @db.VarChar(120)
   activity        Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
   bookingRequests BookingRequest[]
+  allocations BookingAllocation[]
 
   @@unique([source, externalId])
   @@index([activityId])
@@ -1790,6 +1835,9 @@ model Place {
   territory Territory? @relation("PlaceTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   lat                          Float?
   lng                          Float?
+  /// Geohash-6 / geohash-5 of (lat, lng); maintained by the Prisma place extension, null without coordinates.
+  geoCell6                     String? @db.VarChar(6)
+  geoCell5                     String? @db.VarChar(5)
   phone                        String?
   phoneLabel                   String?
   phone2                       String?
@@ -2605,6 +2653,10 @@ model Offer {
   coverImage               String?
   /// Видео URL (YouTube, YouTube Shorts, Instagram Reels)
   videoUrl                 String?
+  /// Короткая цитата площадки о себе (карточка в подборках журнала), до 140 символов
+  venuePitch               String?
+  /// Ограничения и условия «Учтите» (карточка в подборках журнала), до 160 символов
+  visitorNote              String?
   /// Rich-text подпись к цене: что входит, ограничения, условия участия
   priceCaption             String?
   priceFrom                Float?
@@ -2734,6 +2786,7 @@ model Offer {
   boosts          Boost[]
   bookingRequests BookingRequest[]
   partyOrderItems PartyOrderItem[]
+  partySavedOffers PartySavedOffer[]
   bookingUnitOffers BookingUnitOffer[]
   offerPlanItems  PlanItem[]
   offerIdeas      OfferIdea[]
@@ -2855,6 +2908,7 @@ model OfferSession {
   title String?
   isCancelled Boolean @default(false)
   bookingRequests BookingRequest[]
+  allocations BookingAllocation[]
   /// Числовая цена (для бюджет-фильтра)
   price    Decimal? @db.Decimal(10, 2)
 
@@ -2987,6 +3041,13 @@ model OfferScheduleException {
 
 /// Состав пакета «Праздник под ключ» (реляционный, не JSON).
 /// Fase 1: структура без CPA и vendor-constraint в схеме.
+enum PackageComponentRemovalPolicy {
+  REQUIRED
+  REMOVABLE_NO_REFUND
+  REMOVABLE_FIXED_CREDIT
+  REMOVABLE_QUOTE_REQUIRED
+}
+
 model PackageComponent {
   id            String        @id @default(cuid())
   packageId     String
@@ -2999,6 +3060,9 @@ model PackageComponent {
   isOptional    Boolean       @default(false)
   priceDelta    Decimal?      @db.Decimal(10, 2)
   position      Int
+  archivedAt    DateTime?
+  removalPolicy PackageComponentRemovalPolicy?
+  removalCreditByn Decimal? @db.Decimal(10, 2)
 
   partyOrderItems PartyOrderItem[]
 
@@ -3657,6 +3721,11 @@ model Article {
   relatedPlace       Place?               @relation("ArticleRelatedPlace", fields: [relatedPlaceId], references: [id], onDelete: SetNull)
   /// EventCategory с publicationType=ARTICLE (корневая категория журнала).
   categoryId         String?
+  /// Null means evergreen. The calendar owns the occasion's active window.
+  occasionId         String?
+  occasion           Occasion? @relation("ArticleOccasion", fields: [occasionId], references: [id], onDelete: SetNull)
+  /// Start of the season explicitly approved by an editor.
+  seasonReviewedForStart DateTime?
   category           EventCategory?       @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
   additionalCategoryLinks ArticleCategoryLink[]
   additionalGeographyTargets ArticleGeographyTarget[]
@@ -3683,6 +3752,7 @@ model Article {
   @@index([geoScope])
   @@index([relatedPlaceId])
   @@index([categoryId])
+  @@index([occasionId])
   @@index([territoryId])
   @@index([regionTerritoryId])
   @@index([publicationType, status, publishedAt])
@@ -5967,6 +6037,7 @@ model PartyOrder {
   owner User @relation("PartyOrderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   family Family? @relation(fields: [familyId], references: [id], onDelete: SetNull)
   items PartyOrderItem[]
+  savedOffers PartySavedOffer[]
 
   @@index([ownerUserId, status])
   @@index([familyId])
@@ -5980,6 +6051,10 @@ model PartyOrderItem {
   offerId String?
   businessId String?
   packageComponentId String?
+  packageComponentSnapshot Json?
+  packageComponentChange Json?
+  packageComponentChangeHistory Json?
+  draftPriceModeSnapshot String?
   role PartyItemRole
   parentItemId String?
   offerPriceSnapshot Decimal? @db.Decimal(10, 2)
@@ -6010,6 +6085,18 @@ model PartyOrderItem {
   @@index([offerId])
   @@index([businessId])
   @@index([parentItemId])
+}
+
+model PartySavedOffer {
+  id String @id @default(cuid())
+  partyOrderId String
+  offerId String
+  createdAt DateTime @default(now())
+  partyOrder PartyOrder @relation(fields: [partyOrderId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([partyOrderId, offerId])
+  @@index([offerId])
 }
 
 model PartyQuote {
@@ -6169,7 +6256,9 @@ model CalendarBlock {
 model BookingAllocation {
   id String @id @default(cuid())
   bookingUnitId String
-  bookingRequestId String
+  bookingRequestId String?
+  offerSessionId String?
+  activitySessionId String?
   partyQuoteId String? @unique
   blockStart DateTime
   blockEnd DateTime
@@ -6179,11 +6268,15 @@ model BookingAllocation {
   updatedAt DateTime @updatedAt
 
   bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
-  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  bookingRequest BookingRequest? @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  offerSession OfferSession? @relation(fields: [offerSessionId], references: [id], onDelete: Restrict)
+  activitySession ActivitySession? @relation(fields: [activitySessionId], references: [id], onDelete: Restrict)
   quote PartyQuote? @relation(fields: [partyQuoteId], references: [id], onDelete: SetNull)
 
   @@index([bookingUnitId, status, blockStart, blockEnd])
   @@index([bookingRequestId])
+  @@index([offerSessionId])
+  @@index([activitySessionId])
 }
 
 /// Статус заявки на запись
@@ -6206,10 +6299,17 @@ enum BookingMode {
 }
 
 /// Заявка на запись/заказ от клиента
+enum BookingSource {
+  MANUAL
+}
+
 model BookingRequest {
   id         String  @id @default(cuid())
   businessId String
   userId     String?
+  source BookingSource?
+  manualRequestKey String?
+  manualRequestHash String?
 
   // Тип публикации
   publicationType PublicationType
@@ -6318,6 +6418,7 @@ model BookingRequest {
   @@index([activityId])
   @@index([offerId])
   @@unique([offerId, slotIdempotencyKey])
+  @@unique([businessId, manualRequestKey])
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([offerSessionId, status, holdUntil])
@@ -6670,6 +6771,8 @@ model GuestUsage {
   /// Минутное окно (unix-минута) для rate limit
   rateMinuteBucket  Int?
   rateCountInMinute Int      @default(0)
+  /// «Сценарий дня» гостя: даты, для которых уже была первая сборка (только она тратит квоту).
+  scenarioDates     String[] @default([])
 
   @@index([generationsCount])
 }
@@ -6935,8 +7038,33 @@ model DiscoveryFilterPlacement {
   @@index([categoryId, isActive, sortOrder])
 }
 
+enum DiscoveryTagIndexingMode {
+  AUTO
+  INDEX
+  NOINDEX
+}
+
+enum DiscoveryTagReviewStatus {
+  APPROVED
+  PENDING
+}
+
+enum DiscoveryTagGroup {
+  PLACES
+  ENTERTAINMENT
+  INTERESTS
+  DEVELOPMENT
+  CELEBRATIONS
+  FAMILY
+  TRAVEL
+  OTHER
+}
+
 model DiscoveryTag {
   id             String   @id @default(cuid())
+  indexingMode   DiscoveryTagIndexingMode @default(AUTO)
+  reviewStatus   DiscoveryTagReviewStatus @default(APPROVED)
+  group          DiscoveryTagGroup @default(OTHER)
   slug           String   @unique
   title          String
   description    String?

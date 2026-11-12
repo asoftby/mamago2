@@ -100,6 +100,29 @@ export async function resolveTerritoryScope(
   return value;
 }
 
+/** Resolve the containing country for automatic discovery expansion.
+ * Never widen across national borders. The existing territory scope cache
+ * handles the country descendants; only invoked on sparse home feeds.
+ */
+export async function resolveCountryScopeForTerritory(
+  scope: Pick<TerritoryScope, "territoryId">,
+): Promise<TerritoryScope | null> {
+  let id: string | null = scope.territoryId;
+  const visited = new Set<string>();
+  for (let depth = 0; id && depth < 6 && !visited.has(id); depth++) {
+    visited.add(id);
+    const node: { type: TerritoryType; slug: string; parentId: string | null; isActive: boolean } | null =
+      await prisma.territory.findUnique({
+        where: { id },
+        select: { type: true, slug: true, parentId: true, isActive: true },
+      });
+    if (!node?.isActive) return null;
+    if (node.type === "COUNTRY") return resolveTerritoryScope(node.slug);
+    id = node.parentId;
+  }
+  return null;
+}
+
 /** Event belongs to the scope through its own territory, its place or its venue (kuda feed shape). */
 export function activityInTerritoryScopeWhere(territoryIds: readonly string[]): Prisma.ActivityWhereInput {
   const ids = { in: [...territoryIds] };

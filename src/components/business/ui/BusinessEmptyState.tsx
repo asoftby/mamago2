@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { Plus } from "lucide-react";
 import { BusinessSurfaceCard } from "./BusinessSurfaceCard";
 
 interface BusinessEmptyStateProps {
@@ -37,7 +37,7 @@ export function BusinessEmptyState({
             className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800"
           >
             {ctaLabel}
-            <ArrowRight className="h-4 w-4" />
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
           </Link>
         </div>
       ) : null}

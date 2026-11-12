@@ -4,8 +4,7 @@ import "@/styles/event-page.css";
 import { useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
+import { PublicationPriceDisplay } from "@/components/shared/PublicationPriceDisplay";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
@@ -33,6 +32,7 @@ type EventDecisionPanelProps = {
     | "factChips"
     | "priceLabel"
     | "venue"
+    | "media"
     | "cta"
     | "ownerEditHref"
   >;
@@ -57,20 +57,6 @@ function splitTitle(title: string): { head: string; tail: string } {
   const idx = t.indexOf(" ");
   if (idx === -1) return { head: t, tail: "" };
   return { head: t.slice(0, idx), tail: t.slice(idx + 1) };
-}
-
-function renderPriceSuffix(
-  text: string,
-  iconSize: "default" | "sm" = "default",
-) {
-  if (!text) return null;
-  const parts = text.split(BYN_SYMBOL);
-
-  return parts.flatMap((part, index) => {
-    const chunk = part ? [<span key={`text-${index}`}>{part}</span>] : [];
-    if (index === parts.length - 1) return chunk;
-    return [...chunk, <BelarusianRubleIcon key={`byn-${index}`} size={iconSize} />];
-  });
 }
 
 /** Countdown hook — returns d/h/m/s refreshed every second. */
@@ -217,44 +203,8 @@ export function EventDecisionPanel({
             )}
           </div>
 
-          {/* Price */}
-          <div className={cn("text-right", pr?.pricing)}>
-            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-              Стоимость
-            </div>
-            {(() => {
-              const priceStr = normalizeUiCurrencyText(data.priceLabel ?? "");
-              const spaceIdx = priceStr.lastIndexOf(" ");
-              const numPart = spaceIdx !== -1 ? priceStr.slice(0, spaceIdx) : priceStr;
-              const currencyPart = spaceIdx !== -1 ? priceStr.slice(spaceIdx + 1) : "";
-              const fromMatch = numPart.match(/^(от)\s+/i);
-              const fromPrefix = fromMatch?.[1] ?? "";
-              const amountPart = fromMatch ? numPart.slice(fromMatch[0].length) : numPart;
-              return (
-                <div>
-                  <div className="flex items-baseline justify-end gap-1">
-                    {fromPrefix && (
-                      <span className="font-pt-serif text-[20px] font-normal leading-tight tracking-[-0.5px] text-[#141210]">
-                        {fromPrefix}
-                      </span>
-                    )}
-                    <span className="font-pt-serif text-[40px] font-normal leading-tight tracking-[-1px] text-[#141210]">
-                      {amountPart}
-                    </span>
-                    {currencyPart && (
-                      <span
-                        className="inline-flex items-center text-[13px] text-[rgba(20,18,16,0.55)]"
-                        style={{ fontFamily: "Menlo, monospace" }}
-                      >
-                        {renderPriceSuffix(currencyPart, "sm")}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1.5 h-5" aria-hidden />
-                </div>
-              );
-            })()}
-          </div>
+          {/* Shared price presentation: canonical for events, classes and parties. */}
+          <PublicationPriceDisplay label={data.priceLabel} className={pr?.pricing} />
         </div>
 
         {/* Venue row */}
@@ -317,7 +267,7 @@ export function EventDecisionPanel({
               onClick={() => setBookingOpen(true)}
               className={PUBLICATION_PRIMARY_ACTION_CLASS}
             >
-              Записаться
+              {data.cta.simpleBooking.label ?? "Записаться"}
             </button>
           )}
 
@@ -349,6 +299,8 @@ export function EventDecisionPanel({
             open={bookingOpen}
             onOpenChange={setBookingOpen}
             eventTitle={data.title}
+            eventImageUrl={data.media?.posterUrl}
+            eventVenue={data.venue?.name}
             eventCategory={data.categoryLabel}
             priceLabel={data.priceLabel}
             booking={data.cta.simpleBooking}
@@ -368,10 +320,7 @@ export function EventDecisionPanel({
         {/* Owner edit */}
         {data.ownerEditHref && (
           <SidebarCardTopSection mt={20} pt={20}>
-            <OwnerEditDropdown
-              eventId={data.id}
-              className="h-14 rounded-full"
-            />
+            <OwnerEditDropdown eventId={data.id} />
           </SidebarCardTopSection>
         )}
       </SidebarCard>

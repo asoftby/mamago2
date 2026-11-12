@@ -24,31 +24,8 @@ export type SectionHeaderProps = {
   className?: string;
 };
 
-/** Ссылка «[все …]» в стиле подписи «2.0 beta» (font-mono). */
-export function CityHomeAllLink({
-  href,
-  label,
-  className,
-}: {
-  href: string;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "inline-flex h-8 shrink-0 items-center max-w-full font-mono font-normal lowercase",
-        "text-[12px] md:text-[13px] leading-none text-primary whitespace-nowrap",
-        "rounded-sm transition-opacity hover:opacity-70",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className,
-      )}
-    >
-      {label}
-    </Link>
-  );
-}
+import { CityHomeAllLink } from "./CityHomeAllLink";
+export { CityHomeAllLink } from "./CityHomeAllLink";
 
 export function SectionHeader({
   title,
@@ -109,8 +86,8 @@ export function SectionHeader({
       <div
         className={cn(
           useInlineText
-            ? "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 mb-4"
-            : "flex flex-wrap items-center gap-x-2.5 gap-y-2 px-1 mb-4",
+            ? "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 mb-[18px]"
+            : "flex flex-wrap items-center gap-x-2.5 gap-y-2 px-1 mb-[18px]",
           className,
         )}
       >
@@ -125,7 +102,7 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4 px-1 mb-4",
+        "flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4 px-1 mb-[18px]",
         className,
       )}
     >
@@ -140,6 +117,16 @@ export function SectionHeader({
         ) : null}
       </div>
       {actionLink}
+    </div>
+  );
+}
+
+/** Shared in-flow carousel heading; action and arrows belong to the same row. */
+export function HomeCarouselHeading({ title, subtitle }: { title: string; subtitle?: string | null }) {
+  return (
+    <div className="min-w-0 space-y-1 px-1">
+      <h2 className="text-neutral-900 leading-tight" style={{ fontFamily: ptSerifHome.style.fontFamily, fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" }}>{title}</h2>
+      {subtitle && <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">{subtitle}</p>}
     </div>
   );
 }

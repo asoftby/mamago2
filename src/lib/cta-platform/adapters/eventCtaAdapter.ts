@@ -72,10 +72,10 @@ function fromParticipationMode(input: EventCtaLegacyInput): CanonicalCtaSeed | n
       actionKind: "REQUEST",
       sourceEntityType: "EVENT",
       sourceEntityId: input.id,
-      primaryLabel: "Выбрать время",
+      primaryLabel: input.bookingMode === "USE_PUBLICATION_DATES" ? "Выбрать дату" : "Выбрать время",
       requestConfig: {
         runtime: "BOOKING",
-        selectionMode: "SLOT",
+        selectionMode: input.bookingMode === "USE_PUBLICATION_DATES" ? "DATE" : "SLOT",
       },
       instructions: input.bookingNote ?? undefined,
       contactFallback: createPhoneFallback(input.bookingPhone ?? "")
@@ -90,6 +90,25 @@ function fromParticipationMode(input: EventCtaLegacyInput): CanonicalCtaSeed | n
       sourceEntityType: "EVENT",
       sourceEntityId: input.id,
       primaryLabel: "Записаться",
+      requestConfig: {
+        runtime: "BOOKING",
+        selectionMode: "NONE",
+      },
+      instructions: input.bookingNote ?? undefined,
+      contactFallback: createPhoneFallback(input.bookingPhone ?? "")
+        ? [createPhoneFallback(input.bookingPhone ?? "")!]
+        : undefined,
+    };
+  }
+
+  // «Оставить заявку»: заявка возможна только если серверная запись включена; у старых событий с
+  // этим режимом колонки не заполнены, и кнопка не должна обещать несуществующую запись.
+  if (mode === "request" && input.bookingEnabled) {
+    return {
+      actionKind: "REQUEST",
+      sourceEntityType: "EVENT",
+      sourceEntityId: input.id,
+      primaryLabel: "Оставить заявку",
       requestConfig: {
         runtime: "BOOKING",
         selectionMode: "NONE",

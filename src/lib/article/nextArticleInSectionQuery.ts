@@ -2,7 +2,6 @@
  * Чистые хелперы подбора следующей статьи в разделе (без Prisma / server-only).
  */
 import type { GeoScope, Prisma } from "@prisma/client";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 export const MAX_NEXT_ARTICLE_EXCLUDE_IDS = 50;
 
@@ -47,7 +46,7 @@ export function buildNextArticleInSectionWhere(args: {
     publishedAt: { lte: now },
     slug: { not: null },
     id: { notIn: excludeIds },
-    OR: [{ subtitle: null }, { subtitle: { not: BREAKING_NEWS_SUBTITLE } }],
+    publicationType: { not: "BREAKING_NEWS" },
   };
 }
 

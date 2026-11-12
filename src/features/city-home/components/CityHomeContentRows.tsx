@@ -1,22 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { HalloweenChip } from "@/components/discovery/HalloweenChip";
+import { Fragment, useMemo } from "react";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { JournalCard } from "@/components/content-cards/JournalCard";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
-import { CityHomeAllLink } from "@/features/city-home/components/SectionHeader";
+import { CityHomeAllLink, HomeCarouselHeading } from "@/features/city-home/components/SectionHeader";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
-import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { getCityLocativePhrase, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import { formatCardAge } from "@/lib/discovery/formatCardAge";
 import type { ActivityMock } from "@/types/activity";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { cn } from "@/lib/utils";
@@ -29,7 +28,10 @@ import {
   buildAudienceLabel,
   buildMainTitle,
 } from "@/features/city-home/lib/audiencePersonalization";
-import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
+import { rankHomeByAudience, homeAudienceSections } from "@/features/city-home/lib/rankHomeByAudience";
+import { HomeJournalCategoryChips } from "@/features/city-home/components/HomeJournalCategoryChips";
+import { HomeSectionQuickChips } from "@/features/city-home/components/HomeSectionQuickChips";
+import type { CityBlogCategory } from "@/server/article/cityBlogCategories";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
@@ -68,15 +70,8 @@ function buildKudaSectionTitle(input: {
   return `Куда пойти ${cityPart}`;
 }
 
-export function CityHomeKudaSection({
-  activities,
-  halloweenEnabled = false,
-}: {
-  activities: ActivityMock[];
-  halloweenEnabled?: boolean;
-}) {
+export function CityHomeKudaSection({ activities }: { activities: ActivityMock[] }) {
   const { appendCityQuery, citySlug } = useCity();
-  const router = useRouter();
   const { applied } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const baseTitle = buildKudaSectionTitle({
@@ -95,24 +90,17 @@ export function CityHomeKudaSection({
   });
   const preview = useMemo(
     () =>
-      applyPersonaRanking(activities, {
+      rankHomeByAudience(activities, {
         personas: family?.personas ?? [],
         selectedPersonaIds: family?.selectedPersonaIds ?? [],
-      }).slice(0, HOME_PERSONALIZED_PREVIEW_TAKE),
-    [activities, family?.personas, family?.selectedPersonaIds],
+        manualAgeRanges: applied.age,
+      }, activity => ({ ageFrom: activity.ageFrom, ageTo: activity.ageTo, agePolicy: activity.agePolicy }))
+        .slice(0, HOME_PERSONALIZED_PREVIEW_TAKE),
+    [activities, family?.personas, family?.selectedPersonaIds, applied.age],
   );
 
   const eventsHref = appendCityQuery(`/${citySlug}/events`);
   const eventsLabel = "[все события]";
-  const halloweenHref = appendCityQuery(`/${citySlug}/events?occasion=halloween`);
-  const halloweenChip = halloweenEnabled ? (
-    <div className="mb-4 mt-4 flex items-center px-1">
-      <HalloweenChip
-        aria-label="Показать мероприятия на Хэллоуин"
-        onClick={() => router.push(halloweenHref)}
-      />
-    </div>
-  ) : null;
 
   if (preview.length === 0) {
     return (
@@ -124,7 +112,6 @@ export function CityHomeKudaSection({
         actionHref={eventsHref}
         actionInlineText
       >
-        {halloweenChip}
         <p className="text-sm text-neutral-500 px-1 py-2 leading-relaxed">
           Пока нет опубликованных событий — загляните позже в раздел «Куда пойти».
         </p>
@@ -137,10 +124,10 @@ export function CityHomeKudaSection({
       className="pt-[5px]" innerClassName="pt-[10px]"
       title={title}
       titleCitySlug={citySlug}
-      reserveCarouselControls={!halloweenEnabled}
+      hideHeader
     >
-      {halloweenChip}
       <HorizontalCardRow
+        headerTitle={<HomeCarouselHeading title={title} />}
         navLeading={<CityHomeAllLink href={eventsHref} label={eventsLabel} />}
       >
         {preview.map((activity, index) => (
@@ -163,22 +150,23 @@ export function CityHomeKudaSection({
 export function CityHomeClassesSection({
   cityName,
   activities,
+  classChips,
   mode,
 }: {
   cityName: string;
   activities: ActivityMock[];
+  classChips: Array<{ slug: string; title: string }>;
   mode: "local" | "nearby" | "empty";
 }) {
   const { appendCityQuery, citySlug } = useCity();
   const family = useFamilyPersona();
-  const preview = useMemo(
-    () =>
-      applyPersonaRanking(activities, {
-        personas: family?.personas ?? [],
-        selectedPersonaIds: family?.selectedPersonaIds ?? [],
-      }),
-    [activities, family?.personas, family?.selectedPersonaIds],
-  );
+  const { applied } = useDiscoveryFilters();
+  const sections = useMemo(() => homeAudienceSections(activities, {
+    personas: family?.personas ?? [], selectedPersonaIds: family?.selectedPersonaIds ?? [],
+    manualAgeRanges: applied.age,
+  }, activity => ({ ageFrom: activity.ageFrom, ageTo: activity.ageTo, agePolicy: activity.agePolicy })),
+  [activities, family?.personas, family?.selectedPersonaIds, applied.age]);
+  const preview = [...sections.primary, ...sections.alternatives].slice(0, 12);
 
   if (mode === "empty" || preview.length === 0) {
     return null;
@@ -190,10 +178,11 @@ export function CityHomeClassesSection({
       subtitle={
         mode === "nearby" ? `В ${cityName} пока немного вариантов — посмотрите рядом` : undefined
       }
-      reserveCarouselControls
+      hideHeader
     >
       <HorizontalCardRow
-        headerHasSubtitle={mode === "nearby"}
+        headerTitle={<HomeCarouselHeading title={mode === "local" ? `Занятия ${getCityLocativePhrase(citySlug)}` : "Занятия рядом"} subtitle={mode === "nearby" ? `В ${cityName} пока немного вариантов — посмотрите рядом` : null} />}
+        underHeader={<HomeSectionQuickChips label="Категории занятий" chips={classChips.map(chip => ({ label: chip.title, href: `/${citySlug}/classes/${chip.slug}` }))} />}
         navLeading={
           <CityHomeAllLink
             href={appendCityQuery(`/${citySlug}/classes`)}
@@ -208,12 +197,12 @@ export function CityHomeClassesSection({
           const dateRange = activity.dateStart
             ? formatRuShortDayMonthRange(activity.dateStart, activity.dateEnd ?? null)
             : undefined;
-          const ageLabel =
-            activity.ageFrom != null ? `${activity.ageFrom}+` : undefined;
+          const ageLabel = formatCardAge(activity.ageFrom, activity.ageTo);
           const dateLabel = [ageLabel, dateRange].filter(Boolean).join(" · ");
           const priceLabel = formatPublicCardPrice({ priceMode: activity.priceMode, priceFrom: activity.priceMin, priceTo: activity.priceMax, currency: activity.currency }) ?? undefined;
           return (
-            <div key={activity.id} className={cardShell}>
+            <Fragment key={activity.id}>
+            <div className={cardShell + " flex flex-col"}>
               <AnalyticsCardViewTracker
                 entityType="OFFER"
                 entityId={activity.id}
@@ -237,7 +226,11 @@ export function CityHomeClassesSection({
                   saveDateEndISO={activity.dateEnd ?? null}
                 />
               </AnalyticsCardViewTracker>
+              {activity.citySlug && activity.citySlug !== citySlug && <p className="pt-2 text-xs text-muted-foreground">
+                {getCityNominativeName(activity.citySlug)}
+              </p>}
             </div>
+            </Fragment>
           );
         })}
       </HorizontalCardRow>
@@ -253,7 +246,14 @@ export function CityHomeRoutesSection({
   mode: "local" | "nearby" | "empty";
 }) {
   const { appendCityQuery, citySlug } = useCity();
-  const preview = routes;
+  const family = useFamilyPersona();
+  const { applied } = useDiscoveryFilters();
+  const sections = useMemo(() => homeAudienceSections(routes, {
+    personas: family?.personas ?? [], selectedPersonaIds: family?.selectedPersonaIds ?? [],
+    manualAgeRanges: applied.age,
+  }, route => ({ ageFrom: null, ageTo: null, ageTags: route.ageTags })),
+  [routes, family?.personas, family?.selectedPersonaIds, applied.age]);
+  const preview = [...sections.primary, ...sections.alternatives].slice(0, 12);
 
   if (mode === "empty" || preview.length === 0) {
     return null;
@@ -263,10 +263,10 @@ export function CityHomeRoutesSection({
     <CityHomeSection
       title={mode === "local" ? `Маршруты ${getCityLocativePhrase(citySlug)}` : "Маршруты рядом"}
       subtitle={mode === "nearby" ? "Подобрали маршруты недалеко от вас" : undefined}
-      reserveCarouselControls
+      hideHeader
     >
       <HorizontalCardRow
-        headerHasSubtitle={mode === "nearby"}
+        headerTitle={<HomeCarouselHeading title={mode === "local" ? `Маршруты ${getCityLocativePhrase(citySlug)}` : "Маршруты рядом"} subtitle={mode === "nearby" ? "Подобрали маршруты недалеко от вас" : null} />}
         navLeading={
           <CityHomeAllLink
             href={appendCityQuery(`/${citySlug}/routes`)}
@@ -275,9 +275,11 @@ export function CityHomeRoutesSection({
         }
       >
         {preview.map((route) => (
-          <div key={route.id} className={cardShell}>
+          <Fragment key={route.id}>
+          <div className={cardShell}>
             <RouteCard route={route} homeCard />
           </div>
+          </Fragment>
         ))}
       </HorizontalCardRow>
     </CityHomeSection>
@@ -286,8 +288,10 @@ export function CityHomeRoutesSection({
 
 export function CityHomeJournalSection({
   articles,
+  categories,
 }: {
   articles: CityHomeJournalArticle[];
+  categories: CityBlogCategory[];
 }) {
   const { appendCityQuery, citySlug } = useCity();
 
@@ -300,15 +304,22 @@ export function CityHomeJournalSection({
 
   const blogHref = appendCityQuery(`/${citySlug}/blog`);
   const blogLabel = "[все статьи и обзоры]";
+  const liveCategories = categories.length > 0 ? categories : Array.from(
+    new Map(visibleArticles.filter(article => article.category).map(article => [article.category!.slug, {
+      id: article.category!.id,
+      slug: article.category!.slug,
+      name: article.category!.name,
+      thumbnailUrl: article.coverImageUrl,
+      hasNewArticle: false,
+    }])).values(),
+  );
 
   return (
-    <CityHomeSection
-      title="Статьи и обзоры"
-      innerClassName="pt-[10px]"
-      reserveCarouselControls
-    >
+    <section aria-label="Статьи и обзоры">
       <HorizontalCardRow
+        headerTitle={<HomeCarouselHeading title="Статьи и обзоры" />}
         navLeading={<CityHomeAllLink href={blogHref} label={blogLabel} />}
+        underHeader={<HomeJournalCategoryChips citySlug={citySlug} categories={liveCategories} />}
       >
         {visibleArticles.map((a, index) => (
           <div key={a.slug} className={cn(cardShell, "relative")}>
@@ -340,6 +351,6 @@ export function CityHomeJournalSection({
           </div>
         ))}
       </HorizontalCardRow>
-    </CityHomeSection>
+    </section>
   );
 }

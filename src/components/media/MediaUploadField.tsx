@@ -66,6 +66,8 @@ export interface MediaUploadFieldProps {
   loadMediaLibraryPage?: (args: { cursor: string | null; limit: number }) => Promise<MediaLibraryPage<MediaUploadItem>>;
   /** Page size for infinite scroll in the library dialog (default 24). */
   libraryPageSize?: number;
+  /** Manual loading is opt-in; other pickers retain existing infinite scroll. */
+  libraryPageMode?: "automatic" | "manual";
   /** Owner identity of the library (e.g. article authorUserId). Changing it resets items/selection and refetches. */
   libraryOwnerKey?: string | null;
   mediaLibraryTitle?: string;
@@ -205,6 +207,7 @@ export function MediaUploadField({
   onUploadFiles,
   loadMediaLibraryPage,
   libraryPageSize = MEDIA_PICKER_PAGE_SIZE,
+  libraryPageMode = "automatic",
   libraryOwnerKey = null,
   mediaLibraryTitle = "Выбрать из медиатеки",
   mediaLibraryDescription,
@@ -233,6 +236,8 @@ export function MediaUploadField({
   const libraryScrollRef = useRef<HTMLDivElement | null>(null);
   const librarySentinelRef = useRef<HTMLDivElement | null>(null);
   const libraryOpenRef = useRef(libraryOpen);
+  // A modal session must not refresh away selected items from later pages.
+  const authorTabLoadedForOwnerRef = useRef<string | null>(null);
   const hasArticleLibrary = Boolean(articleLibrary);
   const [activeSourceTab, setActiveSourceTab] = useState<"article" | "author">("article");
 
@@ -335,19 +340,41 @@ export function MediaUploadField({
     setLibraryOpen(true);
     setLibrarySelection(new Set());
     setActiveSourceTab("article");
-    const tasks: Promise<unknown>[] = [
-      loadLibraryInitial().catch((error) => {
-        toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
-      }),
-    ];
+    // Allow a TTL refresh only on the first visit in this new dialog session.
+    authorTabLoadedForOwnerRef.current = null;
+
+    // The author tab is not visible on open when an article-specific source is
+    // present. Do not fetch two independent libraries for one interaction.
     if (articleLibrary) {
-      tasks.push(
-        Promise.resolve(articleLibrary.load()).catch((error) => {
-          toast.error(error instanceof Error ? error.message : "Не удалось загрузить изображения статьи");
-        }),
-      );
+      try {
+        await articleLibrary.load();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Не удалось загрузить изображения статьи");
+      }
+      return;
     }
-    await Promise.all(tasks);
+
+    try {
+      await loadLibraryInitial();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+    }
+  };
+
+  const openAuthorLibrary = () => {
+    setActiveSourceTab("author");
+    const owner = libraryOwnerKey?.trim() || "__current-user__";
+    // Refreshing on every tab switch can replace already paginated items,
+    // including images selected on page 2+. Preserve the snapshot while the
+    // current dialog is open; reopening still respects the pager's TTL.
+    if (authorTabLoadedForOwnerRef.current === owner) return;
+    authorTabLoadedForOwnerRef.current = owner;
+    void loadLibraryInitial().catch((error) => {
+      if (authorTabLoadedForOwnerRef.current === owner) {
+        authorTabLoadedForOwnerRef.current = null;
+      }
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+    });
   };
 
   const handleLoadMore = useCallback(() => {
@@ -421,8 +448,16 @@ export function MediaUploadField({
 
   useEffect(() => {
     setLibrarySelection(new Set());
-    if (libraryOpenRef.current) {
+    authorTabLoadedForOwnerRef.current = null;
+    if (libraryOpenRef.current && (!hasArticleLibrary || activeSourceTab === "author")) {
+      // An author change invalidates the previous author's selection and page
+      // snapshot. Mark the new owner as loaded for this dialog once requested.
+      const owner = libraryOwnerKey?.trim() || "__current-user__";
+      authorTabLoadedForOwnerRef.current = owner;
       void loadLibraryInitial().catch((error) => {
+        if (authorTabLoadedForOwnerRef.current === owner) {
+          authorTabLoadedForOwnerRef.current = null;
+        }
         toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
       });
     }
@@ -439,12 +474,21 @@ export function MediaUploadField({
     // `libraryOpen`) makes the effect re-run — and find the now-mounted
     // sentinel — exactly when the tab switches in. Without `articleLibrary`
     // there's only ever one tab, so this collapses back to `libraryOpen`.
-    active: libraryOpen && (!hasArticleLibrary || activeSourceTab === "author"),
+    active: libraryPageMode === "automatic" && libraryOpen && (!hasArticleLibrary || activeSourceTab === "author"),
     hasMore: libraryHasMore,
     onLoadMore: handleLoadMore,
     sentinelRef: librarySentinelRef,
     rootRef: libraryScrollRef,
   });
+
+  const loadMoreButton = libraryPageMode === "manual" && libraryHasMore && !libraryLoading ? (
+    <div className="flex justify-center py-4">
+      <Button type="button" variant="outline" onClick={handleLoadMore} disabled={libraryLoadingMore || uploading}>
+        {libraryLoadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Подгрузить ещё
+      </Button>
+    </div>
+  ) : null;
 
   const renderMediaTile = (item: MediaUploadItem) => {
     const usageAware = usedIds !== undefined;
@@ -701,7 +745,7 @@ export function MediaUploadField({
           {hasArticleLibrary && articleLibrary ? (
             <Tabs
               value={activeSourceTab}
-              onValueChange={(v) => setActiveSourceTab(v === "author" ? "author" : "article")}
+              onValueChange={(v) => v === "author" ? openAuthorLibrary() : setActiveSourceTab("article")}
               className="flex min-h-0 flex-1 flex-col"
             >
               <div className="overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-6">
@@ -722,7 +766,7 @@ export function MediaUploadField({
                       <p className="text-sm text-muted-foreground">
                         {articleLibrary.emptyHint ?? "В этой статье пока нет других изображений"}
                       </p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setActiveSourceTab("author")}>
+                      <Button type="button" variant="outline" size="sm" onClick={openAuthorLibrary}>
                         {authorLibraryTabLabel}
                       </Button>
                     </div>
@@ -747,11 +791,12 @@ export function MediaUploadField({
                       {libraryItems.map(renderMediaTile)}
                     </div>
                   )}
-                  {libraryHasMore ? (
+                  {libraryPageMode === "automatic" && libraryHasMore ? (
                     <div ref={librarySentinelRef} className="flex justify-center py-4">
                       {libraryLoadingMore ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : null}
                     </div>
                   ) : null}
+                  {loadMoreButton}
                 </TabsContent>
               </div>
             </Tabs>
@@ -770,11 +815,12 @@ export function MediaUploadField({
                   {libraryItems.map(renderMediaTile)}
                 </div>
               )}
-              {libraryHasMore ? (
+              {libraryPageMode === "automatic" && libraryHasMore ? (
                 <div ref={librarySentinelRef} className="flex justify-center py-4">
                   {libraryLoadingMore ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : null}
                 </div>
               ) : null}
+              {loadMoreButton}
             </div>
           )}
 

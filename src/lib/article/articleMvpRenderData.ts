@@ -1,11 +1,18 @@
+import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import { buildCollectionEventMedia } from "@/lib/article/collectionEventMedia";
+import { buildCollectionOfferSections, collectionOfferTypeLabel, type CollectionCardSection } from "@/lib/article/collectionCardSections";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { resolveArticleDynamicAfisha } from "@/server/article/resolveArticleDynamicAfisha";
+import type { ArticleDynamicAfishaData } from "@/components/article/blocks/ArticleDynamicAfishaBlock";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { MAIN_ARTICLE_GALLERY_BLOCK_ID } from "@/lib/article/articleMainGallery";
 import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
 import { resolveUniqueConcurrently } from "@/lib/article/resolveUniqueConcurrently";
 import { linkedItemsToCardBlocks } from "@/lib/journal/linkedItemBlocks";
+import { deriveCollectionPartyMode, type CollectionPartyLead } from "@/lib/article/collectionPartyLead";
+import { buildEventCardData, type ResolvedEventCardData } from "@/lib/article/collectionEventCard";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import {
@@ -33,9 +40,12 @@ export type { PlaceCardExtra } from "@/lib/place/articlePlaceEmbedData";
 /** Без coverImage / seoImageAsset — на старой БД может не быть колонки coverImageId. */
 const articleMvpBaseSelect = {
   id: true,
+  geoScope: true,
+  city: { select: { slug: true } },
   title: true,
   excerpt: true,
   subtitle: true,
+  publicationType: true,
   slug: true,
   status: true,
   publishedAt: true,
@@ -94,7 +104,10 @@ export type ResolvedActivityCard = {
   meta?: string;
   imageUrl?: string | null;
   placeExtra?: PlaceCardExtra;
+  /** Данные карточки события афиши (только EVENT). */
+  event?: ResolvedEventCardData;
 };
+
 
 export type ArticleShiftPreview = {
   shiftId: string;
@@ -125,14 +138,22 @@ export type ResolvedOfferEmbedCard = {
   discountBadge?: string | null;
   ratingValue?: number | null;
   ratingCount?: number | null;
-  galleryThumbs: string[];
-  galleryExtraCount: number;
   metaItems: Array<{ id: string; label: string; value: string }>;
   schedulePreview: ArticleShiftPreview[];
   ctaLabel: string;
   ctaMode: "camp-shift" | "phone" | "external" | "details";
   ctaPhone?: string | null;
   ctaHref?: string | null;
+  /** «Площадка о себе» (Offer.venuePitch). */
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
+  /** Есть только у Party-офферов, которые принимают заявку на праздник (Party-поток). */
+  party?: CollectionPartyLead | null;
+  venuePitch?: string | null;
+  /** «Учтите» (Offer.visitorNote). */
+  visitorNote?: string | null;
+  mediaItems?: MediaGalleryItem[];
+  sections?: CollectionCardSection[];
 };
 
 export type ArticleMvpResolvedBlock =
@@ -158,6 +179,7 @@ export type ArticleMvpResolvedBlock =
         height: number | null;
       }>;
     })
+  | (Extract<ArticleBlockMvp, { type: "dynamicAfisha" }> & { afisha: ArticleDynamicAfishaData | null })
   | (Extract<ArticleBlockMvp, { type: "activityCard" }> & {
       card: ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | ResolvedArticlePlaceCard | null;
     })
@@ -186,6 +208,48 @@ function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPrev
   });
 }
 
+/** Same place projection for the linked Activity.place and the actual EventVenue.place. */
+const EVENT_CARD_PLACE_SELECT = {
+  id: true,
+  slug: true,
+  title: true,
+  customAddress: true,
+  formattedAddr: true,
+  districtManual: { select: { name: true } },
+  districtAuto: { select: { name: true } },
+  metroManual: { select: { name: true } },
+  metroAuto: { select: { name: true } },
+  city: { select: { slug: true } },
+} satisfies Prisma.PlaceSelect;
+
+/** One projection for single and batched event collection cards; no N+1 queries. */
+const EVENT_CARD_SELECT = {
+  format: true,
+  venue: {
+    select: {
+      kind: true,
+      title: true,
+      addressLine: true,
+      place: { select: EVENT_CARD_PLACE_SELECT },
+    },
+  },
+  nextOccurrenceAt: true,
+  ageMinMonths: true,
+  ageMaxMonths: true,
+  ageTags: true,
+  agePolicy: true,
+  priceFrom: true,
+  priceTo: true,
+  currency: true,
+  coverImageUrl: true,
+  coverImageId: true,
+  scheduleJson: true,
+  images: { orderBy: { sortOrder: "asc" }, select: { id: true, url: true, mediaAssetId: true } },
+  description: true,
+  eventCategory: { select: { nameRu: true } },
+  place: { select: EVENT_CARD_PLACE_SELECT },
+} satisfies Prisma.ActivitySelect;
+
 async function resolveActivityCard(
   b: Extract<ArticleBlockMvp, { type: "activityCard" }>,
   prefetched?: Map<string, ResolvedActivityCard>,
@@ -202,14 +266,14 @@ async function resolveActivityCard(
         title: true,
         slug: true,
         type: true,
-        place: { select: { city: { select: { slug: true } } } },
+        ...EVENT_CARD_SELECT,
       },
     });
     if (!a) return null;
-    const citySlug = a.place?.city?.slug;
+    const citySlug = a.place?.city?.slug ?? a.venue?.place?.city?.slug;
     const cs = citySlug ?? "minsk";
     const href = `/${cs}/events/${a.slug ?? b.entityId}`;
-    return { kind: "basic", href, title: a.title };
+    return { kind: "basic", href, title: a.title, event: buildEventCardData(a) };
   }
   if (b.entityType === "OFFER") {
     const o = await prisma.offer.findFirst({
@@ -220,8 +284,21 @@ async function resolveActivityCard(
         slug: true,
         kind: true,
         campProgramType: true,
+        venuePitch: true,
+        videoUrl: true,
+        ageMinMonths: true,
+        ageMaxMonths: true,
+        visitorNote: true,
+        productType: true,
+        category: true,
+        partyLocationType: true,
+        minChildren: true,
+        maxChildren: true,
+        placements: { where: { key: "BIRTHDAY", status: "APPROVED" }, select: { id: true }, take: 1 },
+        components: { orderBy: { position: "asc" }, select: { title: true, isOptional: true } },
         place: {
           select: {
+            ownerBusinessId: true,
             city: { select: { slug: true } },
           },
         },
@@ -270,12 +347,7 @@ async function resolveActivityCard(
       })),
     );
 
-    const typeLabel =
-      offerData.offerType === "CAMP"
-        ? "Лагерь"
-        : offerData.offerType === "REGULAR"
-          ? "Программа"
-          : "Предложение";
+    const typeLabel = collectionOfferTypeLabel(o.productType, offerData.offerType);
 
     const firstDiscount = offerData.pricing.discounts?.[0];
     const discountBadge = firstDiscount
@@ -297,6 +369,18 @@ async function resolveActivityCard(
       ctaMode = "external";
     }
 
+    const partyMode = deriveCollectionPartyMode({
+      id: o.id,
+      productType: o.productType,
+      category: o.category,
+      partyLocationType: o.partyLocationType,
+      hasApprovedBirthdayPlacement: o.placements.length > 0,
+      ownerBusinessId: o.place?.ownerBusinessId ?? null,
+    });
+    const partyLead: CollectionPartyLead | null = partyMode
+      ? { mode: partyMode, citySlug, minChildren: o.minChildren, maxChildren: o.maxChildren }
+      : null;
+
     return {
       kind: "offer-embed",
       offerId: offerData.id,
@@ -312,14 +396,24 @@ async function resolveActivityCard(
       discountBadge,
       ratingValue: offerData.averageRating ?? offerData.place?.rating ?? null,
       ratingCount: offerData.reviewsCount ?? offerData.place?.ratingsCount ?? null,
-      galleryThumbs: offerData.media.gallery.slice(0, 3).map((image) => image.url),
-      galleryExtraCount: Math.max(offerData.media.gallery.length - 3, 0),
       metaItems,
+      sections: buildCollectionOfferSections(offerData, o.productType, o.components),
       schedulePreview,
       ctaLabel: offerData.cta.primaryLabel || "Записаться",
       ctaMode,
       ctaPhone: offerData.cta.phone ?? null,
       ctaHref: offerData.cta.link ?? null,
+      ageMinMonths: o.ageMinMonths,
+      ageMaxMonths: o.ageMaxMonths,
+      party: partyLead,
+      venuePitch: o.venuePitch?.trim() || null,
+      visitorNote: o.visitorNote?.trim() || null,
+      mediaItems: buildCollectionEventMedia({
+        title: offerData.title,
+        coverImageUrl: offerData.media.posterUrl ?? null,
+        images: offerData.media.gallery.map((image, index) => ({ id: `offer-photo-${index}`, url: image.url })),
+        scheduleJson: { reelsUrl: o.videoUrl },
+      }),
     };
   }
   if (b.entityType === "ROUTE") {
@@ -378,7 +472,12 @@ async function loadBasicActivityCards(
     idsByType.EVENT.size
       ? prisma.activity.findMany({
           where: { id: { in: [...idsByType.EVENT] }, ...getPublicActivityDetailWhere() },
-          select: { id: true, title: true, slug: true, place: { select: { city: { select: { slug: true } } } } },
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            ...EVENT_CARD_SELECT,
+          },
         })
       : [],
     idsByType.ROUTE.size
@@ -397,8 +496,8 @@ async function loadBasicActivityCards(
 
   const cards = new Map<string, ResolvedActivityCard>();
   for (const event of events) {
-    const citySlug = event.place?.city?.slug ?? "minsk";
-    cards.set(`EVENT:${event.id}`, { kind: "basic", href: `/${citySlug}/events/${event.slug ?? event.id}`, title: event.title });
+    const citySlug = event.place?.city?.slug ?? event.venue?.place?.city?.slug ?? "minsk";
+    cards.set(`EVENT:${event.id}`, { kind: "basic", href: `/${citySlug}/events/${event.slug ?? event.id}`, title: event.title, event: buildEventCardData(event) });
   }
   for (const route of routes) {
     cards.set(`ROUTE:${route.id}`, { kind: "basic", href: `/routes/${route.slug}`, title: route.title });
@@ -420,6 +519,10 @@ export async function buildArticleMvpResolvedBlocks(
   dependencies: {
     loadPlaces?: (ids: string[]) => Promise<Map<string, ResolvedArticlePlace>>;
     loadBasicCards?: (blocks: ArticleBlockMvp[]) => Promise<Map<string, ResolvedActivityCard>>;
+    /** The published article city, never the visitor selected city. */
+    citySlug?: string | null;
+    /** Metadata reads must not execute feed ranking or register commercial exposures. */
+    hydrateDynamicAfisha?: boolean;
   } = {},
 ): Promise<ArticleMvpResolvedBlock[]> {
   const renderableBlocks = blocks.filter(
@@ -452,6 +555,19 @@ export async function buildArticleMvpResolvedBlocks(
     (block) => block.entityId.trim() || null,
     resolveActivityCard,
   );
+
+  const dynamicAfishaBlocks = dependencies.hydrateDynamicAfisha === false ? [] : renderableBlocks.filter(
+    (block): block is Extract<ArticleBlockMvp, { type: "dynamicAfisha" }> =>
+      block.type === "dynamicAfisha",
+  );
+  const resolvedAfisha = new Map(await Promise.all(dynamicAfishaBlocks.map(async (block) => [
+    block.id,
+    await resolveArticleDynamicAfisha({
+      citySlug: dependencies.citySlug,
+      period: block.period,
+      occasionSlug: block.occasionSlug,
+    }),
+  ] as const)));
 
   for (const b of renderableBlocks) {
     if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading" || b.type === "callout") {
@@ -500,6 +616,10 @@ export async function buildArticleMvpResolvedBlocks(
       out.push({ ...b, card });
       continue;
     }
+    if (b.type === "dynamicAfisha") {
+      out.push({ ...b, afisha: resolvedAfisha.get(b.id) ?? null });
+      continue;
+    }
     if (b.type === "embed" || b.type === "contacts" || b.type === "price" || b.type === "openingHours" || b.type === "info") {
       out.push(b);
     }
@@ -507,9 +627,29 @@ export async function buildArticleMvpResolvedBlocks(
   return out;
 }
 
+/** Shared block resolution for standalone and continuous-reading articles. */
+export async function resolvePublicArticleBlocks(
+  articleId: string,
+  contentBlocks: ArticleBlockMvp[],
+  options: { citySlug?: string | null; hydrateDynamicAfisha?: boolean } = {},
+): Promise<ArticleMvpResolvedBlock[]> {
+  const linkedRows = await prisma.articleLinkedItem.findMany({
+    where: { articleId },
+    orderBy: { position: "asc" },
+    select: { id: true, kind: true, position: true, activityId: true, offerId: true, linkedArticleId: true },
+  });
+  const linkedBlocks = linkedItemsToCardBlocks(linkedRows);
+  const resolvedBlocks = await buildArticleMvpResolvedBlocks([...contentBlocks, ...linkedBlocks], options);
+  // Hidden or unpublished linked entities must not produce broken cards.
+  return resolvedBlocks.filter(
+    (block) => !(block.type === "activityCard" && block.id.startsWith("linked-") && !block.card),
+  );
+}
+
 export async function loadArticleMvpBySlugPublic(
   slug: string,
   cityId: string | null,
+  options: { hydrateDynamicAfisha?: boolean } = {},
 ) {
   const resolved = await findArticleBySlug(slug, cityId);
   if (!resolved) return null;
@@ -523,25 +663,18 @@ export async function loadArticleMvpBySlugPublic(
   if (!article) return null;
   const cover = await resolveCoverMedia(await fetchArticleCoverImageId(article.id));
   const content = parseArticleContentJson(article.contentJson);
-  const linkedRows = await prisma.articleLinkedItem.findMany({
-    where: { articleId: article.id },
-    orderBy: { position: "asc" },
-    select: { id: true, kind: true, position: true, activityId: true, offerId: true, linkedArticleId: true },
+  const blocks = await resolvePublicArticleBlocks(article.id, content.blocks, {
+    citySlug: article.geoScope === "CITY" ? article.city?.slug ?? null : null,
+    hydrateDynamicAfisha: options.hydrateDynamicAfisha,
   });
-  const linkedBlocks = linkedItemsToCardBlocks(linkedRows);
-  if (content.blocks.length === 0 && linkedBlocks.length === 0) return null;
-  // Подборка: текст статьи, затем связанные объекты в сохранённом порядке.
-  const resolvedBlocks = await buildArticleMvpResolvedBlocks([...content.blocks, ...linkedBlocks]);
-  // Скрытые/снятые с публикации связанные объекты не показываем (без «не найдено»).
-  const blocks = resolvedBlocks.filter(
-    (block) => !(block.type === "activityCard" && block.id.startsWith("linked-") && !block.card),
-  );
+  if (blocks.length === 0) return null;
   const heroUrl = cover?.publicUrl ?? article.heroImage ?? article.seoOgImage ?? null;
   return {
     id: article.id,
     title: article.title,
     excerpt: article.excerpt,
     subtitle: article.subtitle,
+    publicationType: article.publicationType,
     slug: article.slug,
     status: article.status,
     publishedAt: article.publishedAt,
@@ -559,12 +692,12 @@ export async function loadArticleMvpBySlugPublic(
   };
 }
 
-/** Fetch 3 recent breaking news articles (by subtitle marker) excluding `excludeId`. */
+/** Fetch 3 recent breaking news articles by canonical publication type. */
 export async function loadRelatedBreakingNews(excludeId: string) {
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
-      subtitle: "__breaking_news__",
+      publicationType: "BREAKING_NEWS",
       id: { not: excludeId },
     },
     orderBy: { publishedAt: "desc" },
@@ -597,13 +730,16 @@ export async function loadArticleMvpById(articleId: string) {
   if (!article) return null;
   const cover = await resolveCoverMedia(await fetchArticleCoverImageId(articleId));
   const content = parseArticleContentJson(article.contentJson);
-  const blocks = await buildArticleMvpResolvedBlocks(content.blocks);
+  const blocks = await buildArticleMvpResolvedBlocks(content.blocks, {
+    citySlug: article.geoScope === "CITY" ? article.city?.slug ?? null : null,
+  });
   const heroUrl = cover?.publicUrl ?? article.heroImage ?? article.seoOgImage ?? null;
   return {
     id: article.id,
     title: article.title,
     excerpt: article.excerpt,
     subtitle: article.subtitle,
+    publicationType: article.publicationType,
     slug: article.slug,
     status: article.status,
     publishedAt: article.publishedAt,

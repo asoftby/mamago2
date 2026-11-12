@@ -25,7 +25,7 @@ const BUDGET_LABELS: Record<string, string> = {
   up300: "до 300",
   "300-600": "300–600",
   "600-1000": "600–1000",
-  "1000plus": "1000+",
+  "1000plus": "1000",
 };
 
 function ArrowRight({ c = "currentColor" }: { c?: string }) {
@@ -80,7 +80,6 @@ export function BuilderSummaryBar({
   const parts: string[] = [];
   if (partyForChild) parts.push(`${partyForChild.name}`);
   if (guestsGroup) parts.push(`${GUESTS_LABELS[guestsGroup] ?? guestsGroup} детей`);
-  if (budgetGroup) parts.push(BUDGET_LABELS[budgetGroup] ?? budgetGroup);
 
   return (
     <div
@@ -138,6 +137,17 @@ export function BuilderSummaryBar({
               <span>{p}</span>
             </span>
           ))}
+
+          {budgetGroup && BUDGET_LABELS[budgetGroup] && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <span style={{ opacity: 0.4 }}>·</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+                <span>{BUDGET_LABELS[budgetGroup]}</span>
+                <BelarusianRubleIcon size="text" />
+                {budgetGroup === "1000plus" && <span>и выше</span>}
+              </span>
+            </span>
+          )}
 
           {totalPrice > 0 && (
             <span style={{ display: "flex", gap: 8 }}>

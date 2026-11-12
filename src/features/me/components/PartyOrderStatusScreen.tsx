@@ -1,5 +1,8 @@
 "use client";
 
+import { PartyPackageBrief } from "@/components/birthday/PartyPackageBrief";
+import type { PackageChangeScope } from "@/lib/birthday/packageChangeScope";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -17,6 +20,7 @@ export type PartyOrderScreenData = {
   time: string | null;
   /** Set only when the wishlist feature is on (resolved on the server). */
   giftsHref?: string | null;
+  savedOffers?: Array<{ id: string; title: string; href: string }>;
   items: Array<{
     id: string;
     title: string;
@@ -25,12 +29,16 @@ export type PartyOrderScreenData = {
     request: {
       id: string;
       partyStage: string | null;
+      packageScope?: PackageChangeScope | null;
       quote: {
         id: string;
         version: number;
         status: string;
         priceByn: string | null;
         includes: string | null;
+        changeReason?: string | null;
+        declineReason?: string | null;
+        declineComment?: string | null;
         prepaymentTerms: string | null;
         cancellationTerms: string | null;
         validUntil: string | null;
@@ -52,7 +60,7 @@ const stageLabels: Record<string, string> = {
 };
 
 const orderNotices: Record<string, string> = {
-  NEEDS_ALTERNATIVE: "Основной исполнитель не подтвердил праздник. Можно выбрать другой вариант или отменить праздник.",
+  NEEDS_ALTERNATIVE: "Основная услуга не подтверждена. Можно выбрать другой вариант или отменить праздник.",
   CANCELLED: "Праздник отменён. Заявки исполнителям закрыты.",
 };
 
@@ -84,13 +92,13 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
     }
   };
 
-  const accept = async (requestId: string, quoteId: string, expectedVersion: number) => {
+  const accept = async (requestId: string, quoteId: string, expectedVersion: number, decision = "accept") => {
     if (pending) return;
     setPending(quoteId);
     setError(null);
     try {
       const res = await fetch(
-        `/api/parent/parties/${encodeURIComponent(party.id)}/quotes/${encodeURIComponent(quoteId)}/accept`,
+        `/api/parent/parties/${encodeURIComponent(party.id)}/quotes/${encodeURIComponent(quoteId)}/${decision}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -166,8 +174,13 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                     </span>
                   ) : null}
                 </div>
+                {item.request?.packageScope ? <PartyPackageBrief scope={item.request.packageScope} /> : null}
+                {stage === "DECLINED" && quote ? <p className="text-sm text-muted-foreground">
+                  Причина отказа: {quote.declineComment || ({ DATE_BUSY: "Дата занята", BUDGET: "Не подходит бюджет", FORMAT: "Не подходит формат", NOT_ENOUGH_TIME: "Недостаточно времени на подготовку", OTHER: "Другие условия" } as Record<string, string>)[quote.declineReason ?? ""] || "Уточните у исполнителя"}
+                </p> : null}
                 {quote && (isAvailable || stage === "AWAITING_RECONFIRM" || confirmed) ? (
                   <div className="space-y-2 rounded-xl bg-muted/50 p-3 text-sm">
+                    {quote.changeReason ? <p><span className="font-medium">Изменения исполнителя:</span> {quote.changeReason}</p> : null}
                     {quote.includes ? <p><span className="font-medium">Включено:</span> {quote.includes}</p> : null}
                     {quote.prepaymentTerms ? <p><span className="font-medium">Предоплата:</span> {quote.prepaymentTerms}</p> : null}
                     {quote.cancellationTerms ? <p><span className="font-medium">Отмена:</span> {quote.cancellationTerms}</p> : null}
@@ -179,7 +192,7 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                   </div>
                 ) : null}
                 {isAvailable && item.request && quote ? (
-                  <button
+                  <div className="flex flex-wrap gap-2"><button
                     type="button"
                     disabled={Boolean(pending)}
                     className={cn("inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground",
@@ -188,11 +201,29 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                   >
                     {pending === quote.id ? "Принимаем…" : "Принять предложение"}
                   </button>
+                  <Button type="button" variant="outline" className="min-h-11" disabled={Boolean(pending)}
+                    onClick={() => void accept(item.request!.id, quote.id, quote.version, "reject")}>Отклонить предложение</Button></div>
                 ) : null}
               </section>
             );
           })}
         </div>
+        {party.savedOffers && party.savedOffers.length > 0 ? (
+          <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-foreground">Идеи для сценария</h2>
+            <p className="text-sm text-muted-foreground">
+              Сохранённые предложения не забронированы и не включены в стоимость праздника.
+            </p>
+            <div className="space-y-2">
+              {party.savedOffers.map(offer => (
+                <Link key={offer.id} href={offer.href}
+                  className="block rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-muted/50">
+                  {offer.title}
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {!cancelled && party.giftsHref ? (
           <section className="space-y-2 border-t border-border pt-5">
             <h2 className="text-lg font-semibold text-foreground">Подарки</h2>
