@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { readPartyOrder } from "@/server/birthday/partyDraft.service";
 import { PartyApiError } from "@/server/birthday/partyDraft.validation";
 import { partyCancelBlocker } from "@/server/birthday/partyCancelRules";
+import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { wishlistEnabled } from "@/server/wishlist/wishlistPure";
 import { partyGiftsHref } from "@/features/wishlist/lib/wishlistView";
 import {
@@ -34,6 +35,12 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
     giftsHref: wishlistEnabled()
       ? partyGiftsHref(party.childName || "ребёнка", party.eventDate?.toISOString().slice(0, 10) ?? null)
       : null,
+    savedOffers: party.savedOffers.map(saved => ({
+      id: saved.offerId,
+      title: saved.offer.title,
+      href: getOfferPublicPath({ slug: saved.offer.slug },
+        saved.offer.city?.slug ?? saved.offer.place?.city?.slug ?? party.citySlug),
+    })),
     items: party.items.map((item) => {
       const request = item.requests[0];
       const quote = request?.partyQuotes[0];

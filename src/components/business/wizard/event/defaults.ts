@@ -5,6 +5,7 @@ import type { EventScheduleItem } from "@/components/admin/event-schedule/types"
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
 import { DEFAULT_ACTIVITY_FORMAT } from "@/domain/activities/activity-format";
 import { AgePolicy } from "@prisma/client";
+import { getUnrestrictedEventAgeRangeIds } from "./unrestrictedAgeRangeIds";
 
 /** Одна стартовая строка соцсетей (Instagram, URL пустой). */
 export function createDefaultSocialLink(id?: string): SocialLink {
@@ -45,7 +46,8 @@ export function getDefaultFormData(): EventFormData {
     categoryId: null,
     subcategoryId: null,
     primaryRootHasChildren: false,
-    ageRangeIds: [],
+    // «Любой» highlights every age chip except the separate #nokids control.
+    ageRangeIds: getUnrestrictedEventAgeRangeIds(),
     agePolicy: AgePolicy.UNRESTRICTED,
     ageTags: [],
     ageDetection: {

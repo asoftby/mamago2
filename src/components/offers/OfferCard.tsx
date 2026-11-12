@@ -71,7 +71,7 @@ export function OfferCard({
           eventPlanDateISO={saveDateISO ?? null}
           eventPlanDateEndISO={saveDateEndISO ?? null}
           source={saveSource}
-          className="absolute right-3 top-3 h-11 w-11 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px] sm:h-8 sm:w-8"
+          className="pointer-events-auto absolute right-3 top-3 z-20 h-11 w-11 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px] sm:h-8 sm:w-8"
           iconClassName="h-5 w-5 sm:h-4 sm:w-4"
         />
       )}
