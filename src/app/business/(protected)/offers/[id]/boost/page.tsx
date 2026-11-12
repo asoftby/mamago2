@@ -15,7 +15,7 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const offer = await prisma.offer.findFirst({
     where: { id, place: { ownerBusinessId: business.id } },
-    select: { id: true, title: true, status: true, archivedAt: true },
+    select: { id: true, title: true, status: true, archivedAt: true, kind: true },
   });
   if (!offer) notFound();
 
@@ -28,9 +28,9 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
         <h1 className="mt-2 text-2xl font-bold text-stone-950">Boost: {offer.title}</h1>
         <p className="mt-2 text-sm text-stone-600">Boost — единственное платное действие first PROD. Лиды и контакты бесплатны.</p>
       </div>
-      {offer.status !== "PUBLISHED" || offer.archivedAt ? (
+      {offer.status !== "PUBLISHED" || offer.archivedAt || offer.kind !== "SERVICE" ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          Boost доступен только для опубликованного активного предложения.
+          Boost доступен только для опубликованной активной услуги, которая участвует в каталожной выдаче.
         </div>
       ) : (
         <BoostPurchaseClient offerId={offer.id} options={getConfiguredBoostOptions()} regions={regions} />
