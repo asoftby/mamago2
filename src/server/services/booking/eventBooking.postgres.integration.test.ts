@@ -64,6 +64,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
         date,
         title: planEvent.title,
         startsAt: new Date(planEvent.sessions[0]!.startsAt.getTime() - 3_600_000),
+        endsAt: new Date(planEvent.sessions[0]!.startsAt.getTime() - 1_800_000),
       },
     });
     const planBooking = await createPublicBooking({
@@ -87,6 +88,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.equal(planItem.userId, owner.id);
     assert.equal(planItem.date, date);
     assert.equal(planItem.startsAt?.toISOString(), planEvent.sessions[0]!.startsAt.toISOString());
+    assert.equal(planItem.endsAt, null, "moving the occurrence must clear its obsolete end time");
     await assert.rejects(createPublicBooking({
       publicationType: "EVENT",
       publicationId: planEvent.id,
