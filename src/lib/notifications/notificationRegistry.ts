@@ -611,8 +611,9 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     description: "Поступила новая заявка на запись",
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "BOOKING",
-    ctaLabel: "Открыть заявку",
-    resolveHref: (notification) => notification.ctaAction || "/business/bookings",
+    ctaLabel: "Открыть и подтвердить",
+    telegramOpenIntent: "mini_app",
+    resolveHref: (n) => n.ctaAction || "/business/bookings",
     telegram: {
       enabledByDefault: true,
       template: "booking_created",

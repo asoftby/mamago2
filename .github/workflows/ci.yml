@@ -384,6 +384,7 @@ jobs:
           pnpm exec tsx src/lib/telegram/expandMiniApp.test.ts
           pnpm exec tsx src/lib/telegram/verifyWebAppInitData.test.ts
           pnpm exec tsx src/app/api/auth/telegram-webapp/route.test.ts
+          pnpm exec tsx src/app/api/auth/business-telegram-webapp/route.test.ts
           pnpm exec tsx src/lib/my-plan/planItemTimezoneRepair.test.ts
           bash -n scripts/deploy/run-prod-notification-jobs.sh
           bash -n scripts/deploy/install-prod-notification-cron.sh
@@ -456,6 +457,13 @@ jobs:
         run: pnpm test:seo-http
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+
+      - name: Business Mini App signed authentication and live membership PostgreSQL
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/app/api/auth/business-telegram-webapp/route.postgres.integration.test.ts
 
       - name: Personal family picks policy PostgreSQL integration
         env:

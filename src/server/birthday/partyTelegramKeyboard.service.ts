@@ -3,6 +3,7 @@ import "server-only";
 import type { Notification } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { createTelegramLinkButton } from "@/lib/telegram/webAppButton";
 import { getBusinessTelegramConfig } from "@/server/config/businessTelegram.config";
 import type { TelegramReplyMarkup } from "@/server/services/telegram/TelegramChannel";
 import { listPartyConfirmChoices } from "./partyConfirmChoices.service";
@@ -102,10 +103,16 @@ export async function buildPartyConfirmationTelegramKeyboard(
 
   const baseUrl = getCanonicalPublicAppUrl();
   if (baseUrl.startsWith("https://")) {
-    keyboard.push([{
-      text: "Открыть в кабинете",
-      url: new URL("/business/bookings?tab=action&kind=party&request=" + encodeURIComponent(notification.entityId), baseUrl).toString(),
-    }]);
+    keyboard.push([
+      createTelegramLinkButton(
+        "Открыть заказ в Mini App",
+        new URL("/business/bookings?tab=action&kind=party&request=" + encodeURIComponent(notification.entityId), baseUrl).toString(),
+        baseUrl,
+        "mini_app",
+        "party_confirmation",
+        "/telegram/business/open",
+      ),
+    ]);
   }
   return keyboard.length ? { inline_keyboard: keyboard } : undefined;
 }
