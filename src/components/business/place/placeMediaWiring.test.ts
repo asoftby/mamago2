@@ -57,4 +57,14 @@ const reverted = { ...firstSavedRevision, title: "Published A" };
 assert.equal(extractChanges(reverted, firstSavedRevision).title, "Published A",
   "A to B to A compares with the saved revision, so A is sent back to the server");
 
-console.log("Place unified-media wiring, pending ACL and revision baseline: OK");
+
+const hoursWrite = revisionSave.indexOf("/revision/opening-hours");
+const baselineAdvance = revisionSave.indexOf("setOriginalData(formData)");
+assert.ok(hoursWrite >= 0 && hoursWrite < baselineAdvance,
+  "opening hours must persist before their saved baseline advances");
+assert.match(revisionSave.slice(hoursWrite, baselineAdvance), /if \(!hoursResponse\.ok\) throw/,
+  "failed opening-hours persistence must preserve the previous baseline");
+assert.match(wizard, /Object\.keys\(changes\)\.length === 0 && !wizardSessionId && !openingHoursChanged/,
+  "an hours-only edit must not be mistaken for an already-saved draft");
+
+console.log("Place media, pending ACL, revision baseline and opening-hours ordering: OK");

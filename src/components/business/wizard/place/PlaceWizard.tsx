@@ -498,7 +498,9 @@ export function PlaceWizard({
           return;
         }
         const changes = extractChanges(formData, originalData);
-        if (Object.keys(changes).length === 0 && !wizardSessionId) {
+        const openingHoursChanged = formData.openingHoursData !== null &&
+          JSON.stringify(formData.openingHoursData) !== JSON.stringify(originalData?.openingHoursData);
+        if (Object.keys(changes).length === 0 && !wizardSessionId && !openingHoursChanged) {
           toast.success("Изменения уже сохранены");
           return;
         }
@@ -518,6 +520,14 @@ export function PlaceWizard({
             }),
           });
           if (!saveResponse.ok) throw new Error("Не удалось сохранить черновик ревизии");
+          if (openingHoursChanged) {
+            const hoursResponse = await fetch(`/api/business/places/${place.id}/revision/opening-hours`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ revisionId: revision.id, data: formData.openingHoursData }),
+            });
+            if (!hoursResponse.ok) throw new Error("Не удалось сохранить режим работы в ревизии");
+          }
           // Future revision PATCHes are deltas from the successfully saved draft,
           // not from the original published Place (A → B → A must persist A).
           setOriginalData(formData);
