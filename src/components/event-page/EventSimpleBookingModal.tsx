@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -66,12 +67,14 @@ type Props = {
   eventVenue?: string | null;
   booking: EventSimpleBookingData;
   initialSessionId?: string | null;
+  isAuthenticated?: boolean;
+  onBooked?: (bookingId: string) => void;
 };
 
 export function EventSimpleBookingModal({
   open, onOpenChange,
   eventTitle, eventCategory, priceLabel, eventImageUrl, eventVenue,
-  booking, initialSessionId,
+  booking, initialSessionId, isAuthenticated = false, onBooked,
 }: Props) {
   const slots = useMemo(() => booking.slots ?? [], [booking.slots]);
   // «Оставить заявку»: заявка на участие без выбора времени — другие слова, чем у записи на слот.
@@ -80,6 +83,7 @@ export function EventSimpleBookingModal({
 
   const [phase, setPhase]       = useState<Phase>("form");
   const [apiError, setApiError] = useState<string | null>(null);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [dateId, setDateId] = useState("");
   const [timeId, setTimeId] = useState("");
   const inFlight = useRef(false);
@@ -118,9 +122,11 @@ export function EventSimpleBookingModal({
           adultsCount: 1, childrenCount: 0,
         }),
       });
-      const json = await res.json() as { error?: string };
+      const json = await res.json() as { error?: string; id?: string };
       if (!res.ok) { setApiError(json.error ?? "Не удалось отправить заявку."); setPhase("error"); return; }
+      setCreatedBookingId(json.id ?? null);
       setPhase("success");
+      if (json.id) onBooked?.(json.id);
     } catch {
       setApiError("Ошибка соединения. Попробуйте ещё раз.");
       setPhase("error");
@@ -132,7 +138,7 @@ export function EventSimpleBookingModal({
   function handleClose(val: boolean) {
     if (!val && inFlight.current) return;
     if (!val) {
-      reset(); setPhase("form"); setApiError(null);
+      reset(); setPhase("form"); setApiError(null); setCreatedBookingId(null);
       setDateId("");
       setTimeId("");
     }
@@ -149,13 +155,27 @@ export function EventSimpleBookingModal({
       open={open}
       onOpenChange={handleClose}
       ticket={{ title: eventTitle, imageUrl: eventImageUrl ?? null, venue: eventVenue ?? null, priceLabel: priceLabel ?? null }}
-      heading={phase === "success" ? <>Заявка отправлена</> : isRequest ? <>Оставить заявку</> : <>Записаться на событие</>}
+      heading={phase === "success" ? <>Заявка получена</> : isRequest ? <>Оставить заявку</> : <>Записаться на событие</>}
     >
       {phase === "success" ? (
         <RsSuccess
-          title="Спасибо!"
-          text="Организатор свяжется с вами для подтверждения."
+          title="Заявка принята"
+          text="Она ожидает подтверждения организатора. Это ещё не подтверждённая бронь."
         >
+          {createdBookingId && (
+            <p className="my-3 text-center text-sm text-stone-600">
+              Номер заявки: <span className="font-semibold">{createdBookingId}</span>
+            </p>
+          )}
+          {isAuthenticated ? (
+            <Link href="/me/bookings" className="mb-3 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-stone-900 text-[15px] font-semibold text-white">
+              Мои записи
+            </Link>
+          ) : (
+            <p className="mb-3 text-center text-sm text-stone-600">
+              Заявка создана без привязки к аккаунту. Сохраните номер заявки. Для появления в «Моих записях» понадобится подтверждённая привязка.
+            </p>
+          )}
           <button type="button" onClick={() => handleClose(false)} className="inline-flex min-h-12 w-full items-center justify-center rounded-full border text-[15px] font-semibold" style={{ borderColor: RS.line2 }}>
             Закрыть
           </button>

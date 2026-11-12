@@ -24,7 +24,7 @@ import {
   PublicationType,
 } from "@prisma/client";
 import { notifyBookingCreated, notifyUserBookingSubmitted } from "@/server/services/notification.service";
-import { resolveBookingPlanItem } from "@/server/family/planBooking.service";
+import { ensureEventBookingPlanItem, resolveBookingPlanItem } from "@/server/family/planBooking.service";
 import { trackBookingCreated } from "@/server/analytics/trackBookingEvent";
 import {
   getPublicActivityDetailWhere,
@@ -484,7 +484,12 @@ async function createPublicationBooking(
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
 
-  const planLink = manual ? { planItemId: null, invalid: false } : await resolveBookingPlanItem({
+  // Event occurrences are auto-linked only after locking the Activity and
+  // resolving the persisted session date/time. An early day-only match would
+  // bypass ensureEventBookingPlanItem and preserve a stale saved time.
+  const planLink = manual || (input.publicationType === PublicationType.EVENT && !input.planItemId)
+    ? { planItemId: null, invalid: false }
+    : await resolveBookingPlanItem({
     userId: input.userId,
     planItemId: input.planItemId,
     publicationType: input.publicationType,
@@ -513,6 +518,7 @@ async function createPublicationBooking(
         select: {
           id: true,
           title: true,
+          coverImageUrl: true,
           cityId: true,
           placeId: true,
           bookingEnabled: true,
@@ -621,8 +627,18 @@ async function createPublicationBooking(
         }
       }
 
+      const linkedPlanItemId = manual ? null : await ensureEventBookingPlanItem(tx, {
+        userId: input.userId,
+        activityId: activity.id,
+        // An undated REQUEST_ONLY enquiry is not a planned event occurrence.
+        date: activity.bookingMode === BookingMode.REQUEST_ONLY ? null : date,
+        startsAt: slotStart ?? null,
+        title: activity.title,
+        coverImageUrl: activity.coverImageUrl,
+        linkedPlanItemId: planLink.planItemId,
+      });
       const result = await createBookingWithInitialActivity({
-        planItemId: planLink.planItemId ?? undefined,
+        planItemId: linkedPlanItemId ?? undefined,
         businessId: activity.businessId,
         userId: input.userId ?? undefined,
         publicationType: PublicationType.EVENT,
@@ -640,13 +656,13 @@ async function createPublicationBooking(
         status,
         ...source,
       }, tx, manual?.actorId);
-      return { activity: { ...activity, businessId: activity.businessId }, result };
+      return { activity: { ...activity, businessId: activity.businessId }, result, linkedPlanItemId };
     }
-    const { activity, result } = manual ? await createEvent(manual.tx) : await prisma.$transaction(createEvent);
+    const { activity, result, linkedPlanItemId } = manual ? await createEvent(manual.tx) : await prisma.$transaction(createEvent);
     if (manual) return result;
 
     await triggerBookingCreatedSideEffects({
-      planItemId: planLink.planItemId,
+      planItemId: linkedPlanItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
       entityType: "EVENT",
