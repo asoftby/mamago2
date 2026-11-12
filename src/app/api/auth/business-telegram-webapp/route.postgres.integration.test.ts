@@ -27,6 +27,7 @@ async function main() {
   let userId: string | undefined;
   let businessId: string | undefined;
   let outsiderId: string | undefined;
+  let outsiderUserId: string | undefined;
   try {
     process.env.APP_ENV = "dev";
     process.env.NEXTAUTH_URL = "https://dev.mamago.by";
@@ -40,7 +41,9 @@ async function main() {
     userId = user.id;
     const business = await db.business.create({ data: { ownerUserId: user.id, name: marker, operationalStatus: "ACTIVE" } });
     businessId = business.id;
-    const outsider = await db.business.create({ data: { ownerUserId: user.id, name: marker + "-other", operationalStatus: "ACTIVE" } });
+    const outsiderUser = await db.user.create({ data: { email: marker + "-other@example.test", status: "ACTIVE" } });
+    outsiderUserId = outsiderUser.id;
+    const outsider = await db.business.create({ data: { ownerUserId: outsiderUser.id, name: marker + "-other", operationalStatus: "ACTIVE" } });
     outsiderId = outsider.id;
     const member = await db.businessMember.create({ data: { userId: user.id, businessId: business.id, role: "OWNER", isActive: true } });
     const connection = await db.businessTelegramConnection.create({ data: {
@@ -86,7 +89,7 @@ async function main() {
     await rejected();
     await db.businessMember.update({ where: { id: member.id }, data: { isActive: true } });
     await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { businessId: outsider.id } });
-    await rejected(); // Owning another business is not a substitute for the linked membership.
+    await rejected(); // A valid signature cannot substitute for membership of the linked business.
     await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { businessId: business.id, isActive: false } });
     await rejected();
     await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { isActive: true } });
@@ -102,6 +105,7 @@ async function main() {
     if (businessId) await db.business.deleteMany({ where: { id: businessId } });
     if (outsiderId) await db.business.deleteMany({ where: { id: outsiderId } });
     if (userId) await db.user.deleteMany({ where: { id: userId } });
+    if (outsiderUserId) await db.user.deleteMany({ where: { id: outsiderUserId } });
     await db.$disconnect();
     for (const key of keys) {
       const value = before[key];
