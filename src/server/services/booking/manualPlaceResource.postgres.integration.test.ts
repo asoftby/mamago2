@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { createManualBooking } from "./booking.service";
 import { updateBookingStatus } from "./bookingQuery.service";
+import { lockBookingUnits } from "./resourceAllocation";
 
 const url = process.env.DATABASE_URL;
 if (!url || !["localhost", "127.0.0.1"].includes(new URL(url).hostname)) {
@@ -20,6 +21,7 @@ let unitId = "";
 after(async () => {
   if (businessId) {
     await prisma.bookingRequest.deleteMany({ where: { businessId } });
+    await prisma.calendarBlock.deleteMany({ where: { bookingUnit: { businessId } } });
     await prisma.bookingUnit.deleteMany({ where: { businessId } });
   }
   if (placeId) await prisma.place.delete({ where: { id: placeId } });
@@ -110,4 +112,66 @@ test("confirmed manual PLACE appointment owns one physical allocation and reuses
   })).status, "RELEASED");
   const second = await createManualBooking(competing, { ...ctx, requestKey: randomUUID() });
   assert.equal(second.status, "CONFIRMED");
+
+  const appointment = (day: string, phone: string) => {
+    const startsAt = localWallClockToUtc(day, "14:00");
+    return {
+      ...input, requestedDate: day, customerPhone: phone,
+      resourceReservation: { bookingUnitId: unitId, startsAt: startsAt.toISOString(),
+        endsAt: new Date(startsAt.getTime() + 90 * 60_000).toISOString() },
+    };
+  };
+  const raceDate = addDaysLocal(date, 1);
+  const race = await Promise.allSettled([
+    createManualBooking(appointment(raceDate, "+375291112241"), { ...ctx, requestKey: randomUUID() }),
+    createManualBooking(appointment(raceDate, "+375291112242"), { ...ctx, requestKey: randomUUID() }),
+  ]);
+  assert.equal(race.filter(x => x.status === "fulfilled").length, 1,
+    "simultaneous overlapping PLACE appointments must have exactly one winner");
+  assert.equal(await prisma.bookingAllocation.count({ where: { bookingUnitId: unitId,
+    blockStart: { gte: new Date(raceDate), lt: new Date(addDaysLocal(raceDate, 1)) } } }), 1);
+
+  // Exercise the same locked manual CalendarBlock protocol used by the route.
+  // The route's ACL and lock-before-overlap contract have separate coverage.
+  const blockDate = addDaysLocal(date, 2);
+  const blockStart = localWallClockToUtc(blockDate, "14:00");
+  const blockEnd = new Date(blockStart.getTime() + 90 * 60_000);
+  const blockRace = await Promise.allSettled([
+    createManualBooking(appointment(blockDate, "+375291112243"), { ...ctx, requestKey: randomUUID() }),
+    prisma.$transaction(async tx => {
+      assert.equal(await lockBookingUnits(tx, businessId, [unitId]), true);
+      const occupied = await tx.bookingAllocation.findFirst({ where: {
+        bookingUnitId: unitId, status: "CONFIRMED", blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart },
+      } });
+      if (occupied) throw new Error("manual_block_conflict");
+      return tx.calendarBlock.create({ data: { bookingUnitId: unitId, blockStart, blockEnd, source: "MANUAL" } });
+    }),
+  ]);
+  assert.equal(blockRace.filter(x => x.status === "fulfilled").length, 1,
+    "a booking and an overlapping manual block must not both commit");
+  const blockWindow = { bookingUnitId: unitId, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart } };
+  assert.equal(await prisma.calendarBlock.count({ where: blockWindow }) +
+    await prisma.bookingAllocation.count({ where: { ...blockWindow, status: "CONFIRMED" } }), 1);
+
+  // Force a real DB failure only at allocation INSERT, after BookingRequest
+  // and its initial BookingActivity were written inside the same transaction.
+  const rollbackKey = randomUUID();
+  const functionName = "manual_place_fail_" + suffix.replaceAll("-", "");
+  assert.match(unitId, /^[a-zA-Z0-9_-]+$/);
+  await prisma.$executeRawUnsafe(`CREATE FUNCTION "${functionName}"() RETURNS trigger LANGUAGE plpgsql AS $
+    BEGIN RAISE EXCEPTION 'synthetic_allocation_failure'; END $`);
+  try {
+    await prisma.$executeRawUnsafe(`CREATE TRIGGER "${functionName}" BEFORE INSERT ON "BookingAllocation"
+      FOR EACH ROW WHEN (NEW."bookingUnitId" = '${unitId}') EXECUTE FUNCTION "${functionName}"()`);
+    const beforeActivities = await prisma.bookingActivity.count({ where: { booking: { businessId } } });
+    await assert.rejects(createManualBooking(appointment(addDaysLocal(date, 3), "+375291112244"),
+      { ...ctx, requestKey: rollbackKey }), /synthetic_allocation_failure/);
+    assert.equal(await prisma.bookingRequest.count({ where: { businessId, manualRequestKey: rollbackKey } }), 0,
+      "failed allocation rolls back its booking request");
+    assert.equal(await prisma.bookingActivity.count({ where: { booking: { businessId } } }), beforeActivities,
+      "failed allocation rolls back its initial activity");
+  } finally {
+    await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${functionName}" ON "BookingAllocation"`);
+    await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${functionName}"()`);
+  }
 });
