@@ -17,6 +17,7 @@ let foreignBusinessId = "";
 let placeId = "";
 let foreignPlaceId = "";
 let offerIds: string[] = [];
+let packageOfferId = "";
 let foreignOfferId = "";
 
 test.before(async () => {
@@ -59,6 +60,15 @@ test.before(async () => {
     ),
   );
   offerIds = offers.map((offer) => offer.id);
+  const packageOffer = await prisma.offer.create({
+    data: {
+      placeId,
+      kind: "PACKAGE",
+      title: `${prefix} package without discovery delivery`,
+      status: "PUBLISHED",
+    },
+  });
+  packageOfferId = packageOffer.id;
 
   const foreignOwner = await prisma.user.create({
     data: { email: `${prefix}-foreign@example.invalid`, role: "BUSINESS_OWNER" },
@@ -107,7 +117,7 @@ test.after(async () => {
     where: { businessId: { in: [businessId, foreignBusinessId] } },
   });
   await prisma.offer.deleteMany({
-    where: { id: { in: [...offerIds, foreignOfferId] } },
+    where: { id: { in: [...offerIds, packageOfferId, foreignOfferId] } },
   });
   await prisma.place.deleteMany({ where: { id: { in: [placeId, foreignPlaceId] } } });
   await prisma.business.deleteMany({
@@ -126,6 +136,7 @@ test("candidate list contains only the business's public publications", async ()
     new Set(offerIds),
   );
   assert.equal(candidates.some((candidate) => candidate.id === foreignOfferId), false);
+  assert.equal(candidates.some((candidate) => candidate.id === packageOfferId), false);
   assert.ok(candidates.every((candidate) => candidate.activeBoostUntil === null));
 });
 
@@ -229,12 +240,30 @@ test("foreign targets are rejected, midnight is not a reset, and +24h is availab
     DailyFreeBoostUnavailableError,
   );
 
+  await assert.rejects(
+    createDailyFreeBoost({
+      businessId,
+      userId: ownerUserId,
+      publicationId: packageOfferId,
+      publicationType: "OFFER",
+      now: new Date("2026-08-22T09:00:00.000Z"),
+    }),
+    DailyFreeBoostTargetError,
+  );
+
+  const atBoundary = await getDailyFreeBoostDashboardData({
+    businessId,
+    userId: ownerUserId,
+    now: new Date("2026-08-22T09:00:00.000Z"),
+  });
+  assert.equal(atBoundary.availableToday, true);
+
   const next = await createDailyFreeBoost({
     businessId,
     userId: ownerUserId,
     publicationId: offerIds[2]!,
     publicationType: "OFFER",
-    now: new Date("2026-08-22T09:01:00.000Z"),
+    now: new Date("2026-08-22T09:00:00.000Z"),
   });
   assert.equal(next.freeDailyDateKey, "2026-08-22");
 });
