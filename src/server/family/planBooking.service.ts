@@ -90,10 +90,9 @@ export async function ensureEventBookingPlanItem(
   const date = input.date.toISOString().slice(0, 10);
   const candidates = await tx.planItem.findMany({
     where: {
-      userId: input.userId,
+      ...(await activePlanScopeFor(input.userId)),
       activityId: input.activityId,
       date,
-      cancelledAt: null,
     },
     select: {
       id: true,
