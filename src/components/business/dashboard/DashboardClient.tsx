@@ -43,6 +43,7 @@ export type DashboardData = {
   lowBalanceThreshold: number;
   // Leads
   periodLeadCount: number;
+  newBookingCount: number;
   totalCtaClicks: number;
   // Publications
   activePromotionCount: number;
@@ -533,6 +534,21 @@ export function DashboardClient({ data, defaultPeriod = "week", verificationBann
       </div>
       {/* Business Bot connection stays visible in either dashboard state. */}
       <BusinessTelegramStatusRow location="dashboard" />
+
+      {data.newBookingCount > 0 && (
+        <Link
+          href={data.hrefs.inquiries}
+          className="flex min-h-14 items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white p-4 transition hover:border-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label={`Новых записей: ${data.newBookingCount}. Открыть записи и заказы`}
+        >
+          <span className="text-sm font-semibold text-stone-900">
+            Новых записей: <span className="tabular-nums">{data.newBookingCount}</span>
+          </span>
+          <span className="shrink-0 text-sm font-medium text-primary">
+            Открыть записи и заказы →
+          </span>
+        </Link>
+      )}
 
       {/* Mobile: full-width action below Telegram; desktop: first right-column item. */}
       {!isOnboarding && (
