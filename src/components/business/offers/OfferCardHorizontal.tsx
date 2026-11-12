@@ -27,10 +27,12 @@ import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
+import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
 
 interface Offer {
   id: string;
   kind: OfferKind;
+  productType?: string | null;
   durationType?: string | null;
   campProgramType?: string | null;
   title: string;
@@ -218,7 +220,7 @@ export function OfferCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {offer.status === "PUBLISHED" && !offer.archivedAt && !offer.place.archivedAt && offer.kind === "SERVICE" && <Link
+            {offer.status === "PUBLISHED" && !offer.archivedAt && !offer.place.archivedAt && isBoostableOfferProductType(offer.kind, offer.productType ?? null) && <Link
               href={buildBusinessBoostHref("OFFER", offer.id)}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
