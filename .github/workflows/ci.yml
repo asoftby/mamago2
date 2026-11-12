@@ -458,6 +458,13 @@ jobs:
           pnpm exec tsx src/app/api/analytics/events/route.test.ts
           pnpm exec tsx src/lib/analytics/impressionGate.test.ts
 
+      - name: Business Mini App signed authentication and live membership PostgreSQL
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/app/api/auth/business-telegram-webapp/route.postgres.integration.test.ts
+
       - name: Migrated-user activation HTTP and environment-gate PostgreSQL regressions
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
