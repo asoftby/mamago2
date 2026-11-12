@@ -27,7 +27,11 @@ assert.match(svc, /activePlanScopeFor\(input\.userId\)/);
 const booking = read("src/server/services/booking/booking.service.ts");
 assert.match(booking, /resolveBookingPlanItem\(/);
 assert.match(booking, /BookingValidationError\("planItemId"/);
-assert.equal((booking.match(/planItemId: planLink\.planItemId \?\? undefined/g) ?? []).length, 3, "event, offer, place bookings are linked");
+assert.equal((booking.match(/planItemId: planLink\.planItemId \?\? undefined/g) ?? []).length, 2, "offer and place bookings retain their explicit/auto link");
+assert.match(booking, /await ensureEventBookingPlanItem\(tx,/, "event linkage uses the locked booking transaction");
+assert.match(booking, /planItemId: linkedPlanItemId \?\? undefined/, "event persists its transactionally resolved occurrence");
+assert.ok(booking.indexOf("await ensureEventBookingPlanItem(tx,") < booking.indexOf("planItemId: linkedPlanItemId"),
+  "resolve event occurrence before persisting the linked request");
 assert.match(booking, /\.\.\.\(context\.planItemId \? \{ planItemId: context\.planItemId \} : \{\}\)/, "BOOKING_CREATED carries planItemId");
 
 // Contacts stay with the booker: /me/bookings reads only the user's own bookings.
@@ -39,4 +43,18 @@ assert.doesNotMatch(parent, /planScopeFor|planItemId/, "family scope must not wi
 const calendar = read("src/server/services/familyCalendar.service.ts");
 assert.match(calendar, /getPlanBookingStates\(input\.owner\.userId, items\.map/);
 assert.match(read("src/app/(public)/me/plan/page.tsx"), /loadFamilyCalendarRange\(/);
-console.log("planBooking.contract.test: ok");
+
+const eventPage = read("src/components/event-page/EventPageView.tsx");
+const decisionPanel = read("src/components/event-page/EventDecisionPanel.tsx");
+for (const component of ["EventDecisionPanel", "EventSimpleBookingModal"]) {
+  const invocation = eventPage.match(new RegExp("<" + component + "[\\s\\S]*?/>"))?.[0] ?? "";
+  assert.match(invocation, /isAuthenticated=\{isAuthenticated\}/, component + " preserves signed-in success wording");
+  assert.match(invocation, /onBooked=\{handleBookingSuccess\}/, component + " refreshes saved-plan status");
+  assert.match(invocation, /initialSessionId=\{selectedId\}/, component + " preserves the selected session");
+}
+const heroModal = decisionPanel.match(/<EventSimpleBookingModal[\s\S]*?\/>/)?.[0] ?? "";
+assert.match(heroModal, /isAuthenticated=\{isAuthenticated\}/);
+assert.match(heroModal, /onBooked=\{onBooked\}/);
+assert.match(heroModal, /initialSessionId=\{initialSessionId\}/);
+
+console.log("planBooking transaction linkage and hero booking context: ok");

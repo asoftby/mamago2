@@ -87,6 +87,7 @@ jobs:
       - name: Family picks profile ACL and backwards-compatible API contract
         run: |
           pnpm test:family-picks
+          pnpm test:family-core-reads
           pnpm exec tsx src/features/city-home/lib/homeRecommendationLabel.test.ts
           pnpm exec tsx src/features/city-home/components/HomeMoreEventsCard.test.tsx
 
