@@ -962,6 +962,20 @@ export function PlaceWizard({
         } else {
           // SUBMIT_EXISTING: DRAFT/REJECTED/NEEDS_REVISION → PENDING (or
           // PUBLISHED directly, if the role allows direct publish).
+          // Temporary media pauses autosave; persist pending field edits before
+          // /submit validates the stored draft and attaches the wizard session.
+          const changes = extractChanges(formData, originalData);
+          if (Object.keys(changes).length > 0) {
+            const saveResponse = await fetch(`/api/business/places/${place.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(changes),
+            });
+            if (!saveResponse.ok) {
+              const error = await saveResponse.json().catch(() => ({}));
+              throw new Error(error.message || error.error || "Не удалось сохранить изменения перед отправкой");
+            }
+          }
           const response = await fetch(`/api/business/places/${place.id}/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
