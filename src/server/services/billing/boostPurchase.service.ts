@@ -7,7 +7,7 @@ import {
 } from "@/lib/billing/boostOptions";
 import { debitBusinessDepositInTx } from "./billingAccount.service";
 import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
-import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { getBoostablePublishedOfferWhere } from "@/server/services/promotion/boostEligibility";
 
 export class BoostPurchaseNotAllowedError extends Error {
   code = "BOOST_PURCHASE_NOT_ALLOWED" as const;
@@ -81,7 +81,7 @@ export async function purchaseOfferBoost(params: {
       where: {
         id: params.offerId,
         AND: [
-          getPublicPublishedOfferWhere(now),
+          getBoostablePublishedOfferWhere(now),
           { place: { ownerBusinessId: params.businessId } },
         ],
       },
