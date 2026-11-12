@@ -213,12 +213,8 @@ export function EventCardHorizontal({
       >
         {statusMeta.label}
       </span>
-      {activity.isPromoted ? (
-        <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-950 shadow-[0_1px_0_rgba(251,191,36,0.18)]">
-          <Zap className="mr-1.5 h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500 motion-safe:animate-[pulse_1.8s_ease-in-out_infinite] motion-reduce:animate-none" />
-          Продвигается
-        </span>
-      ) : null}
+      {/* Boost never adds a label/ribbon to the publication card.
+          Active status and performance are available in the Boost section. */}
     </div>
   );
 
