@@ -65,10 +65,11 @@ async function main() {
       method: "POST", headers: { origin: "https://dev.mamago.by", "content-type": "application/json", host: "dev.mamago.by" },
       body: JSON.stringify({ initData }),
     });
-    async function rejected(initData = sign(), status = 403) {
+    async function rejected(initData = sign(), status = 403, expectedError?: string) {
       const count = await db.session.count({ where: { userId: user.id } });
       const response = await POST(request(initData));
       assert.equal(response.status, status);
+      if (expectedError) assert.deepEqual(await response.json(), { error: expectedError });
       assert.equal(response.headers.get("cache-control"), "no-store");
       assert.equal(response.headers.has("set-cookie"), false);
       assert.equal(await db.session.count({ where: { userId: user.id } }), count);
@@ -90,6 +91,17 @@ async function main() {
     await db.businessMember.update({ where: { id: member.id }, data: { isActive: true } });
     await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { businessId: outsider.id } });
     await rejected(); // A valid signature cannot substitute for membership of the linked business.
+    // Even active membership of both businesses must not redirect into the
+    // oldest cabinet when the signed Business Bot connection points elsewhere.
+    await db.businessMember.create({ data: {
+      userId: user.id, businessId: outsider.id, role: "MANAGER", isActive: true,
+      createdAt: new Date(Date.now() + 1000),
+    } });
+    await rejected(sign(), 403, "BUSINESS_CONTEXT_MISMATCH");
+    await db.business.update({ where: { id: business.id }, data: { operationalStatus: "DISABLED" } });
+    await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { businessId: business.id } });
+    await rejected();
+    await db.business.update({ where: { id: business.id }, data: { operationalStatus: "ACTIVE" } });
     await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { businessId: business.id, isActive: false } });
     await rejected();
     await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { isActive: true } });
