@@ -55,6 +55,7 @@ export type DashboardData = {
       id: string;
       title: string;
       publicationType: "EVENT" | "OFFER";
+      activeBoostUntil: string | null;
     }>;
     boost: null | {
       id: string;
