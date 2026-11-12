@@ -42,9 +42,10 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
   const selectedCandidate = data.candidates.find(
     (candidate) => `${candidate.publicationType}:${candidate.id}` === selected,
   );
+  const selectedActive = Boolean(selectedCandidate?.activeBoostUntil);
 
   function submit() {
-    if (!selectedCandidate) return;
+    if (!selectedCandidate || selectedActive || !data.availableToday) return;
     startTransition(async () => {
       const result = await createDailyFreeBoostAction({
         publicationId: selectedCandidate.id,
@@ -149,6 +150,15 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
             {data.candidates.map((candidate) => {
               const key = `${candidate.publicationType}:${candidate.id}`;
               const active = selected === key;
+              const activeUntil = candidate.activeBoostUntil
+                ? new Intl.DateTimeFormat("ru-BY", {
+                    timeZone: "Europe/Minsk",
+                    day: "numeric",
+                    month: "long",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(candidate.activeBoostUntil))
+                : null;
               return (
                 <button
                   key={key}
@@ -169,19 +179,24 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
                       ? "Событие"
                       : "Предложение"}
                   </span>
+                  {activeUntil ? (
+                    <span className="mt-1 block text-xs text-stone-500">
+                      Boost активен до {activeUntil} (Минск) — повторно не продвигается
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
           </div>
           <button
             type="button"
-            disabled={!selectedCandidate || pending || !data.availableToday}
+            disabled={!selectedCandidate || pending || !data.availableToday || selectedActive}
             onClick={submit}
             className="w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
           >
-            {pending ? "Поднимаем…" : data.availableToday ? "Поднять бесплатно" : "Бесплатный Boost пока недоступен"}
+            {pending ? "Поднимаем…" : selectedActive ? "Boost уже активен" : data.availableToday ? "Поднять бесплатно" : "Бесплатный Boost пока недоступен"}
           </button>
-          {selectedCandidate ? (
+          {selectedCandidate && !selectedActive ? (
             <Link
               href={`/business/${selectedCandidate.publicationType === "EVENT" ? "events" : "offers"}/${selectedCandidate.id}/boost`}
               className="block w-full rounded-xl border border-stone-200 px-4 py-3 text-center text-sm font-semibold text-stone-800 hover:bg-stone-50"
