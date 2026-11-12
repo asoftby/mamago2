@@ -48,6 +48,52 @@ test("event booking uses persisted sessions, serializes requests and appears in 
   };
 
   try {
+
+    // A successful authenticated booking must atomically appear in the plan
+    // with the persisted ActivitySession time, not only in BookingRequest.
+    const planEvent = await makeEvent({
+      participationMode: "time-slots",
+      timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "09:00", capacity: 5 }] }] },
+    });
+    const savedOccurrence = await prisma.planItem.create({
+      data: {
+        userId: owner.id,
+        activityId: planEvent.id,
+        date,
+        title: planEvent.title,
+        startsAt: new Date(planEvent.sessions[0]!.startsAt.getTime() - 3_600_000),
+      },
+    });
+    const planBooking = await createPublicBooking({
+      publicationType: "EVENT",
+      publicationId: planEvent.id,
+      selectedSessionId: planEvent.sessions[0]!.id,
+      customerName: "Parent",
+      customerPhone: "+375291119999",
+      userId: owner.id,
+    });
+    const persistedPlanBooking = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: planBooking.bookingId },
+    });
+    assert.equal(persistedPlanBooking.userId, owner.id);
+    assert.ok(persistedPlanBooking.planItemId);
+    const planItem = await prisma.planItem.findUniqueOrThrow({
+      where: { id: persistedPlanBooking.planItemId! },
+    });
+    assert.equal(planItem.id, savedOccurrence.id, "reuse the saved occurrence instead of duplicating it");
+    assert.equal(planItem.activityId, planEvent.id);
+    assert.equal(planItem.userId, owner.id);
+    assert.equal(planItem.date, date);
+    assert.equal(planItem.startsAt?.toISOString(), planEvent.sessions[0]!.startsAt.toISOString());
+    await assert.rejects(createPublicBooking({
+      publicationType: "EVENT",
+      publicationId: planEvent.id,
+      selectedSessionId: planEvent.sessions[0]!.id,
+      customerName: "Parent",
+      customerPhone: "+375291119999",
+      userId: owner.id,
+    }), /уже существует/);
+    assert.equal(await prisma.planItem.count({ where: { userId: owner.id, activityId: planEvent.id } }), 1);
     const nativePrebook = await makeEvent({
       participationMode: "prebook", prebookMethod: "internal",
     });
@@ -128,6 +174,30 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       submit(request.id, 1),
       submit(simple.id, 1, simple.sessions[0]!.id),
     ]);
+    const businessNotice = await prisma.notification.findMany({
+      where: { userId: owner.id, type: "BOOKING_CREATED", entityType: "BOOKING", entityId: requestBooking.bookingId },
+    });
+    assert.equal(businessNotice.length, 1, "business notification must exist before booking returns");
+    const client = await prisma.user.create({ data: { email: `event-customer-${suffix}@example.test` } });
+    try {
+      const submitted = await createPublicBooking({
+        publicationType: "EVENT",
+        publicationId: request.id,
+        customerName: "Test Customer",
+        customerPhone: "+375291110099",
+        userId: client.id,
+      });
+      const userNotice = await prisma.notification.findMany({
+        where: { userId: client.id, type: "BOOKING_SUBMITTED", entityType: "BOOKING", entityId: submitted.bookingId },
+      });
+      assert.equal(userNotice.length, 1, "user must receive a submission acknowledgement");
+      assert.equal(userNotice[0]?.audience, "USER");
+      assert.equal(userNotice[0]?.ctaAction, "/me/bookings");
+    } finally {
+      await prisma.bookingRequest.deleteMany({ where: { userId: client.id } });
+      await prisma.notification.deleteMany({ where: { userId: client.id } });
+      await prisma.user.delete({ where: { id: client.id } });
+    }
     await assert.rejects(submit(calendar.id, 1), /выбрать слот/);
     await assert.rejects(submit(calendar.id, 1, "wizard-first"), /Слот недоступен/);
     await assert.rejects(submit(calendar.id, 1, simple.sessions[0]!.id), /Слот недоступен/);
@@ -221,6 +291,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
 
   } finally {
     await prisma.bookingRequest.deleteMany({ where: { businessId: business.id } });
+    await prisma.planItem.deleteMany({ where: { userId: owner.id } });
     await prisma.activity.deleteMany({ where: { businessId: business.id } });
     await prisma.business.delete({ where: { id: business.id } });
     await prisma.user.delete({ where: { id: owner.id } });

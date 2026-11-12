@@ -182,6 +182,7 @@ export default async function BusinessDashboardPage({
     periodSpend: workspace.periodSpend,
     lowBalanceThreshold,
     periodLeadCount: workspace.periodLeadCount,
+    newBookingCount: workspace.newBookingCount,
     totalCtaClicks: workspace.totalCtaClicks,
     activePromotionCount: workspace.activePromotionCount,
     totalPublications,

@@ -287,6 +287,16 @@ export async function getBusinessWorkspaceData(params: {
     (tx) => tx.type === BillingTransactionType.LEAD_CHARGE,
   ).length;
 
+  // Never derive pending bookings from notification delivery: an in-app/Telegram
+  // outage must not hide actual customer requests on the business dashboard.
+  const newBookingCount = await prisma.bookingRequest.count({
+    where: {
+      businessId: params.businessId,
+      kind: "STANDARD",
+      status: "NEW",
+    },
+  });
+
   // Dashboard is a strict preview of the same canonical business inbox feed.
   const inboxPreviewRows = await getUserInbox(params.userId, {
     stream: "business",
@@ -382,6 +392,7 @@ export async function getBusinessWorkspaceData(params: {
     leadCount,
     periodSpend,
     periodLeadCount,
+    newBookingCount,
     inboxPreview,
     promotionSpend: promotionSummary.totalSpend,
     promotionLeadCount: promotionSummary.totalLeads,
