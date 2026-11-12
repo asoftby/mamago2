@@ -36,6 +36,9 @@ type EventDecisionPanelProps = {
     | "cta"
     | "ownerEditHref"
   >;
+  isAuthenticated?: boolean;
+  onBooked?: (bookingId: string) => void;
+  initialSessionId?: string | null;
   sessionLine?: string;
   /** ISO date-time of next session — used for countdown. */
   sessionTargetDate?: string;
@@ -84,6 +87,9 @@ function useCountdown(targetIso?: string) {
 
 export function EventDecisionPanel({
   data,
+  isAuthenticated = false,
+  onBooked,
+  initialSessionId,
   sessionLine,
   sessionTargetDate,
   venueShort,
@@ -304,6 +310,9 @@ export function EventDecisionPanel({
             eventCategory={data.categoryLabel}
             priceLabel={data.priceLabel}
             booking={data.cta.simpleBooking}
+            isAuthenticated={isAuthenticated}
+            onBooked={onBooked}
+            initialSessionId={initialSessionId}
           />
         )}
 

@@ -1,3 +1,5 @@
+import { activePlanScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
+import { getPlanBookingStates } from "@/server/family/planBooking.service";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
@@ -48,6 +50,149 @@ test("event booking uses persisted sessions, serializes requests and appears in 
   };
 
   try {
+
+    // A successful authenticated booking must atomically appear in the plan
+    // with the persisted ActivitySession time, not only in BookingRequest.
+    const planEvent = await makeEvent({
+      participationMode: "time-slots",
+      timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "09:00", capacity: 5 }] }] },
+    });
+    const savedOccurrence = await prisma.planItem.create({
+      data: {
+        userId: owner.id,
+        activityId: planEvent.id,
+        date,
+        title: planEvent.title,
+        startsAt: new Date(planEvent.sessions[0]!.startsAt.getTime() - 3_600_000),
+        endsAt: new Date(planEvent.sessions[0]!.startsAt.getTime() - 1_800_000),
+      },
+    });
+    const planBooking = await createPublicBooking({
+      publicationType: "EVENT",
+      publicationId: planEvent.id,
+      selectedSessionId: planEvent.sessions[0]!.id,
+      customerName: "Parent",
+      customerPhone: "+375291119999",
+      userId: owner.id,
+    });
+    const persistedPlanBooking = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: planBooking.bookingId },
+    });
+    assert.equal(persistedPlanBooking.userId, owner.id);
+    assert.ok(persistedPlanBooking.planItemId);
+    const planItem = await prisma.planItem.findUniqueOrThrow({
+      where: { id: persistedPlanBooking.planItemId! },
+    });
+    assert.equal(planItem.id, savedOccurrence.id, "reuse the saved occurrence instead of duplicating it");
+    assert.equal(planItem.activityId, planEvent.id);
+    assert.equal(planItem.userId, owner.id);
+    assert.equal(planItem.date, date);
+    assert.equal(planItem.startsAt?.toISOString(), planEvent.sessions[0]!.startsAt.toISOString());
+    assert.equal(planItem.endsAt, null, "moving the occurrence must clear its obsolete end time");
+    await assert.rejects(createPublicBooking({
+      publicationType: "EVENT",
+      publicationId: planEvent.id,
+      selectedSessionId: planEvent.sessions[0]!.id,
+      customerName: "Parent",
+      customerPhone: "+375291119999",
+      userId: owner.id,
+    }), /уже существует/);
+    assert.equal(await prisma.planItem.count({ where: { userId: owner.id, activityId: planEvent.id } }), 1);
+
+
+    // Authorship is not family access: reuse only active occurrences visible
+    // in the booker's current family, never retained former-family history.
+    const familyFlagBefore = process.env.FAMILY_CORE_READS;
+    const aclUserIds: string[] = [];
+    const aclFamilyIds: string[] = [];
+    const aclActivityIds: string[] = [];
+    try {
+      process.env.FAMILY_CORE_READS = "1";
+      const currentFamilyId = await familyIdForWrite(owner.id);
+      aclFamilyIds.push(currentFamilyId);
+      const adult = await prisma.user.create({ data: { email: `event-current-adult-${suffix}@example.test` } });
+      aclUserIds.push(adult.id);
+      const formerViewer = await prisma.user.create({ data: { email: `event-former-adult-${suffix}@example.test` } });
+      aclUserIds.push(formerViewer.id);
+      const oldFamily = await prisma.family.create({ data: { name: "Former event family " + suffix } });
+      aclFamilyIds.push(oldFamily.id);
+      await prisma.familyMembership.createMany({ data: [
+        { userId: adult.id, familyId: currentFamilyId, role: "ADULT", historyAccess: "ALL" },
+        { userId: formerViewer.id, familyId: oldFamily.id, role: "OWNER", historyAccess: "ALL" },
+        { userId: owner.id, familyId: oldFamily.id, role: "ADULT",
+          joinedAt: new Date(Date.now() - 2 * 86_400_000), leftAt: new Date(Date.now() - 86_400_000) },
+      ] });
+      const aclEvent = async (time: string) => {
+        const event = await makeEvent({
+          participationMode: "time-slots",
+          timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: time, capacity: 5 }] }] },
+        });
+        aclActivityIds.push(event.id);
+        return event;
+      };
+      const book = async (event: Awaited<ReturnType<typeof aclEvent>>, phone: string) => {
+        const booking = await createPublicBooking({
+          publicationType: "EVENT", publicationId: event.id,
+          selectedSessionId: event.sessions[0]!.id,
+          customerName: "Current family parent", customerPhone: phone, userId: owner.id,
+        });
+        return prisma.bookingRequest.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      };
+      const sharedEvent = await aclEvent("10:00");
+      const shared = await prisma.planItem.create({ data: {
+        userId: adult.id, familyId: currentFamilyId, visibility: "FAMILY",
+        activityId: sharedEvent.id, date, startsAt: null,
+      } });
+      const privateItem = await prisma.planItem.create({ data: {
+        userId: adult.id, familyId: currentFamilyId, visibility: "PRIVATE",
+        activityId: sharedEvent.id, date, startsAt: sharedEvent.sessions[0]!.startsAt,
+      } });
+      const sharedBooking = await book(sharedEvent, "+375291110071");
+      assert.equal(sharedBooking.planItemId, shared.id, "reuse another current adult's shared occurrence");
+      assert.notEqual(sharedBooking.planItemId, privateItem.id, "never reuse another adult's private occurrence");
+      assert.equal((await prisma.planItem.findUniqueOrThrow({ where: { id: shared.id } })).startsAt?.getTime(),
+        sharedEvent.sessions[0]!.startsAt.getTime());
+      assert.equal((await getPlanBookingStates(adult.id, [shared.id])).get(shared.id)?.status, "NEW");
+
+      const formerEvent = await aclEvent("11:00");
+      const former = await prisma.planItem.create({ data: {
+        userId: owner.id, familyId: oldFamily.id, visibility: "FAMILY",
+        activityId: formerEvent.id, date, startsAt: null,
+      } });
+      const formerBooking = await book(formerEvent, "+375291110072");
+      assert.ok(formerBooking.planItemId);
+      assert.notEqual(formerBooking.planItemId, former.id, "authored former-family item is not accessible");
+      const current = await prisma.planItem.findUniqueOrThrow({ where: { id: formerBooking.planItemId! } });
+      assert.equal(current.familyId, currentFamilyId);
+      assert.equal((await prisma.planItem.findUniqueOrThrow({ where: { id: former.id } })).startsAt, null);
+      assert.equal((await getPlanBookingStates(formerViewer.id, [former.id])).size, 0,
+        "new booking status/time must not leak to former family");
+      assert.equal((await getPlanBookingStates(owner.id, [current.id])).get(current.id)?.status, "NEW");
+
+      const cancelledEvent = await aclEvent("12:00");
+      const cancelled = await prisma.planItem.create({ data: {
+        userId: owner.id, familyId: currentFamilyId, visibility: "FAMILY",
+        activityId: cancelledEvent.id, date, status: "CANCELLED", cancelledAt: null,
+      } });
+      const activeBooking = await book(cancelledEvent, "+375291110073");
+      assert.ok(activeBooking.planItemId);
+      assert.notEqual(activeBooking.planItemId, cancelled.id, "CANCELLED status is authoritative even without cancelledAt");
+      assert.equal((await prisma.planItem.findUniqueOrThrow({ where: { id: cancelled.id } })).status, "CANCELLED");
+      assert.ok(await prisma.planItem.findFirst({ where: {
+        id: activeBooking.planItemId!, ...(await activePlanScopeFor(owner.id)),
+      } }), "new occurrence must appear in the current active plan");
+    } finally {
+      if (aclActivityIds.length) await prisma.bookingRequest.deleteMany({ where: { activityId: { in: aclActivityIds } } });
+      if (aclFamilyIds.length) {
+        await prisma.planItem.deleteMany({ where: { familyId: { in: aclFamilyIds } } });
+        await prisma.familyMembership.deleteMany({ where: { familyId: { in: aclFamilyIds } } });
+        await prisma.family.deleteMany({ where: { id: { in: aclFamilyIds } } });
+      }
+      if (aclUserIds.length) await prisma.user.deleteMany({ where: { id: { in: aclUserIds } } });
+      if (familyFlagBefore === undefined) delete process.env.FAMILY_CORE_READS;
+      else process.env.FAMILY_CORE_READS = familyFlagBefore;
+    }
+
     const request = await makeEvent({ participationMode: "request", dates: [date] });
     const simple = await makeEvent({
       participationMode: "simple-booking", simpleBookingDate: date, simpleBookingTime: "12:00–13:00",
@@ -195,6 +340,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
 
   } finally {
     await prisma.bookingRequest.deleteMany({ where: { businessId: business.id } });
+    await prisma.planItem.deleteMany({ where: { userId: owner.id } });
     await prisma.activity.deleteMany({ where: { businessId: business.id } });
     await prisma.business.delete({ where: { id: business.id } });
     await prisma.user.delete({ where: { id: owner.id } });

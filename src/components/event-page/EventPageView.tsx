@@ -400,6 +400,13 @@ export function EventPageView({
     }
   }, [data.id, isAuthenticated]);
 
+  const handleBookingSuccess = useCallback(() => {
+    void loadSaveStatus();
+    window.dispatchEvent(new CustomEvent("publication-save-changed", {
+      detail: { kind: "event", id: data.id },
+    }));
+  }, [data.id, loadSaveStatus]);
+
   useEffect(() => { void loadSaveStatus(); }, [loadSaveStatus]);
   useEffect(() => {
     if (saveModalOpen) {
@@ -606,6 +613,9 @@ export function EventPageView({
           <div ref={ctaRef}>
             <EventDecisionPanel
               data={data}
+              isAuthenticated={isAuthenticated}
+              onBooked={handleBookingSuccess}
+              initialSessionId={selectedId}
               sessionLine={sessionLineHero}
               sessionTargetDate={selectedSession?.startsAt}
               venueShort={venueShort}
@@ -741,6 +751,8 @@ export function EventPageView({
           priceLabel={data.priceLabel}
           booking={data.cta.simpleBooking}
           initialSessionId={selectedId}
+          isAuthenticated={isAuthenticated}
+          onBooked={handleBookingSuccess}
         />
       )}
       <SaveActivityFlowAdaptive
