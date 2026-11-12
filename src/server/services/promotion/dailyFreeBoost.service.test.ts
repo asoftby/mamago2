@@ -80,7 +80,9 @@ test.before(async () => {
       activityTypes: [],
       ageTags: [],
       visitFormats: [],
-      createdByUserId: foreignUserId,
+      // A publication may have been created by this user before
+      // ownership was reassigned to another Business.
+      createdByUserId: ownerUserId,
       ownerBusinessId: foreignBusinessId,
       status: "PUBLISHED",
     },
@@ -124,6 +126,7 @@ test("candidate list contains only the business's public publications", async ()
     new Set(offerIds),
   );
   assert.equal(candidates.some((candidate) => candidate.id === foreignOfferId), false);
+  assert.ok(candidates.every((candidate) => candidate.activeBoostUntil === null));
 });
 
 test("server allows exactly one free boost per Business rolling 24h window", async () => {
@@ -163,6 +166,9 @@ test("server allows exactly one free boost per Business rolling 24h window", asy
   assert.equal(dashboard.availableToday, false);
   assert.equal(dashboard.nextFreeAt?.toISOString(), "2026-08-22T09:00:00.000Z");
   assert.ok(dashboard.boost);
+  const active = await getFreeBoostCandidates({ businessId, userId: ownerUserId, now });
+  const activeCandidate = active.find(candidate => candidate.id === dashboard.boost?.publicationId);
+  assert.equal(activeCandidate?.activeBoostUntil, "2026-08-22T09:00:00.000Z");
 
   const metricTime = new Date("2026-08-21T09:01:00.000Z");
   await prisma.userEvent.createMany({
