@@ -47,6 +47,7 @@ type EventDecisionPanelProps = {
   onBuy: () => void;
   onSave: () => void;
   isPlanned?: boolean;
+  saveStatusLabel?: string | null;
   planDate?: string | null;
   className?: string;
   previewRegionClassName?: Partial<
@@ -97,6 +98,7 @@ export function EventDecisionPanel({
   onBuy,
   onSave,
   isPlanned = false,
+  saveStatusLabel,
   planDate,
   className,
   previewRegionClassName: pr,
@@ -320,6 +322,7 @@ export function EventDecisionPanel({
         <PublicationSaveShare
           className="mt-4"
           isSaved={isPlanned}
+          savedLabel={saveStatusLabel}
           publicationKind="event"
           publicationId={data.id}
           onSave={onPlan}
