@@ -113,6 +113,7 @@ export async function createDailyFreeBoost(params: {
   now?: Date;
 }) {
   const now = params.now ?? new Date();
+  // Preserve the legacy calendar-day index, but enforce a rolling 24h quota.
   const dateKey = getLocalDateKey(now, DEFAULT_TZ);
   const target = await resolveEligibleTarget({ ...params, now });
   if (!target) {
@@ -123,18 +124,20 @@ export async function createDailyFreeBoost(params: {
 
   try {
     return await prisma.$transaction(async (tx) => {
-      const alreadyUsed = await tx.boost.findUnique({
-        where: {
-          businessId_freeDailyDateKey: {
-            businessId: params.businessId,
-            freeDailyDateKey: dateKey,
-          },
-        },
-        select: { id: true },
+      // Lock the Business, not an individual publication: simultaneous requests
+      // to different publications must consume a single rolling quota.
+      await tx.$queryRaw`SELECT id FROM "Business" WHERE id = ${params.businessId} FOR UPDATE`;
+      const mostRecentFree = await tx.boost.findFirst({
+        where: { businessId: params.businessId, isFreeDaily: true },
+        orderBy: [{ startAt: "desc" }, { createdAt: "desc" }],
+        select: { startAt: true },
       });
-      if (alreadyUsed) {
+      if (
+        mostRecentFree &&
+        now.getTime() - mostRecentFree.startAt.getTime() < BOOST_DURATION_MS
+      ) {
         throw new DailyFreeBoostUnavailableError(
-          "Сегодня бесплатное поднятие уже использовано.",
+          "Бесплатное поднятие доступно через 24 часа после предыдущего.",
         );
       }
 
@@ -174,7 +177,7 @@ export async function createDailyFreeBoost(params: {
   } catch (error) {
     if (isDailyUniqueConflict(error)) {
       throw new DailyFreeBoostUnavailableError(
-        "Сегодня бесплатное поднятие уже использовано.",
+        "Бесплатное поднятие уже использовано за последние 24 часа.",
       );
     }
     throw error;
@@ -187,16 +190,11 @@ export async function getDailyFreeBoostDashboardData(params: {
   now?: Date;
 }) {
   const now = params.now ?? new Date();
-  const dateKey = getLocalDateKey(now, DEFAULT_TZ);
-  const [candidates, boost] = await Promise.all([
+  const [candidates, latestFreeBoost] = await Promise.all([
     getFreeBoostCandidates({ ...params, now }),
-    prisma.boost.findUnique({
-      where: {
-        businessId_freeDailyDateKey: {
-          businessId: params.businessId,
-          freeDailyDateKey: dateKey,
-        },
-      },
+    prisma.boost.findFirst({
+      where: { businessId: params.businessId, isFreeDaily: true },
+      orderBy: [{ startAt: "desc" }, { createdAt: "desc" }],
       include: {
         offer: { select: { title: true } },
         activity: { select: { title: true } },
@@ -204,9 +202,13 @@ export async function getDailyFreeBoostDashboardData(params: {
     }),
   ]);
 
-  if (!boost) {
-    return { availableToday: true, candidates, boost: null };
+  const nextFreeAt = latestFreeBoost
+    ? new Date(latestFreeBoost.startAt.getTime() + BOOST_DURATION_MS)
+    : null;
+  if (!latestFreeBoost || !nextFreeAt || now >= nextFreeAt) {
+    return { availableToday: true, nextFreeAt: null, candidates, boost: null };
   }
+  const boost = latestFreeBoost;
 
   const publicationType = boost.activityId
     ? ("EVENT" as const)
@@ -243,6 +245,7 @@ export async function getDailyFreeBoostDashboardData(params: {
 
   return {
     availableToday: false,
+    nextFreeAt,
     candidates,
     boost: {
       id: boost.id,
