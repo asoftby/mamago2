@@ -1,4 +1,5 @@
 import "server-only";
+import { TELEGRAM_REQUEST_TIMEOUT_MS } from "./telegramRequestTimeout";
 
 import { requireTelegramConfig } from "@/server/config/telegram.config";
 
@@ -61,6 +62,7 @@ async function callTelegramApi<T>(method: string, payload: Record<string, unknow
 
   const response = await fetch(url, {
     method: "POST",
+    signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     cache: "no-store",
