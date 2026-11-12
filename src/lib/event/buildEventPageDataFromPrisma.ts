@@ -314,6 +314,9 @@ function resolveSimpleBooking(
   if (activity.bookingMode === "REQUEST_ONLY") {
     if (mode === "request") return { activityId, label: "Оставить заявку" };
     if (mode === "simple-booking") return { activityId };
+    if (mode === "prebook" && getScheduleJsonString(activity, "prebookMethod") === "internal") {
+      return { activityId, label: "Предварительная запись" };
+    }
   }
   if (mode !== "time-slots" && mode !== "simple-booking") return undefined;
 
@@ -345,7 +348,8 @@ function resolveEventCanonicalCta(
   booking: EventPageData["cta"]["simpleBooking"],
 ) {
   const mode = getScheduleJsonString(activity, "participationMode");
-  const wizardBooking = mode === "request" || mode === "simple-booking" || mode === "time-slots";
+  const wizardBooking = mode === "request" || mode === "simple-booking" || mode === "time-slots" ||
+    (mode === "prebook" && getScheduleJsonString(activity, "prebookMethod") === "internal");
   const primaryPhone = resolveActivityPhones(activity)[0]?.value;
 
   return resolveCanonicalCta({

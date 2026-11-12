@@ -188,6 +188,9 @@ jobs:
         run: |
           pnpm test:event-wizard-update-loop
           pnpm exec tsx src/components/business/wizard/event/steps/Step1Basics.interests.contract.test.ts
+          pnpm exec tsx src/components/business/wizard/event/nativePrebooking.validation.test.ts
+          pnpm exec tsx src/components/business/wizard/event/ctaStepMapper.test.ts
+          pnpm exec tsx src/lib/event/eventRequestBookingColumns.test.ts
 
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
@@ -372,8 +375,8 @@ jobs:
 
       - name: Telegram plan notification regressions
         run: |
-          NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramRequestTimeout.test.ts
           pnpm exec tsx src/features/email/server/notificationEmailRequestOptions.test.ts
+          NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramRequestTimeout.test.ts
           pnpm exec tsx src/lib/notifications/telegramAudienceRouting.test.ts
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramNotificationBootstrap.service.test.ts
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/botWelcome.test.ts

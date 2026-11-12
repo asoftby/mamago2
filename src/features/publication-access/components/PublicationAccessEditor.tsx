@@ -37,7 +37,15 @@ export function PublicationAccessEditor({
   const methods = allowedMethods ?? DEFAULT_ACCESS_METHODS_BY_ENTITY[entityType];
 
   const setMethod = (method: PublicationAccessMethod) => {
-    onChange({ ...value, method });
+    // Newly selected event prebooking uses mamaGo; existing phone/link modes
+    // are rehydrated explicitly by the event wizard and stay unchanged.
+    onChange({
+      ...value,
+      method,
+      ...(entityType === "event" && method === "prebooking" && value.method !== "prebooking"
+        ? { prebookingChannel: "internal" as const }
+        : {}),
+    });
   };
 
   const update = (patch: Partial<PublicationAccess>) => {
@@ -124,7 +132,30 @@ export function PublicationAccessEditor({
 
               {method === "prebooking" ? (
                 <div className="space-y-4">
-                  <div className="space-y-2">
+                  {entityType === "event" && (
+                    <fieldset className="space-y-2">
+                      <legend className="text-sm font-medium text-gray-900">Где принимать предварительную запись</legend>
+                      {([
+                        ["internal", "В mamaGo — заявка со статусом и подтверждением бизнеса"],
+                        ["phone", "По телефону — без отслеживания заявки в mamaGo"],
+                        ["link", "На другом сайте — без отслеживания заявки в mamaGo"],
+                      ] as const).map(([channel, label]) => (
+                        <label key={channel} className="flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm text-gray-700">
+                          <input
+                            type="radio"
+                            name="event-prebooking-channel"
+                            value={channel}
+                            checked={(value.prebookingChannel ?? "internal") === channel}
+                            onChange={() => update({ prebookingChannel: channel })}
+                            disabled={disabled}
+                            className="mt-0.5"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
+                  {(entityType !== "event" || value.prebookingChannel === "phone") && <div className="space-y-2">
                     <Label htmlFor="publication-prebooking-phone">
                       Телефон для связи
                     </Label>
@@ -135,9 +166,9 @@ export function PublicationAccessEditor({
                       placeholder="+375 29 123 45 67"
                       disabled={disabled}
                     />
-                  </div>
+                  </div>}
 
-                  <div className="space-y-2">
+                  {(entityType !== "event" || value.prebookingChannel === "link") && <div className="space-y-2">
                     <Label htmlFor="publication-prebooking-url">
                       Ссылка для записи
                     </Label>
@@ -151,7 +182,7 @@ export function PublicationAccessEditor({
                       placeholder="https://..."
                       disabled={disabled}
                     />
-                  </div>
+                  </div>}
                 </div>
               ) : null}
 

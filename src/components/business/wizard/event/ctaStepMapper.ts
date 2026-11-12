@@ -32,7 +32,7 @@ export interface EventLegacyCtaFields {
   id: string;
   participationMode: EventLegacyParticipationMode;
   ticketLink: string;
-  prebookMethod: "phone" | "link" | null;
+  prebookMethod: "internal" | "phone" | "link" | null;
   prebookPhone: string;
   prebookUrl: string;
   timeSlots: EventFormData["timeSlots"];
@@ -250,6 +250,22 @@ function resolveRequestCompatibilityMode(
     };
   }
 
+  if (value.nativePrebooking && value.requestLabelKind === "BOOK") {
+    return {
+      participationMode: "prebook",
+      prebookMethod: "internal",
+      prebookPhone: "",
+      prebookUrl: "",
+      bookingEnabled: true,
+      bookingMode: "REQUEST_ONLY",
+      bookingPhone: phone,
+      timeSlots: { dates: [] },
+      simpleBookingDate: null,
+      simpleBookingTime: null,
+      simpleBookingCapacity: null,
+    };
+  }
+
   if (value.legacyOrigin === "BOOKING") {
     if (value.requestLabelKind === "BOOK") {
       return {
@@ -394,6 +410,7 @@ function buildPublicationAccessFromCtaStepValue(
     if (value.requestLabelKind === "BOOK") {
       return {
         method: "prebooking",
+        prebookingChannel: value.nativePrebooking ? "internal" : website ? "link" : "phone",
         phone,
         externalUrl: website,
         instructions,
@@ -461,6 +478,7 @@ function mapPublicationAccessToStepValue(access: PublicationAccess): CtaStepForm
       formValue.requestLabelKind = "BOOK";
       formValue.fallback.website = trim(access.externalUrl);
       formValue.legacyOrigin = "BOOKING";
+      formValue.nativePrebooking = access.prebookingChannel === "internal";
       return formValue;
     case "details":
     default:
@@ -502,6 +520,7 @@ export function mapEventLegacyCtaToStepValue(
       formValue.requestMode = "SIMPLE";
       formValue.requestLabelKind = "BOOK";
       formValue.legacyOrigin = "BOOKING";
+      formValue.nativePrebooking = input.prebookMethod === "internal";
       formValue.fallback.phone = trim(input.prebookPhone || input.bookingPhone);
       formValue.fallback.website =
         input.prebookMethod === "link" ? trim(input.prebookUrl) : "";

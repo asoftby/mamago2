@@ -404,7 +404,7 @@ function validateStep6(data: EventFormData): ValidationResult {
         ? Boolean(data.prebookPhone?.trim())
         : data.prebookMethod === "link"
           ? Boolean(data.prebookUrl?.trim())
-          : false
+          : data.prebookMethod === "internal"
       : true)
   );
 

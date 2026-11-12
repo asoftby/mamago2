@@ -19,8 +19,12 @@ export function deriveEventRequestBookingColumns(input: {
   const { bookingEnabled, bookingMode } = input.current;
   const slots = getEventBookingSchedule(input.scheduleJson);
   let nextMode: BookingMode | null = null;
+  const schedule = input.scheduleJson && typeof input.scheduleJson === "object" && !Array.isArray(input.scheduleJson)
+    ? input.scheduleJson as Record<string, unknown>
+    : null;
+  const internalPrebooking = mode === "prebook" && schedule?.prebookMethod === "internal";
   if (input.hasBusiness) {
-    if (mode === "request" || (mode === "simple-booking" && !slots.size)) {
+    if (mode === "request" || internalPrebooking || (mode === "simple-booking" && !slots.size)) {
       nextMode = BookingMode.REQUEST_ONLY;
     } else if ((mode === "time-slots" || mode === "simple-booking") && slots.size) {
       nextMode = [...slots.values()].some((slot) => slot.startTime)
