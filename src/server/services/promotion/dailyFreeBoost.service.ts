@@ -124,9 +124,47 @@ export async function createDailyFreeBoost(params: {
 
   try {
     return await prisma.$transaction(async (tx) => {
-      // Lock the Business, not an individual publication: simultaneous requests
-      // to different publications must consume a single rolling quota.
+      // Serialize free quota on Business. Then lock the target as paid Boost
+      // does: free and paid must not activate concurrently on one publication.
       await tx.$queryRaw`SELECT id FROM "Business" WHERE id = ${params.businessId} FOR UPDATE`;
+      if (params.publicationType === "EVENT") {
+        await tx.$queryRaw`SELECT id FROM "Activity" WHERE id = ${params.publicationId} FOR UPDATE`;
+        const event = await tx.activity.findFirst({
+          where: {
+            id: params.publicationId,
+            AND: [
+              getPublicListingActivityWhere(now),
+              { type: "EVENT" },
+              { OR: [
+                { businessId: params.businessId },
+                { ownerUserId: params.userId, businessId: null },
+              ] },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!event) {
+          throw new DailyFreeBoostTargetError("Событие недоступно для продвижения.");
+        }
+      } else {
+        await tx.$queryRaw`SELECT id FROM "Offer" WHERE id = ${params.publicationId} FOR UPDATE`;
+        const offer = await tx.offer.findFirst({
+          where: {
+            id: params.publicationId,
+            AND: [
+              getPublicPublishedOfferWhere(now),
+              { place: { OR: [
+                { ownerBusinessId: params.businessId },
+                { ownerBusinessId: null, createdByUserId: params.userId },
+              ] } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!offer) {
+          throw new DailyFreeBoostTargetError("Предложение недоступно для продвижения.");
+        }
+      }
       const mostRecentFree = await tx.boost.findFirst({
         where: { businessId: params.businessId, isFreeDaily: true },
         orderBy: [{ startAt: "desc" }, { createdAt: "desc" }],
