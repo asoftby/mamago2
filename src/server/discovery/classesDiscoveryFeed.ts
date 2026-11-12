@@ -212,6 +212,7 @@ export async function getClassesDiscoveryFeed(
   const qualityBoostMap = await getBusinessQualityBoostMap(offerBusinessIds);
 
   const homeCityIds = scope ? await resolveTerritoryCityIds({ id: scope.territoryId, type: scope.type }) : [cityId];
+  const freeBoostIds = new Set<string>();
   const cards = rows.map<ActivityMock>((offer) => {
     const audience = projectOfferAudience(offer);
     const cityForPath = (offer.place as { city?: { slug: string } | null }).city?.slug ?? citySlug;
@@ -229,6 +230,7 @@ export async function getClassesDiscoveryFeed(
     const crossRegion = offer.place?.cityId != null && !homeCityIds.includes(offer.place.cityId);
     const applicableBoosts = offer.boosts.filter(boost => isBoostForDiscoveryRegion(boost, targetRegionId, !crossRegion));
     const boostLevel = getPublicationBoostLevel(applicableBoosts);
+    if (boostLevel === "FREE") freeBoostIds.add(offer.id);
     const isPromoted = boostLevel === "PAID";
     const baseEngagement = 0;
 
@@ -286,7 +288,10 @@ export async function getClassesDiscoveryFeed(
     return right.id.localeCompare(left.id);
   });
 
-  const selected = (options?.onlyIds ? cards : composePromotedCards(cards)).slice(0, take);
+  const selected = (options?.onlyIds
+    ? cards
+    : composePromotedCards(cards, undefined, card => freeBoostIds.has(card.id))
+  ).slice(0, take);
   if (!options?.onlyIds) await recordDiscoveryExposures(selected, cityId, citySlug, "classes");
   return selected;
 }
