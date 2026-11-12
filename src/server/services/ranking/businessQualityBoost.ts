@@ -259,12 +259,26 @@ export function applyBusinessQualityBoost(
  * Callers must build the eligible candidate pool first; this function never
  * changes visibility, city, age or date eligibility.
  */
+export type PublicationBoostLevel = "NONE" | "FREE" | "PAID";
+
+/**
+ * Paid and free Boosts must not share the same +1000 rank signal.
+ * Payment is stronger, while free is a bounded discovery nudge only.
+ */
+export function getPublicationBoostLevel(
+  boosts: readonly { isFreeDaily: boolean }[],
+): PublicationBoostLevel {
+  if (boosts.some((boost) => !boost.isFreeDaily)) return "PAID";
+  if (boosts.some((boost) => boost.isFreeDaily)) return "FREE";
+  return "NONE";
+}
+
 export function applyActivePublicationBoost(
   baseScore: number,
-  isBoosted: boolean,
+  level: PublicationBoostLevel,
   qualityMultiplier: number,
 ): number {
-  return isBoosted
-    ? baseScore + 1000
-    : applyBusinessQualityBoost(baseScore, qualityMultiplier);
+  if (level === "PAID") return baseScore + 1000;
+  if (level === "FREE") return baseScore + 6;
+  return applyBusinessQualityBoost(baseScore, qualityMultiplier);
 }
