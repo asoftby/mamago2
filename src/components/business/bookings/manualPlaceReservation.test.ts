@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildManualPlaceReservation } from "./manualPlaceReservation";
+import { buildManualPlaceReservation, manualPlaceDurationChoices } from "./manualPlaceReservation";
 
 const common = {
   bookingUnitId: "worker-1",
@@ -47,4 +47,23 @@ test("overnight manually agreed interval preserves actual calendar date after mi
   assert.ok(result);
   assert.equal(result.resourceReservation.startsAt, "2026-11-18T20:30:00.000Z");
   assert.equal(result.resourceReservation.endsAt, "2026-11-18T21:30:00.000Z");
+});
+
+test("a 45-minute resource remains bookable when its whole working interval is 45 minutes", () => {
+  const durations = manualPlaceDurationChoices(45);
+  assert.equal(durations[0], 45);
+  assert.equal(durations.includes(30), false);
+  assert.ok(durations.includes(90), "independent 90-minute duration stays available");
+  const reservation = buildManualPlaceReservation({ ...common, durationMinutes: durations[0]!, prepMinutes: 0, cleanupMinutes: 0 });
+  assert.ok(reservation);
+  assert.equal(new Date(reservation.resourceReservation.endsAt).getTime() -
+    new Date(reservation.resourceReservation.startsAt).getTime(), 45 * 60_000);
+});
+
+test("duration minima are unique, sorted, bounded and preserve null/default presets", () => {
+  assert.equal(manualPlaceDurationChoices(60).filter((value) => value === 60).length, 1);
+  assert.deepEqual(manualPlaceDurationChoices(600), [600]);
+  assert.deepEqual(manualPlaceDurationChoices(1440), [1440]);
+  assert.equal(manualPlaceDurationChoices(null)[0], 15);
+  for (const minimum of [0, -1, 1500, Number.NaN]) assert.deepEqual(manualPlaceDurationChoices(minimum), []);
 });

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatHHMM } from "@/lib/formatters/date";
-import { buildManualPlaceReservation } from "./manualPlaceReservation";
+import { buildManualPlaceReservation, manualPlaceDurationChoices } from "./manualPlaceReservation";
 import { Textarea } from "@/components/ui/textarea";
 
 type Publication = { id: string; title: string; offerBooking?: { id: string } | null };
@@ -22,7 +22,6 @@ type PlaceUnit = {
   cleanupMinutes: number;
   stepMinutes: number;
 };
-const durationSteps = [15, ...Array.from({ length: 16 }, (_, index) => (index + 1) * 30)];
 function durationLabel(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
@@ -85,11 +84,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   const placeUnits = placeResourceList?.placeId === publicationId ? placeResourceList.units : undefined;
   const selectedPlaceUnit = placeUnits?.find((unit) => unit.id === placeResourceId) ??
     (placeUnits?.length === 1 ? placeUnits[0] : undefined);
-  const durations = selectedPlaceUnit ? [
-    ...durationSteps.filter((minutes) => minutes >= (selectedPlaceUnit.minDurationMinutes ?? 15)),
-    ...(selectedPlaceUnit.minDurationMinutes !== null &&
-      selectedPlaceUnit.minDurationMinutes > 480 ? [selectedPlaceUnit.minDurationMinutes] : []),
-  ] : [];
+  const durations = selectedPlaceUnit ? manualPlaceDurationChoices(selectedPlaceUnit.minDurationMinutes) : [];
   const selectedDuration = durations.includes(placeDuration) ? placeDuration : (durations[0] ?? 0);
   const placeReservation = reservePlaceResource && selectedPlaceUnit
     ? buildManualPlaceReservation({
