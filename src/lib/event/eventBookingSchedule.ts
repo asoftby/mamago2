@@ -22,7 +22,10 @@ export function eventBookingSlotKey(date: string, time: string): string {
 }
 
 /** Wizard IDs identify editor rows. Public bookings use the matching ActivitySession ID. */
-export function getEventBookingSchedule(value: unknown): Map<string, EventBookingSlotConfig> {
+export function getEventBookingSchedule(
+  value: unknown,
+  bookingMode?: string | null,
+): Map<string, EventBookingSlotConfig> {
   const schedule = record(value);
   const slots = new Map<string, EventBookingSlotConfig>();
 
@@ -47,7 +50,19 @@ export function getEventBookingSchedule(value: unknown): Map<string, EventBookin
       ? schedule.simpleBookingTime.split(/[-–]/).map((time) => time.trim()) : [];
     add(schedule.simpleBookingDate, start || "", end, schedule.simpleBookingCapacity);
   }
-  if (schedule.participationMode === "time-slots") {
+  // The legacy booking wizard may persist an enabled calendar with a null
+  // participationMode (or a "walk-in" compatibility fallback). Only honor
+  // this path when the booking columns explicitly enable scheduled booking.
+  // An explicit DISCOVER/walk-in draft must never create a booking CTA.
+  const draft = record(schedule.ctaStepDraft);
+  const legacyCalendar =
+    (bookingMode === "USE_PUBLICATION_DATES" || bookingMode === "USE_PUBLICATION_SLOTS") &&
+    (schedule.participationMode == null ||
+      (schedule.participationMode === "walk-in" &&
+        draft.legacyOrigin === "BOOKING" &&
+        draft.actionChoice === "REQUEST" &&
+        draft.requestMode === "CALENDAR"));
+  if (schedule.participationMode === "time-slots" || legacyCalendar) {
     const dates = record(schedule.timeSlots).dates;
     for (const entry of Array.isArray(dates) ? dates : []) {
       const day = record(entry);
