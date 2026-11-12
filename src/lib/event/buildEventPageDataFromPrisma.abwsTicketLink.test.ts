@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
-import { resolveEventActionPhones, resolvePurchaseUrl, type ActivityForEventPageInput } from "./buildEventPageDataFromPrisma";
+import { resolveEventActionPhones, resolvePurchaseUrl, resolveSimpleBooking, type ActivityForEventPageInput } from "./buildEventPageDataFromPrisma";
+import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
 
 /**
@@ -93,6 +94,59 @@ import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
     place: null,
   } as ActivityForEventPageInput);
   assert.deepEqual(phones, []);
+}
+
+// Legacy BOOKING-origin calendar saved as walk-in: the public signup stays actionable.
+{
+  const date = addDaysLocal(getLocalDateKey(), 7);
+  const startsAt = localWallClockToUtc(date, "14:00");
+  const legacy = {
+    id: "event-legacy-calendar",
+    bookingEnabled: true,
+    businessId: "business-1",
+    bookingMode: "USE_PUBLICATION_SLOTS",
+    scheduleJson: {
+      participationMode: "walk-in",
+      ctaStepDraft: { legacyOrigin: "BOOKING", actionChoice: "REQUEST", requestMode: "CALENDAR" },
+      timeSlots: {
+        dates: [{ isoDate: date, slots: [{ startTime: "14:00", endTime: "15:00", capacity: 5 }] }],
+      },
+    },
+    sessions: [{ id: "session-bookable", startsAt }],
+  } as unknown as ActivityForEventPageInput;
+  const booking = resolveSimpleBooking(legacy.id, legacy);
+  assert.equal(booking?.slots?.length, 1);
+  assert.equal(booking?.slots?.[0]?.id, "session-bookable");
+  assert.equal(booking?.slots?.[0]?.endTime, "15:00");
+
+  assert.equal(resolveSimpleBooking(legacy.id, {
+    ...legacy,
+    scheduleJson: { ...legacy.scheduleJson, participationMode: null },
+  })?.slots?.length, 1);
+  assert.equal(resolveSimpleBooking(legacy.id, { ...legacy, bookingEnabled: false }), undefined);
+  assert.equal(resolveSimpleBooking(legacy.id, { ...legacy, businessId: null }), undefined);
+  assert.equal(resolveSimpleBooking(legacy.id, {
+    ...legacy,
+    sessions: [{ id: "past", startsAt: new Date(0) }],
+  }), undefined);
+  assert.equal(resolveSimpleBooking(legacy.id, {
+    ...legacy,
+    scheduleJson: {
+      ...legacy.scheduleJson,
+      ctaStepDraft: { legacyOrigin: "BOOKING", actionChoice: "DISCOVER", requestMode: "CALENDAR" },
+    },
+  }), undefined);
+}
+{
+  const request = {
+    id: "event-request-only",
+    bookingEnabled: true,
+    businessId: "business-1",
+    bookingMode: "REQUEST_ONLY",
+    scheduleJson: {},
+    sessions: [],
+  } as unknown as ActivityForEventPageInput;
+  assert.equal(resolveSimpleBooking(request.id, request)?.label, "Оставить заявку");
 }
 
 console.log("buildEventPageDataFromPrisma abws-ticketLink tests: OK");
