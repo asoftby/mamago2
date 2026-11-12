@@ -1,0 +1,79 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
+import { getDefaultFormData } from "@/components/business/wizard/place/defaults";
+import { extractChanges } from "@/components/business/wizard/place/mappers";
+
+// No network/DB is required for this architecture contract. The real file
+// upload and media-library pagination pipelines have their own integration tests.
+const read = (path: string) => readFileSync(path, "utf8");
+const logo = read("src/components/business/place/PlaceLogoUploadTemp.tsx");
+const gallery = read("src/components/business/place/PlaceGalleryUploadTemp.tsx");
+const step = read("src/components/business/wizard/place/steps/Step4Photos.tsx");
+const adapter = read("src/components/business/place/placeWizardMediaAdapter.ts");
+const sessionRoute = read("src/app/api/business/temp-media/route.ts");
+const reorderRoute = read("src/app/api/business/places/[id]/images/reorder/route.ts");
+
+for (const source of [logo, gallery]) {
+  assert.match(source, /<MediaUploadField\b/, "place media uses the shared picker UI");
+  assert.match(source, /loadMediaLibraryPage=\{loadPlaceMediaLibraryPage\}/);
+  assert.match(source, /uploadButtonLabel="Загрузить новое"/);
+  assert.match(source, /disabled=\{[^}]*published\}/);
+  assert.doesNotMatch(source, /document\.createElement\("input"\)/, "no private upload input");
+}
+assert.match(logo, /mode="single"/);
+assert.match(gallery, /mode="multiple"/);
+assert.match(gallery, /allowReorder/);
+assert.match(gallery, /reorderSavedPlaceGallery/);
+assert.match(gallery, /removeSavedPlaceImage/);
+assert.match(gallery, /newlyAttachedIds/);
+assert.match(gallery, /Promise\.allSettled\(newlyAttachedIds\.map\(/, "partial library selection must not leave invisible session images");
+assert.match(step, /const isMediaEditable = isEditable && data\.status !== "PUBLISHED"/);
+assert.match(step, /isEditable=\{isMediaEditable\}/, "Instagram import is gated alongside the picker");
+assert.match(adapter, /\/api\/business\/media-picker/, "shared business library source");
+assert.match(adapter, /mediaAssetId: assetId/, "attach stable asset ID, not user-supplied URL");
+assert.match(adapter, /Promise\.allSettled\(items\.map\(/, "failed multi-upload must clean session records");
+assert.match(sessionRoute, /uploadedById: user\.id/, "owner-bound media lookup");
+assert.match(sessionRoute, /status: "ACTIVE", kind: "IMAGE"/, "only active images");
+assert.match(sessionRoute, /resolvedUrl = asset\.publicUrl/, "URL must come from the database");
+assert.match(sessionRoute, /prisma\.\$transaction\(/, "logo replacement is atomic");
+assert.match(reorderRoute, /canManagePlaceAsync\(user, place\)/);
+assert.match(reorderRoute, /place\.status === "PUBLISHED"/);
+
+
+const wizard = read("src/components/business/wizard/place/PlaceWizard.tsx");
+assert.match(reorderRoute, /place\.status === "PENDING" && !canEditPendingPlace\(user\.role\)/);
+assert.ok(reorderRoute.indexOf('place.status === "PENDING"') < reorderRoute.indexOf("await req.json()"),
+  "pending-place staff guard runs before any image payload/write");
+for (const role of ["USER", "BUSINESS_OWNER", undefined] as const) assert.equal(canEditPendingPlace(role), false);
+for (const role of ["ADMIN", "MODERATOR"] as const) assert.equal(canEditPendingPlace(role), true);
+const revisionSave = wizard.slice(wizard.indexOf('if (place.status === "PUBLISHED" && userRole !== "ADMIN")'));
+assert.match(revisionSave.slice(0, revisionSave.indexOf("} else {")), /setOriginalData\(formData\)/,
+  "advance the baseline after a successful revision PATCH");
+const published = { ...getDefaultFormData(), title: "Published A" };
+const firstSavedRevision = { ...published, title: "Draft B" };
+assert.equal(extractChanges(firstSavedRevision, published).title, "Draft B");
+const reverted = { ...firstSavedRevision, title: "Published A" };
+assert.equal(extractChanges(reverted, firstSavedRevision).title, "Published A",
+  "A to B to A compares with the saved revision, so A is sent back to the server");
+
+
+const hoursWrite = revisionSave.indexOf("/revision/opening-hours");
+const baselineAdvance = revisionSave.indexOf("setOriginalData(formData)");
+assert.ok(hoursWrite >= 0 && hoursWrite < baselineAdvance,
+  "opening hours must persist before their saved baseline advances");
+assert.match(revisionSave.slice(hoursWrite, baselineAdvance), /if \(!hoursResponse\.ok\) throw/,
+  "failed opening-hours persistence must preserve the previous baseline");
+assert.match(wizard, /Object\.keys\(changes\)\.length === 0 && !wizardSessionId && !openingHoursChanged/,
+  "an hours-only edit must not be mistaken for an already-saved draft");
+
+console.log("Place media, pending ACL, revision baseline and opening-hours ordering: OK");
+
+const submitExisting = wizard.slice(wizard.indexOf("// SUBMIT_EXISTING:"));
+assert.ok(submitExisting.indexOf('method: "PATCH"') < submitExisting.indexOf('const response = await fetch'),
+  "pending draft fields persist before submit validates stored content");
+assert.ok(submitExisting.includes("body: JSON.stringify(changes)"));
+assert.ok(submitExisting.includes("if (!saveResponse.ok)"));
+const editedWithMedia = { ...published, title: "Edited with new photos", shortDesc: "New description", tempGalleryMediaIds: ["synthetic"] };
+assert.equal(extractChanges(editedWithMedia, published).title, "Edited with new photos");
+assert.equal(extractChanges(editedWithMedia, published).shortDesc, "New description");

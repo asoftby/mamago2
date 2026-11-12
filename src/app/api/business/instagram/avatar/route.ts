@@ -428,22 +428,34 @@ async function downloadAndSave(
     );
   }
 
-  // Save to TempMedia
-  const tempMedia = await prisma.tempMedia.create({
-    data: {
-      ownerUserId: user.id,
-      wizardSessionId,
-      url: uploadedImage.url,
-      width: uploadedImage.width,
-      height: uploadedImage.height,
-      blurhash: uploadedImage.blurhash,
-      mimeType: "image/webp",
-      sizeBytes: 0,
-      kind: "PLACE_LOGO",
-      sortOrder: 0,
-      status: "TEMP",
-    },
-  });
+  // Instagram and the shared library picker use the same single-logo
+  // semantics. The old temp logo cannot be attached alongside this one.
+  const [, tempMedia] = await prisma.$transaction([
+    prisma.tempMedia.updateMany({
+      where: {
+        ownerUserId: user.id,
+        wizardSessionId,
+        kind: "PLACE_LOGO",
+        status: "TEMP",
+      },
+      data: { status: "DELETED" },
+    }),
+    prisma.tempMedia.create({
+      data: {
+        ownerUserId: user.id,
+        wizardSessionId,
+        url: uploadedImage.url,
+        width: uploadedImage.width,
+        height: uploadedImage.height,
+        blurhash: uploadedImage.blurhash,
+        mimeType: "image/webp",
+        sizeBytes: 0,
+        kind: "PLACE_LOGO",
+        sortOrder: 0,
+        status: "TEMP",
+      },
+    }),
+  ]);
 
   devLog(`Saved temp media ${tempMedia.id} for @${username}`);
 

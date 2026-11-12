@@ -47,6 +47,7 @@ import { resolvePlaceWizardSubmitAction } from "./resolvePlaceWizardSubmitAction
 import { canNavigateToPlaceWizardStep } from "./canNavigateToPlaceWizardStep";
 import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
+import { reconcileSavedPlaceMedia, type SavedPlaceMedia } from "./reconcileSavedPlaceMedia";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
 
 import { Step1Profile } from "./steps/Step1Profile";
@@ -352,6 +353,11 @@ export function PlaceWizard({
       const isAdmin = userRole === "ADMIN";
       if (isPublished && !isAdmin) return;
 
+      // Never auto-attach a partly selected TempMedia batch while the user is
+      // still editing the gallery. Explicit draft save receives the persisted
+      // PlaceImage ids and reconciles the editor state before editing continues.
+      if (formData.tempLogoMediaId || formData.tempGalleryMediaIds?.length) return;
+
       if (isSaving || isSubmitting || autosaveInFlightRef.current) {
         return;
       }
@@ -492,27 +498,66 @@ export function PlaceWizard({
           return;
         }
         const changes = extractChanges(formData, originalData);
-        if (Object.keys(changes).length === 0) {
+        const openingHoursChanged = formData.openingHoursData !== null &&
+          JSON.stringify(formData.openingHoursData) !== JSON.stringify(originalData?.openingHoursData);
+        if (Object.keys(changes).length === 0 && !wizardSessionId && !openingHoursChanged) {
           toast.success("Изменения уже сохранены");
           return;
         }
-        const perf = createClientSavePerf("save-place:client", {
-          endpoint: `/api/business/places/${place.id}`,
-          payload: changes,
-        });
 
-        const response = await fetch(`/api/business/places/${place.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(changes),
-        });
-        perf.log({ status: response.status, mode: "save-draft" });
+        // A business may save a draft revision, but must never mutate an
+        // already-published Place just by pressing "Save draft".
+        if (place.status === "PUBLISHED" && userRole !== "ADMIN") {
+          const revisionResponse = await fetch(`/api/business/places/${place.id}/revision`);
+          if (!revisionResponse.ok) throw new Error("Не удалось создать ревизию");
+          const { revision } = await revisionResponse.json();
+          const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              revisionId: revision.id,
+              data: { ...changes, wizardSessionId },
+            }),
+          });
+          if (!saveResponse.ok) throw new Error("Не удалось сохранить черновик ревизии");
+          if (openingHoursChanged) {
+            const hoursResponse = await fetch(`/api/business/places/${place.id}/revision/opening-hours`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ revisionId: revision.id, data: formData.openingHoursData }),
+            });
+            if (!hoursResponse.ok) throw new Error("Не удалось сохранить режим работы в ревизии");
+          }
+          // Future revision PATCHes are deltas from the successfully saved draft,
+          // not from the original published Place (A → B → A must persist A).
+          setOriginalData(formData);
+        } else {
+          const payload = { ...changes, wizardSessionId };
+          const perf = createClientSavePerf("save-place:client", {
+            endpoint: `/api/business/places/${place.id}`,
+            payload,
+          });
 
-        if (!response.ok) {
-          throw new Error("Failed to save");
+          const response = await fetch(`/api/business/places/${place.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          perf.log({ status: response.status, mode: "save-draft" });
+
+          if (!response.ok) {
+            throw new Error("Failed to save");
+          }
+
+          const saved = (await response.json()) as { place?: SavedPlaceMedia | null };
+          if (!saved.place || !Array.isArray(saved.place.images)) {
+            throw new Error("Изменения сохранены, но изображения не синхронизированы. Обновите страницу.");
+          }
+          const reconciled = reconcileSavedPlaceMedia(formData, saved.place);
+          setFormData(reconciled);
+          setOriginalData(reconciled);
         }
 
-        setOriginalData(formData);
         showSuccessModal({
           kind: "place",
           outcome: "draft_saved",
@@ -917,6 +962,20 @@ export function PlaceWizard({
         } else {
           // SUBMIT_EXISTING: DRAFT/REJECTED/NEEDS_REVISION → PENDING (or
           // PUBLISHED directly, if the role allows direct publish).
+          // Temporary media pauses autosave; persist pending field edits before
+          // /submit validates the stored draft and attaches the wizard session.
+          const changes = extractChanges(formData, originalData);
+          if (Object.keys(changes).length > 0) {
+            const saveResponse = await fetch(`/api/business/places/${place.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(changes),
+            });
+            if (!saveResponse.ok) {
+              const error = await saveResponse.json().catch(() => ({}));
+              throw new Error(error.message || error.error || "Не удалось сохранить изменения перед отправкой");
+            }
+          }
           const response = await fetch(`/api/business/places/${place.id}/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

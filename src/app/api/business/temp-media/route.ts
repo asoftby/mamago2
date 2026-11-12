@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     const {
       wizardSessionId,
       url,
+      mediaAssetId,
       width,
       height,
       blurhash,
@@ -42,27 +43,36 @@ export async function POST(req: NextRequest) {
       sortOrder,
     } = body;
 
-    if (!wizardSessionId || !url || !kind) {
+    // Library selection is resolved server-side from its MediaAsset id.
+    // Never trust a client-provided URL when attaching someone else's media.
+    let resolvedUrl = url;
+    let resolvedWidth = width;
+    let resolvedHeight = height;
+    if (mediaAssetId !== undefined) {
+      if (typeof mediaAssetId !== "string" || !mediaAssetId.trim()) {
+        return NextResponse.json({ error: "Invalid mediaAssetId" }, { status: 400 });
+      }
+      const asset = await prisma.mediaAsset.findFirst({
+        where: { id: mediaAssetId, uploadedById: user.id, status: "ACTIVE", kind: "IMAGE" },
+        select: { publicUrl: true, width: true, height: true },
+      });
+      if (!asset?.publicUrl) {
+        return NextResponse.json({ error: "Media asset not found" }, { status: 404 });
+      }
+      resolvedUrl = asset.publicUrl;
+      resolvedWidth = asset.width;
+      resolvedHeight = asset.height;
+    }
+
+    if (!wizardSessionId || !resolvedUrl || !kind) {
       return NextResponse.json(
-        { error: "wizardSessionId, url, and kind are required" },
+        { error: "wizardSessionId, mediaAssetId or url, and kind are required" },
         { status: 400 },
       );
     }
 
     if (!Object.values(TempMediaKind).includes(kind)) {
       return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
-    }
-
-    if (kind === "PLACE_LOGO") {
-      await prisma.tempMedia.updateMany({
-        where: {
-          ownerUserId: user.id,
-          wizardSessionId,
-          kind: "PLACE_LOGO",
-          status: "TEMP",
-        },
-        data: { status: "DELETED" },
-      });
     }
 
     let finalSortOrder = sortOrder;
@@ -80,21 +90,31 @@ export async function POST(req: NextRequest) {
       finalSortOrder = (lastMedia?.sortOrder || 0) + 1;
     }
 
-    const media = await prisma.tempMedia.create({
-      data: {
-        ownerUserId: user.id,
-        wizardSessionId,
-        url,
-        width: width || null,
-        height: height || null,
-        blurhash: blurhash || null,
-        mimeType: mimeType || null,
-        sizeBytes: sizeBytes || null,
-        kind,
-        sortOrder: finalSortOrder,
-        status: "TEMP",
-      },
-    });
+    const mediaData = {
+      ownerUserId: user.id,
+      wizardSessionId,
+      url: resolvedUrl,
+      width: resolvedWidth || null,
+      height: resolvedHeight || null,
+      blurhash: blurhash || null,
+      mimeType: mimeType || null,
+      sizeBytes: sizeBytes || null,
+      kind,
+      sortOrder: finalSortOrder,
+      status: "TEMP" as const,
+    };
+
+    // Replacing a logo must be atomic. Never delete the previous temp logo
+    // before the replacement has been safely written.
+    const media = kind === "PLACE_LOGO"
+      ? await prisma.$transaction(async (tx) => {
+          await tx.tempMedia.updateMany({
+            where: { ownerUserId: user.id, wizardSessionId, kind: "PLACE_LOGO", status: "TEMP" },
+            data: { status: "DELETED" },
+          });
+          return tx.tempMedia.create({ data: mediaData });
+        })
+      : await prisma.tempMedia.create({ data: mediaData });
 
     return NextResponse.json({ media });
   } catch (error) {

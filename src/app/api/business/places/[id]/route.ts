@@ -476,6 +476,20 @@ export async function PATCH(
       select: { id: true },
     });
 
+    // Replacing or removing a logo must not leave old LOGO PlaceImages behind.
+    // The FK is updated first, then only outdated associations are removed;
+    // the reusable MediaAsset binary stays in the owner's library.
+    if (Object.prototype.hasOwnProperty.call(updateData, "logoImageId")) {
+      const keepId = updateData.logoImageId;
+      await prisma.placeImage.deleteMany({
+        where: {
+          placeId: id,
+          kind: "LOGO",
+          ...(typeof keepId === "string" ? { id: { not: keepId } } : {}),
+        },
+      });
+    }
+
     // Update subcategories if provided — skip deleteMany/createMany when unchanged.
     // Position matters: subcategories are ordered, so comparison is ordered too.
     if (Array.isArray(body.subcategoryIds)) {
@@ -523,6 +537,22 @@ export async function PATCH(
         status: true,
         slug: true,
         updatedAt: true,
+        // The edit wizard must replace TempMedia ids with persisted PlaceImage
+        // ids immediately after PATCH; otherwise "continue editing" deletes
+        // ATTACHED rows and reorders the wrong table.
+        logoImageId: true,
+        images: {
+          orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
+          select: {
+            id: true,
+            url: true,
+            kind: true,
+            sortOrder: true,
+            width: true,
+            height: true,
+            blurhash: true,
+          },
+        },
       },
     });
     perf.mark("response");
