@@ -13,6 +13,7 @@ import {
 import { resolveEmailCtaUrl } from "../lib/email-cta-url";
 import { EMAIL_SUBJECTS } from "../lib/email-subjects";
 import { getResendClient } from "./resend-client";
+import { notificationEmailRequestOptions } from "./notificationEmailRequestOptions";
 import {
   getDebugRedirectTo,
   getEmailDeliveryConfigurationStatus,
@@ -103,7 +104,8 @@ async function sendViaResend(input: SendViaResendInput): Promise<{ messageId?: s
           tags: [{ name: "type", value: input.kind }],
         };
 
-  const { data, error } = await resend.emails.send(payload);
+  const { data, error } = await resend.emails.send(payload,
+    input.kind === "notification" ? notificationEmailRequestOptions() : undefined);
 
   if (error) {
     console.error("[email] Resend error", {
