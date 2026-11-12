@@ -55,6 +55,15 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       participationMode: "time-slots",
       timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "09:00", capacity: 5 }] }] },
     });
+    const savedOccurrence = await prisma.planItem.create({
+      data: {
+        userId: owner.id,
+        activityId: planEvent.id,
+        date,
+        title: planEvent.title,
+        startsAt: new Date(planEvent.sessions[0]!.startsAt.getTime() - 3_600_000),
+      },
+    });
     const planBooking = await createPublicBooking({
       publicationType: "EVENT",
       publicationId: planEvent.id,
@@ -71,6 +80,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     const planItem = await prisma.planItem.findUniqueOrThrow({
       where: { id: persistedPlanBooking.planItemId! },
     });
+    assert.equal(planItem.id, savedOccurrence.id, "reuse the saved occurrence instead of duplicating it");
     assert.equal(planItem.activityId, planEvent.id);
     assert.equal(planItem.userId, owner.id);
     assert.equal(planItem.date, date);

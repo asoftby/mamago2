@@ -477,7 +477,12 @@ async function createPublicationBooking(
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
 
-  const planLink = manual ? { planItemId: null, invalid: false } : await resolveBookingPlanItem({
+  // Event occurrences are auto-linked only after locking the Activity and
+  // resolving the persisted session date/time. An early day-only match would
+  // bypass ensureEventBookingPlanItem and preserve a stale saved time.
+  const planLink = manual || (input.publicationType === PublicationType.EVENT && !input.planItemId)
+    ? { planItemId: null, invalid: false }
+    : await resolveBookingPlanItem({
     userId: input.userId,
     planItemId: input.planItemId,
     publicationType: input.publicationType,
