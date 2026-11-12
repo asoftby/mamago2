@@ -333,7 +333,7 @@ export const GROUP_CONTENT: AdminSidebarGroup = {
     },
     {
       id: "content-publications",
-      label: "Публикации",
+      label: "Статьи и новости",
       href: adminPath("/content/publications"),
       matchers: [{ type: "prefix", value: adminPath("/content/publications") }],
     },

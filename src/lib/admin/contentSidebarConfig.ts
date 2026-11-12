@@ -25,7 +25,7 @@ export const CONTENT_NAV_ITEMS: readonly ContentNavItemDefinition[] = [
   { id: "places", label: "Места", path: "/content/places" },
   { id: "offers", label: "Предложения", path: "/content/offers" },
   { id: "routes", label: "Маршруты", path: "/content/routes" },
-  { id: "publications", label: "Публикации", path: "/content/publications" },
+  { id: "publications", label: "Статьи и новости", path: "/content/publications" },
   { id: "media", label: "Медиатека", path: "/media" },
 ] as const;
 
