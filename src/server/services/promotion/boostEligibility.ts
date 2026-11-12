@@ -7,15 +7,7 @@ import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisib
  * PARTY_PACKAGE and other unsupported product types must not be sold a Boost
  * until their own ranked catalog delivery is implemented.
  */
-export function isBoostableOfferProductType(
-  kind: string,
-  productType: string | null,
-): boolean {
-  return kind === "SERVICE" &&
-    (productType == null ||
-      productType === "ONE_TIME_ACTIVITY" ||
-      productType === "REGULAR_ACTIVITY");
-}
+export { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
 
 export function getBoostablePublishedOfferWhere(now = new Date()): Prisma.OfferWhereInput {
   return {
