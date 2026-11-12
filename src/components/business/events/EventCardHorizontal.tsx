@@ -37,6 +37,7 @@ import { ru } from "date-fns/locale";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
 import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
+import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
 import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
 
 interface Activity {
@@ -276,7 +277,7 @@ export function EventCardHorizontal({
 
             {activity.status === ContentStatus.PUBLISHED && !activity.isPromoted ? (
               <Link
-                href={`/business/events/${activity.id}/boost`}
+                href={buildBusinessBoostHref("EVENT", activity.id)}
                 className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
               >
                 <Zap className="h-4 w-4 shrink-0" />
