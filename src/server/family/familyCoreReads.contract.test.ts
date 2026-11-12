@@ -95,7 +95,6 @@ const activeStateFiles = [
   "src/app/api/save/status/route.ts",
   "src/app/api/save/ideas/route.ts",
   "src/app/api/plan/suggestions/route.ts",
-  "src/app/api/plan/generate/route.ts",
   "src/server/ideas/loadUserIdeas.ts",
 ];
 for (const f of activeStateFiles) {

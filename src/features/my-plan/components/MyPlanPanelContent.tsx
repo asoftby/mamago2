@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
-import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
 import { applyGuestDayScenarioAndAnnounce } from "@/lib/my-plan/applyGuestDayScenario";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
+import { appendMyPlanOpenToHref } from "@/lib/my-plan/myPlanOpenIntent";
 import { useMyPlan } from "../hooks/useMyPlan";
 import type { PlanItemWithActivity } from "../types/event";
 import { PlanMainContent } from "./PlanMainContent";
-import { GuestMyPlanPanel } from "./GuestMyPlanPanel";
 import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
 import { useDayScenarioEnabled } from "../hooks/useDayScenarioEnabled";
 import { useOptionalCity } from "@/contexts/CityContext";
@@ -44,6 +45,8 @@ export function MyPlanPanelContent({
   /** DAY_SCENARIO_ENGINE_ENABLED: off, the guest panel below is exactly as before. */
   const dayScenarioEnabled = useDayScenarioEnabled();
   const city = useOptionalCity()?.citySlug ?? "minsk";
+  // Where a guest's sign-in comes back to: the page they were on, with My Plan open (not a hard-coded home page).
+  const pathname = usePathname();
   const {
     isLoading,
     accessPhase,
@@ -102,12 +105,6 @@ export function MyPlanPanelContent({
     return next;
   }, [effectiveSelectedPlanDate, nowMs, planItemsByDate, todayIso]);
 
-  /**
-   * Recovery bridge for guest "Подбери за меня" -> auth.
-   * The main post-auth pipeline performs the same idempotent migration earlier;
-   * this retry covers interrupted navigation/auth-cookie races. The local draft
-   * is cleared only after every explicitly committed card is saved by the API.
-   */
   // A day a guest built with «Собрать день» and saved before the FULL-PAGE sign-in (/login never runs the post-auth
   // pipeline): saved here, once, as soon as the widget opens for a signed-in user.
   useEffect(() => {
@@ -116,38 +113,6 @@ export function MyPlanPanelContent({
       console.error("[my-plan] guest day scenario recovery failed", error);
     });
   }, [open, isAuthenticated, authMeLoading, dayScenarioEnabled]);
-
-  useEffect(() => {
-    if (!open || !isAuthenticated || authMeLoading) return;
-    let cancelled = false;
-
-    void migrateGuestMyPlanAfterAuth()
-      .then((result) => {
-        if (cancelled || result.migratedCount === 0) return;
-        if (result.selectedDate) {
-          const migratedDate =
-            result.selectedDate < todayIso ? todayIso : result.selectedDate;
-          setSelectedPlanDate(migratedDate);
-          void refetchPlanForDate(migratedDate);
-        }
-        void refetchPlanSummary();
-      })
-      .catch((error) => {
-        console.error("[my-plan] guest plan recovery migration failed", error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    open,
-    isAuthenticated,
-    authMeLoading,
-    setSelectedPlanDate,
-    refetchPlanForDate,
-    refetchPlanSummary,
-    todayIso,
-  ]);
 
   /** Подтягиваем план с сервера при открытии и при смене даты — только для авторизованных */
   useEffect(() => {
@@ -184,14 +149,18 @@ export function MyPlanPanelContent({
     );
   }
 
+  // The day scenario is the only way to pick a day. With its flag off (the kill switch) a guest gets a plain way on.
   if (!isAuthenticated) {
     return (
-      <GuestMyPlanPanel
-        layout={layout}
-        onRequestClose={onRequestClose}
-        setSelectedPlanDate={handleChangeDate}
-        todayIso={todayIso}
-      />
+      <div className="flex min-h-[320px] flex-1 items-center justify-center px-6 text-center">
+        <div className="max-w-sm">
+          <p className="m-0 text-[18px] font-semibold">Подбор дня сейчас недоступен</p>
+          <p className="mb-4 mt-2 text-[15px] text-gray-600">Войдите, чтобы вести свой план, мы сохраним его для вас.</p>
+          <a href={buildAuthUrl({ redirectTo: appendMyPlanOpenToHref(pathname || "/") })} className="inline-flex min-h-11 items-center rounded-full bg-neutral-900 px-5 font-semibold text-white no-underline">
+            Войти или зарегистрироваться
+          </a>
+        </div>
+      </div>
     );
   }
 
