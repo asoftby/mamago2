@@ -218,7 +218,7 @@ export function OfferCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {offer.status === "PUBLISHED" && <Link
+            {offer.status === "PUBLISHED" && !offer.archivedAt && !offer.place.archivedAt && offer.kind === "SERVICE" && <Link
               href={buildBusinessBoostHref("OFFER", offer.id)}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
