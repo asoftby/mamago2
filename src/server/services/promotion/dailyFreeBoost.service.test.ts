@@ -63,7 +63,8 @@ test.before(async () => {
   const packageOffer = await prisma.offer.create({
     data: {
       placeId,
-      kind: "PACKAGE",
+      kind: "SERVICE",
+      productType: "PARTY_PACKAGE",
       title: `${prefix} package without discovery delivery`,
       status: "PUBLISHED",
     },
