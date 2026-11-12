@@ -4,7 +4,8 @@
 
 ## Policy
 - One free Boost per `Business.id` in a **rolling 24-hour window**, starting at the previous free Boost's `startAt`; business-local calendar midnight does not reset the quota. A free Boost lasts exactly 24 hours.
-- Eligible targets: business-owned publicly listed Event, or business-owned published Offer backed by a publicly visible Place. Expired, unpublished, archived, inactive-business and foreign content is ineligible.
+- Eligible targets: business-owned publicly listed Event or business-owned published **SERVICE Offer** backed by a publicly visible Place. Expired, unpublished, archived, inactive-business and foreign content is ineligible.
+- **No unfulfillable promotion:** PACKAGE / EVENT kinds of Offer cannot currently be boosted because existing `classesDiscoveryFeed` ranks only SERVICE Offer rows. Before opening other Offer kinds, connect them to a real eligible ranked discovery feed and test exposure. Do not charge money for these kinds until then.
 - No overlapping Boosts (paid or free) on the same target; a free Boost does not authorize paid overlap/extension.
 - Paid purchases are independent of the free quota and allowed on *other* targets. Existing paid 1/3/7-day price configuration, region targeting, ledger atomicity and request-key idempotency remain authoritative. No active server prices means no checkout, not a guessed price.
 - Free runs in the target's organic region only. Paid can target permitted regions. No Boost changes access, public status, date/age/category eligibility or strict geography. Boost is a bounded ranking signal, **not** a guarantee of placement.
