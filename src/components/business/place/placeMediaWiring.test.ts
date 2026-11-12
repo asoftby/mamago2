@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
+import { getDefaultFormData } from "@/components/business/wizard/place/defaults";
+import { extractChanges } from "@/components/business/wizard/place/mappers";
 
 // No network/DB is required for this architecture contract. The real file
 // upload and media-library pagination pipelines have their own integration tests.
@@ -37,4 +40,21 @@ assert.match(sessionRoute, /prisma\.\$transaction\(/, "logo replacement is atomi
 assert.match(reorderRoute, /canManagePlaceAsync\(user, place\)/);
 assert.match(reorderRoute, /place\.status === "PUBLISHED"/);
 
-console.log("Place unified-media wiring contract: OK");
+
+const wizard = read("src/components/business/wizard/place/PlaceWizard.tsx");
+assert.match(reorderRoute, /place\.status === "PENDING" && !canEditPendingPlace\(user\.role\)/);
+assert.ok(reorderRoute.indexOf('place.status === "PENDING"') < reorderRoute.indexOf("await req.json()"),
+  "pending-place staff guard runs before any image payload/write");
+for (const role of ["USER", "BUSINESS_OWNER", undefined] as const) assert.equal(canEditPendingPlace(role), false);
+for (const role of ["ADMIN", "MODERATOR"] as const) assert.equal(canEditPendingPlace(role), true);
+const revisionSave = wizard.slice(wizard.indexOf('if (place.status === "PUBLISHED" && userRole !== "ADMIN")'));
+assert.match(revisionSave.slice(0, revisionSave.indexOf("} else {")), /setOriginalData\(formData\)/,
+  "advance the baseline after a successful revision PATCH");
+const published = { ...getDefaultFormData(), title: "Published A" };
+const firstSavedRevision = { ...published, title: "Draft B" };
+assert.equal(extractChanges(firstSavedRevision, published).title, "Draft B");
+const reverted = { ...firstSavedRevision, title: "Published A" };
+assert.equal(extractChanges(reverted, firstSavedRevision).title, "Published A",
+  "A to B to A compares with the saved revision, so A is sent back to the server");
+
+console.log("Place unified-media wiring, pending ACL and revision baseline: OK");
