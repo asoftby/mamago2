@@ -1406,6 +1406,8 @@ export interface NotifyBookingCreatedParams {
   /** userId владельца бизнеса (получатель уведомления) */
   ownerUserId: string;
   bookingId: string;
+  /** Event P0: persist delivery outcomes before acknowledging the public request. */
+  waitForDelivery?: boolean;
   offerId?: string | null;
   offerTitle?: string | null;
   activityId?: string | null;
@@ -1490,6 +1492,7 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     ctaLabel: "Открыть заявку",
     ctaAction: `/business/bookings?tab=action&kind=standard&request=${encodeURIComponent(params.bookingId)}`,
     metadata: { templatePayload },
+    waitForDelivery: params.waitForDelivery ?? false,
   });
 }
 
@@ -1501,6 +1504,35 @@ export interface NotifyUserBookingParams {
   bookingId: string;
   /** Название активности/предложения/места (для тела уведомления) */
   publicationTitle?: string | null;
+}
+
+/**
+ * Принятие новой клиентской заявки. Это НЕ подтверждение организатором:
+ * на данном этапе BookingStatus.NEW.
+ * Дубли по BookingRequest.id подавляются тем же механизмом, что и BUSINESS.
+ */
+export async function notifyUserBookingSubmitted(params: NotifyUserBookingParams) {
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "BOOKING_SUBMITTED",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) return null;
+
+  const title = params.publicationTitle?.trim() || "событие";
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "BOOKING_SUBMITTED",
+    title: "Заявка получена",
+    body: `Заявка на «${title}» получена и ожидает подтверждения организатора.`,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Мои записи",
+    ctaAction: "/me/bookings",
+    waitForDelivery: true,
+  });
 }
 
 /**

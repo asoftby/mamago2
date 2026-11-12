@@ -82,6 +82,7 @@ const DEDUP_WINDOWS: Record<NotificationType, number | null> = {
   CONTENT_REJECTED: null,
   // One-time booking events (exact dedup)
   BOOKING_CREATED: null,
+  BOOKING_SUBMITTED: null,
   BOOKING_CONFIRMED: null,
   BOOKING_CANCELLED: null,
   BOOKING_COMPLETED: null,

@@ -487,7 +487,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
 
   formData.participationMode = normalizeParticipationMode(scheduleJson.participationMode);
   formData.prebookMethod =
-    scheduleJson.prebookMethod === "phone" || scheduleJson.prebookMethod === "link"
+    scheduleJson.prebookMethod === "internal" || scheduleJson.prebookMethod === "phone" || scheduleJson.prebookMethod === "link"
       ? scheduleJson.prebookMethod
       : null;
   formData.prebookPhone =
