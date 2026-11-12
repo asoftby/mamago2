@@ -126,7 +126,7 @@ test("candidate list contains only the business's public publications", async ()
   assert.equal(candidates.some((candidate) => candidate.id === foreignOfferId), false);
 });
 
-test("server allows exactly one free boost per Business calendar day", async () => {
+test("server allows exactly one free boost per Business rolling 24h window", async () => {
   const now = new Date("2026-08-21T09:00:00.000Z");
   const results = await Promise.allSettled([
     createDailyFreeBoost({
@@ -161,6 +161,7 @@ test("server allows exactly one free boost per Business calendar day", async () 
     now,
   });
   assert.equal(dashboard.availableToday, false);
+  assert.equal(dashboard.nextFreeAt?.toISOString(), "2026-08-22T09:00:00.000Z");
   assert.ok(dashboard.boost);
 
   const metricTime = new Date("2026-08-21T09:01:00.000Z");
@@ -198,7 +199,7 @@ test("server allows exactly one free boost per Business calendar day", async () 
   });
 });
 
-test("foreign targets are rejected and the next calendar day is available", async () => {
+test("foreign targets are rejected, midnight is not a reset, and +24h is available", async () => {
   await assert.rejects(
     createDailyFreeBoost({
       businessId,
@@ -208,6 +209,18 @@ test("foreign targets are rejected and the next calendar day is available", asyn
       now: new Date("2026-08-22T09:01:00.000Z"),
     }),
     DailyFreeBoostTargetError,
+  );
+
+  // A calendar-day reset would incorrectly allow this shortly after midnight.
+  await assert.rejects(
+    createDailyFreeBoost({
+      businessId,
+      userId: ownerUserId,
+      publicationId: offerIds[2]!,
+      publicationType: "OFFER",
+      now: new Date("2026-08-22T00:01:00.000Z"),
+    }),
+    DailyFreeBoostUnavailableError,
   );
 
   const next = await createDailyFreeBoost({
