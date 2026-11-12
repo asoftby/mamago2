@@ -98,6 +98,33 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ mode: event.bookingMode, dates, slots }, { headers: privateHeaders });
   }
 
+  const placeId = params.get("placeId");
+  if (type.data === "PLACE" && placeId) {
+    // Read-only options for a confirmed individual appointment.
+    // Publishing a place does not itself assign physical resources.
+    const place = await prisma.place.findFirst({
+      where: {
+        ...getPublicPublishedPlaceWhere(), id: placeId,
+        ownerBusinessId: business.id, bookingEnabled: true,
+      },
+      select: { id: true },
+    });
+    if (!place) return NextResponse.json({ error: "Место недоступно" }, { status: 404 });
+    const units = await prisma.bookingUnit.findMany({
+      where: {
+        businessId: business.id, status: "ACTIVE", type: "EXCLUSIVE",
+        OR: [{ placeId: null }, { placeId }],
+      },
+      select: {
+        id: true, name: true, timezone: true, minDurationMinutes: true,
+        prepMinutes: true, cleanupMinutes: true, stepMinutes: true,
+      },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      take: 100,
+    });
+    return NextResponse.json({ units }, { headers: privateHeaders });
+  }
+
   const offerId = params.get("offerId");
   if (type.data === "OFFER" && offerId) {
     const offerWhere: Prisma.OfferWhereInput = {

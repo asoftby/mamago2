@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatHHMM } from "@/lib/formatters/date";
+import { buildManualPlaceReservation, manualPlaceDurationChoices } from "./manualPlaceReservation";
 import { Textarea } from "@/components/ui/textarea";
 
 type Publication = { id: string; title: string; offerBooking?: { id: string } | null };
@@ -12,6 +13,26 @@ type OfferSlot = { startsAt: string; endsAt: string; unitIds: string[] };
 type Tariff = { id: string; label: string };
 type OfferDetails = { id: string; timezone: string; tariffs: Tariff[]; units: Record<string, string>; groups: { id: string; title: string; tariffs: Tariff[] }[] };
 type Type = "EVENT" | "PLACE" | "OFFER";
+type PlaceUnit = {
+  id: string;
+  name: string;
+  timezone: string;
+  minDurationMinutes: number | null;
+  prepMinutes: number;
+  cleanupMinutes: number;
+  stepMinutes: number;
+};
+function durationLabel(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours ? `${hours} ч${rest ? ` ${rest} мин` : ""}` : `${rest} мин`;
+}
+function dateTimeLabel(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat("ru-BY", {
+    timeZone: timezone, day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(date);
+}
 type Availability = {
   mode: "REQUEST_ONLY" | "USE_PUBLICATION_SLOTS" | "USE_PUBLICATION_DATES";
   dates: string[];
@@ -36,6 +57,14 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   const [offerSlots, setOfferSlots] = useState<{ key: string; choices: OfferSlot[] }>();
   const [offerChoiceIndex, setOfferChoiceIndex] = useState("");
   const [offerDetails, setOfferDetails] = useState<OfferDetails>();
+  const [placeResourceList, setPlaceResourceList] = useState<{ placeId: string; units: PlaceUnit[] }>();
+  const [placeResourceError, setPlaceResourceError] = useState("");
+  const [reservePlaceResource, setReservePlaceResource] = useState(false);
+  const [placeResourceId, setPlaceResourceId] = useState("");
+  const [placeDate, setPlaceDate] = useState("");
+  const [placeTime, setPlaceTime] = useState("");
+  const [placeDuration, setPlaceDuration] = useState(60);
+  const [bookingStatus, setBookingStatus] = useState<"NEW" | "CONFIRMED">("CONFIRMED");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = useRef<{ key: string; intent: string } | null>(null);
@@ -52,8 +81,26 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   const hasGroups = Boolean(details?.groups.length);
   const selectedGroup = details?.groups.find((group) => group.id === groupId);
   const tariffs = hasGroups ? selectedGroup?.tariffs : details?.tariffs;
-  const ready = (!scheduledOffer || Boolean(choice)) && Boolean(publicationId && (type !== "EVENT" || (options &&
-    (options.mode === "REQUEST_ONLY" || options.slots.length || options.dates.length))));
+  const placeUnits = placeResourceList?.placeId === publicationId ? placeResourceList.units : undefined;
+  const selectedPlaceUnit = placeUnits?.find((unit) => unit.id === placeResourceId) ??
+    (placeUnits?.length === 1 ? placeUnits[0] : undefined);
+  const durations = selectedPlaceUnit ? manualPlaceDurationChoices(selectedPlaceUnit.minDurationMinutes) : [];
+  const selectedDuration = durations.includes(placeDuration) ? placeDuration : (durations[0] ?? 0);
+  const placeReservation = reservePlaceResource && selectedPlaceUnit
+    ? buildManualPlaceReservation({
+        bookingUnitId: selectedPlaceUnit.id, date: placeDate, time: placeTime,
+        timezone: selectedPlaceUnit.timezone, durationMinutes: selectedDuration,
+        prepMinutes: selectedPlaceUnit.prepMinutes, cleanupMinutes: selectedPlaceUnit.cleanupMinutes,
+      }) : null;
+  const placeStart = placeReservation ? new Date(placeReservation.resourceReservation.startsAt) : null;
+  const placeEnd = placeReservation ? new Date(placeReservation.resourceReservation.endsAt) : null;
+  const placeResourceReady = !reservePlaceResource || (
+    type === "PLACE" && bookingStatus === "CONFIRMED" &&
+    Boolean(placeReservation && placeStart && placeStart > new Date())
+  );
+  const ready = placeResourceReady && (!scheduledOffer || Boolean(choice)) && Boolean(publicationId &&
+    (type !== "EVENT" || (options &&
+      (options.mode === "REQUEST_ONLY" || options.slots.length || options.dates.length))));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -94,6 +141,25 @@ export function ManualBookingDialog({ onClose, onCreated }: {
     return () => controller.abort();
   }, [scheduledOffer, publicationId, offerDate, offerKey, details, hasGroups, groupId]);
 
+  useEffect(() => {
+    if (type !== "PLACE" || !publicationId || !reservePlaceResource) return;
+    const controller = new AbortController();
+    setPlaceResourceError("");
+    fetch(endpoint + "?" + new URLSearchParams({ type: "PLACE", placeId: publicationId }), {
+      signal: controller.signal,
+      cache: "no-store",
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Не удалось загрузить ресурсы");
+      return response.json() as Promise<{ units: PlaceUnit[] }>;
+    }).then(({ units }) => {
+      if (!Array.isArray(units)) throw new Error("Резервирование ресурсов недоступно");
+      if (!controller.signal.aborted) setPlaceResourceList({ placeId: publicationId, units });
+    }).catch(() => {
+      if (!controller.signal.aborted) setPlaceResourceError("Не удалось загрузить ресурсы. Повторите выбор места.");
+    });
+    return () => controller.abort();
+  }, [type, publicationId, reservePlaceResource]);
+
   const needsResourcePicker = unitIds.length > 1;
   useEffect(() => {
     if (!scheduledOffer || !publicationId) return;
@@ -114,9 +180,15 @@ export function ManualBookingDialog({ onClose, onCreated }: {
     const data = new FormData(event.currentTarget);
     const slot = options?.slots.find(({ id }) => id === data.get("slot"));
     const requestedDate = (scheduledOffer ? offerDate : slot?.date) || String(data.get("date") ?? "") || undefined;
+    if (reservePlaceResource && (!selectedPlaceUnit || !placeReservation ||
+        bookingStatus !== "CONFIRMED")) {
+      setError("Выберите ресурс, дату, время и продолжительность записи.");
+      return;
+    }
     const intent = {
       publicationType: type, publicationId,
       selectedSessionId: slot?.id,
+      resourceReservation: reservePlaceResource ? placeReservation?.resourceReservation : undefined,
       offerSlot: choice ? {
         startsAt: choice.startsAt, endsAt: choice.endsAt, groupId: groupId || undefined,
         tariffId: String(data.get("tariff") ?? "") || undefined,
@@ -168,6 +240,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
             <label className="grid gap-1 text-sm">Раздел
               <select className={selectClass} value={type} onChange={(e) => {
                 setType(e.target.value as Type); setPublicationId(""); setSearch(""); setQuery(""); setError("");
+                setReservePlaceResource(false); setPlaceResourceId(""); setPlaceDate(""); setPlaceTime("");
               }}>
                 <option value="EVENT">Событие</option>
                 <option value="PLACE">Место</option>
@@ -177,6 +250,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
             <label className="grid gap-1 text-sm">Выберите публикацию
               <select className={selectClass} required value={publicationId} onChange={(e) => {
                 setPublicationId(e.target.value); setOfferDate(""); setGroupId(""); setOfferChoiceIndex(""); setError("");
+                setReservePlaceResource(false); setPlaceResourceId(""); setPlaceDate(""); setPlaceTime("");
               }}>
                 <option value="">{!items ? "Загружаем…" : items.length ? "Выберите публикацию" : "Публикаций нет"}</option>
                 {items?.map(({ id, title }) => <option key={id} value={id}>{title}</option>)}
@@ -253,7 +327,76 @@ export function ManualBookingDialog({ onClose, onCreated }: {
                 </label> : null}
               </>
             ) : null}
-            {type !== "EVENT" && publicationId && !scheduledOffer ? (
+            {type === "PLACE" && publicationId ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="grid min-w-0 gap-1 text-sm">Дата
+                    <Input type="date" name="date" className="min-h-11 text-base"
+                      required={reservePlaceResource} value={placeDate} onChange={(event) => setPlaceDate(event.target.value)} />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-sm">Время
+                    <Input type="time" name="time" className="min-h-11 text-base"
+                      required={reservePlaceResource} value={placeTime} onChange={(event) => setPlaceTime(event.target.value)} />
+                  </label>
+                </div>
+                {placeUnits === undefined && reservePlaceResource && !placeResourceError
+                  ? <p role="status" className="text-xs text-stone-500">Загружаем доступные ресурсы…</p> : null}
+                {placeResourceError && reservePlaceResource
+                  ? <p role="alert" className="text-sm text-destructive">{placeResourceError}</p> : null}
+                {bookingStatus === "CONFIRMED" ? (
+                  <label className="flex items-start gap-3 rounded-xl border border-stone-200 p-3 text-sm">
+                    <input type="checkbox" className="mt-1 size-4 shrink-0 accent-orange-500"
+                      checked={reservePlaceResource} onChange={(event) => setReservePlaceResource(event.target.checked)} />
+                    <span>
+                      <span className="block font-semibold text-stone-900">Занять время исполнителя или зала</span>
+                      <span className="mt-1 block text-xs leading-5 text-stone-500">
+                        Проверим доступность и закроем время для других записей.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
+                {reservePlaceResource && placeUnits?.length === 0 ? (
+                  <p role="alert" className="text-xs leading-5 text-stone-600">
+                    Для этого места нет доступных ресурсов. Создайте исполнителя или зал в разделе
+                    «Ресурсы и расписание» либо снимите выбор «Занять время», чтобы добавить заявку без блокировки.
+                  </p>
+                ) : null}
+                {reservePlaceResource && bookingStatus === "CONFIRMED" ? (
+                  <div className="grid gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3">
+                    <label className="grid gap-1 text-sm">Исполнитель или зал
+                      <select className={selectClass} required
+                        value={selectedPlaceUnit?.id ?? ""}
+                        onChange={(event) => setPlaceResourceId(event.target.value)}>
+                        <option value="">Выберите ресурс</option>
+                        {placeUnits?.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-sm">Продолжительность
+                      <select className={selectClass} required value={selectedDuration}
+                        onChange={(event) => setPlaceDuration(Number(event.target.value))}>
+                        {durations.map((minutes) =>
+                          <option key={minutes} value={minutes}>{durationLabel(minutes)}</option>)}
+                      </select>
+                    </label>
+                    {selectedPlaceUnit && placeReservation && placeStart && placeEnd ? (
+                      <p className="text-xs leading-5 text-stone-600">
+                        Ресурс будет занят с {dateTimeLabel(
+                          placeReservation.blockStart, selectedPlaceUnit.timezone,
+                        )} до {dateTimeLabel(
+                          placeReservation.blockEnd, selectedPlaceUnit.timezone,
+                        )} (включая подготовку и уборку).
+                        Окончательную доступность проверим при сохранении.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-xs leading-5 text-stone-500">
+                    Без выбора ресурса запись появится в списке и, при наличии даты, в календаре,
+                    но не закроет время исполнителя или зала.
+                  </p>
+                )}
+              </>
+            ) : type === "OFFER" && publicationId && !scheduledOffer ? (
               <div className="grid grid-cols-2 gap-2">
                 <label className="grid min-w-0 gap-1 text-sm">Дата<Input type="date" name="date" className="min-h-11 text-base" /></label>
                 <label className="grid min-w-0 gap-1 text-sm">Время<Input type="time" name="time" className="min-h-11 text-base" /></label>
@@ -276,7 +419,11 @@ export function ManualBookingDialog({ onClose, onCreated }: {
               </div>
             </details>
             <label className="grid gap-1 text-sm">Создать как
-              <select className={selectClass} name="status" defaultValue="CONFIRMED">
+              <select className={selectClass} name="status" value={bookingStatus} onChange={(event) => {
+                const next = event.target.value as "NEW" | "CONFIRMED";
+                setBookingStatus(next);
+                if (next !== "CONFIRMED") setReservePlaceResource(false);
+              }}>
                 <option value="CONFIRMED">Подтверждена</option>
                 <option value="NEW">Требует подтверждения</option>
               </select>
