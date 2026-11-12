@@ -46,6 +46,7 @@ import { PublicationFactsStrip } from "@/components/publication-page/Publication
 import { PublicationAboutSection } from "@/components/publication-page/PublicationAboutSection";
 import { PublicationSection } from "@/components/publication-page/PublicationSection";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { getEventSaveStatusLabel } from "@/lib/event/eventSaveStatusLabel";
 import { toastAddedToPlan } from "@/lib/my-plan/toastAddedToPlan";
 import { useUpcomingSessions } from "./useUpcomingSessions";
 import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
@@ -537,6 +538,7 @@ export function EventPageView({
 
   const hasPurchaseUrl = Boolean(data.cta.purchaseUrl);
   const hasSimpleBooking = Boolean(data.cta.simpleBooking);
+  const saveStatusLabel = getEventSaveStatusLabel(saveStatus);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const handleBook = useCallback(() => setBookingModalOpen(true), []);
   // Сервер ранжирует по всей семье и не знает, кого пользователь выбрал в шапке («Я» / ребёнок / свободный
@@ -623,6 +625,7 @@ export function EventPageView({
               onBuy={handleBuy}
               onSave={handleSave}
               isPlanned={saveStatus.isIdea || saveStatus.inPlan}
+              saveStatusLabel={saveStatusLabel}
               planDate={saveStatus.planDate}
             />
           </div>
