@@ -218,7 +218,9 @@ function resolveRequestCompatibilityMode(
   if (value.requestMode === "CALENDAR") {
     if (value.legacyOrigin === "BOOKING") {
       return {
-        participationMode: null,
+        // Keep participationMode in sync with the booking columns. Falling
+        // back to "walk-in" in the form patch hides the public signup CTA.
+        participationMode: "time-slots",
         prebookMethod: null,
         prebookPhone: "",
         prebookUrl: "",
@@ -284,7 +286,7 @@ function resolveRequestCompatibilityMode(
     }
 
     return {
-      participationMode: null,
+      participationMode: "request",
       prebookMethod: null,
       prebookPhone: "",
       prebookUrl: "",
