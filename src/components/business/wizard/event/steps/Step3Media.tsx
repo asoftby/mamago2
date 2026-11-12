@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import {
   Check,
   GripVertical,
@@ -316,6 +316,7 @@ export function Step3Media({
   const [importedMediaIdBySourceUrl, setImportedMediaIdBySourceUrl] = useState<Record<string, string>>({});
 
   const hasInitialized = useRef(false);
+  const pendingGallerySyncRef = useRef<GalleryItem[] | null>(null);
   const coverDropzoneRef = useRef<MediaDropzoneHandle | null>(null);
   const UPLOAD_TIMEOUT_MS = 120_000;
 
@@ -465,15 +466,33 @@ export function Step3Media({
     setCoverPreviewUnavailable(false);
   }, [onChange]);
 
+  // Never call parent onChange inside a setState updater — React may re-run
+  // updaters during render and that updates EventWizard while Step3Media renders.
+  const commitGalleryItems = useCallback(
+    (updater: GalleryItem[] | ((prev: GalleryItem[]) => GalleryItem[])) => {
+      setGalleryItems((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        pendingGallerySyncRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
+    const pending = pendingGallerySyncRef.current;
+    if (!pending) return;
+    pendingGallerySyncRef.current = null;
+    syncUnifiedMedia(pending);
+  });
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setGalleryItems((items) => {
+      commitGalleryItems((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
-        const reordered = arrayMove(items, oldIndex, newIndex);
-        syncUnifiedMedia(reordered);
-        return reordered;
+        return arrayMove(items, oldIndex, newIndex);
       });
     }
   };
@@ -584,11 +603,9 @@ export function Step3Media({
 
     if (pickerMode === "cover") {
       const first = selectedItems[0];
-      setGalleryItems((prev) => {
+      commitGalleryItems((prev) => {
         const nextItem: GalleryItem = { id: first.raw.id, url: first.normalized.url, status: "done" };
-        const merged = [nextItem, ...prev.filter((item) => item.id !== first.raw.id)];
-        syncUnifiedMedia(merged);
-        return merged;
+        return [nextItem, ...prev.filter((item) => item.id !== first.raw.id)];
       });
       setCoverPreview(first.normalized.url);
       setCoverPreviewUnavailable(false);
@@ -597,20 +614,16 @@ export function Step3Media({
       return;
     }
 
-    setGalleryItems((prev) => {
-      const merged = [
-        ...prev,
-        ...selectedItems
-          .filter((item) => !prev.some((row) => row.id === item.raw.id))
-          .map((item) => ({
-            id: item.raw.id,
-            url: item.normalized.url,
-            status: "done" as const,
-          })),
-      ];
-      syncUnifiedMedia(merged);
-      return merged;
-    });
+    commitGalleryItems((prev) => [
+      ...prev,
+      ...selectedItems
+        .filter((item) => !prev.some((row) => row.id === item.raw.id))
+        .map((item) => ({
+          id: item.raw.id,
+          url: item.normalized.url,
+          status: "done" as const,
+        })),
+    ]);
     setPickerOpen(false);
     toast.success(
       selectedItems.length === 1 ? "Изображение добавлено" : `Добавлено изображений: ${selectedItems.length}`,
@@ -627,11 +640,9 @@ export function Step3Media({
       setImportedMediaIdBySourceUrl((prev) => ({ ...prev, [cover.sourceUrl]: cover.mediaId }));
       setChosenImportedCoverUrl(url);
       setSelectedImportedUrl(url);
-      setGalleryItems((prev) => {
+      commitGalleryItems((prev) => {
         const nextItem: GalleryItem = { id: cover.mediaId, url: cover.publicUrl, status: "done" };
-        const merged = [nextItem, ...prev.filter((item) => item.id !== cover.mediaId)];
-        syncUnifiedMedia(merged);
-        return merged;
+        return [nextItem, ...prev.filter((item) => item.id !== cover.mediaId)];
       });
       toast.success("Изображение из источника установлено как главное");
     } catch (error) {
@@ -655,20 +666,16 @@ export function Step3Media({
         return;
       }
 
-      setGalleryItems((prev) => {
-        const merged = [
-          ...prev,
-          ...toAdd
-            .filter((item) => !prev.some((row) => row.id === item.mediaId))
-            .map((item) => ({
-              id: item.mediaId,
-              url: item.publicUrl,
-              status: "done" as const,
-            })),
-        ];
-        syncUnifiedMedia(merged);
-        return merged;
-      });
+      commitGalleryItems((prev) => [
+        ...prev,
+        ...toAdd
+          .filter((item) => !prev.some((row) => row.id === item.mediaId))
+          .map((item) => ({
+            id: item.mediaId,
+            url: item.publicUrl,
+            status: "done" as const,
+          })),
+      ]);
       setImportedAssetSourceById((prev) => {
         const next = { ...prev };
         for (const item of imported) {
@@ -771,13 +778,11 @@ export function Step3Media({
         if (!uploadedImage) throw new Error("Failed to upload image");
 
         const mediaId = uploadedImage.id;
-        setGalleryItems((prev) => {
-          const next = prev.map((img) =>
+        commitGalleryItems((prev) =>
+          prev.map((img) =>
             img.id === placeholderId ? { id: mediaId, url: uploadedImage.url, status: "done" as const } : img,
-          );
-          syncUnifiedMedia(next);
-          return next;
-        });
+          ),
+        );
       } catch (error) {
         console.error("Gallery upload error:", error);
         setGalleryItems((prev) => prev.filter((img) => img.id !== placeholderId));
@@ -816,11 +821,7 @@ export function Step3Media({
         return next;
       });
     }
-    setGalleryItems((prev) => {
-      const next = prev.filter((img) => img.id !== imageId);
-      syncUnifiedMedia(next);
-      return next;
-    });
+    commitGalleryItems((prev) => prev.filter((img) => img.id !== imageId));
   };
 
   const hasRenderedGallery = galleryItems.length > 0;
