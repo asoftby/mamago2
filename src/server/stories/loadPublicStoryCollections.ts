@@ -187,7 +187,7 @@ export async function loadPublicStoryCollections(input: {
     offerIds.length ? prisma.offer.findMany({ where: { id: { in: offerIds }, status: "PUBLISHED" }, select: { id: true, slug: true, title: true, description: true, coverImage: true, priceMode: true, priceFrom: true, priceTo: true, priceText: true, dateFrom: true, dateTo: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true } }) : [],
     placeIds.length ? prisma.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, title: true, displayAddress: true, formattedAddr: true, customAddress: true } }) : [],
     mediaIds.length ? prisma.mediaAsset.findMany({ where: { id: { in: mediaIds } }, select: { id: true, publicUrl: true } }) : [],
-    activityIds.length ? prisma.activitySession.findMany({ where: { activityId: { in: activityIds } }, select: { activityId: true, startsAt: true }, orderBy: { startsAt: "asc" } }) : [],
+    activityIds.length ? prisma.activitySession.findMany({ where: { activityId: { in: activityIds }, withdrawnAt: null }, select: { activityId: true, startsAt: true }, orderBy: { startsAt: "asc" } }) : [],
   ]);
   const activityById = new Map(activities.map((row) => [row.id, row]));
   const offerById = new Map(offers.map((row) => [row.id, row]));

@@ -740,6 +740,7 @@ export function EventPageView({
           eventCategory={data.categoryLabel}
           priceLabel={data.priceLabel}
           booking={data.cta.simpleBooking}
+          initialSessionId={selectedId}
         />
       )}
       <SaveActivityFlowAdaptive

@@ -2786,6 +2786,7 @@ model Offer {
   boosts          Boost[]
   bookingRequests BookingRequest[]
   partyOrderItems PartyOrderItem[]
+  partySavedOffers PartySavedOffer[]
   bookingUnitOffers BookingUnitOffer[]
   offerPlanItems  PlanItem[]
   offerIdeas      OfferIdea[]
@@ -6036,6 +6037,7 @@ model PartyOrder {
   owner User @relation("PartyOrderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   family Family? @relation(fields: [familyId], references: [id], onDelete: SetNull)
   items PartyOrderItem[]
+  savedOffers PartySavedOffer[]
 
   @@index([ownerUserId, status])
   @@index([familyId])
@@ -6083,6 +6085,18 @@ model PartyOrderItem {
   @@index([offerId])
   @@index([businessId])
   @@index([parentItemId])
+}
+
+model PartySavedOffer {
+  id String @id @default(cuid())
+  partyOrderId String
+  offerId String
+  createdAt DateTime @default(now())
+  partyOrder PartyOrder @relation(fields: [partyOrderId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([partyOrderId, offerId])
+  @@index([offerId])
 }
 
 model PartyQuote {
@@ -6285,10 +6299,17 @@ enum BookingMode {
 }
 
 /// Заявка на запись/заказ от клиента
+enum BookingSource {
+  MANUAL
+}
+
 model BookingRequest {
   id         String  @id @default(cuid())
   businessId String
   userId     String?
+  source BookingSource?
+  manualRequestKey String?
+  manualRequestHash String?
 
   // Тип публикации
   publicationType PublicationType
@@ -6397,6 +6418,7 @@ model BookingRequest {
   @@index([activityId])
   @@index([offerId])
   @@unique([offerId, slotIdempotencyKey])
+  @@unique([businessId, manualRequestKey])
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([offerSessionId, status, holdUntil])

@@ -18,6 +18,7 @@ function createFakeClient(nextUpcomingSession: { startsAt: Date } | null) {
       }) as unknown as EventScheduleResyncTransactionClient["activity"]["update"],
     },
     activitySession: {
+      updateMany: (async () => ({ count: 0 })) as unknown as EventScheduleResyncTransactionClient["activitySession"]["updateMany"],
       deleteMany: (async (args: unknown) => {
         calls.push({ delegate: "activitySession", method: "deleteMany", args });
         return { count: 0 };
@@ -54,7 +55,7 @@ async function testWritesSessionsAndNextOccurrence() {
   assert.equal(result.activityId, "activity-1");
   assert.equal(result.sessionsWritten, 1);
   assert.equal(result.nextOccurrenceAt, nextStartsAt);
-  assert.ok(calls.some((c) => c.delegate === "activitySession" && c.method === "deleteMany"));
+  assert.ok(!calls.some((c) => c.delegate === "activitySession" && c.method === "deleteMany"));
   assert.ok(calls.some((c) => c.delegate === "activitySession" && c.method === "createMany"));
 }
 

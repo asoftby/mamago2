@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
+import { Metadata } from "next";
 import { NotificationCenter } from "@/components/business/notifications/NotificationCenter";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
-export const metadata: Metadata = { title: "Уведомления | mamaGo Business" };
+export const metadata: Metadata = {
+  title: "Уведомления | Business",
+};
 
 export default function BusinessNotificationsPage() {
   return (
@@ -10,9 +12,9 @@ export default function BusinessNotificationsPage() {
       <BusinessSectionHeader
         eyebrow="КАБИНЕТ"
         title="Уведомления"
-        description="Последние события, новости и действия, которые требуют внимания"
+        description="Последние события, новости и действия, которые требуют внимания."
       />
-      <NotificationCenter stream="business" showHeader={false} />
+      <NotificationCenter stream="business" hideHeader />
     </div>
   );
 }

@@ -509,7 +509,9 @@ export function mapEventLegacyCtaToStepValue(
     case "time-slots":
       formValue.actionChoice = "REQUEST";
       formValue.requestMode = "CALENDAR";
-      formValue.calendarMode = "DATE_AND_TIME";
+      formValue.calendarMode = input.timeSlots.dates.length > 0 &&
+        input.timeSlots.dates.every((day) => day.slots.length > 0 && day.slots.every((slot) => !trim(slot.startTime)))
+        ? "DATE_ONLY" : "DATE_AND_TIME";
       formValue.legacyOrigin = "CTA";
       formValue.calendarDays = buildCalendarDaysFromEventTimeSlots(input.timeSlots);
       formValue.fallback.phone = trim(input.bookingPhone);
@@ -520,6 +522,20 @@ export function mapEventLegacyCtaToStepValue(
       formValue.requestLabelKind = "BOOK";
       formValue.legacyOrigin = "CTA";
       formValue.fallback.phone = trim(input.bookingPhone);
+      if (input.simpleBookingDate) {
+        const [startTime = "", endTime = ""] = (input.simpleBookingTime ?? "").split(/[-–]/);
+        formValue.calendarDays = [{
+          id: `${input.id}-simple-day`,
+          date: input.simpleBookingDate,
+          capacity: input.simpleBookingCapacity,
+          slots: [{
+            id: `${input.id}-simple-slot`,
+            startTime,
+            endTime,
+            capacity: input.simpleBookingCapacity,
+          }],
+        }];
+      }
       break;
     case "request":
       formValue.actionChoice = "DISCOVER";
@@ -654,7 +670,9 @@ export function mapCtaStepValueToEventFormPatch(
   const participationMode =
     legacy.participationMode === "external-link" ||
     legacy.participationMode === "time-slots" ||
-    legacy.participationMode === "prebook"
+    legacy.participationMode === "prebook" ||
+    legacy.participationMode === "request" ||
+    legacy.participationMode === "simple-booking"
       ? legacy.participationMode
       : "walk-in";
 

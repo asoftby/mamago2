@@ -1,25 +1,19 @@
-import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import { isDirectAccessError, requireDirectThreadAccess } from "@/lib/auth/directAccess";
-import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
-import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { getUnifiedConversationDetail } from "@/server/services/direct/directConversation.service";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { DirectThreadClient } from "@/app/(public)/me/direct/[threadId]/DirectThreadClient";
-
-export const metadata: Metadata = { title: "Переписка | mamaGo Business" };
 
 export default async function BusinessDirectThreadPage({
   params,
 }: {
   params: Promise<{ threadId: string }>;
 }) {
-  const { threadId } = await params;
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-
-  const business = await getMyBusiness(user.id);
-  if (!business) notFound();
+  const { threadId } = await params;
 
   let thread;
   try {
@@ -28,12 +22,12 @@ export default async function BusinessDirectThreadPage({
     if (isDirectAccessError(error)) notFound();
     throw error;
   }
-  // A user may also have private customer threads. Business routes must
-  // never open them, even when requireDirectThreadAccess permits customer access.
-  if (thread.businessId !== business.id) notFound();
+  // A personal customer thread is never a business-cabinet thread,
+  // even if its customer also happens to own a business.
+  if (!(await canAccessBusiness(user.id, thread.businessId))) notFound();
 
   const detail = await getUnifiedConversationDetail(
-    business.id,
+    thread.businessId,
     thread.customerUserId,
     "BUSINESS",
   );
@@ -43,10 +37,10 @@ export default async function BusinessDirectThreadPage({
     <div className="space-y-6">
       <BusinessSectionHeader
         eyebrow="КАБИНЕТ"
-        title="Переписка с клиентом"
-        description="История обращений и сообщений с одним клиентом"
+        title="Сообщения"
+        description="Переписка с клиентами вашей организации"
       />
-      <DirectThreadClient initialDetail={detail} surface="business" />
+      <DirectThreadClient initialDetail={detail} businessMode />
     </div>
   );
 }

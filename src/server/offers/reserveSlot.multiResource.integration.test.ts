@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { BookingStatus, PrismaClient } from "@prisma/client";
+import { createManualBooking } from "@/server/services/booking/booking.service";
 import { updateBookingStatus } from "@/server/services/booking/bookingQuery.service";
 import { reserveSlot, SlotReservationError } from "./reserveSlot";
 import { saveBookingServices } from "./bookingServices.service";
@@ -491,4 +492,25 @@ test("manual block in extension hour rejects entire booking, never only the extr
     (error: unknown) => error instanceof SlotReservationError && error.code === "SLOT_UNAVAILABLE");
   assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
   assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: room } }), 0);
+});
+
+test("manual confirmation shares resource exclusion and releases the same allocation", async () => {
+  const room = await unit("Manual room");
+  const offerId = await offer([room]);
+  await db.place.update({ where: { id: placeId }, data: { status: "PUBLISHED" } });
+  await db.offer.update({ where: { id: offerId }, data: { productType: "ONE_TIME_ACTIVITY" } });
+  const input = {
+    publicationType: "OFFER" as const, publicationId: offerId, status: "CONFIRMED" as const,
+    offerSlot: { startsAt: start.toISOString(), endsAt: end.toISOString(), unitId: room },
+    ...contact,
+  };
+  const result = await createManualBooking(input, { businessId, actorId: ownerId, requestKey: randomUUID() });
+  const row = await db.bookingRequest.findUniqueOrThrow({ where: { id: result.bookingId }, include: { allocations: true } });
+  assert.equal(row.source, "MANUAL");
+  assert.equal(row.holdUntil, null);
+  assert.equal(row.allocations[0]?.status, "CONFIRMED");
+  assert.equal(row.allocations[0]?.expiresAt, null);
+  await assert.rejects(reserveSlot({ offerId, startsAt: start, endsAt: end, unitId: room, ...contact }), SlotReservationError);
+  await updateBookingStatus(row.id, businessId, "REJECTED");
+  await reserveSlot({ offerId, startsAt: start, endsAt: end, unitId: room, ...contact });
 });

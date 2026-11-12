@@ -24,7 +24,7 @@ const QUICK_REPLIES = [
 
 interface Props {
   initialDetail: UnifiedConversationDetail;
-  surface?: "public" | "business";
+  businessMode?: boolean;
 }
 
 function statusLabel(status: UnifiedConversationDetail["occasions"][number]["status"]): string {
@@ -40,7 +40,7 @@ function statusLabel(status: UnifiedConversationDetail["occasions"][number]["sta
   }
 }
 
-export function DirectThreadClient({ initialDetail, surface = "public" }: Props) {
+export function DirectThreadClient({ initialDetail, businessMode = false }: Props) {
   const [detail, setDetail] = useState(initialDetail);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -67,7 +67,7 @@ export function DirectThreadClient({ initialDetail, surface = "public" }: Props)
     if (markedReadRef.current) return;
     markedReadRef.current = true;
     for (const occasion of detail.occasions) {
-      fetch(`/api/direct/${occasion.threadId}/read`, { method: "POST", credentials: "include" }).catch(() => {});
+      fetch(`/api/direct/${occasion.threadId}/read${businessMode ? "?as=business" : ""}`, { method: "POST", credentials: "include" }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -78,7 +78,7 @@ export function DirectThreadClient({ initialDetail, surface = "public" }: Props)
 
     async function refresh() {
       try {
-        const res = await fetch(`/api/direct/${anchorThreadId}`, { credentials: "include" });
+        const res = await fetch(`/api/direct/${anchorThreadId}${businessMode ? "?as=business" : ""}`, { credentials: "include" });
         if (!res.ok) return;
         setDetail(await res.json());
       } catch {
@@ -110,11 +110,11 @@ export function DirectThreadClient({ initialDetail, surface = "public" }: Props)
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [anchorThreadId]);
+  }, [anchorThreadId, businessMode]);
 
   async function refreshDetail() {
     if (!anchorThreadId) return;
-    const res = await fetch(`/api/direct/${anchorThreadId}`, { credentials: "include" });
+    const res = await fetch(`/api/direct/${anchorThreadId}${businessMode ? "?as=business" : ""}`, { credentials: "include" });
     if (res.ok) setDetail(await res.json());
   }
 
@@ -123,7 +123,7 @@ export function DirectThreadClient({ initialDetail, surface = "public" }: Props)
     if (!trimmed || sending || !detail.replyTargetThreadId) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/direct/${detail.replyTargetThreadId}/messages`, {
+      const res = await fetch(`/api/direct/${detail.replyTargetThreadId}/messages${businessMode ? "?as=business" : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -164,46 +164,18 @@ export function DirectThreadClient({ initialDetail, surface = "public" }: Props)
   }
 
   return (
-    <div className={surface === "business" ? `${styles.page} ${styles.businessPage}` : styles.page}>
-      {surface === "business" ? (
-        <div className="mb-4">
-          <Link href="/business/direct" className="text-sm font-semibold text-stone-600 hover:text-stone-950">
-            ← Все сообщения
-          </Link>
-        </div>
-      ) : (
-        <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
-          <Link href="/me/direct">← Мои сообщения</Link>
-        </div>
-      )}
+    <div className={businessMode ? `${styles.businessPage} space-y-4` : styles.page}>
+      <div className={businessMode ? "text-sm text-stone-500" : `${styles.wrap} ${styles.breadcrumbs}`}>
+        <Link href={businessMode ? "/business/direct" : "/me/direct"}>← {businessMode ? "Все сообщения" : "Мои сообщения"}</Link>
+      </div>
 
-      <div className={surface === "business"
-        ? "min-w-0 rounded-[28px] border border-stone-200/80 bg-white p-4 shadow-sm sm:p-6"
-        : styles.threadWrap}>
-        {surface === "business" ? (
-          <div className="flex items-center gap-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-lg font-semibold text-stone-700">
-              {detail.counterpartyLogoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={detail.counterpartyLogoUrl} alt="" className="h-full w-full object-cover" />
-              ) : detail.counterpartyName.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-lg font-semibold text-stone-950">{detail.counterpartyName}</h2>
-              <p className="text-sm text-stone-500">
-                {detail.occasions.length} обращений
-                {latestOccasion ? ` · ${statusLabel(latestOccasion.status)}` : ""}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <ConversationHeader
-            counterpartyName={detail.counterpartyName}
-            counterpartyLogoUrl={detail.counterpartyLogoUrl}
-            occasionCount={detail.occasions.length}
-            latestStatusLabel={latestOccasion ? statusLabel(latestOccasion.status) : undefined}
-          />
-        )}
+      <div className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : styles.threadWrap}>
+        <ConversationHeader
+          counterpartyName={detail.counterpartyName}
+          counterpartyLogoUrl={detail.counterpartyLogoUrl}
+          occasionCount={detail.occasions.length}
+          latestStatusLabel={latestOccasion ? statusLabel(latestOccasion.status) : undefined}
+        />
 
         {isWaitingOnMe && (
           <div className={`${styles.banner} ${styles.bannerWaiting}`}>

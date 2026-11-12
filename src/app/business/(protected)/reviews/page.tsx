@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Star, MessageSquare, Edit, Trash, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { Badge } from "@/components/ui/badge";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
 import Link from "next/link";

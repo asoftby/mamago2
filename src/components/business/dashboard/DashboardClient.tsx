@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
+import { shouldAutoOpenBusinessTour } from "@/lib/business/shouldAutoOpenBusinessTour";
 import Link from "next/link";
 import { CirclePlay } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -12,11 +13,14 @@ import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCar
 import { formatPrice } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { DepositTopUpTrigger } from "@/components/business/billing/DepositTopUpTrigger";
-import { DashboardHeader } from "@/components/business/dashboard/DashboardHeader";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { DashboardActionStack } from "@/components/business/dashboard/DashboardActionStack";
 import { DashboardPeriodSwitcher } from "@/components/business/dashboard/DashboardPeriodSwitcher";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
-import { BusinessOnboardingTour } from "@/components/business/dashboard/BusinessOnboardingTour";
+import {
+  BusinessOnboardingTour,
+  sendBusinessOnboardingAction,
+} from "@/components/business/dashboard/BusinessOnboardingTour";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
 import { BusinessTelegramStatusRow } from "@/components/business/notifications/BusinessTelegramStatusRow";
 import { DailyFreeBoostCard } from "@/components/business/dashboard/DailyFreeBoostCard";
@@ -458,10 +462,15 @@ interface DashboardClientProps {
 
 export function DashboardClient({ data, defaultPeriod = "week", verificationBanner }: DashboardClientProps) {
   const [period, setPeriod] = useState<DashboardPeriod>(defaultPeriod);
-  const [tourOpen, setTourOpen] = useState(() =>
-    data.onboarding.showLaunchpad && !data.onboarding.tourCompleted &&
-    !data.onboarding.tourSkipped && !data.onboarding.hasAny,
-  );
+  // First cabinet visit only. Persist immediately so a refresh cannot reopen the
+  // tour if `start` from the launchpad has not landed yet. Manual replay stays
+  // available via «Возможности кабинета».
+  const shouldAutoOpenTour = shouldAutoOpenBusinessTour(data.onboarding);
+  const [tourOpen, setTourOpen] = useState(shouldAutoOpenTour);
+  useEffect(() => {
+    if (!shouldAutoOpenTour) return;
+    void sendBusinessOnboardingAction("tour_skip");
+  }, [shouldAutoOpenTour]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -488,7 +497,25 @@ export function DashboardClient({ data, defaultPeriod = "week", verificationBann
   const isOnboarding = data.onboarding.showLaunchpad;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* The same B2B header as Bookings; the onboarding tour keeps its anchor. */}
+      <div data-business-tour="intro">
+        <BusinessSectionHeader
+          eyebrow="КАБИНЕТ"
+          title="Панель управления"
+          description="Обзор обращений, публикаций и результатов вашей организации."
+          actions={
+            <Link
+              href={data.hrefs.settings}
+              className="inline-flex min-h-10 items-center rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              title="Настройки бизнеса"
+            >
+              {data.legalName ?? data.businessName}{data.city ? ` · ${data.city}` : ""}
+            </Link>
+          }
+        />
+      </div>
+
       {/* Verification and tour share the top row on mobile and desktop. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {verificationBanner}
@@ -501,16 +528,6 @@ export function DashboardClient({ data, defaultPeriod = "week", verificationBann
           <CirclePlay className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>Возможности кабинета</span>
         </button>
-      </div>
-
-      {/* Header: title + identity — always shown */}
-      <div data-business-tour="intro">
-        <DashboardHeader
-          businessName={data.businessName}
-          legalName={data.legalName}
-          city={data.city}
-          settingsHref={data.hrefs.settings}
-        />
       </div>
       {/* Business Bot connection stays visible in either dashboard state. */}
       <BusinessTelegramStatusRow location="dashboard" />

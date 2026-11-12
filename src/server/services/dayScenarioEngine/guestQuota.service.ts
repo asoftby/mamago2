@@ -5,7 +5,7 @@ import { guestMaxLifetimeGenerations } from "@/server/services/guestPlanQuota";
 /**
  * The guest quota of the day scenario (BACKLOG-230, PR 3c-2): only the FIRST build of a date counts. Another variant,
  * a replacement and a rebuild of a date already built are free; a second build of the same date is free too. A guest
- * has the same lifetime allowance as the old guest picks (GUEST_MAX_GENERATIONS, default 2), so a weekend (two dates)
+ * has the same lifetime allowance as the old guest picks (GUEST_MAX_GENERATIONS, default 3), so a weekend (two dates)
  * is the whole allowance; after that the guest signs in or registers.
  */
 

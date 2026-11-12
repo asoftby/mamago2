@@ -92,16 +92,20 @@ export async function PUT(request: NextRequest, { params }: Context) {
         throw new UnitEditError(409, "Есть будущие бронирования. Изменение ресурса недоступно.");
 
       // Offer ownership is through linked Place; never trust client-supplied IDs.
-      const owned = await tx.offer.count({
-        where: { id: { in: offerIds }, place: { ownerBusinessId: businessId } },
-      });
-      if (owned !== offerIds.length)
-        throw new UnitEditError(403, "Услуги не принадлежат бизнесу");
+      if (offerIds.length > 0) {
+        const owned = await tx.offer.count({
+          where: { id: { in: offerIds }, place: { ownerBusinessId: businessId } },
+        });
+        if (owned !== offerIds.length)
+          throw new UnitEditError(403, "Услуги не принадлежат бизнесу");
+      }
 
       await tx.bookingUnitOffer.deleteMany({ where: { bookingUnitId: id } });
-      await tx.bookingUnitOffer.createMany({
-        data: offerIds.map(offerId => ({ bookingUnitId: id, offerId })),
-      });
+      if (offerIds.length > 0) {
+        await tx.bookingUnitOffer.createMany({
+          data: offerIds.map(offerId => ({ bookingUnitId: id, offerId })),
+        });
+      }
       await tx.availabilityRule.deleteMany({ where: { bookingUnitId: id } });
       await tx.availabilityRule.createMany({
         data: rules.map(rule => ({ bookingUnitId: id, ...rule })),

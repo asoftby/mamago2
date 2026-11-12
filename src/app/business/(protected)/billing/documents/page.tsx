@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth/server";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { LegalDocumentsBlock } from "@/components/business/billing/LegalDocumentsBlock";
@@ -45,6 +46,11 @@ export default async function BillingDocumentsPage() {
 
   return (
     <div className="space-y-6">
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Документы"
+        description="Счета, акты и договоры организации."
+      />
       {/* Legal Documents Block (Always Visible) */}
       <LegalDocumentsBlock documents={legalDocuments} />
 

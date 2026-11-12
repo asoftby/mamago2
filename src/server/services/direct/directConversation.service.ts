@@ -164,12 +164,13 @@ async function getCustomerSideItems(userId: string): Promise<UnifiedConversation
 
 /** Business-side groups: every business this user represents, grouped by which customer messaged them. */
 async function getBusinessSideItems(userId: string, selectedBusinessId?: string): Promise<UnifiedConversationListItem[]> {
-  const businessIds = await getBusinessIdsUserCanAccess(userId);
-  const permittedIds = selectedBusinessId ? businessIds.filter((id) => id === selectedBusinessId) : businessIds;
-  if (permittedIds.length === 0) return [];
+  const permittedBusinessIds = await getBusinessIdsUserCanAccess(userId);
+  if (selectedBusinessId && !permittedBusinessIds.includes(selectedBusinessId)) return [];
+  const businessIds = selectedBusinessId ? [selectedBusinessId] : permittedBusinessIds;
+  if (businessIds.length === 0) return [];
 
   const threads = await prisma.directThread.findMany({
-    where: { businessId: { in: permittedIds } },
+    where: { businessId: { in: businessIds } },
     include: threadIncludeWithCustomer,
     orderBy: { lastMessageAt: "desc" },
   });
@@ -209,17 +210,38 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
   return items;
 }
 
-/**
- * Business cabinet inbox only. Unlike /me/direct, never mixes a manager's
- * private customer threads into the organization's customer inbox.
- * The selected business is checked against the caller's memberships.
+/** Personal-profile inbox: only conversations where this user is the customer.
+ * Business replies are available via getBusinessConversationsForUser instead.
+ */
+export async function getCustomerConversationsForUser(
+  userId: string,
+): Promise<UnifiedConversationListItem[]> {
+  return getCustomerSideItems(userId);
+}
+
+/** Single counter contract for both personal and business inboxes. */
+export function countConversationsByTab(
+  items: UnifiedConversationListItem[],
+): Record<ConversationTab, number> {
+  const counts: Record<ConversationTab, number> = {
+    ALL: items.length,
+    ACTIVE: 0,
+    WAITING: 0,
+    COMPLETED: 0,
+    ARCHIVE: 0,
+  };
+  for (const item of items) counts[item.tab] += 1;
+  return counts;
+}
+
+/** Only client conversations for the selected, authorized business cabinet.
+ * Never query or combine this user's personal customer conversations here.
  */
 export async function getBusinessConversationsForUser(
   userId: string,
   businessId: string,
 ): Promise<UnifiedConversationListItem[]> {
-  const items = await getBusinessSideItems(userId, businessId);
-  return items.sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+  return getBusinessSideItems(userId, businessId);
 }
 
 /** Parses "D-10253" or "10253" into a numeric threadNumber for search. */

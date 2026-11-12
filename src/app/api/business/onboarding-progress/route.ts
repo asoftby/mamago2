@@ -39,18 +39,31 @@ export async function POST(request: NextRequest) {
     action === "tour_complete" ? { tourCompletedAt: now } :
     action === "tour_skip" ? { tourSkippedAt: now } :
     action === "public_open" ? { firstPublicViewedAt: now } : {};
+  // Any first cabinet interaction counts as started so auto-open cannot race a refresh.
+  const marksStarted = action === "start" || action === "tour_complete" || action === "tour_skip";
 
   await prisma.businessOnboardingState.upsert({
     where: { businessId_userId: { businessId: business.id, userId: user.id } },
     create: {
       businessId: business.id,
       userId: user.id,
-      ...(action === "start" ? { startedAt: now } : {}),
+      ...(marksStarted ? { startedAt: now } : {}),
       tourVersion: 1,
       ...patch,
     },
     update: { ...(action === "start" ? { startedAt: now } : {}), ...patch },
   });
+
+  if (marksStarted) {
+    await prisma.businessOnboardingState.updateMany({
+      where: {
+        businessId: business.id,
+        userId: user.id,
+        startedAt: null,
+      },
+      data: { startedAt: now },
+    });
+  }
 
   return NextResponse.json({ ok: true }, { headers: noStore });
 }
