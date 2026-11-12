@@ -76,14 +76,26 @@ export function getPurchaseLabel(type: EventActionType): string {
 }
 
 /**
- * Форматирует дату плана для отображения
+ * Форматирует дату плана для отображения (например "24 нояб.").
+ * Accepts YYYY-MM-DD plan keys without UTC day-shift.
  */
 export function formatPlanDateShort(dateISO: string): string {
   try {
-    const date = new Date(dateISO);
+    const key = dateISO.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+      return new Date(dateISO).toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short",
+        timeZone: "Europe/Minsk",
+      });
+    }
+    // Noon local avoids DST/timezone flipping the calendar day.
+    const date = new Date(`${key}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return dateISO;
     return date.toLocaleDateString("ru-RU", {
       day: "numeric",
       month: "short",
+      timeZone: "Europe/Minsk",
     });
   } catch {
     return dateISO;
