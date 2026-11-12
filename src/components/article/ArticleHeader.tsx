@@ -72,7 +72,7 @@ export function ArticleHeader({
   ) : null;
 
   return (
-    <header className="mb-10 md:mb-14">
+    <header className="mb-5 md:mb-6">
       {/* Journal · [section] · date · read time · edit */}
       {showMeta ? (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 mb-5 text-sm text-muted-foreground font-sans">
