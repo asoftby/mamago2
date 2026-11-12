@@ -305,7 +305,7 @@ export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "sc
   return undefined;
 }
 
-function resolveSimpleBooking(
+export function resolveSimpleBooking(
   activityId: string,
   activity: ActivityForEventPageInput,
 ): EventPageData["cta"]["simpleBooking"] {
