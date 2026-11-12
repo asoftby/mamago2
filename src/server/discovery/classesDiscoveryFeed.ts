@@ -7,7 +7,7 @@ import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
-import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
+import { getBusinessQualityBoostMap, applyActivePublicationBoost, getPublicationBoostLevel } from "@/server/services/ranking/businessQualityBoost";
 import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
 
 function ageBoundsFromOffer(offer: {
@@ -228,18 +228,16 @@ export async function getClassesDiscoveryFeed(
     });
     const crossRegion = offer.place?.cityId != null && !homeCityIds.includes(offer.place.cityId);
     const applicableBoosts = offer.boosts.filter(boost => isBoostForDiscoveryRegion(boost, targetRegionId, !crossRegion));
-    const isBoosted = applicableBoosts.length > 0;
-    const isPromoted = applicableBoosts.some(boost => !boost.isFreeDaily);
+    const boostLevel = getPublicationBoostLevel(applicableBoosts);
+    const isPromoted = boostLevel === "PAID";
     const baseEngagement = 0;
 
-    // Apply quality boost (capped at +10%, no effect on promoted boosts)
+    // Quality only applies to organic results; free is a smaller +6 nudge.
     const businessId = (offer.place as { ownerBusinessId?: string | null }).ownerBusinessId;
     const qualityMultiplier = businessId ? (qualityBoostMap.get(businessId) ?? 1.0) : 1.0;
-    // Don't apply quality boost to already-promoted offers (isBoosted = 1000)
-    // to avoid double-boosting. Only apply to organic offers.
     const finalEngagement = applyActivePublicationBoost(
       baseEngagement,
-      isBoosted,
+      boostLevel,
       qualityMultiplier,
     );
 
