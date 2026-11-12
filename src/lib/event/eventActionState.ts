@@ -75,28 +75,47 @@ export function getPurchaseLabel(type: EventActionType): string {
   }
 }
 
+/** Compact plan CTA months: «24 ноя.» (not locale «нояб.»). */
+const PLAN_MONTHS_SHORT = [
+  "янв.",
+  "фев.",
+  "мар.",
+  "апр.",
+  "мая",
+  "июн.",
+  "июл.",
+  "авг.",
+  "сен.",
+  "окт.",
+  "ноя.",
+  "дек.",
+] as const;
+
 /**
- * Форматирует дату плана для отображения (например "24 нояб.").
+ * Форматирует дату плана для отображения (например "24 ноя.").
  * Accepts YYYY-MM-DD plan keys without UTC day-shift.
  */
 export function formatPlanDateShort(dateISO: string): string {
   try {
     const key = dateISO.slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) {
-      return new Date(dateISO).toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "short",
-        timeZone: "Europe/Minsk",
-      });
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+      const month = Number(key.slice(5, 7));
+      const day = Number(key.slice(8, 10));
+      if (month < 1 || month > 12 || day < 1 || day > 31) return dateISO;
+      return `${day} ${PLAN_MONTHS_SHORT[month - 1]}`;
     }
-    // Noon local avoids DST/timezone flipping the calendar day.
-    const date = new Date(`${key}T12:00:00`);
-    if (Number.isNaN(date.getTime())) return dateISO;
-    return date.toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "short",
+    // Full ISO: read the calendar day in Europe/Minsk, then reuse compact months.
+    const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Europe/Minsk",
-    });
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date(dateISO));
+    const y = parts.find((p) => p.type === "year")?.value;
+    const m = parts.find((p) => p.type === "month")?.value;
+    const d = parts.find((p) => p.type === "day")?.value;
+    if (!y || !m || !d) return dateISO;
+    return formatPlanDateShort(`${y}-${m}-${d}`);
   } catch {
     return dateISO;
   }

@@ -14,6 +14,7 @@ assert.equal(
   getEventSaveStatusLabel({ inPlan: true, isIdea: true, planDate: "2026-11-24" }),
   `В плане на ${formatPlanDateShort("2026-11-24")}`,
 );
-assert.match(formatPlanDateShort("2026-11-24"), /^24\s+ноя/);
+assert.equal(formatPlanDateShort("2026-11-24"), "24 ноя.");
+assert.equal(formatPlanDateShort("2026-11-13"), "13 ноя.");
 
 console.log("Event saved status labels: OK");
