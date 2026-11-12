@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
 
 /** Persist the order of existing PlaceImages for non-published places. */
 export async function POST(
@@ -18,6 +19,9 @@ export async function POST(
   if (!place) return NextResponse.json({ error: "Place not found" }, { status: 404 });
   if (!(await canManagePlaceAsync(user, place))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (place.status === "PENDING" && !canEditPendingPlace(user.role)) {
+    return NextResponse.json({ error: "Pending places can only be edited by staff" }, { status: 403 });
   }
   if (place.status === "PUBLISHED") {
     return NextResponse.json({ error: "Published images require revision" }, { status: 409 });

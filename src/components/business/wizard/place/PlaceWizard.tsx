@@ -518,6 +518,9 @@ export function PlaceWizard({
             }),
           });
           if (!saveResponse.ok) throw new Error("Не удалось сохранить черновик ревизии");
+          // Future revision PATCHes are deltas from the successfully saved draft,
+          // not from the original published Place (A → B → A must persist A).
+          setOriginalData(formData);
         } else {
           const payload = { ...changes, wizardSessionId };
           const perf = createClientSavePerf("save-place:client", {
