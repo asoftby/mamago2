@@ -197,7 +197,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
 
   return (
     <div className="min-h-screen pb-20">
-      <Container className="space-y-[53px] pt-[46px]">
+      <Container className="pt-[30px]">
         <Suspense fallback={<HeroGreetingShell initialModel={heroFallbackModel} />}>
           <HeroWeatherSection
             cityId={city.id}
@@ -210,9 +210,10 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           />
         </Suspense>
 
+        <div className="mt-[30px] space-y-[53px]">
         <StoriesSection cityId={city.id} citySlug={city.slug} />
 
-        <div className="px-1">
+        <div className="!mt-[30px] px-1 [&+*]:!mt-[30px]">
           <ActivationBannerHost />
         </div>
 
@@ -248,6 +249,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
         ) : null}
 
         <CityHomeJournalSection articles={journalArticles} categories={journalCategories} />
+        </div>
       </Container>
     </div>
   );

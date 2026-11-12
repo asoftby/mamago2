@@ -1,5 +1,6 @@
 import { addDaysLocal } from "@/lib/date/localDateKey";
 import { expandScheduleItemDates, isLocalDateString } from "./expandScheduleItemDates";
+import { getEventBookingSchedule } from "./eventBookingSchedule";
 import { normalizeSessionTitle } from "./sessionTitle";
 
 export type ScheduleJsonLike = {
@@ -253,6 +254,12 @@ export function extractScheduleOccurrences(scheduleJson: unknown, window?: Sched
   for (const occurrence of occurrences) {
     if (window && (occurrence.date < window.from || occurrence.date > window.to)) continue;
     unique.set(`${occurrence.date}|${occurrence.startTime}`, occurrence);
+  }
+
+  for (const [key, slot] of getEventBookingSchedule(scheduleJson)) {
+    if (!slot.startTime) continue;
+    if (window && (slot.date < window.from || slot.date > window.to)) continue;
+    if (!unique.has(key)) unique.set(key, { date: slot.date, startTime: slot.startTime });
   }
 
   return [...unique.values()].sort((a, b) =>

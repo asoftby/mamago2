@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth/server";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { redirect } from "next/navigation";
 import { EMPTY_BILLING_STATE, formatDate } from "@/lib/business/billing";
 import { formatPrice } from "@/lib/formatters/format-price";
@@ -27,6 +28,11 @@ export default async function BillingPlanPage() {
 
   return (
     <div className="space-y-6">
+      <BusinessSectionHeader
+        eyebrow="КАБИНЕТ"
+        title="Тариф"
+        description="Текущий тариф, способ оплаты и история продлений организации."
+      />
       {!plan ? (
         <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center shadow-sm">
           <div className="w-16 h-16 rounded-2xl bg-stone-100 flex items-center justify-center mx-auto mb-4">

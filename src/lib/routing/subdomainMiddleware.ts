@@ -148,7 +148,18 @@ export function resolveSubdomainMiddlewareDecision(params: {
   const isLocalhost = isDevLocalHost(hostname);
 
   if (isLocalhost) {
-    // Dev LAN / localhost fallback: keep path as-is and treat as public surface.
+    // Public surface as-is, except the single-city default for `/`.
+    if (pathname === "/") {
+      return {
+        kind: "redirect",
+        location: buildSameHostLocation({
+          protocol,
+          host,
+          pathname: "/minsk",
+          search: "",
+        }),
+      };
+    }
     return { kind: "next" };
   }
 
@@ -246,18 +257,17 @@ export function resolveSubdomainMiddlewareDecision(params: {
   }
 
   if (isBusinessHost) {
-    // Unified direct messages live on the public surface. Without this narrow
-    // redirect, business-host /me/direct becomes /business/me/direct (404).
-    // Preserve legacy /direct links and unhydrated /me/direct navigation.
-    const isLegacyDirect = pathname === "/direct" || pathname.startsWith("/direct/");
-    const isUnifiedDirect = pathname === "/me/direct" || pathname.startsWith("/me/direct/");
-    if (isLegacyDirect || isUnifiedDirect) {
+    // Personal conversations must stay on the public surface, but /direct
+    // now belongs to the business cabinet. On the business subdomain,
+    // /direct and /direct/[id] fall through to the /business/* rewrite below.
+    const isPersonalDirect = pathname === "/me/direct" || pathname.startsWith("/me/direct/");
+    if (isPersonalDirect) {
       return {
         kind: "redirect",
         location: buildPublicLocation({
           host,
           protocol,
-          pathname: isLegacyDirect ? `/me${pathname}` : pathname,
+          pathname,
           search: adminSafeSearch,
           // Preserve DEV/PROD host even if NEXT_PUBLIC_APP_URL differs.
         }),

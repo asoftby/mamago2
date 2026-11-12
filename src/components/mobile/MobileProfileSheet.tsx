@@ -11,6 +11,7 @@ import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
+import { accountProfileTriggerLetter } from "@/lib/account/userInitials";
 import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
 import { useCurrentPath } from "@/hooks/useCurrentPath";
 import {
@@ -60,9 +61,32 @@ export function MobileProfileSheet({
   });
 
   const resolvedProfileAvatar = profileAvatarUrl ?? user?.avatarUrl ?? undefined;
+  const profileLetter =
+    user != null ? accountProfileTriggerLetter(user.displayName, user.email) : null;
   const showBadge = profileBadgeCount > 0;
   const size = compact ? "compact" : "default";
   const bare = variant === "bare";
+
+  // Header floating chrome is a white pill (`MOBILE_FLOATING_CHROME`), even when
+  // callers pass chrome="dark" — never use white letter text on that surface.
+  const letterInner = profileLetter ? (
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full font-semibold uppercase transition-colors duration-200",
+        bare
+          ? "h-[52px] w-[52px] text-base"
+          : compact
+            ? "h-8 w-8 text-[12px]"
+            : "h-[37px] w-[37px] text-[13px]",
+        isProfileActive
+          ? "bg-[#EF8759]/15 text-[#C24E22]"
+          : "bg-neutral-100/95 text-neutral-700",
+      )}
+      aria-hidden
+    >
+      {profileLetter}
+    </span>
+  ) : null;
 
   const inner = resolvedProfileAvatar ? (
     // eslint-disable-next-line @next/next/no-img-element -- remote avatar URLs may be arbitrary
@@ -75,6 +99,8 @@ export function MobileProfileSheet({
         bare ? "h-[52px] w-[52px]" : compact ? "h-8 w-8" : "h-[37px] w-[37px]",
       )}
     />
+  ) : letterInner ? (
+    letterInner
   ) : bare || chrome === "dark" ? (
     <NavUserIcon
       className={cn(

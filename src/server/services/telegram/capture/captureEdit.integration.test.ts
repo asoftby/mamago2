@@ -68,7 +68,7 @@ async function makeItem() {
   });
 }
 
-async function edit(script: Reply[], models: CaptureModelConfig) {
+async function edit(script: Reply[], models: CaptureModelConfig, opts?: { previewFailure?: boolean }) {
   const item = await makeItem();
   const calls: OpenRouterCallInput[] = [];
   const queue = [...script];
@@ -86,7 +86,10 @@ async function edit(script: Reply[], models: CaptureModelConfig) {
     },
     models: () => models,
     context: { db, city: { findCityIdBySlug: async () => cityId }, places: { publicPlaceWhere: getPublicPublishedPlaceWhere() } },
-    presenter: { present: async (id: string) => { presented.push(id); } } as never,
+    presenter: { present: async (id: string) => {
+      if (opts?.previewFailure) throw new Error("Telegram preview unavailable");
+      presented.push(id);
+    } } as never,
     notifier: { typing: async () => undefined, reply: async (_chat: number, text: string) => { replies.push(text); } },
   });
   const capture: ParsedCapture = {
@@ -130,7 +133,24 @@ test("a valid first answer is applied: version bump, usage, presenter", async ()
   assert.deepEqual([h.after.tokensIn, h.after.tokensOut], [10, 5]);
   assert.equal(h.after.error, null);
   assert.deepEqual(h.presented, [h.item.id]);
-  assert.equal(h.replies.length, 1, "only the \"accepted\" reply, no failure text");
+  assert.deepEqual(h.replies, [
+    "Правки приняты, вношу изменения",
+    "Готово. Правка сохранена. Проверьте обновлённую карточку.",
+  ]);
+  assert.ok(!h.replies.includes(FAILURE_TEXT));
+});
+
+test("a Telegram preview failure after commit reports saved, not an edit failure", async () => {
+  const h = await edit([ok(edited(), FAST)], both, { previewFailure: true });
+  assert.equal(titleOf(h.after.draft), "Новое название");
+  assert.equal(h.after.draftVersion, 2);
+  assert.equal(h.after.editCount, 1);
+  assert.equal(h.after.awaitingEditUntil, null, "edit window remains closed after commit");
+  assert.deepEqual(h.presented, []);
+  assert.deepEqual(h.replies, [
+    "Правки приняты, вношу изменения",
+    "Правка сохранена, но обновить карточку в Telegram не удалось. Попробуйте открыть её позже.",
+  ]);
   assert.ok(!h.replies.includes(FAILURE_TEXT));
 });
 

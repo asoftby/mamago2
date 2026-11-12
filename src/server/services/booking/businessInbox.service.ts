@@ -25,7 +25,7 @@ function minskEndOfDay(date: Date | null): Date | null {
 }
 
 const INBOX_SELECT = {
-  id: true, kind: true, status: true, partyStage: true,
+  id: true, kind: true, status: true, source: true, partyStage: true,
   createdAt: true, firstResponseAt: true, lastActivityAt: true,
   requestedDate: true, requestedTime: true, responseDueAt: true,
   startsAt: true, endsAt: true, campShiftDateTo: true,
@@ -104,6 +104,7 @@ export async function getBusinessInbox({
       packageScope: scopes.get(row.id) ?? null,
       kind: row.kind,
       status: row.status,
+      source: row.source,
       partyStage: row.partyStage,
       createdAt: row.createdAt,
       // No parent PII, contact, comments or personal info in this endpoint.

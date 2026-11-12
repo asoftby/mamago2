@@ -16,7 +16,7 @@
  * Writes use the plain Prisma client (no search indexing): mocks are visible to the
  * public listing predicates and to the engine, not to the search index.
  */
-import { PrismaClient, type Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { fromZonedTime } from "date-fns-tz";
 import { geoCellsFor } from "../../src/lib/geo/geoCell";
 import { CLUSTER_LABEL, MOCK_PLACES, type ClusterKey, type MockPlaceSpec } from "./day-scenario-mocks/places.data";
@@ -276,7 +276,19 @@ async function applyPlaces(ctx: Ctx): Promise<Map<string, string>> {
       lng: spec.lng,
       geoCell6: cells?.geoCell6 ?? null,
       geoCell5: cells?.geoCell5 ?? null,
-      shortAddress: `Минск, ${CLUSTER_LABEL[spec.cluster]} (тестовая точка)`,
+      // Street+house only — city comes from Place.city for "Город, улица, дом".
+      shortAddress: `${
+        (
+          {
+            center: "ул. Немига",
+            uruche: "пр-т Независимости",
+            kamgorka: "ул. Притыцкого",
+            serebr: "ул. Якубова",
+            bor: "ул. 40 лет Победы",
+            zhd: "ул. Тимирязева",
+          } as const
+        )[spec.cluster]
+      }, ${10 + ((ordinal - 1) % 80)}`,
       primaryCategoryId: ctx.categories.get(spec.primary)!,
       ageTags: spec.ages,
       agePolicy: spec.adultOnly ? ("ADULT_ONLY" as const) : spec.ages.length > 0 ? ("SPECIFIC" as const) : ("UNKNOWN" as const),
@@ -428,11 +440,15 @@ async function main(): Promise<number> {
     console.log(buildPlanLines(minskDateOf(new Date())).join("\n"));
     return 0;
   }
+  // Refuse before importing Prisma Client: its config loads `.env` and would
+  // otherwise make APP_ENV=local look "allowed" even when the parent process
+  // intentionally left APP_ENV unset (refusal e2e).
   const reason = refusalReason(process.env, argValue("confirm-host"));
   if (reason) {
     console.log(`MOCK_SEED REFUSED: ${reason}`);
     return 2;
   }
+  const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient();
   try {
     console.log(`target database host: ${databaseHost()} (APP_ENV=${process.env.APP_ENV})`);

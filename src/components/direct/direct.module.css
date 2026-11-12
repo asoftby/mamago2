@@ -3,7 +3,8 @@
    (bookings.module.css), адаптированный под карточки диалогов.
 ══════════════════════════════════════════════════════════════════ */
 
-.page {
+.page,
+.businessPage {
   --font-display: var(--font-pt-serif), Georgia, serif;
   --font-body: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: Menlo, ui-monospace, monospace;
@@ -25,7 +26,9 @@
   --hot: #d6342b;
   --hot-bg: rgba(214, 52, 43, 0.1);
   --maxw: 1100px;
+}
 
+.page {
   position: relative;
   min-height: 100vh;
   background: var(--page);
@@ -706,4 +709,19 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--accent-deep);
+}
+
+/* The business cabinet supplies its own page shell. Keep message tokens,
+   but do not add the public profile's full-height page or narrow layout. */
+.businessThread {
+  max-width: none;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid #e7e5e4;
+  border-radius: 18px;
+  background: #fff;
+}
+
+@media (max-width: 390px) {
+  .businessThread { padding: 14px; }
 }

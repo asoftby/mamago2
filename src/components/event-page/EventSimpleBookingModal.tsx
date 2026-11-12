@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -65,28 +65,31 @@ type Props = {
   eventImageUrl?: string | null;
   eventVenue?: string | null;
   booking: EventSimpleBookingData;
+  initialSessionId?: string | null;
 };
 
 export function EventSimpleBookingModal({
   open, onOpenChange,
   eventTitle, eventCategory, priceLabel, eventImageUrl, eventVenue,
-  booking,
+  booking, initialSessionId,
 }: Props) {
-  const slots = booking.slots ?? [];
+  const slots = useMemo(() => booking.slots ?? [], [booking.slots]);
   // «Оставить заявку»: заявка на участие без выбора времени — другие слова, чем у записи на слот.
   const isRequest = booking.label === "Оставить заявку";
   const dateGroups = useMemo(() => groupSlotsByDate(slots), [slots]);
 
   const [phase, setPhase]       = useState<Phase>("form");
   const [apiError, setApiError] = useState<string | null>(null);
-  const [dateId, setDateId]     = useState<string>(dateGroups[0]?.isoDate ?? "");
-  const [timeId, setTimeId]     = useState<string>(dateGroups[0]?.slots[0]?.id ?? "");
+  const [dateId, setDateId] = useState("");
+  const [timeId, setTimeId] = useState("");
+  const inFlight = useRef(false);
+  const initialSlot = slots.find((slot) => slot.id === initialSessionId);
 
-  const selectedDate = dateGroups.find(d => d.isoDate === dateId) ?? dateGroups[0];
-  const selectedSlot = slots.find(s => s.id === timeId);
+  const selectedDate = dateGroups.find((group) => group.isoDate === (dateId || initialSlot?.isoDate)) ?? dateGroups[0];
+  const selectedSlot = selectedDate?.slots.find((slot) => slot.id === (timeId || initialSlot?.id)) ?? selectedDate?.slots[0];
 
   // В режиме time-slots нужен выбранный слот; в simple-booking слотов нет → сразу valid
-  const valid = slots.length > 0 ? !!timeId : true;
+  const valid = slots.length === 0 || Boolean(selectedSlot);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -94,7 +97,8 @@ export function EventSimpleBookingModal({
   });
 
   async function onSubmit(values: FormValues) {
-    if (!valid) return;
+    if (!valid || inFlight.current) return;
+    inFlight.current = true;
     setPhase("submitting");
     setApiError(null);
     try {
@@ -105,8 +109,9 @@ export function EventSimpleBookingModal({
         body: JSON.stringify({
           publicationType: "EVENT",
           publicationId: booking.activityId,
+          selectedSessionId: selectedSlot?.startTime ? selectedSlot.id : undefined,
           requestedDate: selectedSlot?.isoDate ?? booking.date,
-          requestedTime: selectedSlot?.startTime ?? booking.time,
+          requestedTime: selectedSlot?.startTime || booking.time,
           customerName: values.customerName.trim(),
           customerPhone: values.customerPhone.trim(),
           customerComment: values.comment.trim() || undefined,
@@ -119,21 +124,24 @@ export function EventSimpleBookingModal({
     } catch {
       setApiError("Ошибка соединения. Попробуйте ещё раз.");
       setPhase("error");
+    } finally {
+      inFlight.current = false;
     }
   }
 
   function handleClose(val: boolean) {
+    if (!val && inFlight.current) return;
     if (!val) {
       reset(); setPhase("form"); setApiError(null);
-      setDateId(dateGroups[0]?.isoDate ?? "");
-      setTimeId(dateGroups[0]?.slots[0]?.id ?? "");
+      setDateId("");
+      setTimeId("");
     }
     onOpenChange(val);
   }
 
   const submitting = phase === "submitting";
-  const summary = selectedSlot
-    ? `${selectedDate ? `${selectedDate.dow.toLowerCase()}, ${selectedDate.d} ${selectedDate.m}` : ""} · ${slotTimeLabel(selectedSlot)}`
+  const summary = selectedDate
+    ? `${selectedDate.dow.toLowerCase()}, ${selectedDate.d} ${selectedDate.m}${selectedSlot?.startTime ? ` · ${slotTimeLabel(selectedSlot)}` : ""}`
     : (isRequest ? "Без выбора времени" : (eventCategory ?? "Запись на событие"));
 
   return (
@@ -141,7 +149,7 @@ export function EventSimpleBookingModal({
       open={open}
       onOpenChange={handleClose}
       ticket={{ title: eventTitle, imageUrl: eventImageUrl ?? null, venue: eventVenue ?? null, priceLabel: priceLabel ?? null }}
-      heading={phase === "success" ? <>{isRequest ? "Заявка отправлена" : "Вы записаны"}</> : isRequest ? <>Оставить заявку</> : <>Записаться на событие</>}
+      heading={phase === "success" ? <>Заявка отправлена</> : isRequest ? <>Оставить заявку</> : <>Записаться на событие</>}
     >
       {phase === "success" ? (
         <RsSuccess
@@ -159,18 +167,18 @@ export function EventSimpleBookingModal({
               <RsSection label="Дата">
                 <RsDateCards
                   items={dateGroups.map((dg) => ({ key: dg.isoDate, weekday: dg.dow.toLowerCase(), day: Number(dg.d), month: dg.m }))}
-                  value={dateId}
+                  value={selectedDate?.isoDate ?? ""}
                   onChange={(iso) => {
                     setDateId(iso);
                     setTimeId(dateGroups.find((g) => g.isoDate === iso)?.slots[0]?.id ?? "");
                   }}
                 />
               </RsSection>
-              {selectedDate && selectedDate.slots.length > 0 ? (
+              {selectedSlot?.startTime && selectedDate ? (
                 <RsSection label="Время">
                   <RsChipRow>
                     {selectedDate.slots.map((slot) => (
-                      <RsChip key={slot.id} active={slot.id === timeId} onClick={() => setTimeId(slot.id)}>
+                      <RsChip key={slot.id} active={slot.id === selectedSlot?.id} onClick={() => setTimeId(slot.id)}>
                         {slotTimeLabel(slot)}
                       </RsChip>
                     ))}

@@ -8,7 +8,7 @@ export const bookingUnitFieldsSchema = z.object({
   cleanupMinutes: z.number().int().min(0).max(240).default(0),
   minDurationMinutes: z.number().int().min(15).max(1440).nullable().default(null),
   stepMinutes: z.number().int().min(5).max(240).default(30),
-  offerIds: z.array(z.string().min(1)).min(1).max(30),
+  offerIds: z.array(z.string().min(1)).max(30),
   rules: z.array(z.object({
     weekday: z.number().int().min(1).max(7),
     startMinutes: z.number().int().min(0).max(1439),

@@ -138,11 +138,13 @@ export function OfferPageView({
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isIdeaSaved, setIsIdeaSaved] = useState(false);
+  const [inBirthdaySaved, setInBirthdaySaved] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
 
   const loadIdeaStatus = useCallback(async () => {
     if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
       setIsIdeaSaved(false);
+      setInBirthdaySaved(false);
       setLocalSave(null);
       setPlanItemId(null);
       return;
@@ -154,6 +156,7 @@ export function OfferPageView({
       if (!res.ok) return;
       const json = await res.json();
       setIsIdeaSaved(Boolean(json.isIdea));
+      setInBirthdaySaved(Boolean(json.inBirthday));
       setPlanItemId(typeof json.planItemId === "string" ? json.planItemId : null);
       setLocalSave(json.inPlan ? { kind: "plan", dateISO: json.planDate ?? null } : null);
     } catch {
@@ -385,7 +388,7 @@ export function OfferPageView({
     }).catch(() => toast.error("Не удалось добавить предложение в «Мой план»"));
   }, [data.id, planItemId, loadIdeaStatus]);
 
-  const isSaved = isIdeaSaved || Boolean(localSave);
+  const isSaved = isIdeaSaved || Boolean(localSave) || inBirthdaySaved;
   useRegisterHeaderSaveAction(isSaved, handleSave, data.title, { entityNoun: "предложением" });
   const isPlanSaved = localSave?.kind === "plan";
   const planDate = localSave?.kind === "plan" ? localSave.dateISO ?? null : null;
@@ -559,10 +562,14 @@ export function OfferPageView({
         open={saveModalOpen}
         onOpenChange={(open) => {
           setSaveModalOpen(open);
-          if (!open) setSaveTargetShift(null);
+          if (!open) {
+            setSaveTargetShift(null);
+            void loadIdeaStatus();
+          }
         }}
         scenario={saveScenario}
         collectionTarget={{ offerId: data.id }}
+        birthdayOfferId={data.id}
         onConfirm={handleSavePersist}
         isIdea={isIdeaSaved}
         inPlan={isPlanSaved}

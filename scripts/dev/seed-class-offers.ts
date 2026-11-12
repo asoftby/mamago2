@@ -132,34 +132,48 @@ async function main() {
     update: {},
     create: { email: USER_EMAIL, role: "USER" },
   });
-  const existingPlace = await prisma.place.findUnique({
-    where: { cityId_slug: { cityId: city.id, slug: PLACE_SLUG } },
-    select: { createdByUserId: true },
+  // Place(cityId, slug) has a PARTIAL unique PostgreSQL index (see
+  // 20260608114243_city_scoped_slugs). Prisma's composite-key upsert emits
+  // ON CONFLICT(cityId, slug), which cannot infer that partial index (42P10).
+  // Perform a guarded read, then create/update by primary key instead.
+  const existingPlace = await prisma.place.findFirst({
+    where: { cityId: city.id, slug: PLACE_SLUG },
+    select: { id: true, createdByUserId: true },
   });
   if (existingPlace && existingPlace.createdByUserId !== owner.id) {
     throw new Error("Fixture place slug belongs to another owner; refusing to modify it.");
   }
 
-  const place = await prisma.place.upsert({
-    where: { cityId_slug: { cityId: city.id, slug: PLACE_SLUG } },
-    update: { status: "PUBLISHED", archivedAt: null, territoryId: territory.id },
-    create: {
-      createdByUserId: owner.id,
-      title: "[DEV] Учебная площадка занятий",
-      slug: PLACE_SLUG,
-      slugUpdatedAt: new Date(),
-      cityId: city.id,
-      territoryId: territory.id,
-      category: "education",
-      shortDesc: "Тестовая площадка DEV, не реальная организация.",
-      status: "PUBLISHED",
-      ageTags: [],
-      visitFormats: [],
-      activityTypes: [],
-      locationSource: "MANUAL",
-      seoRobots: "noindex,nofollow",
-    },
-  });
+  const placeData = {
+    status: "PUBLISHED" as const,
+    archivedAt: null,
+    territoryId: territory.id,
+  };
+
+  const place = existingPlace
+    ? await prisma.place.update({
+        where: { id: existingPlace.id },
+        data: placeData,
+      })
+    : await prisma.place.create({
+        data: {
+          createdByUserId: owner.id,
+          title: "[DEV] Учебная площадка занятий",
+          slug: PLACE_SLUG,
+          slugUpdatedAt: new Date(),
+          cityId: city.id,
+          territoryId: territory.id,
+          category: "education",
+          shortDesc: "Тестовая площадка DEV, не реальная организация.",
+          status: "PUBLISHED",
+          ageTags: [],
+          visitFormats: [],
+          activityTypes: [],
+          locationSource: "MANUAL",
+          seoRobots: "noindex,nofollow",
+        },
+      });
+
 
   const rows = makeFixtures(city.id, territory.id, place.id);
   if (rows.length !== 45) throw new Error("Fixture contract: expected exactly 45 class Offers.");

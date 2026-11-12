@@ -1612,6 +1612,7 @@ model ActivitySession {
   title           String?          @db.VarChar(120)
   activity        Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
   bookingRequests BookingRequest[]
+  allocations BookingAllocation[]
 
   @@unique([source, externalId])
   @@index([activityId])
@@ -2785,6 +2786,7 @@ model Offer {
   boosts          Boost[]
   bookingRequests BookingRequest[]
   partyOrderItems PartyOrderItem[]
+  partySavedOffers PartySavedOffer[]
   bookingUnitOffers BookingUnitOffer[]
   offerPlanItems  PlanItem[]
   offerIdeas      OfferIdea[]
@@ -2906,6 +2908,7 @@ model OfferSession {
   title String?
   isCancelled Boolean @default(false)
   bookingRequests BookingRequest[]
+  allocations BookingAllocation[]
   /// Числовая цена (для бюджет-фильтра)
   price    Decimal? @db.Decimal(10, 2)
 
@@ -6034,6 +6037,7 @@ model PartyOrder {
   owner User @relation("PartyOrderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   family Family? @relation(fields: [familyId], references: [id], onDelete: SetNull)
   items PartyOrderItem[]
+  savedOffers PartySavedOffer[]
 
   @@index([ownerUserId, status])
   @@index([familyId])
@@ -6081,6 +6085,18 @@ model PartyOrderItem {
   @@index([offerId])
   @@index([businessId])
   @@index([parentItemId])
+}
+
+model PartySavedOffer {
+  id String @id @default(cuid())
+  partyOrderId String
+  offerId String
+  createdAt DateTime @default(now())
+  partyOrder PartyOrder @relation(fields: [partyOrderId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([partyOrderId, offerId])
+  @@index([offerId])
 }
 
 model PartyQuote {
@@ -6240,7 +6256,9 @@ model CalendarBlock {
 model BookingAllocation {
   id String @id @default(cuid())
   bookingUnitId String
-  bookingRequestId String
+  bookingRequestId String?
+  offerSessionId String?
+  activitySessionId String?
   partyQuoteId String? @unique
   blockStart DateTime
   blockEnd DateTime
@@ -6250,11 +6268,15 @@ model BookingAllocation {
   updatedAt DateTime @updatedAt
 
   bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
-  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  bookingRequest BookingRequest? @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  offerSession OfferSession? @relation(fields: [offerSessionId], references: [id], onDelete: Restrict)
+  activitySession ActivitySession? @relation(fields: [activitySessionId], references: [id], onDelete: Restrict)
   quote PartyQuote? @relation(fields: [partyQuoteId], references: [id], onDelete: SetNull)
 
   @@index([bookingUnitId, status, blockStart, blockEnd])
   @@index([bookingRequestId])
+  @@index([offerSessionId])
+  @@index([activitySessionId])
 }
 
 /// Статус заявки на запись
@@ -6277,10 +6299,17 @@ enum BookingMode {
 }
 
 /// Заявка на запись/заказ от клиента
+enum BookingSource {
+  MANUAL
+}
+
 model BookingRequest {
   id         String  @id @default(cuid())
   businessId String
   userId     String?
+  source BookingSource?
+  manualRequestKey String?
+  manualRequestHash String?
 
   // Тип публикации
   publicationType PublicationType
@@ -6389,6 +6418,7 @@ model BookingRequest {
   @@index([activityId])
   @@index([offerId])
   @@unique([offerId, slotIdempotencyKey])
+  @@unique([businessId, manualRequestKey])
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([offerSessionId, status, holdUntil])

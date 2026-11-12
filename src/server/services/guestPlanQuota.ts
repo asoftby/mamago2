@@ -6,7 +6,7 @@ export function guestMaxLifetimeGenerations(): number {
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 1) return Math.min(Math.floor(n), 10_000);
   }
-  return 2;
+  return 3;
 }
 
 /** Канонический UUID (crypto.randomUUID и др.) */
