@@ -38,6 +38,7 @@ export function BusinessTelegramOpenClient({ destination }: { destination: strin
         const messages: Record<string, string> = {
           INVALID_ORIGIN: "Не удалось проверить адрес mamaGo. Откройте кнопку в бизнес-боте повторно.",
           TELEGRAM_NOT_LINKED: "Этот Telegram не подключён к действующему бизнес-аккаунту. Подключите бизнес-бота в настройках кабинета.",
+          BUSINESS_CONTEXT_MISMATCH: "Бизнес-бот подключён к другой компании. Переподключите его к компании текущего бизнес-кабинета.",
           ACCOUNT_UNAVAILABLE: "Бизнес-аккаунт недоступен для входа. Обратитесь в поддержку.",
           INVALID_INIT_DATA: "Не удалось подтвердить Telegram. Откройте кнопку из бизнес-бота ещё раз.",
           AUTH_UNAVAILABLE: "Вход через бизнес-бота временно недоступен.",
