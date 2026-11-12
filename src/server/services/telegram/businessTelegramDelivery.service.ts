@@ -1,4 +1,5 @@
 import "server-only";
+import { TELEGRAM_REQUEST_TIMEOUT_MS } from "./telegramRequestTimeout";
 
 import { prismaBase } from "@/lib/prisma";
 import { getBusinessTelegramConfig } from "@/server/config/businessTelegram.config";
@@ -42,7 +43,8 @@ export async function sendBusinessTelegramMessage(params: {
     throw new Error("BUSINESS_TELEGRAM_DELIVERY_DISABLED");
   }
   const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-    method: "POST", cache: "no-store",
+    method: "POST",
+    signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS), cache: "no-store",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: params.chatId,
