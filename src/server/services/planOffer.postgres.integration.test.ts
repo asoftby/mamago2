@@ -65,11 +65,12 @@ async function main() {
   assert.notEqual(ownerPrivate.id, memberPrivate.id);
   assert.equal(await prisma.planItem.count({ where: { offerId: privateOffer.id } }), 2);
 
-  const attempts = await Promise.all([
+  const attempts = await Promise.all(Array.from({ length: 8 }, () =>
     addOfferPlanItem(owner.id, duplicateOffer.id, "2026-11-05"),
-    addOfferPlanItem(owner.id, duplicateOffer.id, "2026-11-05"),
-  ]);
-  assert.equal(attempts[0]?.id, attempts[1]?.id, "Concurrent saves must return the same ID");
+  ));
+  assert.equal(attempts.length, 8);
+  assert.ok(attempts.every((item) => item.id === attempts[0]?.id),
+    "Every concurrent save must return the same ID after bounded serialization retries");
   assert.equal(await prisma.planItem.count({ where: { offerId: duplicateOffer.id } }), 1);
 
   await removePlanItem(outsider.id, first.id);
