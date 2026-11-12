@@ -1600,6 +1600,34 @@ export async function notifyUserBookingCancelled(params: NotifyUserBookingParams
 }
 
 /**
+ * Уведомление пользователю: организатор не ответил в срок, заявка истекла.
+ * Тип BOOKING_CANCELLED переиспользован (EXPIRED — терминальный статус, по
+ * заявке уходит не более одного уведомления этого типа; dedup по заявке).
+ */
+export async function notifyUserBookingExpired(params: NotifyUserBookingParams) {
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "BOOKING_CANCELLED",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) return null;
+
+  const title = params.publicationTitle ? `«${params.publicationTitle}»` : "Ваша заявка";
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "BOOKING_CANCELLED",
+    title: "Заявка не подтверждена",
+    body: `Организатор не ответил вовремя, поэтому запись на ${title} не подтверждена и заявка отменена. Вы можете подать новую заявку.`,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Мои записи",
+    ctaAction: "/me/bookings",
+  });
+}
+
+/**
  * Уведомление пользователю: заявка завершена.
  * Вызывается при переходе CONFIRMED → COMPLETED.
  * Dedup: one per status change (no time window)
