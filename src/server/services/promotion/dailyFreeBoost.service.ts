@@ -8,8 +8,8 @@ import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import {
   getPublicListingActivityWhere,
-  getPublicPublishedOfferWhere,
 } from "@/server/public/publicContentVisibility";
+import { getBoostablePublishedOfferWhere } from "@/server/services/promotion/boostEligibility";
 
 export type FreeBoostPublicationType = "EVENT" | "OFFER";
 
@@ -72,7 +72,7 @@ export async function getFreeBoostCandidates(params: {
     prisma.offer.findMany({
       where: {
         AND: [
-          getPublicPublishedOfferWhere(now),
+          getBoostablePublishedOfferWhere(now),
           {
             place: {
               OR: [
@@ -173,7 +173,7 @@ export async function createDailyFreeBoost(params: {
           where: {
             id: params.publicationId,
             AND: [
-              getPublicPublishedOfferWhere(now),
+              getBoostablePublishedOfferWhere(now),
               { place: { OR: [
                 { ownerBusinessId: params.businessId },
                 { ownerBusinessId: null, createdByUserId: params.userId },
