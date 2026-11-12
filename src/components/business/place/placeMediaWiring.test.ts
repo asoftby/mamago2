@@ -72,8 +72,8 @@ console.log("Place media, pending ACL, revision baseline and opening-hours order
 const submitExisting = wizard.slice(wizard.indexOf("// SUBMIT_EXISTING:"));
 assert.ok(submitExisting.indexOf('method: "PATCH"') < submitExisting.indexOf('const response = await fetch'),
   "pending draft fields persist before submit validates stored content");
-assert.match(submitExisting, /body: JSON.stringify\\(changes\\)/);
-assert.match(submitExisting, /if \\(!saveResponse.ok\\)/);
+assert.ok(submitExisting.includes("body: JSON.stringify(changes)"));
+assert.ok(submitExisting.includes("if (!saveResponse.ok)"));
 const editedWithMedia = { ...published, title: "Edited with new photos", shortDesc: "New description", tempGalleryMediaIds: ["synthetic"] };
 assert.equal(extractChanges(editedWithMedia, published).title, "Edited with new photos");
 assert.equal(extractChanges(editedWithMedia, published).shortDesc, "New description");
