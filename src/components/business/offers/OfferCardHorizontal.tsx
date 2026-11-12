@@ -26,6 +26,7 @@ import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
+import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
 
 interface Offer {
   id: string;
@@ -217,15 +218,15 @@ export function OfferCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
-              href={`/business/offers/${offer.id}/boost`}
+            {offer.status === "PUBLISHED" && <Link
+              href={buildBusinessBoostHref("OFFER", offer.id)}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
                 BUSINESS_PUBLICATION_ACTION_PROMOTE,
               )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Купить Boost
+              Продвинуть
             </Link>}
 
             {onArchive && offer.status !== "DRAFT" ? (
