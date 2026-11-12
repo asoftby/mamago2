@@ -25,3 +25,10 @@
 - Active free blocks paid on the same target but not on a different target. Paid never spends free allowance.
 - FREE score below PAID; no boosts crossing geographic/content filters.
 - Typecheck, tests, CI and live DEV smoke required before merge; not merged or deployed as part of this PR.
+
+## Visual labeling policy (12.11.2026 update)
+- **FREE and PAID Boost do not add a public badge, ribbon, label, or altered card styling** to Event/Offer cards. Boost changes discovery order only.
+- `isPromoted` in ranking/composition is internal and **must not** be interpreted as a public advertising label.
+- Advertorial banners and **separate promotional/ad offerings** under Native Ads (#1235) retain their advertising labels; that independent labeling must not be removed when cleaning up Boost UI.
+- B2B users see boost status, duration, and analytics in the Boost dashboard, not as a promotional ribbon on publication cards.
+- Before PROD, obtain a compliance review for any legal disclosure requirements applying to paid ranking.
