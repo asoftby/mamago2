@@ -7,6 +7,10 @@ assert.equal(isCapabilityUrlPath("/w/abc123/"), true);
 assert.equal(isCapabilityUrlPath("/minsk/events/w/x"), false, "only the top-level /w/ route");
 assert.equal(isCapabilityUrlPath("/wishlists"), false);
 assert.equal(isCapabilityUrlPath("/w"), false);
+assert.equal(isCapabilityUrlPath("/d/abc123"), true, "a shared day of the day scenario");
+assert.equal(isCapabilityUrlPath("/d/abc123/"), true);
+assert.equal(isCapabilityUrlPath("/minsk/d/x"), false, "only the top-level /d/ route");
+assert.equal(isCapabilityUrlPath("/d"), false);
 assert.equal(isCapabilityUrlPath(null), false);
 
 console.log("privatePaths ok");

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { SaveActivityHeader } from "@/components/activity/SaveActivityHeader";
 import { IdeaCollectionStep } from "@/components/activity/IdeaCollectionStep";
+import { BirthdayScenarioSaveStep } from "@/features/birthday/components/BirthdayScenarioSaveStep";
 import type { IdeaCollectionTarget, IdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -26,25 +27,14 @@ import {
 import {
   type ActivityTicketSource,
 } from "@/components/activity/ActivityTicketCard";
-
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg: "#FFFFFF",
-  paper: "#FAF7F1",
-  ink: "#141210",
-  /** Выбранное состояние как в «Моём плане»: персиковый фон, оранжевая обводка, тёмный текст. */
-  peach: "#F7C3AD",
-  peachLine: "#F3A684",
-  ink2: "#3A332B",
-  ink3: "rgba(20,18,16,.55)",
-  line: "rgba(20,18,16,.10)",
-  line2: "rgba(20,18,16,.18)",
-  accent: "#E86A3A",
-  accentDeep: "#C24E22",
-  accentSoft: "#FFE8DC",
-  green: "#1F8A5B",
-  greenBg: "rgba(31,138,91,.12)",
-} as const;
+import { C } from "@/components/save-flow/tokens";
+import {
+  RU_MONTHS_NAMED, fmtDateChip, fmtDateLong, fmtDateShort,
+  parseLocalDate, pluralDat, pluralRu,
+} from "@/components/save-flow/dateFormat";
+import { KickerLine } from "@/components/save-flow/KickerLine";
+import { SaveConfirmBar, type SaveConfirmBarProps } from "@/components/save-flow/SaveConfirmBar";
+import { DateSlider } from "@/components/save-flow/DateSlider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type SaveScenario =
@@ -103,6 +93,7 @@ export interface SaveToPlanModalProps {
   planItemId?: string | null;
   source?: string;
   collectionTarget?: IdeaCollectionTarget;
+  birthdayOfferId?: string;
 }
 
 export interface SaveToPlanPickerBodyProps {
@@ -115,6 +106,7 @@ export interface SaveToPlanPickerBodyProps {
   planItemId?: string | null;
   source?: string;
   collectionTarget?: IdeaCollectionTarget;
+  birthdayOfferId?: string;
   /** Закрыть контейнер */
   onClose?: () => void;
   /**
@@ -174,63 +166,6 @@ function SaveAudienceChips() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const RU_MONTHS_SHORT = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
-const RU_MONTHS_FULL  = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
-const RU_MONTHS_NAMED = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
-const RU_DAYS_SHORT   = ["вс","пн","вт","ср","чт","пт","сб"];
-const RU_DAYS_FULL    = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
-
-function pluralDat(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "дат";
-  if (mod10 === 1) return "дата";
-  if (mod10 >= 2 && mod10 <= 4) return "даты";
-  return "дат";
-}
-
-function pluralRu(n: number, forms: [string, string, string]): string {
-  const abs = Math.abs(n);
-  const mod10 = abs % 10;
-  const mod100 = abs % 100;
-  if (mod100 >= 11 && mod100 <= 14) return forms[2];
-  if (mod10 === 1) return forms[0];
-  if (mod10 >= 2 && mod10 <= 4) return forms[1];
-  return forms[2];
-}
-
-function formatSessionDotsLabel(count: number): string {
-  if (count >= 3) return "3 или больше сеансов в этот день";
-  return `${count} ${pluralRu(count, ["сеанс", "сеанса", "сеансов"])} в этот день`;
-}
-
-function parseLocalDate(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function fmtDateChip(iso: string) {
-  const d = parseLocalDate(iso);
-  return {
-    dow: RU_DAYS_SHORT[d.getDay()],
-    day: String(d.getDate()),
-    month: RU_MONTHS_SHORT[d.getMonth()],
-    monthIdx: d.getMonth(),
-    year: d.getFullYear(),
-  };
-}
-
-function fmtDateLong(iso: string): string {
-  const d = parseLocalDate(iso);
-  const dow = RU_DAYS_FULL[d.getDay()];
-  return `${dow.charAt(0).toUpperCase() + dow.slice(1)}, ${d.getDate()} ${RU_MONTHS_FULL[d.getMonth()]}`;
-}
-
-function fmtDateShort(iso: string): string {
-  const d = parseLocalDate(iso);
-  return `${d.getDate()} ${RU_MONTHS_FULL[d.getMonth()]}`;
-}
-
 function normalizePlanDateISO(value?: string | null): string | null {
   if (!value) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -346,19 +281,6 @@ function ExternalLinkIcon({ size = 14, color = "currentColor" }: { size?: number
 }
 
 // ─── Atoms ────────────────────────────────────────────────────────────────────
-function KickerLine({ label, rightEl }: { label: string; rightEl?: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-      <span style={{
-        fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase",
-        fontSize: 10, letterSpacing: ".14em", color: C.ink3, whiteSpace: "nowrap",
-      }}>{label}</span>
-      <span style={{ flex: 1, height: 1, background: C.line }} />
-      {rightEl}
-    </div>
-  );
-}
-
 function OrDivider({ label = "или" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "18px 0 14px" }}>
@@ -452,124 +374,6 @@ function defaultSessionId(
   return sessions[0]!.id;
 }
 
-// ─── Date Slider (Variant B) ──────────────────────────────────────────────────
-interface DateSliderProps {
-  options: string[];  // YYYY-MM-DD sorted upcoming
-  selISO: string | null;
-  onSelect: (iso: string) => void;
-  sessionCountsByDate?: Record<string, number>;
-}
-
-function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSliderProps) {
-  const sliderRef = React.useRef<HTMLDivElement>(null);
-
-  const scrollBy = (dir: number) => {
-    sliderRef.current?.scrollBy({ left: dir * 240, behavior: "smooth" });
-  };
-
-  // Scroll selected into view
-  React.useEffect(() => {
-    if (!selISO || !sliderRef.current) return;
-    const el = sliderRef.current.querySelector<HTMLElement>(`[data-iso="${selISO}"]`);
-    if (!el) return;
-    const c = sliderRef.current;
-    const er = el.getBoundingClientRect();
-    const cr = c.getBoundingClientRect();
-    if (er.left < cr.left + 40 || er.right > cr.right - 40) {
-      el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-    }
-  }, [selISO]);
-
-  return (
-    <div className="w-full min-w-0 max-w-full" style={{ position: "relative", marginBottom: 2 }}>
-      {/* Arrows */}
-      {(["left", "right"] as const).map((side) => (
-        <button
-          key={side}
-          onClick={() => scrollBy(side === "left" ? -1 : 1)}
-          aria-label={side === "left" ? "Назад" : "Вперёд"}
-          style={{
-            position: "absolute", [side]: -2, top: "50%", transform: "translateY(-50%)", zIndex: 2,
-            width: 32, height: 32, borderRadius: 99,
-            background: C.paper, border: `1px solid ${C.line2}`,
-            color: C.ink, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 10px rgba(20,18,16,.06)",
-            padding: 0,
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-            {side === "left"
-              ? <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              : <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-            }
-          </svg>
-        </button>
-      ))}
-
-      {/* Fade edges */}
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 36, background: `linear-gradient(90deg, ${C.bg}, transparent)`, pointerEvents: "none", zIndex: 1 }} />
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 36, background: `linear-gradient(270deg, ${C.bg}, transparent)`, pointerEvents: "none", zIndex: 1 }} />
-
-      {/* Track */}
-      <div
-        ref={sliderRef}
-        style={{
-          display: "flex", gap: 8, overflowX: "auto", overflowY: "hidden",
-          width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box",
-          padding: "4px 20px", scrollSnapType: "x proximity", scrollbarWidth: "none",
-        }}
-      >
-        <style>{`.stp-slider::-webkit-scrollbar{display:none}`}</style>
-        {options.map((iso) => {
-          const chip = fmtDateChip(iso);
-          const isSel = iso === selISO;
-          const sessionsCount = sessionCountsByDate?.[iso] ?? 0;
-          const dotsCount = Math.min(sessionsCount, 3);
-          const dotsLabel = sessionsCount > 0 ? formatSessionDotsLabel(sessionsCount) : null;
-          return (
-            <button
-              key={iso}
-              data-iso={iso}
-              onClick={() => onSelect(iso)}
-              style={{
-                flexShrink: 0, scrollSnapAlign: "center",
-                width: 76, padding: "10px 8px 10px",
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                background: isSel ? C.peach : C.paper,
-                color: C.ink,
-                border: `1px solid ${isSel ? C.peachLine : C.line}`,
-                borderRadius: 14, cursor: "pointer",
-                transition: "all .15s", position: "relative",
-                fontFamily: "var(--font-sans)",
-              }}
-              onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.ink; }}
-              onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
-            >
-              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: C.ink3 }}>{chip.dow}</span>
-              <span style={{ fontFamily: "var(--font-pt-serif), Georgia, serif", fontSize: 28, fontWeight: 400, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
-              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: C.ink3 }}>{chip.month}</span>
-              {dotsCount > 0 ? (
-                <span
-                  aria-label={dotsLabel ?? undefined}
-                  title={dotsLabel ?? undefined}
-                  style={{ display: "flex", gap: 3, minHeight: 5, alignItems: "center", marginTop: 1 }}
-                >
-                  {Array.from({ length: dotsCount }, (_, di) => (
-                    <span key={di} style={{ width: 4, height: 4, borderRadius: 99, background: C.accent }} />
-                  ))}
-                </span>
-              ) : (
-                <span aria-hidden="true" style={{ minHeight: 5, marginTop: 1 }} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── Time chip row ────────────────────────────────────────────────────────────
 function ClockIcon({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
   return (
@@ -657,56 +461,11 @@ function TimeChipRow({ sessions, selectedId, onSelect }: TimeChipRowProps) {
 }
 
 // ─── Dark confirmation bar ────────────────────────────────────────────────────
-function ConfirmBar({ iso, time, onConfirm, label = "Сохранить" }: { iso: string; time?: string | null; onConfirm: () => void; label?: string }) {
+// Presentation lives in save-flow/SaveConfirmBar; the audience gate stays here.
+function ConfirmBar(props: Omit<SaveConfirmBarProps, "disabled">) {
   const audience = React.useContext(SaveAudienceContext);
   const disabled = Boolean(audience?.personas.length && audience.selectedIds.length === 0);
-  const chip = fmtDateChip(iso);
-  const DOW_FULL: Record<string, string> = {
-    вс: "Воскресенье", пн: "Понедельник", вт: "Вторник",
-    ср: "Среда", чт: "Четверг", пт: "Пятница", сб: "Суббота",
-  };
-  return (
-    <div style={{
-      marginTop: 14, padding: "14px 16px",
-      background: C.peach, color: C.ink, borderRadius: 14,
-      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
-    }}>
-      <div>
-        <div style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".1em", color: C.ink3, marginBottom: 3 }}>● выбрано</div>
-        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em" }}>
-          {DOW_FULL[chip.dow] ?? chip.dow},{" "}
-          <span>{chip.day}</span>{" "}
-          {RU_MONTHS_FULL[chip.monthIdx]}
-          {time && (
-            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 13, fontWeight: 500, color: C.ink2, marginLeft: 6 }}>
-              · {time}
-            </span>
-          )}
-        </div>
-      </div>
-      <button
-        onClick={onConfirm}
-        disabled={disabled}
-        title={disabled ? "Выберите, для кого сохраняем" : undefined}
-        aria-label="Добавить в план"
-        style={{
-          height: 46, padding: "0 20px", borderRadius: 999,
-          background: disabled ? "#DBD7D3" : C.accent, color: disabled ? C.ink3 : "#fff",
-          display: "flex", alignItems: "center", gap: 8,
-          flexShrink: 0, cursor: disabled ? "not-allowed" : "pointer", border: 0,
-          fontSize: 14, fontWeight: 600, letterSpacing: "-.01em",
-          fontFamily: "var(--font-sans, ui-sans-serif)",
-          transition: "transform .18s",
-          whiteSpace: "nowrap",
-        }}
-        onMouseDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(.94)"; }}
-        onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
-      >
-        {label}
-      </button>
-    </div>
-  );
+  return <SaveConfirmBar {...props} disabled={disabled} />;
 }
 
 // ─── All-dates drawer (MoreD style) ──────────────────────────────────────────
@@ -838,7 +597,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 function DateSliderView({
   options, title, ticket,
   onConfirm, onIdea, sessionsByDate, confirmLabel,
-  isIdea = false, inPlan = false, onCollections, onRemoveIdea, onRemovePlan,
+  isIdea = false, inPlan = false, onCollections, onBirthday, onRemoveIdea, onRemovePlan,
   initialDateISO, collectionLink,
 }: {
   options: string[]; title: string; ticket?: ActivityTicketSource;
@@ -846,7 +605,7 @@ function DateSliderView({
   initialDateISO?: string | null;
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
   isIdea?: boolean; inPlan?: boolean;
-  onCollections?: () => void; onRemoveIdea?: () => void; onRemovePlan?: () => void;
+  onCollections?: () => void; onBirthday?: () => void; onRemoveIdea?: () => void; onRemovePlan?: () => void;
   /** Подпись кнопки подтверждения; по умолчанию «Сохранить». */
   confirmLabel?: string;
   sessionsByDate?: Record<string, Array<{ id: string; time: string; title?: string }>>;
@@ -999,6 +758,12 @@ function DateSliderView({
             <OrDivider label="или без даты" />
             <IdeasRow onClick={onIdea} />
           </>
+        ) : null}
+        {onBirthday ? (
+          <div className="mt-3">
+            <IdeasRow onClick={onBirthday} title="В сценарий ДР"
+              subtitle="Выбрать праздник или создать новый" />
+          </div>
         ) : null}
         {onRemoveIdea ? (
           <button type="button" onClick={onRemoveIdea}
@@ -1719,10 +1484,10 @@ export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
 function PickerBodyInner({
   scenario, onCommit, isIdea = false, inPlan = false,
   planDate = null, planStartsAt = null, planItemId = null,
-  source, onClose, collectionTarget, onCollectionStepChange,
+  source, onClose, collectionTarget, birthdayOfferId, onCollectionStepChange,
 }: SaveToPlanPickerBodyProps) {
-  const [view, setView] = React.useState<"main" | "calendar" | "collections">("main");
-  React.useEffect(() => { onCollectionStepChange?.(view === "collections"); }, [view, onCollectionStepChange]);
+  const [view, setView] = React.useState<"main" | "calendar" | "collections" | "birthday">("main");
+  React.useEffect(() => { onCollectionStepChange?.(view === "collections" || view === "birthday"); }, [view, onCollectionStepChange]);
   const [replanMode, setReplanMode] = React.useState(false);
   const [collectionLink, setCollectionLink] = React.useState<{ title: string; href: string } | null>(null);
 
@@ -1779,6 +1544,12 @@ function PickerBodyInner({
     if (result.action === "ideas") setView("collections");
     else onCommit(result);
   };
+
+  if (view === "birthday" && birthdayOfferId) {
+    return <BirthdayScenarioSaveStep offerId={birthdayOfferId} title={scenario.title}
+      ticket={scenario.kind === "quickdate" ? scenario.ticket : undefined}
+      onBack={() => setView("main")} onClose={() => onClose?.()} />;
+  }
 
   if (view === "collections") {
     return (
@@ -1862,6 +1633,7 @@ function PickerBodyInner({
         isIdea={isIdea}
         inPlan={inPlan}
         onCollections={collectionTarget ? () => setView("collections") : undefined}
+        onBirthday={birthdayOfferId ? () => setView("birthday") : undefined}
         onRemoveIdea={isIdea ? () => onCommit({ action: "remove-idea" }) : undefined}
         onRemovePlan={inPlan && planItemId ? () => onCommit({ action: "remove-plan", planItemId }) : undefined}
       />
@@ -1873,7 +1645,7 @@ function PickerBodyInner({
 interface ModalContentProps extends SaveToPlanModalProps { onClose: () => void; }
 
 function ModalContent(props: ModalContentProps) {
-  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, planItemId, source, collectionTarget } = props;
+  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, planItemId, source, collectionTarget, birthdayOfferId } = props;
   return (
     <>
       <style>{`
@@ -1890,6 +1662,7 @@ function ModalContent(props: ModalContentProps) {
           planItemId={planItemId}
           source={source}
           collectionTarget={collectionTarget}
+          birthdayOfferId={birthdayOfferId}
           onCommit={(result) => {
             if (result.action === "plan") toastPlan(result.dateISO);
             else if (result.action === "ideas") toastIdea();

@@ -1,29 +1,21 @@
-import { parseQuickFilterPreset } from "@/features/filters/discovery/quickFilterPresets";
 import { NextRequest, NextResponse } from "next/server";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { countKudaDiscoveryEvents } from "@/server/discovery/kudaDiscoveryFeed";
-import { resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
+import { buildKudaEventFilters } from "@/server/discovery/kudaListingPage";
+import { getActivePublicOccasions } from "@/lib/discovery/occasions";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 
 export async function GET(request: NextRequest) {
   const p = request.nextUrl.searchParams;
   const city = await findCityBySlug(p.get("city") ?? "minsk");
   if (!city) return NextResponse.json({ error: "CITY_NOT_FOUND" }, { status: 404 });
-  const explicitTerritorySlug = p.get("explore") === "1" ? city.slug : null;
-  const preset = p.get("preset");
+
+  const activeOccasions = await getActivePublicOccasions();
+  const eventFilters = buildKudaEventFilters(p, new Set(activeOccasions.map(item => item.slug)));
   const count = await countKudaDiscoveryEvents(city.id, city.slug, {
     format: parseActivityFormatQuery(p.get("format")),
-    explicitTerritorySlug,
-    eventFilters: {
-      categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],
-      genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
-      occasionSlug: p.get("occasion") === "halloween" ? "halloween" : null,
-      dateRange: resolveEventDateRange({ preset: parseQuickFilterPreset(preset), from: p.get("from"), to: p.get("to") }),
-      free: p.get("free") === "true",
-      priceMin: p.get("free") === "true" || p.get("priceMin") == null ? null : (() => { const value = Number(p.get("priceMin")); return Number.isFinite(value) && value > 0 ? value : null; })(),
-      priceMax: p.get("free") === "true" || p.get("priceMax") == null ? null : (() => { const value = Number(p.get("priceMax")); return Number.isFinite(value) && value >= 0 ? value : null; })(),
-      districtId: p.get("district"), metroId: p.get("metro"), adultOnly: p.get("adultOnly") === "true",
-    },
+    explicitTerritorySlug: p.get("explore") === "1" ? city.slug : null,
+    eventFilters,
   });
-  return NextResponse.json({ count });
+  return NextResponse.json({ count }, { headers: { "Cache-Control": "private, no-store" } });
 }

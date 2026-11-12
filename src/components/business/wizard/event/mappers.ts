@@ -19,6 +19,7 @@ import { createDefaultScheduleItem, createDefaultSocialLink } from "./defaults";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { detectAgeBuckets } from "@/lib/age/ageMapping";
 import { AGE_OPTIONS, formatAgeKeys, getCombinedAgeRange, sortAgeKeys } from "@/lib/config/ages";
+import { getUnrestrictedEventAgeRangeIds } from "./unrestrictedAgeRangeIds";
 import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
@@ -180,9 +181,19 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   const resolvedAgeBuckets =
     persistedAgeRangeIds.length > 0 ? persistedAgeRangeIds : derivedSavedAgeBuckets;
 
-  formData.ageRangeIds = resolvedAgeBuckets;
-  formData.ageTags = resolvedAgeBuckets;
   formData.agePolicy = event.agePolicy;
+  if (event.agePolicy === AgePolicy.UNRESTRICTED) {
+    // Keep ageTags empty (canonical unrestricted write); expand chips for the editor UI.
+    formData.ageTags = [];
+    formData.ageRangeIds =
+      resolvedAgeBuckets.length > 0 ? resolvedAgeBuckets : getUnrestrictedEventAgeRangeIds();
+  } else if (event.agePolicy === AgePolicy.ADULT_ONLY) {
+    formData.ageTags = [];
+    formData.ageRangeIds = [];
+  } else {
+    formData.ageRangeIds = resolvedAgeBuckets;
+    formData.ageTags = resolvedAgeBuckets;
+  }
 
   formData.eventFormats = resolveEventFormatsFromScheduleJson(scheduleJson);
   // Optional multi-select «Интересы» (за пределами eventFormats).

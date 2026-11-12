@@ -29,6 +29,8 @@ import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanStickyCounter } from "./PlanStickyCounter";
 import { PlanArticleScreen } from "./v3/PlanArticleScreen";
+import { PlanEntryScreen } from "./v3/PlanEntryScreen";
+import { isEditableNote, planItemLinkKind } from "../lib/planItemLink";
 import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
@@ -38,11 +40,26 @@ import { PlanDayRibbon } from "./v3/PlanDayRibbon";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMonthScreen } from "./v3/PlanMonthScreen";
 import { PlanPicksScreen } from "./v3/PlanPicksScreen";
+import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
+import { SavedDayMenu } from "./dayScenario/SavedDayMenu";
+import { pairOf } from "../lib/dayScenarioUi/model";
+import { usePlanScenarioDays } from "@/features/plan-calendar/usePlanDayCounts";
+import { entryLabel } from "../lib/dayScenarioUi/model";
+import { useDayScenarioEnabled } from "../hooks/useDayScenarioEnabled";
+import { useOptionalPlanOverlay } from "@/lib/my-plan/usePlanOverlay";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, hasPendingPlanFeedback, type PlanExperienceFeed } from "./v3/planExperienceApi";
 import { ArrowRight, Bookmark, Heart, Lightbulb, Search } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
+import {
+  appendSuggestionBatch,
+  canGoBackSuggestionBatch,
+  currentSuggestionBatch,
+  emptySuggestionBatchHistory,
+  goBackSuggestionBatch,
+  type SuggestionBatchHistory,
+} from "../lib/suggestionBatchHistory";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "../lib/canOpenDayScenario";
@@ -419,6 +436,9 @@ export function PlanMainContent({
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? "minsk";
   const family = useFamilyPersona();
+  /** DAY_SCENARIO_ENGINE_ENABLED: off (and until answered) the widget is exactly as before. */
+  const dayScenarioEnabled = useDayScenarioEnabled();
+  const planOverlay = useOptionalPlanOverlay();
   const isDesktop = layout === "desktop";
   const [removingIdeaActivityId, setRemovingIdeaActivityId] = useState<string | null>(null);
   const [addingActivityId, setAddingActivityId] = useState<string | null>(null);
@@ -427,20 +447,36 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
   /** Счётчик идей, пересчитанный на экране «Мои идеи» (удаления там не обновляют useMyPlan). */
   const [ideasCountOverride, setIdeasCountOverride] = useState<number | null>(null);
   const shownIdeasCount = ideasCountOverride ?? ideasCount;
-  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas") => {
+  // «Изменить день»: the saved points the draft screen starts from (null = a fresh build).
+  const [editSeed, setEditSeed] = useState<{ kind: "event" | "place"; activityId: string; startsAt: string }[] | null>(null);
+  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | "dayScenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
   }, []);
-  const closeNestedScreen = useCallback(() => setScreen("plan"), []);
+  const clearLanding = planOverlay?.clearLanding;
+  const closeNestedScreen = useCallback(() => {
+    clearLanding?.();
+    setEditSeed(null);
+    setScreen("plan");
+  }, [clearLanding]);
+
+  /**
+   * «Куда пойти» → «Собрать день»: the open plan lands on the day scenario (only when it is on). The
+   * request lives in the overlay state, so a remount of this content while the plan is open lands again.
+   */
+  const landing = planOverlay?.landing ?? null;
+  useEffect(() => {
+    if (landing === "dayScenario" && dayScenarioEnabled) openNestedScreen("dayScenario");
+  }, [landing, dayScenarioEnabled, openNestedScreen]);
 
   useEffect(() => {
     if (screen !== "plan" || mountedNestedScreen === null) return;
@@ -497,6 +533,9 @@ export function PlanMainContent({
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
   const [suggestions, setSuggestions] = useState<PlanSuggestionItem[]>([]);
   const [suggestionsGeneration, setSuggestionsGeneration] = useState(0);
+  const [suggestionBatchHistory, setSuggestionBatchHistory] = useState<
+    SuggestionBatchHistory<PlanSuggestionItem>
+  >(() => emptySuggestionBatchHistory());
   /** Selection local to plan recommendations, separate from global discovery filters. */
   const [planAudienceOverride, setPlanAudienceOverride] = useState<string[] | null>(null);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
@@ -510,8 +549,15 @@ export function PlanMainContent({
   });
   /** Все id, когда-либо показанные в подборках этого сеанса — не даём «Ещё варианты» повторяться. */
   const shownSuggestionActivityIdsRef = useRef<Set<string>>(new Set());
+  const suggestionBatchHistoryRef = useRef(suggestionBatchHistory);
+  suggestionBatchHistoryRef.current = suggestionBatchHistory;
   const hydratedDraftKeyRef = useRef<string | null>(null);
   const skipNextDraftPersistRef = useRef<string | null>(null);
+
+  const beginFreshSuggestionHistory = useCallback(() => {
+    setSuggestionBatchHistory(emptySuggestionBatchHistory());
+    setSuggestionsGeneration(0);
+  }, []);
 
   const restorePendingPlanItem = useCallback((itemId: string) => {
     pendingRemovalIdsRef.current.delete(itemId);
@@ -810,6 +856,7 @@ export function PlanMainContent({
         for (const item of results) {
           shownSuggestionActivityIdsRef.current.add(item.id);
         }
+        setSuggestionBatchHistory((prev) => appendSuggestionBatch(prev, results, MAX_SUGGESTION_BATCHES));
         setSuggestions(results);
         setSuggestionsGeneration((v) => v + 1);
         window.setTimeout(() => {
@@ -843,20 +890,23 @@ export function PlanMainContent({
       const ages = childIds.length === 0 && planAudienceIds.length > 0
         ? ["18+"]
         : deriveAgeRangesFromChildren(childrenList, childIds).map((item) => item.range);
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, planAudienceIds));
       return;
     }
 
     if (defaultParticipants.source === "last-used-age-ranges") {
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(defaultParticipants.ageRanges, []));
       return;
     }
     if (needsAgeAnswerValues?.length) {
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(needsAgeAnswerValues, []));
       return;
     }
     setAwaitingAgeAnswer(true);
-  }, [planAudienceOverride, planAudienceIds, defaultParticipants, personas, childrenList, needsAgeAnswerValues, handleFetchSuggestions]);
+  }, [planAudienceOverride, planAudienceIds, defaultParticipants, personas, childrenList, needsAgeAnswerValues, handleFetchSuggestions, beginFreshSuggestionHistory]);
 
   const handleAgeAnswerConfirm = useCallback(
     (ageRanges: string[]) => {
@@ -864,9 +914,10 @@ export function PlanMainContent({
       setAwaitingAgeAnswer(false);
       writeLastPlanAgeRanges(ageRanges);
       onChangeSelectedAgeRanges(ageRanges.map((range) => ({ range, source: "manual" as const })));
+      beginFreshSuggestionHistory();
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ageRanges, []));
     },
-    [onChangeSelectedAgeRanges, handleFetchSuggestions],
+    [onChangeSelectedAgeRanges, handleFetchSuggestions, beginFreshSuggestionHistory],
   );
 
   const handleAgeAnswerCancel = useCallback(() => {
@@ -880,6 +931,14 @@ export function PlanMainContent({
     }
     handleDecideClick();
   }, [handleDecideClick, handleFetchSuggestions, suggestionsGeneration]);
+
+  const handleShowPreviousSuggestions = useCallback(() => {
+    const next = goBackSuggestionBatch(suggestionBatchHistoryRef.current);
+    if (next.index === suggestionBatchHistoryRef.current.index) return;
+    const batch = currentSuggestionBatch(next);
+    setSuggestionBatchHistory(next);
+    if (batch) setSuggestions(batch);
+  }, []);
 
   const handleRemoveIdea = async (activityId: string) => {
     if (!onRemoveIdea) return;
@@ -964,7 +1023,17 @@ export function PlanMainContent({
           setAddedSuggestionActivityIds((prev) =>
             prev.includes(activity.id) ? prev : [...prev, activity.id],
           );
-          setSuggestions((prev) => prev.filter((s) => s.id !== activity.id));
+          setSuggestions((prev) => {
+            const next = prev.filter((s) => s.id !== activity.id);
+            setSuggestionBatchHistory((history) => {
+              if (history.index < 0 || history.index >= history.batches.length) return history;
+              const batches = history.batches.map((batch, i) =>
+                i === history.index ? next : batch,
+              );
+              return { batches, index: history.index };
+            });
+            return next;
+          });
           return true;
         }
       } catch {
@@ -1071,8 +1140,14 @@ export function PlanMainContent({
 
   useEffect(() => {
     const draft = loadRecommendationDraft(recommendationDraftKeyValue);
-    setSuggestions(draft?.suggestions ?? []);
+    const restored = draft?.suggestions ?? [];
+    setSuggestions(restored);
     setSuggestionsGeneration(draft?.batchNumber ?? 0);
+    setSuggestionBatchHistory(
+      restored.length > 0
+        ? appendSuggestionBatch(emptySuggestionBatchHistory(), restored, MAX_SUGGESTION_BATCHES)
+        : emptySuggestionBatchHistory(),
+    );
     setSuggestionsError(false);
     setAddedSuggestionActivityIds(draft?.addedActivityIds ?? []);
     lastRequestSnapshotRef.current = {
@@ -1141,6 +1216,22 @@ export function PlanMainContent({
       onOpenMonth={() => openNestedScreen("month")}
     />
   ) : null;
+  // «День от mamaGo»: the day and its neighbours (a weekend's pair is the adjacent day), from the ribbon's cached chunks.
+  const savedDays = usePlanScenarioDays(dayScenarioEnabled ? { from: addDaysIso(selectedDate, -1), to: addDaysIso(selectedDate, 1) } : null, { enabled: dayScenarioEnabled });
+  const savedDay = dayScenarioEnabled ? savedDays[selectedDate] : undefined;
+  const startEditDay = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/plan/day-scenario/saved?date=${encodeURIComponent(selectedDate)}`, { credentials: "include" });
+      if (!response.ok) throw new Error(String(response.status));
+      const { points } = (await response.json()) as { points: { kind: "event" | "place"; activityId: string; startsAt: string }[] };
+      if (points.length === 0) throw new Error("empty");
+      setEditSeed(points.map((point) => ({ kind: point.kind, activityId: point.activityId, startsAt: point.startsAt })));
+      openNestedScreen("dayScenario");
+    } catch {
+      toast.error("Не удалось открыть день для изменения. Попробуйте ещё раз.");
+    }
+  }, [selectedDate, openNestedScreen]);
+  const savedDayMenu = savedDay ? <SavedDayMenu date={selectedDate} count={savedDay.count} pair={pairOf(selectedDate, savedDays)} onOpenDate={(date) => onChangeDate?.(date)} onEdit={() => void startEditDay()} /> : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
   const filteredAudience = includedPeople.length > 0 || excludedPeople.length > 0 || planVisibilityFilter !== "ALL";
@@ -1184,11 +1275,14 @@ export function PlanMainContent({
     return (
       <div className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 flex items-baseline justify-between gap-3"}>
         <h3 className="m-0 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]">{dayContextLabel}</h3>
-        <span
-          style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
-          className="min-w-0 truncate text-right text-[12px] text-[var(--mp-tx2)]"
-        >
-          {audienceLabel}
+        <span className="flex min-w-0 items-center gap-1">
+          <span
+            style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+            className="min-w-0 truncate text-right text-[12px] text-[var(--mp-tx2)]"
+          >
+            {audienceLabel}
+          </span>
+          {savedDayMenu}
         </span>
       </div>
     );
@@ -1244,7 +1338,9 @@ export function PlanMainContent({
         onRemove={() => handleRemoveFromPlan(item.id)}
         onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
         onOpen={() => {
-          if (item.source === "MANUAL") {
+          // A catalog link (event, place, offer, route, article) opens the short preview; an unlinked note opens its editor.
+          if (planItemLinkKind(item) === null) {
+            if (!isEditableNote(item)) return;
             setEditingNote(item);
             openNestedScreen("new");
             return;
@@ -1290,18 +1386,26 @@ export function PlanMainContent({
         {dayPartSections.length > 0 ? (
           renderDayPlanSection(compact)
         ) : (
-          <p
-            role="status"
-            className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
-          >
-            В этот день записей не было
-          </p>
+          <>
+            {/* A saved day whose entries a person filter hides keeps its ⋯ menu (it lives in the heading). */}
+            {savedDayMenu ? renderDayHeading(compact) : null}
+            <p
+              role="status"
+              className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
+            >
+              В этот день записей не было
+            </p>
+          </>
         )}
       </div>
     );
 
   /** Экран подборки; саму подборку запрашиваем, только если её ещё не было. */
   const openPicks = () => {
+    if (dayScenarioEnabled) {
+      openNestedScreen("dayScenario");
+      return;
+    }
     openNestedScreen("picks");
     if (!hasRequestedSuggestions) handleDecideClick();
   };
@@ -1327,7 +1431,11 @@ export function PlanMainContent({
     );
   };
 
-  const ideaMeta = (activity: PlanSuggestionItem) => {
+  const ideaPickFields = (activity: PlanSuggestionItem) => {
+    const date = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+    });
     const text = activity.priceText?.trim();
     const price = text
       ? normalizeUiCurrencyText(text)
@@ -1336,7 +1444,12 @@ export function PlanMainContent({
         : activity.priceFrom != null && !Number.isNaN(activity.priceFrom)
           ? formatPriceFrom(activity.priceFrom)
           : null;
-    return [activity.ageLabel ?? null, price].filter(Boolean).join(" · ");
+    return { date, time: null as string | null, price };
+  };
+
+  const ideaMetaLine = (activity: PlanSuggestionItem) => {
+    const fields = ideaPickFields(activity);
+    return [fields.date, fields.time, fields.price].filter(Boolean).join(" · ");
   };
 
   /** Пустой день: 1–2 сохранённые идеи с кнопкой «Запланировать на {дата}» (тот же механизм, что «+» у идей). */
@@ -1366,8 +1479,8 @@ export function PlanMainContent({
                   <p className="m-0 line-clamp-2 text-[15px] font-semibold leading-[1.3] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
                     {idea.activity.title}
                   </p>
-                  {ideaMeta(idea.activity) ? (
-                    <p className="m-0 mt-0.5 truncate text-[13px] text-[var(--mp-tx2)]">{ideaMeta(idea.activity)}</p>
+                  {ideaMetaLine(idea.activity) ? (
+                    <p className="m-0 mt-0.5 truncate text-[13px] text-[var(--mp-tx2)]">{ideaMetaLine(idea.activity)}</p>
                   ) : null}
                 </div>
               </div>
@@ -1399,8 +1512,8 @@ export function PlanMainContent({
           <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
-          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Активности на {posterDayWord(selectedDate, todayKey)}</span>
+          <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{dayScenarioEnabled ? entryLabel(dayItems.length > 0) : "Подобрать, куда сходить"}</span>
+          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">{dayScenarioEnabled ? "Места и события на" : "Активности на"} {posterDayWord(selectedDate, todayKey)}</span>
         </span>
         <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--primary-hover)]" strokeWidth={1.8} aria-hidden />
       </button>
@@ -1409,6 +1522,7 @@ export function PlanMainContent({
 
   /** Запрос подборки с экрана подборки: свой возраст важнее состава, «Для всех» = возраст «Любой». */
   const refetchPicks = (ids: string[], ages: string[]) => {
+    beginFreshSuggestionHistory();
     if (ages.length > 0) {
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, ids));
       return;
@@ -1738,6 +1852,18 @@ export function PlanMainContent({
                 }}
                 onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
               />
+            ) : openedEvent && planItemLinkKind(openedEvent) !== "activity" ? (
+              <PlanEntryScreen
+                key={openedEvent.id}
+                onNavigate={onRequestClose}
+                item={openedEvent}
+                onBack={closeNestedScreen}
+                onRemove={() => {
+                  handleRemoveFromPlan(openedEvent.id);
+                  closeNestedScreen();
+                }}
+                onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
+              />
             ) : openedEvent ? (
               <PlanEventScreen
                 key={openedEvent.id}
@@ -1758,6 +1884,28 @@ export function PlanMainContent({
               changed={scenarioCtaState === "changed"}
               onBack={closeNestedScreen}
               onOpen={handleOpenScenarioPage}
+            />
+          ) : mountedNestedScreen === "dayScenario" ? (
+            <DayScenarioScreen
+              key={`${nestedScreenVersion}-${selectedDate}`}
+              audience="member"
+              city={city}
+              todayIso={todayKey}
+              initialDate={selectedDate}
+              initialPersonaIds={selectedPersonaIds}
+              people={personas.map((persona) => ({
+                id: persona.id,
+                label: persona.kind === "adult" ? "Я" : persona.displayName?.trim() || "Ребёнок",
+                kind: persona.kind === "adult" ? ("adult" as const) : ("child" as const),
+              }))}
+              seed={editSeed}
+              ownEntries={dayItemsSorted.filter((item) => !editSeed || !editSeed.some((point) => point.activityId === item.activityId || point.activityId === item.placeId)).map((item) => ({
+                startsAt: item.startsAt ? new Date(item.startsAt).toISOString() : null,
+                title: item.title?.trim() || item.activity?.title || "Запись",
+              }))}
+              hasPlanItems={dayItems.length > 0}
+              onBack={closeNestedScreen}
+              onClose={onRequestClose}
             />
           ) : mountedNestedScreen === "ideas" ? (
             <PlanIdeasScreen key={nestedScreenVersion} onBack={closeNestedScreen} onClose={onRequestClose} onCountChange={setIdeasCountOverride} />
@@ -1791,7 +1939,7 @@ export function PlanMainContent({
               loading={isFetchingSuggestions}
               failed={suggestionsError}
               addingActivityId={addingActivityId}
-              metaFor={ideaMeta}
+              metaFor={ideaPickFields}
               ageQuestion={
                 awaitingAgeAnswer ? (
                   <PlanNeedsAgeQuestion
@@ -1804,9 +1952,11 @@ export function PlanMainContent({
                 ) : null
               }
               exhausted={suggestionsGeneration >= MAX_SUGGESTION_BATCHES}
+              canGoPrevious={canGoBackSuggestionBatch(suggestionBatchHistory)}
               onAdd={(activity) => void handleAddSuggestionToPlan(activity)}
               onRetry={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
               onMore={handleRegenerate}
+              onPrevious={handleShowPreviousSuggestions}
               onOpenCatalog={handleOpenCatalog}
               onBack={closeNestedScreen}
               onClose={onRequestClose}

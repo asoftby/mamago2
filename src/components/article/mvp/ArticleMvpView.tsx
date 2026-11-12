@@ -9,7 +9,9 @@ import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed
 import { CollectionOfferCard } from "@/components/article/collection/CollectionOfferCard";
 import { CollectionPersonalList } from "@/components/article/collection/CollectionPersonalList";
 import { CollectionEventCard } from "@/components/article/collection/CollectionEventCard";
+import { ArticleDynamicAfishaBlock } from "@/components/article/blocks/ArticleDynamicAfishaBlock";
 import { collectionDuplicateHeadingIds } from "@/lib/article/collectionDuplicateHeadings";
+import { collectionContiguousCardRuns, firstRenderableCollectionBodyBlockIndex } from "@/lib/article/collectionCardRuns";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleCalloutBlock } from "@/components/article/blocks/ArticleCalloutBlock";
@@ -29,7 +31,7 @@ import {
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
-import { PublicationTagChips } from "@/components/article/PublicationTagChips";
+import { PublicationTagLinks } from "@/components/article/PublicationTagLinks";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleInfoCard } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
@@ -142,7 +144,6 @@ export function ArticleMvpView({
   const headingEntries = extractHeadingEntriesFromArticleBlocks(blocks.filter((block) => !duplicateHeadingIds.has(block.id)) as ArticleBlockMvp[]);
   const showToc = shouldShowArticleToc(headingEntries);
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
-  const firstBodyBlockIndex = blocks.findIndex((b) => b.type !== "intro");
 
   const renderActivityCard = (block: Extract<ArticleMvpResolvedBlock, { type: "activityCard" }>): ReactNode => {
           const c = block.card;
@@ -174,38 +175,35 @@ export function ArticleMvpView({
           return wrap(<ArticleOfferCardBlock title={c.title} href={c.href} image={c.imageUrl ?? undefined} />);
   };
 
-  // The editor may embed an activity and also link it as an ArticleLinkedItem.
-  // Render each unique activity exactly once, immediately after the editorial introduction.
-  // This lets the family selector control the complete collection, not just appended linked cards.
-  const collectionRun = publicationType === "COLLECTION"
-    ? (() => {
-        const seen = new Set<string>();
-        return blocks.filter(
-          (b): b is Extract<ArticleMvpResolvedBlock, { type: "activityCard" }> => {
-            if (b.type !== "activityCard" || !b.card) return false;
-            const key = `${b.entityType}:${b.entityId}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          },
-        );
-      })()
-    : [];
+  // Keep the author's section headings, descriptions and cards in their authored order.
+  // Personalisation may reorder only a contiguous run of cards, never cards across sections.
+  const collectionRuns = publicationType === "COLLECTION" ? collectionContiguousCardRuns(blocks) : [];
   const collectionRunIds = new Set(
     publicationType === "COLLECTION"
       ? blocks.filter((b) => b.type === "activityCard").map((b) => b.id)
       : [],
   );
-  const collectionRunItems = collectionRun.map((b) => {
-    const c = b.card;
-    const age =
-      c && c.kind === "offer-embed"
-        ? { ageMinMonths: c.ageMinMonths ?? null, ageMaxMonths: c.ageMaxMonths ?? null }
-        : c && c.kind === "basic" && c.event
-          ? { ageMinMonths: c.event.ageMinMonths, ageMaxMonths: c.event.ageMaxMonths }
-          : { ageMinMonths: null, ageMaxMonths: null };
-    return { id: b.id, title: c && "title" in c ? c.title : "", ...age, node: renderActivityCard(b) };
-  });
+  const collectionRunItemsByStartId = new Map(
+    collectionRuns.map((run) => {
+      const items = run.map((b) => {
+        const c = b.card;
+        const age =
+          c && c.kind === "offer-embed"
+            ? { ageMinMonths: c.ageMinMonths ?? null, ageMaxMonths: c.ageMaxMonths ?? null }
+            : c && c.kind === "basic" && c.event
+              ? { ageMinMonths: c.event.ageMinMonths, ageMaxMonths: c.event.ageMaxMonths }
+              : { ageMinMonths: null, ageMaxMonths: null };
+        return { id: b.id, title: c && "title" in c ? c.title : "", ...age, node: renderActivityCard(b) };
+      });
+      return [run[0].id, items] as const;
+    }),
+  );
+
+  // Collection cards can be hidden when unpublished or de-duplicated.
+  // Anchor the TOC to the first block that will actually render.
+  const firstBodyBlockIndex = publicationType === "COLLECTION"
+    ? firstRenderableCollectionBodyBlockIndex(blocks, duplicateHeadingIds, new Set(collectionRunItemsByStartId.keys()))
+    : blocks.findIndex((b) => b.type !== "intro" && !duplicateHeadingIds.has(b.id));
 
   const subtitleTrim = (isBreakingNews ? "" : subtitle?.trim()) || "";
   const leadHtml = !isBreakingNews ? deriveArticleLeadHtml({ blocks: blocks as ArticleBlockMvp[] }) : null;
@@ -273,8 +271,6 @@ export function ArticleMvpView({
           className="py-2 md:py-3"
         />
 
-        <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
-
         <ArticlePerformanceProvider articleId={articleId}>
           <ArticlePerformanceArticleTracker />
           <ArticleContent>
@@ -313,11 +309,12 @@ export function ArticleMvpView({
               if (block.type === "intro" || duplicateHeadingIds.has(block.id)) return null;
 
               if (collectionRunIds.has(block.id)) {
-                if (!collectionRun.length || block.id !== collectionRun[0].id) return null;
+                const items = collectionRunItemsByStartId.get(block.id);
+                if (!items) return null;
                 return (
                   <Fragment key={block.id}>
                     {tocBeforeBody}
-                    <div className="my-6"><CollectionPersonalList items={collectionRunItems} /></div>
+                    <div className="my-6"><CollectionPersonalList items={items} /></div>
                   </Fragment>
                 );
               }
@@ -391,6 +388,7 @@ export function ArticleMvpView({
                 }
                 if (block.type === "gallery") return <ArticleGallery images={block.images} presentation={block.presentation} caption={block.caption} />;
                 if (block.type === "embed") return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
+                if (block.type === "dynamicAfisha") return <ArticleDynamicAfishaBlock data={block.afisha} />;
                 if (block.type === "info") {
                   const descriptor = structuredBlockRenders(block) ? [structuredDescriptor(block)] : [];
                   return <ArticlePerformanceScope blocks={descriptor} mode="info"><ArticleInfoCard data={block.data} /></ArticlePerformanceScope>;
@@ -413,6 +411,8 @@ export function ArticleMvpView({
             })}
           </ArticleContent>
         </ArticlePerformanceProvider>
+
+        <PublicationTagLinks tags={tags} citySlug={citySlug} className="mt-8 md:mt-10" />
 
         {showJournalFooter ? (
           <footer className="mt-14 md:mt-16 pt-8 border-t border-border/60 text-sm text-muted-foreground">

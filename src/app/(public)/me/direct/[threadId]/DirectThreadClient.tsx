@@ -24,6 +24,7 @@ const QUICK_REPLIES = [
 
 interface Props {
   initialDetail: UnifiedConversationDetail;
+  businessMode?: boolean;
 }
 
 function statusLabel(status: UnifiedConversationDetail["occasions"][number]["status"]): string {
@@ -39,7 +40,7 @@ function statusLabel(status: UnifiedConversationDetail["occasions"][number]["sta
   }
 }
 
-export function DirectThreadClient({ initialDetail }: Props) {
+export function DirectThreadClient({ initialDetail, businessMode = false }: Props) {
   const [detail, setDetail] = useState(initialDetail);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -66,7 +67,7 @@ export function DirectThreadClient({ initialDetail }: Props) {
     if (markedReadRef.current) return;
     markedReadRef.current = true;
     for (const occasion of detail.occasions) {
-      fetch(`/api/direct/${occasion.threadId}/read`, { method: "POST", credentials: "include" }).catch(() => {});
+      fetch(`/api/direct/${occasion.threadId}/read${businessMode ? "?as=business" : ""}`, { method: "POST", credentials: "include" }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -77,7 +78,7 @@ export function DirectThreadClient({ initialDetail }: Props) {
 
     async function refresh() {
       try {
-        const res = await fetch(`/api/direct/${anchorThreadId}`, { credentials: "include" });
+        const res = await fetch(`/api/direct/${anchorThreadId}${businessMode ? "?as=business" : ""}`, { credentials: "include" });
         if (!res.ok) return;
         setDetail(await res.json());
       } catch {
@@ -109,11 +110,11 @@ export function DirectThreadClient({ initialDetail }: Props) {
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [anchorThreadId]);
+  }, [anchorThreadId, businessMode]);
 
   async function refreshDetail() {
     if (!anchorThreadId) return;
-    const res = await fetch(`/api/direct/${anchorThreadId}`, { credentials: "include" });
+    const res = await fetch(`/api/direct/${anchorThreadId}${businessMode ? "?as=business" : ""}`, { credentials: "include" });
     if (res.ok) setDetail(await res.json());
   }
 
@@ -122,7 +123,7 @@ export function DirectThreadClient({ initialDetail }: Props) {
     if (!trimmed || sending || !detail.replyTargetThreadId) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/direct/${detail.replyTargetThreadId}/messages`, {
+      const res = await fetch(`/api/direct/${detail.replyTargetThreadId}/messages${businessMode ? "?as=business" : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -163,12 +164,12 @@ export function DirectThreadClient({ initialDetail }: Props) {
   }
 
   return (
-    <div className={styles.page}>
-      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
-        <Link href="/me/direct">← Мои сообщения</Link>
+    <div className={businessMode ? `${styles.businessPage} space-y-4` : styles.page}>
+      <div className={businessMode ? "text-sm text-stone-500" : `${styles.wrap} ${styles.breadcrumbs}`}>
+        <Link href={businessMode ? "/business/direct" : "/me/direct"}>← {businessMode ? "Все сообщения" : "Мои сообщения"}</Link>
       </div>
 
-      <div className={styles.threadWrap}>
+      <div className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : styles.threadWrap}>
         <ConversationHeader
           counterpartyName={detail.counterpartyName}
           counterpartyLogoUrl={detail.counterpartyLogoUrl}

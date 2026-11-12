@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  submitBirthdayParty, submittedPartyId, type PartyFlowState, type PartyRequest, type PartySubmissionInput,
+  PartyRequestError, saveBirthdayComposition, submitBirthdayParty, submittedPartyId, type PartyFlowState, type PartyRequest, type PartySubmissionInput,
 } from "./partySubmitFlow";
 
 const input: PartySubmissionInput = {
@@ -99,4 +99,60 @@ test("already submitted order after a lost response is not submitted twice when 
   await submitBirthdayParty(state, { ...input, adultsCount: 4 }, request);
   assert.equal(state.submitted, true);
   assert.equal(sends, 1);
+});
+
+
+test("composition changes reuse one server draft and its compare-and-swap version", async () => {
+  const state = fresh();
+  const calls: Array<{ method: string; body?: object }> = [];
+  const request: PartyRequest = async <T>(_url: string, method: string, body?: object) => {
+    calls.push({ method, body });
+    return { id: "order", version: calls.length - 1, status: "DRAFT" } as T;
+  };
+  const selection = {
+    citySlug: input.citySlug, venueMode: input.venueMode,
+    anchorOfferId: input.anchorOfferId, addonOfferIds: input.addonOfferIds,
+  };
+  await saveBirthdayComposition(state, selection, request);
+  await saveBirthdayComposition(state, { ...selection, addonOfferIds: ["decor"] }, request);
+  assert.deepEqual(calls.map(call => call.method), ["POST", "PATCH", "PATCH"]);
+  assert.deepEqual(calls[2].body, {
+    version: 1, venueMode: "HOME", anchorOfferId: "animator", addonOfferIds: ["decor"],
+  });
+});
+
+
+test("definitive submit validation failure leaves the existing draft editable", async () => {
+  const state = fresh();
+  const request: PartyRequest = async <T>(_url: string, method: string, body?: object) => {
+    if (_url.endsWith("/submit")) throw new PartyRequestError(422, "Измените состав");
+    const version = (body as { version?: number })?.version;
+    return { id: "order", version: method === "PATCH" ? (version ?? 0) + 1 : 0 } as T;
+  };
+  await assert.rejects(() => submitBirthdayParty(state, input, request), /Измените состав/);
+  assert.equal(state.pending, null);
+  assert.equal(state.key, null);
+  const updated = await saveBirthdayComposition(state, {
+    citySlug: input.citySlug, venueMode: input.venueMode,
+    anchorOfferId: input.anchorOfferId, addonOfferIds: [],
+  }, request);
+  assert.equal(updated.id, "order");
+  assert.equal(updated.version, 2);
+});
+
+
+test("modified package submits details without replacing server component snapshots", async () => {
+  const state = fresh(); state.draft = { id: "saved", version: 12 };
+  const bodies: object[] = [];
+  const request: PartyRequest = async <T>(_url: string, method: string, body?: object) => {
+    if (method === "PATCH") bodies.push(body!);
+    return { id: "saved", version: 13, status: "DRAFT" } as T;
+  };
+  await submitBirthdayParty(state, { ...input, preservePackageComposition: true }, request);
+  assert.equal(bodies.length, 1);
+  assert.equal("anchorOfferId" in bodies[0], false);
+  assert.equal("addonOfferIds" in bodies[0], false);
+  assert.equal("addonCategories" in bodies[0], false);
+  assert.equal("preservePackageComposition" in bodies[0], false);
+  assert.equal(state.submitted, true);
 });

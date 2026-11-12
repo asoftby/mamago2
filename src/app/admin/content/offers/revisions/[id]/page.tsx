@@ -1,3 +1,4 @@
+import { componentRows } from "@/server/offers/packageComponents";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
@@ -23,6 +24,7 @@ export default async function OfferRevisionPage({ params }: { params: Promise<{ 
     include: {
       offer: {
         include: {
+          components: { where: { archivedAt: null }, orderBy: [{ position: "asc" }, { id: "asc" }] },
           placements: { select: { key: true } },
           categoryLinks: { orderBy: { sortOrder: "asc" }, select: { categoryId: true } },
         },
@@ -37,6 +39,7 @@ export default async function OfferRevisionPage({ params }: { params: Promise<{ 
     payload,
     revision.offer as unknown as Record<string, unknown>,
     {
+      packageComponents: { rows: componentRows(revision.offer.components) },
       requestedPlacements: revision.offer.placements.map((placement) => placement.key),
       campSessionTexts: revision.offer.campSessions,
       categoryIds: revision.offer.categoryLinks.map((link) => link.categoryId),

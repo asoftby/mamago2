@@ -263,10 +263,22 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
     <div className="space-y-6 pb-1">
       <DiscoveryWhoFilter inline />
 
-      {(draft.occasionSlug === "halloween" || facets?.occasions.includes("halloween")) && (
+      {facets && facets.occasionOptions.length > 0 && (
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold">Повод</legend>
-          <Chip active={draft.occasionSlug === "halloween"} onClick={() => patch({ occasionSlug: draft.occasionSlug === "halloween" ? null : "halloween" })}>Хэллоуин</Chip>
+          <div className="flex flex-wrap gap-2">
+            {facets.occasionOptions.map((occasion) => (
+              <Chip
+                key={occasion.slug}
+                active={draft.occasionSlug === occasion.slug}
+                onClick={() => patch({
+                  occasionSlug: draft.occasionSlug === occasion.slug ? null : occasion.slug,
+                })}
+              >
+                {occasion.name}
+              </Chip>
+            ))}
+          </div>
         </fieldset>
       )}
 

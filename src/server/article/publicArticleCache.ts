@@ -5,7 +5,7 @@ import { revalidateTag } from "next/cache";
  * dependencies (embedded events/offers/places) and is intentionally excluded.
  */
 export const PUBLIC_ARTICLE_LIST_CACHE_TAG = "public-articles:list";
-export const PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS = 60 * 60;
+export const PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS = 300;
 
 /**
  * EventCategory is shared across publication types. Its admin mutation routes

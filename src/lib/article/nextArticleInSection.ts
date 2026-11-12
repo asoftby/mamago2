@@ -164,7 +164,9 @@ export async function mapRowToPublicContinuousArticleDto(
 ): Promise<PublicContinuousArticleDto | null> {
   if (!row.slug || !row.geoScope) return null;
   const content = parseArticleContentJson(row.contentJson);
-  const blocks = await resolvePublicArticleBlocks(row.id, content.blocks);
+  const blocks = await resolvePublicArticleBlocks(row.id, content.blocks, {
+    citySlug: row.geoScope === "CITY" ? row.city?.slug ?? null : null,
+  });
   if (blocks.length === 0) return null;
   const cover = await fetchCoverPublicUrl(row.id);
   const heroUrl = cover?.publicUrl ?? row.heroImage ?? row.seoOgImage ?? null;

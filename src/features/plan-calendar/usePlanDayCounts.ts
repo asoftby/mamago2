@@ -7,7 +7,11 @@ import { chunkEnd, chunkStartsFor } from "./lib/dayChunks";
 
 export type PlanDayMarkers = Record<DateKey, string[]>;
 
-type Entry = { markers: PlanDayMarkers; stale: boolean };
+/** A day saved as «День от mamaGo» (day-scenario flag on): its scenario, weekend group and number of points. */
+export type SavedDayMarker = { scenarioId: string; groupId: string | null; count: number };
+export type SavedDayMarkers = Record<DateKey, SavedDayMarker>;
+
+type Entry = { markers: PlanDayMarkers; scenarios: SavedDayMarkers; stale: boolean };
 
 const cache = new Map<string, Entry>();
 const inflight = new Map<string, Promise<void>>();
@@ -34,12 +38,12 @@ function loadChunk(start: DateKey, scope: PlanScopeFilter): Promise<void> {
   const to = chunkEnd(start);
   const request = fetch(`/api/plan/day-markers?from=${start}&to=${to}&scope=${scope}`, { credentials: "include" })
     .then(async (res) => {
-      const body = res.ok ? ((await res.json()) as { markers?: PlanDayMarkers }) : null;
+      const body = res.ok ? ((await res.json()) as { markers?: PlanDayMarkers; scenarios?: SavedDayMarkers }) : null;
       // A failed chunk is cached as fresh-empty (no retry loop); invalidate retries it.
-      cache.set(key, { markers: body?.markers ?? {}, stale: false });
+      cache.set(key, { markers: body?.markers ?? {}, scenarios: body?.scenarios ?? {}, stale: false });
     })
     .catch(() => {
-      cache.set(key, { markers: {}, stale: false });
+      cache.set(key, { markers: {}, scenarios: {}, stale: false });
     })
     .finally(() => {
       inflight.delete(key);
@@ -82,6 +86,42 @@ export function usePlanDayCounts(
     for (const start of chunkStartsFor(from, to)) {
       Object.assign(merged, cache.get(cacheKey(scope, start))?.markers);
     }
+    return merged;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tick signals cache changes
+  }, [from, to, scope, tick]);
+}
+
+/**
+ * Days of the range saved as «День от mamaGo», from the same chunk cache as the markers: reading them asks the
+ * server for nothing extra (the ribbon already loads these chunks).
+ */
+export function usePlanScenarioDays(range: { from: DateKey; to: DateKey } | null, options: { enabled?: boolean; scope?: PlanScopeFilter } = {}): SavedDayMarkers {
+  const scope = options.scope ?? "all";
+  const [tick, setTick] = useState(0);
+  const from = range?.from;
+  const to = range?.to;
+  const enabled = options.enabled ?? true;
+
+  useEffect(() => {
+    const listener = () => setTick((n) => n + 1);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || !from || !to) return;
+    for (const start of chunkStartsFor(from, to)) {
+      const entry = cache.get(cacheKey(scope, start));
+      if (!entry || entry.stale) void loadChunk(start, scope);
+    }
+  }, [enabled, from, to, scope, tick]);
+
+  return useMemo(() => {
+    const merged: SavedDayMarkers = {};
+    if (!from || !to) return merged;
+    for (const start of chunkStartsFor(from, to)) Object.assign(merged, cache.get(cacheKey(scope, start))?.scenarios);
     return merged;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tick signals cache changes
   }, [from, to, scope, tick]);

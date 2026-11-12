@@ -29,6 +29,8 @@ export type ArticleEditorSnapshot = {
   cityContext: string | null;
   /** EventCategory с publicationType=ARTICLE */
   categoryId: string | null;
+  occasionId?: string | null;
+  seasonReviewedForStart?: string | null;
   additionalCategoryIds?: string[];
   additionalGeographyTargets?: ArticleGeographyTargetInput[];
   /** null in UI = охват ещё не выбран (черновик). */
@@ -72,6 +74,10 @@ export type ArticleSaveInput = {
   authorUserId: string | null;
   cityContext: string | null;
   categoryId: string | null;
+  occasionId?: string | null;
+  seasonReviewRequested?: boolean;
+  /** Season start displayed to the editor during approval. */
+  seasonReviewStartsAt?: string | null;
   additionalCategoryIds?: string[];
   additionalGeographyTargets?: ArticleGeographyTargetInput[];
   /** undefined = не менять в БД; null = охват не выбран. */

@@ -36,6 +36,19 @@ export type ResolvedEventCardData = {
 
 type NamedRef = { name: string } | null | undefined;
 
+type EventCardPlace = {
+  id?: string;
+  slug?: string | null;
+  title: string | null;
+  customAddress?: string | null;
+  formattedAddr?: string | null;
+  districtManual?: NamedRef;
+  districtAuto?: NamedRef;
+  metroManual?: NamedRef;
+  metroAuto?: NamedRef;
+  city?: { slug: string } | null;
+};
+
 export type EventCardSource = {
   title?: string;
   nextOccurrenceAt: Date | null;
@@ -52,17 +65,13 @@ export type EventCardSource = {
   scheduleJson?: unknown;
   description?: string | null;
   eventCategory?: { nameRu: string | null } | null;
-  place: {
-    id?: string;
-    slug?: string | null;
+  format?: string | null;
+  place: EventCardPlace | null;
+  venue?: {
+    kind: string;
     title: string | null;
-    customAddress?: string | null;
-    formattedAddr?: string | null;
-    districtManual?: NamedRef;
-    districtAuto?: NamedRef;
-    metroManual?: NamedRef;
-    metroAuto?: NamedRef;
-    city?: { slug: string } | null;
+    addressLine: string | null;
+    place: EventCardPlace | null;
   } | null;
 };
 
@@ -79,17 +88,48 @@ export function eventCardDescription(html: string | null | undefined, max: numbe
   return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
+/** Resolve the physical venue with the same priority as the event landing page. */
+export function resolveCollectionEventVenue(a: EventCardSource): ResolvedEventCardVenue | null {
+  if (a.format === "ONLINE") return null;
+  const venue = a.venue;
+  const actualVenuePlace = venue?.kind === "PLACE" && venue.place ? venue.place : null;
+  const linkedPlace = a.place;
+  const place = actualVenuePlace ?? linkedPlace;
+  const explicitAddress = venue?.addressLine?.trim() || null;
+  const hasCustomVenue = !actualVenuePlace && Boolean(venue?.title?.trim() || explicitAddress);
+  const name = actualVenuePlace?.title?.trim()
+    || (hasCustomVenue ? venue?.title?.trim() || linkedPlace?.title?.trim() || a.title?.trim() : null)
+    || linkedPlace?.title?.trim();
+  if (!name) return null;
+
+  // A custom event address can differ from Activity.place. Never show a
+  // misleading place link, district or metro for that other address.
+  const matchesLinkedAddress = explicitAddress != null &&
+    [linkedPlace?.customAddress, linkedPlace?.formattedAddr].some((value) => value?.trim() === explicitAddress);
+  const placeForLocation = hasCustomVenue && explicitAddress && !matchesLinkedAddress ? null : place;
+  const rawAddress = actualVenuePlace
+    ? actualVenuePlace.customAddress ?? actualVenuePlace.formattedAddr ?? null
+    : explicitAddress ?? place?.customAddress ?? place?.formattedAddr ?? null;
+  const address = rawAddress ? formatVenueAddressForPublicDisplay(rawAddress) : null;
+  const citySlug = placeForLocation?.city?.slug ?? "minsk";
+
+  return {
+    name,
+    address: address || undefined,
+    district: (placeForLocation?.districtManual ?? placeForLocation?.districtAuto)?.name || undefined,
+    metro: (placeForLocation?.metroManual ?? placeForLocation?.metroAuto)?.name || undefined,
+    href: placeForLocation?.slug || placeForLocation?.id
+      ? `/${citySlug}/places/${encodeURIComponent(placeForLocation.slug ?? placeForLocation.id!)}`
+      : undefined,
+  };
+}
+
 export function buildEventCardData(a: EventCardSource): ResolvedEventCardData {
   // «Бесплатно» только если платных тарифов нет: диапазон 0…N — это не бесплатное событие.
   const hasPaidTier = (a.priceTo ?? 0) > 0;
   const free = a.priceFrom === 0 && !hasPaidTier;
   const hasAge = a.ageMinMonths != null || a.ageMaxMonths != null;
   const [dateLabel = "", timeLabel = ""] = a.nextOccurrenceAt ? formatRuSessionHero(a.nextOccurrenceAt.toISOString()).split(" · ") : [];
-  const p = a.place;
-  const placeName = p?.title?.trim();
-  const rawAddress = p?.customAddress ?? p?.formattedAddr ?? null;
-  const address = rawAddress ? formatVenueAddressForPublicDisplay(rawAddress) : null;
-  const citySlug = p?.city?.slug ?? "minsk";
   return {
     dateLabel,
     timeLabel: timeLabel || null,
@@ -107,15 +147,7 @@ export function buildEventCardData(a: EventCardSource): ResolvedEventCardData {
     isFree: free,
     posterUrl: a.coverImageUrl,
     mediaItems: buildCollectionEventMedia({ title: a.title ?? "Событие", ...a }),
-    venue: placeName
-      ? {
-          name: placeName,
-          address: address || undefined,
-          district: (p?.districtManual ?? p?.districtAuto)?.name || undefined,
-          metro: (p?.metroManual ?? p?.metroAuto)?.name || undefined,
-          href: p?.slug || p?.id ? `/${citySlug}/places/${p.slug ?? p.id}` : undefined,
-        }
-      : null,
+    venue: resolveCollectionEventVenue(a),
     descriptionText: eventCardDescription(a.description),
     ageMinMonths: a.ageMinMonths,
     ageMaxMonths: a.ageMaxMonths,

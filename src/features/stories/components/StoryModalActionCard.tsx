@@ -154,8 +154,8 @@ export function StoryModalActionCard({
                   className={cn(
                     "flex h-11 w-full items-center justify-center text-[14px] font-semibold transition-all",
                     action.variant === "primary"
-                      ? "rounded-2xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:scale-[0.98]"
-                      : "text-neutral-500 hover:text-neutral-700",
+                      ? "rounded-2xl bg-neutral-900 text-white hover:bg-neutral-800 active:scale-[0.98]"
+                      : "rounded-2xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:scale-[0.98]",
                   )}
                 >
                   {action.label}

@@ -3,10 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
+import { applyGuestDayScenarioAndAnnounce } from "@/lib/my-plan/applyGuestDayScenario";
 import { useMyPlan } from "../hooks/useMyPlan";
 import type { PlanItemWithActivity } from "../types/event";
 import { PlanMainContent } from "./PlanMainContent";
 import { GuestMyPlanPanel } from "./GuestMyPlanPanel";
+import { DayScenarioScreen } from "./dayScenario/DayScenarioScreen";
+import { useDayScenarioEnabled } from "../hooks/useDayScenarioEnabled";
+import { useOptionalCity } from "@/contexts/CityContext";
 
 interface MyPlanPanelContentProps {
   open: boolean;
@@ -37,6 +41,9 @@ export function MyPlanPanelContent({
   layout = "default",
   onRequestClose,
 }: MyPlanPanelContentProps) {
+  /** DAY_SCENARIO_ENGINE_ENABLED: off, the guest panel below is exactly as before. */
+  const dayScenarioEnabled = useDayScenarioEnabled();
+  const city = useOptionalCity()?.citySlug ?? "minsk";
   const {
     isLoading,
     accessPhase,
@@ -101,6 +108,15 @@ export function MyPlanPanelContent({
    * this retry covers interrupted navigation/auth-cookie races. The local draft
    * is cleared only after every explicitly committed card is saved by the API.
    */
+  // A day a guest built with «Собрать день» and saved before the FULL-PAGE sign-in (/login never runs the post-auth
+  // pipeline): saved here, once, as soon as the widget opens for a signed-in user.
+  useEffect(() => {
+    if (!open || !isAuthenticated || authMeLoading || !dayScenarioEnabled) return;
+    void applyGuestDayScenarioAndAnnounce().catch((error) => {
+      console.error("[my-plan] guest day scenario recovery failed", error);
+    });
+  }, [open, isAuthenticated, authMeLoading, dayScenarioEnabled]);
+
   useEffect(() => {
     if (!open || !isAuthenticated || authMeLoading) return;
     let cancelled = false;
@@ -156,6 +172,14 @@ export function MyPlanPanelContent({
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-primary" />
           <p className="text-gray-600">Загружаем ваш план...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && dayScenarioEnabled) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <DayScenarioScreen audience="guest" city={city} todayIso={todayIso} initialDate={todayIso} onBack={onRequestClose} onClose={onRequestClose} />
       </div>
     );
   }

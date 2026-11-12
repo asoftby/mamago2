@@ -36,9 +36,10 @@ export function parseListingPage(value: string | string[] | null | undefined): n
 /** Same filter semantics as the previous inline parsing in CityShell / count API. */
 export function buildKudaEventFilters(
   params: Pick<URLSearchParams, "get">,
-  halloweenEnabled: boolean,
+  activeOccasionSlugs: ReadonlySet<string>,
 ): EventRuntimeFilters {
   const preset = params.get("preset");
+  const occasion = params.get("occasion");
   const free = params.get("free") === "true";
   const num = (key: string, min: (value: number) => boolean) => {
     if (free) return null;
@@ -49,7 +50,7 @@ export function buildKudaEventFilters(
   };
   return {
     categorySlugs: params.get("category")?.split(",").filter(Boolean) ?? [],
-    occasionSlug: halloweenEnabled && params.get("occasion") === "halloween" ? "halloween" : null,
+    occasionSlug: occasion && activeOccasionSlugs.has(occasion) ? occasion : null,
     genreSlugs: params.get("genre")?.split(",").filter(Boolean) ?? [],
     dateRange: resolveEventDateRange({
       preset: parseQuickFilterPreset(preset),
@@ -76,13 +77,13 @@ export async function loadKudaListingPage(input: {
   userId: string | null;
   searchParams: Pick<URLSearchParams, "get">;
   page: number;
-  halloweenEnabled: boolean;
+  activeOccasionSlugs: ReadonlySet<string>;
   /** Events-only territory scope (`explore=1`, #795); null = default city hub expansion. */
   explicitTerritorySlug?: string | null;
   pageSize?: number;
 }): Promise<KudaListingResult> {
   const filters = parseAppliedFromUrl(input.searchParams);
-  const eventFilters = buildKudaEventFilters(input.searchParams, input.halloweenEnabled);
+  const eventFilters = buildKudaEventFilters(input.searchParams, input.activeOccasionSlugs);
   // Family personas never reach the server listing (no persona IDs in URLs,
   // #799): the partition uses only explicit filters (manual age chips), so
   // `?page=N`, infinite scroll and guests all see the same membership/order.

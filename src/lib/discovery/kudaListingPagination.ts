@@ -1,4 +1,4 @@
-/** Client-safe pagination contract for the afisha («Куда пойти») masonry listing. */
+/** Client-safe pagination contract for the afisha («Куда пойти») ordered listing. */
 
 import {
   applyImplicitListingParams,

@@ -93,6 +93,7 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
 
   return {
     ...buildOgMeta({
+      preview: "compact",
       title,
       description,
       image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,

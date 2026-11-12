@@ -28,6 +28,8 @@ function toAbsoluteUrl(url: string | null | undefined): string | undefined {
 
 export interface BuildOgMetaOptions {
   title: string;
+  /** Preferred social preview layout. Telegram ultimately controls link rendering. */
+  preview?: "compact" | "large";
   /** Plain-text description. If omitted, descriptionHtml is used as fallback. */
   description?: string | null;
   /** HTML description — stripped and truncated when description is absent. */
@@ -55,6 +57,7 @@ export interface BuildOgMetaOptions {
  */
 export function buildOgMeta({
   title,
+  preview = "large",
   description,
   descriptionHtml,
   image,
@@ -82,14 +85,12 @@ export function buildOgMeta({
       images: [
         {
           url: resolvedImage,
-          width: 1200,
-          height: 630,
         },
       ],
       type: "website",
     },
     twitter: {
-      card: "summary_large_image",
+      card: preview === "compact" ? "summary" : "summary_large_image",
       title,
       description: resolvedDescription,
       images: [resolvedImage],

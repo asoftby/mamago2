@@ -1,8 +1,6 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { HalloweenChip } from "@/components/discovery/HalloweenChip";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { JournalCard } from "@/components/content-cards/JournalCard";
 import { OfferCard } from "@/components/offers/OfferCard";
@@ -31,7 +29,6 @@ import {
   buildMainTitle,
 } from "@/features/city-home/lib/audiencePersonalization";
 import { rankHomeByAudience, homeAudienceSections } from "@/features/city-home/lib/rankHomeByAudience";
-import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
 import { HomeJournalCategoryChips } from "@/features/city-home/components/HomeJournalCategoryChips";
 import { HomeSectionQuickChips } from "@/features/city-home/components/HomeSectionQuickChips";
 import type { CityBlogCategory } from "@/server/article/cityBlogCategories";
@@ -73,15 +70,8 @@ function buildKudaSectionTitle(input: {
   return `Куда пойти ${cityPart}`;
 }
 
-export function CityHomeKudaSection({
-  activities,
-  halloweenEnabled = false,
-}: {
-  activities: ActivityMock[];
-  halloweenEnabled?: boolean;
-}) {
+export function CityHomeKudaSection({ activities }: { activities: ActivityMock[] }) {
   const { appendCityQuery, citySlug } = useCity();
-  const router = useRouter();
   const { applied } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const baseTitle = buildKudaSectionTitle({
@@ -111,15 +101,6 @@ export function CityHomeKudaSection({
 
   const eventsHref = appendCityQuery(`/${citySlug}/events`);
   const eventsLabel = "[все события]";
-  const halloweenHref = appendCityQuery(`/${citySlug}/events?occasion=halloween`);
-  const halloweenChip = halloweenEnabled ? (
-    <div className="mb-4 mt-4 flex items-center px-1">
-      <HalloweenChip
-        aria-label="Показать мероприятия на Хэллоуин"
-        onClick={() => router.push(halloweenHref)}
-      />
-    </div>
-  ) : null;
 
   if (preview.length === 0) {
     return (
@@ -131,7 +112,6 @@ export function CityHomeKudaSection({
         actionHref={eventsHref}
         actionInlineText
       >
-        {halloweenChip}
         <p className="text-sm text-neutral-500 px-1 py-2 leading-relaxed">
           Пока нет опубликованных событий — загляните позже в раздел «Куда пойти».
         </p>
@@ -149,7 +129,6 @@ export function CityHomeKudaSection({
       <HorizontalCardRow
         headerTitle={<HomeCarouselHeading title={title} />}
         navLeading={<CityHomeAllLink href={eventsHref} label={eventsLabel} />}
-        underHeader={halloweenChip}
       >
         {preview.map((activity, index) => (
           <div key={activity.id} className={kudaCardShell}>
@@ -189,7 +168,7 @@ export function CityHomeClassesSection({
   [activities, family?.personas, family?.selectedPersonaIds, applied.age]);
   const preview = [...sections.primary, ...sections.alternatives].slice(0, 12);
 
-  if (mode === "empty") {
+  if (mode === "empty" || preview.length === 0) {
     return null;
   }
 
@@ -211,9 +190,7 @@ export function CityHomeClassesSection({
           />
         }
       >
-        {sections.active && preview.length === 0 && <SoftAudienceNotice noAlternatives actionHref={appendCityQuery(`/${citySlug}/classes`)} actionLabel="Занятия" />}
-        {sections.active && sections.primary.length === 0 && preview.length > 0 && <SoftAudienceNotice label="занятия" />}
-        {preview.map((activity, index) => {
+        {preview.map((activity) => {
           const href =
             activity.href ??
             publicActivityPath(activity.id, activity.citySlug ?? citySlug, activity.slug);
@@ -225,7 +202,6 @@ export function CityHomeClassesSection({
           const priceLabel = formatPublicCardPrice({ priceMode: activity.priceMode, priceFrom: activity.priceMin, priceTo: activity.priceMax, currency: activity.currency }) ?? undefined;
           return (
             <Fragment key={activity.id}>
-              {sections.active && sections.primary.length > 0 && sections.alternatives.length > 0 && index === sections.primary.length && <SoftAudienceNotice label="занятия" afterMatches />}
             <div className={cardShell + " flex flex-col"}>
               <AnalyticsCardViewTracker
                 entityType="OFFER"
@@ -279,7 +255,7 @@ export function CityHomeRoutesSection({
   [routes, family?.personas, family?.selectedPersonaIds, applied.age]);
   const preview = [...sections.primary, ...sections.alternatives].slice(0, 12);
 
-  if (mode === "empty") {
+  if (mode === "empty" || preview.length === 0) {
     return null;
   }
 
@@ -298,11 +274,8 @@ export function CityHomeRoutesSection({
           />
         }
       >
-        {sections.active && preview.length === 0 && <SoftAudienceNotice noAlternatives />}
-        {sections.active && sections.primary.length === 0 && preview.length > 0 && <SoftAudienceNotice label="маршруты" />}
-        {preview.map((route, index) => (
+        {preview.map((route) => (
           <Fragment key={route.id}>
-            {sections.active && sections.primary.length > 0 && sections.alternatives.length > 0 && index === sections.primary.length && <SoftAudienceNotice label="маршруты" afterMatches />}
           <div className={cardShell}>
             <RouteCard route={route} homeCard />
           </div>

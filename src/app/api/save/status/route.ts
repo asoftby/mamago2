@@ -89,16 +89,25 @@ export async function GET(request: NextRequest) {
     }
 
     if (offerId) {
-      const isIdea = hasOfferIdeaSupport() ? await hasOfferIdea(user.id, offerId) : false;
-      const planItems = await prisma.planItem.findMany({
-        where: { ...(await activePlanScopeFor(user.id)), offerId },
-        select: { id: true, date: true, startsAt: true },
-        orderBy: { date: "asc" },
-      });
+      const planScope = await activePlanScopeFor(user.id);
+      const [isIdea, planItems, savedBirthdayOffer] = await Promise.all([
+        hasOfferIdeaSupport() ? hasOfferIdea(user.id, offerId) : Promise.resolve(false),
+        prisma.planItem.findMany({
+          where: { ...planScope, offerId },
+          select: { id: true, date: true, startsAt: true },
+          orderBy: { date: "asc" },
+        }),
+        prisma.partySavedOffer.findFirst({
+          where: { offerId, partyOrder: { ownerUserId: user.id, status: { not: "CANCELLED" } } },
+          select: { id: true },
+        }),
+      ]);
+      const inBirthday = Boolean(savedBirthdayOffer);
       const planState = resolveIdeaPlanState(planItems.map((item) => ({ id: item.id, date: item.date })));
       return NextResponse.json({
-        isSaved: isIdea || planItems.length > 0,
+        isSaved: isIdea || planItems.length > 0 || inBirthday,
         isIdea,
+        inBirthday,
         inPlan: planState.isPlanned,
         planDate: planState.plannedDate ?? null,
         planStartsAt: planItems.find((item) => item.id === planState.planItemId)?.startsAt ?? null,

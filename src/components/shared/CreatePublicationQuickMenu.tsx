@@ -16,6 +16,7 @@ import {
   PartyPopper,
   Sun,
 } from "lucide-react";
+import { BUSINESS_OFFERS_ENABLED } from "@/lib/business/publicationAvailability";
 import { Button } from "@/components/ui/button";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { cn } from "@/lib/utils";
@@ -93,7 +94,7 @@ const BUSINESS_INTENTS: Item[] = [
     id: "dated-event",
     kind: "link",
     href: "/editor/event/new",
-    label: "Мероприятие",
+    label: "Событие",
     description: "Спектакли, экскурсии и мастер-классы с конкретной датой и временем",
     Icon: Calendar,
   },
@@ -133,7 +134,7 @@ const BUSINESS_INTENTS: Item[] = [
     id: "visit-place",
     kind: "link",
     href: "/editor/place/new",
-    label: "Добавить место",
+    label: "Место",
     description: "Адрес, фотографии и информация об объекте",
     Icon: MapPin,
   },
@@ -181,7 +182,9 @@ export function CreatePublicationQuickMenu({
 
   const visibleItems = publicationMode === "full"
     ? [...BUSINESS_INTENTS, ...ADMIN_ONLY_ITEMS]
-    : BUSINESS_INTENTS;
+    : BUSINESS_OFFERS_ENABLED
+      ? BUSINESS_INTENTS
+      : BUSINESS_INTENTS.filter((item) => item.id === "dated-event" || item.id === "visit-place");
 
   const goAdminPublication = (type: "news" | "article" | "collection") => {
     setOpen(false);
@@ -215,7 +218,7 @@ export function CreatePublicationQuickMenu({
 
           return (
             <Fragment key={item.id}>
-              {item.id === "visit-place" && (
+              {item.id === "visit-place" && publicationMode === "full" && (
                 <div role="separator" aria-orientation="horizontal" className="my-2 border-t border-border" />
               )}
               <Link

@@ -60,6 +60,24 @@ import { getDefaultFormData } from "./defaults";
 }
 
 {
+  const defaults = getDefaultFormData();
+  assert.equal(defaults.agePolicy, "UNRESTRICTED");
+  assert.deepEqual(defaults.ageTags, []);
+  assert.deepEqual(defaults.ageRangeIds, [
+    "0-1",
+    "1-3",
+    "3-5",
+    "5-7",
+    "7-9",
+    "9-12",
+    "12-14",
+    "14-16",
+    "16-18",
+    "18+",
+  ]);
+}
+
+{
   const form = getDefaultFormData();
   form.title = "Any age event";
   form.agePolicy = "UNRESTRICTED";
@@ -71,6 +89,47 @@ import { getDefaultFormData } from "./defaults";
   assert.equal(payload.ageMaxMonths, null);
   assert.ok(payload.scheduleJson);
   assert.deepEqual(payload.scheduleJson.ageRangeIds, form.ageRangeIds);
+}
+
+{
+  const form = mapEventToFormData({
+    id: "unrestricted-empty-ranges",
+    title: "Open age",
+    description: null,
+    ageLabel: null,
+    ageMinMonths: null,
+    ageMaxMonths: null,
+    ageTags: [],
+    agePolicy: "UNRESTRICTED",
+    scheduleJson: {},
+    coverImageId: null,
+    placeId: null,
+    eventCategoryId: null,
+    priceFrom: null,
+    priceTo: null,
+    priceText: null,
+    format: "OFFLINE",
+    scheduleMode: "MULTI_DATE",
+    shortDesc: "",
+    status: "DRAFT",
+    ownerUserId: "user-1",
+    type: "EVENT",
+  } as unknown as ActivityWithRelations);
+
+  assert.equal(form.agePolicy, "UNRESTRICTED");
+  assert.deepEqual(form.ageTags, []);
+  assert.deepEqual(form.ageRangeIds, [
+    "0-1",
+    "1-3",
+    "3-5",
+    "5-7",
+    "7-9",
+    "9-12",
+    "12-14",
+    "14-16",
+    "16-18",
+    "18+",
+  ]);
 }
 
 {

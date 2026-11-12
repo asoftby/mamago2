@@ -13,7 +13,8 @@ const bookings = source("../../server/services/booking/bookingQuery.service.ts")
 const api = source("../../app/api/business/bookings/[id]/route.ts");
 
 assert.match(ui, /response\?\.query === query \? response\.result : null/);
-assert.match(ui, /setResponse\(\{ query: tab \+ ":" \+ kind, result: json \}\)/);
+assert.match(ui, /const query = tab \+ ":" \+ kind \+ ":" \+ requestId/);
+assert.match(ui, /setResponse\(\{ query, result: json \}\)/);
 assert.match(ui, /setState\("loading"\)/);
 assert.match(ui, /onStandard=\{setStandardId\}/);
 assert.match(ui, /<StandardBookingDetails/);

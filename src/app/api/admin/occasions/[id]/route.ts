@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canManageEventCategories } from "@/lib/auth/eventCategoriesAdmin";
 import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import { normalizeTaxonomySlug } from "@/lib/taxonomy/transliterateToSlug";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 
 export const runtime = "nodejs";
 
@@ -159,6 +160,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     }
 
     const updated = await prisma.occasion.update({ where: { id }, data });
+    invalidatePublicArticleLists();
     return NextResponse.json({
       ...updated,
       startsAt: updated.startsAt ? updated.startsAt.toISOString().slice(0, 10) : null,
@@ -181,6 +183,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
   const { id } = await params;
   try {
     await prisma.occasion.delete({ where: { id } });
+    invalidatePublicArticleLists();
     return NextResponse.json({ ok: true });
   } catch (e) {
     const j = prismaToHttpResponse(e);

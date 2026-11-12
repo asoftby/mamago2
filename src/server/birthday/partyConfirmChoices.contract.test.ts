@@ -23,5 +23,5 @@ assert.match(confirm, /bookingUnitOffer.findMany/);
 // The overlap error mapping lives in the shared unit allocation used by confirm.
 const unitAllocation = readFileSync(new URL("./partyUnitAllocation.ts", import.meta.url), "utf8");
 assert.match(confirm, /isAllocationOverlapError\(error\)/);
-assert.match(unitAllocation, /BookingAllocation_no_active_overlap/);
+assert.match(unitAllocation, /await lockBookingUnits\(tx, businessId, \[unitId\]\)/);
 console.log("Party confirmation room-choice API contracts: OK");

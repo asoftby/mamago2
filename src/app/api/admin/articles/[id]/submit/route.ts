@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
-import { submitArticleForModeration } from "@/lib/article/articleAdminService";
+import { moderateArticle, submitArticleForModeration } from "@/lib/article/articleAdminService";
+import { resolveArticleSubmitAction } from "@/lib/article/articleSubmitPolicy";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 import { createRequestPerf } from "@/server/utils/requestPerf";
 
 export async function POST(
@@ -16,8 +18,14 @@ export async function POST(
 
   const { id } = await params;
   try {
-    const snapshot = await submitArticleForModeration(id);
+    // Право на прямую публикацию проверяется здесь, на сервере (не по подписи кнопки).
+    const action = resolveArticleSubmitAction(user.role);
+    const snapshot =
+      action === "publish"
+        ? await moderateArticle(id, "publish")
+        : await submitArticleForModeration(id);
     perf.mark("service");
+    if (snapshot.status === "PUBLISHED") invalidatePublicArticleLists();
     perf.log({ articleId: id, status: snapshot.status });
     return NextResponse.json(snapshot);
   } catch (e) {

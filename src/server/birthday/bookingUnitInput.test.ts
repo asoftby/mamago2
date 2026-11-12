@@ -8,6 +8,7 @@ const base = {
   rules: [{ weekday: 2, startMinutes: 600, endMinutes: 1080 }],
 };
 assert.equal(bookingUnitCreateSchema.safeParse(base).success, true);
+assert.deepEqual(bookingUnitCreateSchema.parse({ ...base, offerIds: [] }).offerIds, []);
 assert.equal(bookingUnitCreateSchema.safeParse({ ...base, offerIds: ["x", "x"] }).success, false);
 assert.equal(bookingUnitCreateSchema.safeParse({ ...base, rules: [
   { weekday: 2, startMinutes: 600, endMinutes: 840 },

@@ -32,9 +32,11 @@ import {
   assertCollectionItemCount,
   assertJournalExpiryShape,
   assertJournalLinkedItemsShape,
-  resolveBreakingNewsExpiresAtOnPublish,
+  resolvePublishTimestamps,
   resolveJournalExpiresAt,
 } from "@/lib/journal/publicationType";
+
+import { PUBLIC_DISCOVERY_OCCASION_TYPES } from "@/lib/discovery/occasionUtils";
 
 export type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 export {
@@ -56,6 +58,8 @@ function toSnapshot(row: {
   authorLabel: string | null;
   cityContext: string | null;
   categoryId: string | null;
+  occasionId: string | null;
+  seasonReviewedForStart: Date | null;
   additionalCategoryLinks: Array<{ categoryId: string }>;
   additionalGeographyTargets: Array<{ type: "CITY" | "REGION"; cityId: string | null; regionId: string | null }>;
   geoScope: GeoScope | null;
@@ -100,6 +104,8 @@ function toSnapshot(row: {
     authorLabel: row.authorLabel,
     cityContext: row.cityContext,
     categoryId: row.categoryId,
+    occasionId: row.occasionId,
+    seasonReviewedForStart: row.seasonReviewedForStart?.toISOString() ?? null,
     additionalCategoryIds: row.additionalCategoryLinks.map((link) => link.categoryId),
     additionalGeographyTargets: row.additionalGeographyTargets.map((target) => target.type === "CITY"
       ? { type: "CITY", cityId: target.cityId as string }
@@ -156,6 +162,8 @@ const articleSelect = {
   cityId: true,
   regionId: true,
   categoryId: true,
+  occasionId: true,
+  seasonReviewedForStart: true,
   additionalCategoryLinks: {
     orderBy: { position: "asc" as const },
     select: { categoryId: true },
@@ -237,6 +245,39 @@ async function assertLinkedItemsExist(
 function resolveCreatePublicationType(input: ArticleSaveInput): ArticleEditorSnapshot["publicationType"] {
   if (input.publicationType) return input.publicationType;
   return input.subtitle === BREAKING_NEWS_SUBTITLE ? "BREAKING_NEWS" : "ARTICLE";
+}
+
+/**
+ * Approval belongs to one calendar season (occasion.startsAt).
+ * Editing text or moving next year's occasion dates never silently renews it.
+ */
+async function resolveArticleSeasonalFields(
+  input: ArticleSaveInput,
+  publicationType: ArticleEditorSnapshot["publicationType"],
+  previous?: { occasionId: string | null },
+): Promise<{ occasionId?: string | null; seasonReviewedForStart?: Date | null }> {
+  if (publicationType === "BREAKING_NEWS") {
+    if (input.occasionId) throw new Error("Повод доступен только для статей и подборок");
+    return { occasionId: null, seasonReviewedForStart: null };
+  }
+  if (input.occasionId === undefined) return {};
+  if (input.occasionId === null) return { occasionId: null, seasonReviewedForStart: null };
+  if (previous?.occasionId === input.occasionId && !input.seasonReviewRequested) {
+    return { occasionId: input.occasionId };
+  }
+  const occasion = await prisma.occasion.findUnique({
+    where: { id: input.occasionId },
+    select: { id: true, type: true, isActive: true, startsAt: true, endsAt: true },
+  });
+  if (!occasion || !occasion.isActive || !PUBLIC_DISCOVERY_OCCASION_TYPES.includes(occasion.type)
+    || !occasion.startsAt || !occasion.endsAt) {
+    throw new Error("Выберите действующий календарный повод с датами");
+  }
+  // A period change between editor load and save must not silently approve a new season.
+  if (!input.seasonReviewStartsAt || new Date(input.seasonReviewStartsAt).getTime() !== occasion.startsAt.getTime()) {
+    throw new Error("Период повода изменился. Обновите редактор и подтвердите актуальность повторно");
+  }
+  return { occasionId: occasion.id, seasonReviewedForStart: occasion.startsAt };
 }
 
 function assertRequiredJournalCategory(
@@ -529,6 +570,7 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     resolvedGeo.regionId ?? null,
   );
   const publicationType = resolveCreatePublicationType(input);
+  const seasonalFields = await resolveArticleSeasonalFields(input, publicationType);
   if (isPublishLikeStatus(input.status)) assertRequiredJournalCategory(input.categoryId, publicationType);
   await assertArticleCategoryValid(input.categoryId);
   const linkedItems = input.linkedItems ?? [];
@@ -574,6 +616,7 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
         cityId: resolvedGeo.cityId,
         regionId: resolvedGeo.regionId,
         categoryId: input.categoryId,
+        ...seasonalFields,
         additionalCategoryLinks: additionalCategoryIds.length
           ? { create: additionalCategoryIds.map((categoryId, position) => ({ categoryId, position })) }
           : undefined,
@@ -618,7 +661,7 @@ export async function saveArticleDraft(
   const perf = createRequestPerf("save-article:service:update");
   const previous = await prisma.article.findUnique({
     where: { id },
-    select: { status: true, publicationType: true, expiresAt: true, _count: { select: { linkedItems: true } } },
+    select: { status: true, publicationType: true, occasionId: true, expiresAt: true, _count: { select: { linkedItems: true } } },
   });
   if (!previous) throw new Error("Article not found");
   const resolvedGeo = resolvedGeoScope(input);
@@ -656,6 +699,7 @@ export async function saveArticleDraft(
       : input.cityContext;
 
   const publicationType = input.publicationType ?? previous.publicationType;
+  const seasonalFields = await resolveArticleSeasonalFields(input, publicationType, previous);
   if (isPublishLikeStatus(input.status)) assertRequiredJournalCategory(input.categoryId, publicationType);
   const expiresAt = resolveJournalExpiresAt({
     publicationType,
@@ -729,6 +773,7 @@ export async function saveArticleDraft(
             }
           : {}),
         categoryId: input.categoryId,
+        ...seasonalFields,
         publicationType,
         expiresAt,
         ...(input.featured !== undefined ? { featured: input.featured } : {}),
@@ -828,7 +873,8 @@ export async function moderateArticle(
       where: { id },
       select: {
         title: true, slug: true, geoScope: true, cityId: true, regionId: true,
-        categoryId: true, publicationType: true, expiresAt: true, _count: { select: { linkedItems: true } },
+        categoryId: true, publicationType: true, expiresAt: true, status: true, publishedAt: true,
+        _count: { select: { linkedItems: true } },
       },
     });
     if (!row) throw new Error("Article not found");
@@ -841,15 +887,11 @@ export async function moderateArticle(
       await resolveArticleSlugOnSaveInTransaction(tx, id, row.title, null);
     }
     await syncArticleCanonicalInTransaction(tx, id);
-    const publishedAt = new Date();
     await tx.article.update({
       where: { id },
       data: {
         status: "PUBLISHED",
-        publishedAt,
-        ...(row.publicationType === "BREAKING_NEWS"
-          ? { expiresAt: resolveBreakingNewsExpiresAtOnPublish(row.expiresAt, publishedAt) }
-          : {}),
+        ...resolvePublishTimestamps(row, new Date()),
       },
       select: { id: true },
     });

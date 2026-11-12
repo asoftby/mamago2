@@ -62,6 +62,59 @@ test("event card data: no place means no venue block", () => {
   assert.equal(buildEventCardData({ ...base, place: { title: "  " } }).venue, null);
 });
 
+
+test("event venue: explicit PLACE venue overrides a different Activity.place", () => {
+  const card = buildEventCardData({
+    ...base,
+    place: {
+      id: "linked", slug: "old-place", title: "Другая площадка",
+      customAddress: "Минск, ул. Старая, 1", city: { slug: "minsk" },
+    },
+    venue: {
+      kind: "PLACE", title: null, addressLine: null,
+      place: {
+        id: "actual", slug: "new-place", title: "Фактическая площадка",
+        customAddress: "Минск, ул. Новая, 2",
+        districtAuto: { name: "Советский р-н" }, metroAuto: { name: "Немига" },
+        city: { slug: "minsk" },
+      },
+    },
+  });
+  assert.equal(card.venue?.name, "Фактическая площадка");
+  assert.match(card.venue?.address ?? "", /Новая/);
+  assert.doesNotMatch(card.venue?.address ?? "", /Старая/);
+  assert.equal(card.venue?.href, "/minsk/places/new-place");
+  assert.equal(card.venue?.district, "Советский р-н");
+});
+
+test("event venue: standalone address overrides linked place without a misleading link", () => {
+  const card = buildEventCardData({
+    ...base,
+    title: "Мастер-класс",
+    place: { id: "linked", slug: "incorrect", title: "Место организатора", customAddress: "Минск, ул. Старая, 1" },
+    venue: { kind: "CUSTOM", title: "Зал на фестивале", addressLine: "Минск, ул. Новая, 5", place: null },
+  });
+  assert.equal(card.venue?.name, "Зал на фестивале");
+  assert.match(card.venue?.address ?? "", /Новая/);
+  assert.equal(card.venue?.href, undefined);
+  assert.equal(card.venue?.district, undefined);
+  assert.equal(card.venue?.metro, undefined);
+});
+
+test("event venue: online activities never show a physical address", () => {
+  const card = buildEventCardData({
+    ...base, format: "ONLINE",
+    place: { title: "Офлайн-площадка", formattedAddr: "Минск, ул. Мира, 3" },
+    venue: { kind: "CUSTOM", title: "Другая площадка", addressLine: "Минск, ул. Ленина, 2", place: null },
+  });
+  assert.equal(card.venue, null);
+});
+
+test("event venue: custom title without linked place still renders", () => {
+  const card = buildEventCardData({ ...base, title: "Событие", venue: { kind: "CUSTOM", title: "Встреча в парке", addressLine: null, place: null } });
+  assert.equal(card.venue?.name, "Встреча в парке");
+});
+
 test("description: plain text from html, truncated at a word boundary", () => {
   assert.equal(eventCardDescription("<p>Привет, <b>мир</b>!</p>"), "Привет, мир!");
   assert.equal(eventCardDescription("<p> </p>"), null);

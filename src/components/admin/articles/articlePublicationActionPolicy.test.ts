@@ -7,7 +7,7 @@ const draft = resolveArticlePublicationActionPolicy({
   hasUnsavedChanges: true,
   hasPublicUrl: false,
 });
-assert.deepStrictEqual(draft.primary, { kind: "submit", label: "Отправить на модерацию" });
+assert.deepStrictEqual(draft.primary, { kind: "submit", label: "Опубликовать" }, "ADMIN/MODERATOR publish without queue");
 assert.strictEqual(draft.showQuietSave, true);
 assert.strictEqual(draft.showReject, false);
 assert.strictEqual(draft.showPublicLink, false);
@@ -41,6 +41,25 @@ assert.deepStrictEqual(pendingAdminDirty.primary, {
   disabledReason: "Сначала сохраните изменения",
 });
 
+// Non-moderators (business-style authors) keep the moderation queue wording.
+const draftAuthor = resolveArticlePublicationActionPolicy({
+  status: "DRAFT",
+  canModerate: false,
+  hasUnsavedChanges: true,
+  hasPublicUrl: false,
+});
+assert.deepStrictEqual(draftAuthor.primary, { kind: "submit", label: "Отправить на модерацию" });
+const rejectedAuthor = resolveArticlePublicationActionPolicy({
+  status: "REJECTED",
+  canModerate: false,
+  hasUnsavedChanges: false,
+  hasPublicUrl: false,
+});
+assert.deepStrictEqual(rejectedAuthor.primary, { kind: "submit", label: "Исправить и отправить снова" });
+
+// Explicit draft save never publishes: the quiet save button stays and has no publish semantics.
+assert.strictEqual(draft.showQuietSave, true);
+
 const pendingAuthor = resolveArticlePublicationActionPolicy({
   status: "PENDING",
   canModerate: false,
@@ -70,7 +89,7 @@ const rejected = resolveArticlePublicationActionPolicy({
   hasUnsavedChanges: false,
   hasPublicUrl: false,
 });
-assert.deepStrictEqual(rejected.primary, { kind: "submit", label: "Исправить и отправить снова" });
+assert.deepStrictEqual(rejected.primary, { kind: "submit", label: "Исправить и опубликовать" });
 assert.strictEqual(rejected.showQuietSave, true);
 
 for (const policy of [draft, pendingAdmin, pendingAdminDirty, pendingAuthor, published, rejected]) {

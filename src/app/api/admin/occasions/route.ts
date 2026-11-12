@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canManageEventCategories } from "@/lib/auth/eventCategoriesAdmin";
 import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import { normalizeTaxonomySlug, transliterateToSlug } from "@/lib/taxonomy/transliterateToSlug";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 
 export const runtime = "nodejs";
 
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
         isActive: true,
       },
     });
+    invalidatePublicArticleLists();
     return NextResponse.json(created);
   } catch (e) {
     const j = prismaToHttpResponse(e);

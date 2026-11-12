@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
-import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
-import { SoftAudienceNotice } from "@/features/city-home/components/SoftAudienceNotice";
-import { resolvePosterFrame } from "@/lib/media/posterFrame";
+
 import {
   buildNextPageParams,
   listingPageHref,
@@ -37,6 +35,17 @@ const STORE_PREFIX = "mamago:kuda-listing:";
 const STORE_TTL_MS = 30 * 60 * 1000;
 /** Eager/high-priority covers: the first row(s) on phones and desktop. */
 const PRIORITY_COUNT = 4;
+
+/** The catalog preserves feed order without orphaned cards in middle columns. */
+function KudaListingRows({ items }: { items: Array<{ key: string; content: ReactNode }> }) {
+  return (
+    <div className="grid grid-cols-2 items-start gap-x-5 gap-y-10 sm:grid-cols-3 sm:gap-x-6 md:grid-cols-4 lg:gap-x-8">
+      {items.map(({ key, content }) => (
+        <div key={key} className="min-w-0">{content}</div>
+      ))}
+    </div>
+  );
+}
 
 function readStored(key: string): StoredListing | null {
   try {
@@ -74,11 +83,11 @@ function isBackForwardNavigation(): boolean {
  *
  * - SSR renders exactly the requested page (indexable, see CityShell). The
  *   client appends next pages from `/api/discovery/events/page` to the same
- *   masonry; already shown cards never move (OrderedMasonryGrid append mode).
- * - Back from an event: loaded pages, column assignment and scroll position
+ *   row-aligned grid, so an incomplete final row always starts at the left.
+ * - Back from an event: loaded pages and scroll position
  *   are restored from sessionStorage (keyed by the listing URL).
  * - The «Популярное у других семей» layer keeps its position after all
- *   primary results; when it starts, it gets its own heading + masonry.
+ *   primary results; when it starts, it gets its own heading + grid.
  */
 export function KudaMasonryListing({
   listing,
@@ -224,7 +233,6 @@ export function KudaMasonryListing({
       const card = activityMockToEventCard(activity, citySlug);
       return {
         key: activity.id,
-        ratio: resolvePosterFrame(card.imageWidth, card.imageHeight).ratio,
         content: (
           <AnalyticsCardViewTracker
             threshold={0.5}
@@ -266,22 +274,13 @@ export function KudaMasonryListing({
   return (
     <div className="space-y-8">
       {primary.length > 0 ? (
-        <OrderedMasonryGrid
-          items={toMasonry(primary, listing.offset)}
-          persistKey={`${storeKey}:primary`}
-        />
+        <KudaListingRows items={toMasonry(primary, listing.offset)} />
       ) : null}
 
       {secondary.length > 0 && listing.secondaryHeading ? (
         <div className="space-y-4">
           <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">{listing.secondaryHeading}</h2>
-          <OrderedMasonryGrid
-            items={[
-              ...(!hasMore && primary.length === 0 ? [{ key: "__audience-alternatives__", ratio: 1.5, content: <SoftAudienceNotice inGrid label="события" /> }] : []),
-              ...toMasonry(secondary, listing.offset + primary.length),
-            ]}
-            persistKey={`${storeKey}:secondary`}
-          />
+          <KudaListingRows items={toMasonry(secondary, listing.offset + primary.length)} />
         </div>
       ) : null}
 

@@ -1,8 +1,10 @@
+import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { readPartyOrder } from "@/server/birthday/partyDraft.service";
 import { PartyApiError } from "@/server/birthday/partyDraft.validation";
 import { partyCancelBlocker } from "@/server/birthday/partyCancelRules";
+import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { wishlistEnabled } from "@/server/wishlist/wishlistPure";
 import { partyGiftsHref } from "@/features/wishlist/lib/wishlistView";
 import {
@@ -33,6 +35,12 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
     giftsHref: wishlistEnabled()
       ? partyGiftsHref(party.childName || "ребёнка", party.eventDate?.toISOString().slice(0, 10) ?? null)
       : null,
+    savedOffers: party.savedOffers.map(saved => ({
+      id: saved.offerId,
+      title: saved.offer.title,
+      href: getOfferPublicPath({ slug: saved.offer.slug },
+        saved.offer.city?.slug ?? saved.offer.place?.city?.slug ?? party.citySlug),
+    })),
     items: party.items.map((item) => {
       const request = item.requests[0];
       const quote = request?.partyQuotes[0];
@@ -40,11 +48,11 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
         id: item.id, title: item.offer?.title ?? item.category,
         role: item.role, status: item.status,
         request: request ? {
-          id: request.id, partyStage: request.partyStage,
+          id: request.id, partyStage: request.partyStage, packageScope: readPackageChangeScope(request.bookingPriceSnapshot),
           quote: quote ? {
             id: quote.id, version: quote.version, status: quote.status,
             priceByn: quote.priceByn?.toString() ?? null,
-            includes: quote.includes, prepaymentTerms: quote.prepaymentTerms,
+            declineReason: quote.declineReason, declineComment: quote.declineComment, changeReason: quote.changeReason, includes: quote.includes, prepaymentTerms: quote.prepaymentTerms,
             cancellationTerms: quote.cancellationTerms,
             validUntil: quote.validUntil?.toISOString() ?? null,
             canAccept: request.partyStage === "QUOTED" && quote.status === "ACTIVE" &&

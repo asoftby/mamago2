@@ -454,7 +454,7 @@ function getQuickDateItems(baseDate: Date) {
   });
 }
 
-export function BookingsPageClient() {
+export function BookingsPageClient({ revision = 0 }: { revision?: number } = {}) {
   const [items, setItems] = useState<BusinessBookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<StatusFilter>("all");
@@ -572,7 +572,7 @@ export function BookingsPageClient() {
 
   useEffect(() => {
     void fetchBookings();
-  }, [fetchBookings]);
+  }, [fetchBookings, revision]);
 
   const handleStatusChange = useCallback(
     async (id: string, status: BookingStatus) => {
@@ -1252,7 +1252,7 @@ function BookingCalendarDayPanel({
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-stone-500">
-                      {booking.customerName} · {booking.customerPhone}
+                      {booking.customerName} · {booking.customerPhone}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", STATUS_META[booking.status].chipClass)}>
@@ -1414,7 +1414,7 @@ function BookingListItem({
             {booking.display.title}
           </div>
           <div className="mt-2 text-base text-stone-500">
-            {booking.customerName} · {booking.customerPhone}
+            {booking.customerName} · {booking.customerPhone}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
           </div>
           {participant ? <div className="mt-1 text-sm text-stone-400">{participant}</div> : null}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
@@ -1575,7 +1575,7 @@ export function BookingDetailsDrawer({
                   icon={<User2 className="h-5 w-5 text-blue-500" />}
                   label="Клиент"
                   primary={booking.customerName}
-                  secondary={[booking.customerPhone, booking.customerEmail].filter(Boolean) as string[]}
+                  secondary={[booking.customerPhone, booking.customerEmail, booking.source === "MANUAL" ? "Добавлено вручную" : null].filter(Boolean) as string[]}
                   trailing={
                     <div className="flex items-center gap-4 text-stone-400">
                       <a href={`tel:${booking.customerPhone}`} className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-stone-50 hover:text-stone-700" aria-label="Позвонить клиенту">

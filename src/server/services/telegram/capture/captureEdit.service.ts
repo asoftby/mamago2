@@ -433,7 +433,26 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
         return;
       }
 
-      await deps.presenter.present(snapshot.id);
+      // The edit is already committed. A Telegram presentation failure must
+      // never be reported as a failure to apply the edit or reopen its window.
+      let previewUpdated = true;
+      try {
+        await deps.presenter.present(snapshot.id);
+      } catch {
+        previewUpdated = false;
+        safeLog("EDIT_PREVIEW_FAILED", snapshot.id, snapshot.userId);
+      }
+
+      try {
+        await deps.notifier.reply(
+          capture.chatId,
+          previewUpdated
+            ? "Готово. Правка сохранена. Проверьте обновлённую карточку."
+            : "Правка сохранена, но обновить карточку в Telegram не удалось. Попробуйте открыть её позже.",
+        );
+      } catch {
+        safeLog("EDIT_CONFIRMATION_FAILED", snapshot.id, snapshot.userId);
+      }
     } catch {
       safeLog("EDIT_PROCESSOR_ERROR", snapshot.id, snapshot.userId);
       await reopenEdit(snapshot);

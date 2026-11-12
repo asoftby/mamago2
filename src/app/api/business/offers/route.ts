@@ -1,3 +1,4 @@
+import { packageComponentInputSchema, PackageComponentsError, savePackageComponents } from "@/server/offers/packageComponents";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -5,6 +6,7 @@ import { z } from "zod";
 import { AgePolicy, Prisma } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
+import { canBusinessCreateOffer } from "@/lib/business/publicationAvailability";
 import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
@@ -133,6 +135,9 @@ const createOfferSchema = z.object({
   productType: offerProductTypeSchema.optional(),
   requestedPlacements: z.array(offerPlacementKeySchema).optional(),
   /** Type-specific display details (Offer.details JSONB). Validated per productType client-side. */
+  partyPriceMode: z.enum(["EXACT", "FROM", "ON_REQUEST", "FREE", "RANGE", "NONE", "UNKNOWN"]).optional(),
+  packageComponents: packageComponentInputSchema.optional(),
+  packageComponentsBaseline: packageComponentInputSchema.optional(),
   details: z.record(z.string(), z.unknown()).optional(),
   /** Шаг «Расписание» нового мастера: способ записи, режим работы, закрытые дни. */
   schedule: offerScheduleInputSchema.optional(),
@@ -178,6 +183,12 @@ export async function POST(request: NextRequest) {
     
     if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!canBusinessCreateOffer(user.role)) {
+      return NextResponse.json(
+        { error: "Создание предложений для бизнеса временно недоступно", code: "BUSINESS_OFFER_CREATION_PAUSED" },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();
@@ -359,6 +370,11 @@ export async function POST(request: NextRequest) {
 
       assertScheduleValid(data.schedule);
 
+      if (productType === "PARTY_PACKAGE" && data.pricingMode !== "MULTIPLE" && data.partyPriceMode && data.partyPriceMode !== "RANGE") {
+        const normalized = normalizePublicationPrice({ mode: data.partyPriceMode, min: data.singlePrice });
+        priceFrom = normalized.min; priceTo = normalized.max; priceMode = normalized.mode;
+      }
+      if (data.packageComponents !== undefined && data.details) delete data.details.includedCategories;
       const offer = await prisma.$transaction(async (tx) => {
         const createdOffer = await tx.offer.create({
           data: {
@@ -455,6 +471,9 @@ export async function POST(request: NextRequest) {
           requestedPlacements: data.requestedPlacements,
         });
 
+        if (data.packageComponents !== undefined) {
+          await savePackageComponents(tx, createdOffer.id, data.packageComponents, [], true);
+        }
         if (data.categoryIds !== undefined) {
           await syncOfferCategories({
             db: tx,
@@ -552,6 +571,8 @@ export async function POST(request: NextRequest) {
     timer.log({ error: 1 });
     console.error("Create offer error:", error);
     
+    if (error instanceof PackageComponentsError) return NextResponse.json({ error: error.message }, { status: 409 });
+
     if (error instanceof OfferCategoriesError) {
       return NextResponse.json(
         {

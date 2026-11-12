@@ -22,6 +22,6 @@ assert.ok(acceptance.indexOf("assertPartyConfirmationEnabled()") !== -1 &&
 assert.ok(confirm.indexOf("assertPartyConfirmationEnabled()") !== -1 &&
   confirm.indexOf("assertPartyConfirmationEnabled()") < confirm.indexOf("prisma.$transaction"),
   "Business confirmation (site and Telegram) is gated before any write");
-assert.match(reply, /const fixedPrice = !declined && isPartyConfirmationEnabled\(\) &&/);
+assert.match(reply, /const fixedPrice = !packageScope && !declined && isPartyConfirmationEnabled\(\) &&/);
 assert.match(telegram, /status === 503\) return \{ ok: false as const, reason: "CONFIRMATION_DISABLED"/);
 console.log("partyConfirmationFlag.contract.test.ts: OK");
