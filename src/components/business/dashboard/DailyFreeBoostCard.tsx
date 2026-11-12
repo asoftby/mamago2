@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, Heart, MousePointerClick, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -18,19 +19,33 @@ import type { DashboardData } from "./DashboardClient";
 
 type Props = {
   data: DashboardData["dailyFreeBoost"];
+  initialTarget?: string;
 };
 
-export function DailyFreeBoostCard({ data }: Props) {
+export function DailyFreeBoostCard({ data, initialTarget }: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
+  const validInitialTarget = data.candidates.some(
+    (candidate) => `${candidate.publicationType}:${candidate.id}` === initialTarget,
+  ) ? initialTarget! : null;
+  const [open, setOpen] = useState(Boolean(validInitialTarget));
+  const [selected, setSelected] = useState<string | null>(validInitialTarget);
+  const nextFreeLabel = data.nextFreeAt
+    ? new Intl.DateTimeFormat("ru-BY", {
+        timeZone: "Europe/Minsk",
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(data.nextFreeAt))
+    : null;
   const [pending, startTransition] = useTransition();
   const selectedCandidate = data.candidates.find(
     (candidate) => `${candidate.publicationType}:${candidate.id}` === selected,
   );
+  const selectedActive = Boolean(selectedCandidate?.activeBoostUntil);
 
   function submit() {
-    if (!selectedCandidate) return;
+    if (!selectedCandidate || selectedActive || !data.availableToday) return;
     startTransition(async () => {
       const result = await createDailyFreeBoostAction({
         publicationId: selectedCandidate.id,
@@ -67,9 +82,19 @@ export function DailyFreeBoostCard({ data }: Props) {
               <p className="mt-1 text-sm text-stone-600">
                 {data.boost.publicationTitle}
               </p>
-              <p className="mt-2 text-xs text-stone-400">
-                Следующее поднятие доступно завтра
+              <p className="mt-2 text-xs text-stone-500">
+                {nextFreeLabel
+                  ? `Следующее бесплатное поднятие: ${nextFreeLabel} (Минск)`
+                  : "Следующее бесплатное поднятие — через 24 часа"}
               </p>
+              <button
+                type="button"
+                disabled={data.candidates.length === 0}
+                onClick={() => setOpen(true)}
+                className="mt-3 w-full rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-800 disabled:opacity-50"
+              >
+                Продвинуть другую публикацию
+              </button>
             </div>
 
             <div className="border-t border-stone-100 pt-3">
@@ -91,11 +116,11 @@ export function DailyFreeBoostCard({ data }: Props) {
           <>
             <div>
               <p className="text-base font-semibold text-stone-900">
-                1 поднятие доступно сегодня
+                1 бесплатное поднятие доступно
               </p>
               <p className="mt-1.5 text-sm leading-relaxed text-stone-500">
-                Поднимите одну публикацию в рекомендациях и посмотрите, как
-                изменится результат.
+                Поднимите одну публикацию на 24 часа в своём регионе. Место
+                в выдаче зависит от актуальности и интересов семьи.
               </p>
             </div>
             <button
@@ -117,13 +142,23 @@ export function DailyFreeBoostCard({ data }: Props) {
           <DialogHeader>
             <DialogTitle>Выберите публикацию</DialogTitle>
             <DialogDescription>
-              Поднять можно одну опубликованную публикацию бизнеса.
+              Выберите событие или предложение. Бесплатно — один раз за 24 часа,
+              дополнительные публикации — через платный Boost.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[360px] space-y-2 overflow-y-auto py-2">
             {data.candidates.map((candidate) => {
               const key = `${candidate.publicationType}:${candidate.id}`;
               const active = selected === key;
+              const activeUntil = candidate.activeBoostUntil
+                ? new Intl.DateTimeFormat("ru-BY", {
+                    timeZone: "Europe/Minsk",
+                    day: "numeric",
+                    month: "long",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(candidate.activeBoostUntil))
+                : null;
               return (
                 <button
                   key={key}
@@ -144,18 +179,31 @@ export function DailyFreeBoostCard({ data }: Props) {
                       ? "Событие"
                       : "Предложение"}
                   </span>
+                  {activeUntil ? (
+                    <span className="mt-1 block text-xs text-stone-500">
+                      Boost активен до {activeUntil} (Минск) — повторно не продвигается
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
           </div>
           <button
             type="button"
-            disabled={!selectedCandidate || pending}
+            disabled={!selectedCandidate || pending || !data.availableToday || selectedActive}
             onClick={submit}
             className="w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
           >
-            {pending ? "Поднимаем…" : "Поднять публикацию"}
+            {pending ? "Поднимаем…" : selectedActive ? "Boost уже активен" : data.availableToday ? "Поднять бесплатно" : "Бесплатный Boost пока недоступен"}
           </button>
+          {selectedCandidate && !selectedActive ? (
+            <Link
+              href={`/business/${selectedCandidate.publicationType === "EVENT" ? "events" : "offers"}/${selectedCandidate.id}/boost`}
+              className="block w-full rounded-xl border border-stone-200 px-4 py-3 text-center text-sm font-semibold text-stone-800 hover:bg-stone-50"
+            >
+              Платный Boost
+            </Link>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

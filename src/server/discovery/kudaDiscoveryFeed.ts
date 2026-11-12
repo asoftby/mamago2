@@ -14,7 +14,7 @@ import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
 import { activeOccasionWhere } from "@/lib/discovery/occasionUtils";
-import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
+import { getBusinessQualityBoostMap, applyActivePublicationBoost, getPublicationBoostLevel } from "@/server/services/ranking/businessQualityBoost";
 import {
   getWeatherRankingBoost,
   type HomeWeatherScenario,
@@ -222,16 +222,18 @@ export async function getKudaDiscoveryFeed(
 
   const displayRegionId = targetRegionId ?? await getDiscoveryRegionContext(cityId, citySlug);
   const eligibilityById = new Map(eligibility.map(row => [row.activityId, row]));
+  const freeBoostIds = new Set<string>();
   const cards = rows.map((a) => {
     const physicalCityId = a.venue?.cityId ?? a.place?.cityId ?? a.cityId;
     const crossRegion = physicalCityId != null && !expandedCityIds.includes(physicalCityId);
     const applicableBoosts = a.boosts.filter(boost => isBoostForDiscoveryRegion(boost, displayRegionId, !crossRegion));
     const baseEngagement = (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0);
-    const isBoosted = applicableBoosts.length > 0;
+    const boostLevel = getPublicationBoostLevel(applicableBoosts);
+    if (boostLevel === "FREE") freeBoostIds.add(a.id);
     const qualityMultiplier = activityQualityBoost.get(a.id) ?? 1.0;
     const finalEngagement = applyActivePublicationBoost(
       baseEngagement,
-      isBoosted,
+      boostLevel,
       qualityMultiplier,
     );
 
@@ -267,7 +269,11 @@ export async function getKudaDiscoveryFeed(
   });
 
   // Compose within temporal relevance bands; no irrelevant replacement or candidate loss.
-  const composed = options?.onlyIds ? cards : composePromotedCards(cards, card => String(Math.floor((temporalById.get(card.id) ?? 0) / 10)));
+  const composed = options?.onlyIds ? cards : composePromotedCards(
+    cards,
+    card => String(Math.floor((temporalById.get(card.id) ?? 0) / 10)),
+    card => freeBoostIds.has(card.id),
+  );
   let selected: ActivityMock[] = options?.allCandidates ? composed : composed.slice(0, take);
   // Do not broaden strict catalog geographic filters or exact-ID hydration.
   // Only the automatic HOME preview can fill missing local slots. External

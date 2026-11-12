@@ -50,10 +50,12 @@ export type DashboardData = {
   pausedPromotionCount: number;
   dailyFreeBoost: {
     availableToday: boolean;
+    nextFreeAt: string | null;
     candidates: Array<{
       id: string;
       title: string;
       publicationType: "EVENT" | "OFFER";
+      activeBoostUntil: string | null;
     }>;
     boost: null | {
       id: string;

@@ -7,6 +7,7 @@ import {
 } from "@/lib/billing/boostOptions";
 import { debitBusinessDepositInTx } from "./billingAccount.service";
 import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
+import { getBoostablePublishedOfferWhere } from "@/server/services/promotion/boostEligibility";
 
 export class BoostPurchaseNotAllowedError extends Error {
   code = "BOOST_PURCHASE_NOT_ALLOWED" as const;
@@ -75,23 +76,21 @@ export async function purchaseOfferBoost(params: {
     // Serializes eligibility and active-Boost decisions for this Offer.
     await tx.$queryRaw`SELECT id FROM "Offer" WHERE id = ${params.offerId} FOR UPDATE`;
 
+    const now = new Date();
     const offer = await tx.offer.findFirst({
       where: {
         id: params.offerId,
-        status: "PUBLISHED",
-        archivedAt: null,
-        place: {
-          archivedAt: null,
-          ownerBusinessId: params.businessId,
-        },
+        AND: [
+          getBoostablePublishedOfferWhere(now),
+          { place: { ownerBusinessId: params.businessId } },
+        ],
       },
       select: { id: true, title: true },
     });
     if (!offer) {
-      throw new BoostPurchaseNotAllowedError("Offer is not eligible or belongs to another business");
+      throw new BoostPurchaseNotAllowedError("Offer is not publicly eligible or belongs to another business");
     }
 
-    const now = new Date();
     const activeBoost = await tx.boost.findFirst({
       where: { offerId: offer.id, startAt: { lte: now }, endAt: { gt: now } },
       select: { id: true },

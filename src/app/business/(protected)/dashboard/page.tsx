@@ -188,6 +188,7 @@ export default async function BusinessDashboardPage({
     pausedPromotionCount: 0,
     dailyFreeBoost: {
       availableToday: dailyFreeBoost.availableToday,
+      nextFreeAt: dailyFreeBoost.nextFreeAt?.toISOString() ?? null,
       candidates: dailyFreeBoost.candidates,
       boost: dailyFreeBoost.boost
         ? {
