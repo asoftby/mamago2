@@ -378,14 +378,17 @@ export async function addOfferPlanItem(
   // Serializable transactions make the read-before-create safe even when two
   // requests arrive simultaneously. A conflicting transaction retries and
   // observes the item inserted by the winner, rather than inserting a duplicate.
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       return await prisma.$transaction(async (tx) => {
         const existing = await tx.planItem.findFirst({
           where: { ...scope, offerId },
-          select: { id: true },
+          select: { id: true, date: true, title: true, coverImageUrl: true },
         });
         if (existing) {
+          // Idempotent retries must not contend on another identical UPDATE.
+          if (existing.date === date && existing.title === offer.title &&
+              existing.coverImageUrl === offer.coverImage) return { id: existing.id };
           return tx.planItem.update({
             where: { id: existing.id },
             data: { date, title: offer.title, coverImageUrl: offer.coverImage },
@@ -407,7 +410,10 @@ export async function addOfferPlanItem(
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) ||
-          error.code !== "P2034" || attempt === 2) throw error;
+          error.code !== "P2034" || attempt === 4) throw error;
+      // Give a concurrent winner time to commit; total backoff is at most 300ms.
+      // Ordinary saves add no wait or extra database calls.
+      await new Promise<void>((resolve) => setTimeout(resolve, 20 * 2 ** attempt));
     }
   }
   throw new Error("offer_plan_conflict");
