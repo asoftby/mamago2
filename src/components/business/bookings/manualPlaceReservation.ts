@@ -44,3 +44,14 @@ export function buildManualPlaceReservation(input: {
     return null;
   }
 }
+
+const DURATION_PRESETS = [15, ...Array.from({ length: 16 }, (_, index) => (index + 1) * 30)];
+
+/** Always offer the configured minimum, even between the usual presets. */
+export function manualPlaceDurationChoices(minDurationMinutes: number | null): number[] {
+  const minimum = minDurationMinutes ?? 15;
+  if (!Number.isInteger(minimum) || minimum < 1 || minimum > 1440) return [];
+  return [...new Set([...DURATION_PRESETS, minimum])]
+    .filter((minutes) => minutes >= minimum)
+    .sort((a, b) => a - b);
+}
