@@ -5,6 +5,7 @@ import type { BoostOptionId } from "@/lib/billing/boostOptions";
 import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurchase.service";
 import { debitBusinessDepositInTx } from "@/server/services/billing/billingAccount.service";
 import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
+import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 
 export async function purchaseEventBoost(params: {
   businessId: string;
@@ -30,13 +31,24 @@ export async function purchaseEventBoost(params: {
     }
 
     await tx.$queryRaw`SELECT id FROM "Activity" WHERE id = ${params.activityId} FOR UPDATE`;
+    const now = new Date();
     const event = await tx.activity.findFirst({
-      where: { id: params.activityId, OR: [{ businessId: params.businessId }, { ownerUserId: params.ownerUserId }], type: "EVENT", status: "PUBLISHED" },
+      where: {
+        id: params.activityId,
+        type: "EVENT",
+        status: "PUBLISHED",
+        AND: [
+          getPublicListingActivityWhere(now),
+          { OR: [
+            { businessId: params.businessId },
+            { businessId: null, ownerUserId: params.ownerUserId },
+          ] },
+        ],
+      },
       select: { id: true, title: true },
     });
-    if (!event) throw new Error("Событие не опубликовано или не принадлежит вашему бизнесу.");
+    if (!event) throw new Error("Событие не доступно в афише или не принадлежит вашему бизнесу.");
 
-    const now = new Date();
     const active = await tx.boost.findFirst({
       where: { activityId: event.id, startAt: { lte: now }, endAt: { gt: now } },
       select: { id: true },
