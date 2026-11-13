@@ -72,13 +72,13 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
 
   return (
     <div className={styles.page}>
-      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
+      <div className={`${styles.wrap} ${styles.breadcrumbs} ${styles.crumbsHideMobile}`}>
         <Link href="/me">← Профиль</Link>
         <span style={{ opacity: 0.5 }}>→</span>
         <span style={{ color: "var(--ink)" }}>Мои сообщения</span>
       </div>
 
-      <section style={{ paddingTop: 20, paddingBottom: 36 }}>
+      <section className={styles.heroAfterCrumbs} style={{ paddingTop: 20, paddingBottom: 36 }}>
         <div className={`${styles.wrap} ${styles.heroGrid}`}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>

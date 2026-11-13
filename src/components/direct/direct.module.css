@@ -74,6 +74,15 @@
 .breadcrumbs a:hover {
   color: var(--ink);
 }
+/* Phones: the trail on the list page is hidden, the hero takes its room. */
+@media (max-width: 760px) {
+  .crumbsHideMobile {
+    display: none;
+  }
+  .heroAfterCrumbs {
+    padding-top: 36px !important;
+  }
+}
 
 .heroGrid {
   display: grid;

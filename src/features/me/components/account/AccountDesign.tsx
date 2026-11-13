@@ -169,7 +169,7 @@ export function AccountDesign(props: AccountDesignProps) {
       <div className="mg-acc__content">
         {/* ── Breadcrumbs ── */}
         <div
-          className="wrap"
+          className="wrap mg-acc__crumbs"
           style={{ paddingTop: 24, paddingBottom: 8, display: "flex", gap: 8, alignItems: "center", color: "var(--ink-3)", fontSize: 13 }}
         >
           <Link href={homeHref} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -180,7 +180,7 @@ export function AccountDesign(props: AccountDesignProps) {
         </div>
 
         {/* ── Profile hero ── */}
-        <section style={{ paddingTop: 24, paddingBottom: 44 }}>
+        <section className="mg-acc__hero" style={{ paddingTop: 24, paddingBottom: 44 }}>
           <div className="hero-grid wrap">
             <Reveal>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
@@ -565,6 +565,11 @@ const CSS = `
 .mg-acc :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
 
 .mg-acc .mg-acc__hero-name{font-size:100px}
+/* Phones: no breadcrumb trail; the hero keeps the room it used to share with it. */
+@media(max-width:760px){
+.mg-acc__crumbs{display:none !important}
+.mg-acc__hero{padding-top:36px !important}
+}
 @media(max-width:760px){
  .mg-acc .hero-grid{grid-template-columns:1fr;gap:28px;align-items:stretch}
 }
