@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AccountPage } from "@/components/account/AccountPage";
 import { DirectActorType } from "@prisma/client";
 import type { UnifiedConversationDetail } from "@/server/services/direct/directConversation.service";
 import { ConversationHeader } from "@/components/direct/ConversationHeader";
@@ -163,13 +164,9 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
     }
   }
 
-  return (
-    <div className={businessMode ? `${styles.businessPage} space-y-4` : styles.page}>
-      <div className={businessMode ? "text-sm text-stone-500" : `${styles.wrap} ${styles.breadcrumbs}`}>
-        <Link href={businessMode ? "/business/direct" : "/me/direct"}>← {businessMode ? "Все сообщения" : "Мои сообщения"}</Link>
-      </div>
-
-      <div className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : styles.threadWrap}>
+  const content = (
+    <>
+      <div className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : `${styles.threadWrap} ${styles.threadWrapPersonal}`}>
         <ConversationHeader
           counterpartyName={detail.counterpartyName}
           counterpartyLogoUrl={detail.counterpartyLogoUrl}
@@ -299,6 +296,23 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
       {complaintTargetThreadId && (
         <DirectComplaintModal open={complaintOpen} onOpenChange={setComplaintOpen} threadId={complaintTargetThreadId} />
       )}
+    </>
+  );
+
+  if (!businessMode) {
+    return (
+      <AccountPage backHref="/me/direct" backLabel="← Мои сообщения" title="Переписка">
+        <div className={styles.page}>{content}</div>
+      </AccountPage>
+    );
+  }
+
+  return (
+    <div className={`${styles.businessPage} space-y-4`}>
+      <div className="text-sm text-stone-500">
+        <Link href="/business/direct">← Все сообщения</Link>
+      </div>
+      {content}
     </div>
   );
 }

@@ -20,12 +20,18 @@ assert.match(read("src/app/globals.css"), /\.me-page h1\s*\{\s*font-size: 34px !
 const ON_SHELL = [
   "src/app/(public)/me/profile/page.tsx",
   "src/features/me/components/account/AccountDesign.tsx",
+  "src/app/(public)/me/bookings/ParentBookingsClient.tsx",
+  "src/app/(public)/me/direct/DirectListClient.tsx",
+  "src/app/(public)/me/direct/[threadId]/DirectThreadClient.tsx",
+  "src/features/ideas-collections/IdeasCollections.tsx",
 ];
 for (const file of ON_SHELL) {
   const src = read(file);
   assert.match(src, /<AccountPage\b/, `${file} uses AccountPage`);
-  assert.doesNotMatch(src, /mg-acc|<h1\b/, `${file} has no bespoke page chrome`);
+  assert.doesNotMatch(src, /mg-acc|<h1\b|styles\.(breadcrumbs|heroTitle|heroGrid|kick)\b/, `${file} has no bespoke page chrome`);
 }
+// Бизнес-режим личной переписки не переведён на каркас кабинета.
+assert.match(read("src/app/(public)/me/direct/[threadId]/DirectThreadClient.tsx"), /businessPage/);
 // Только корневая /me без ссылки назад.
 assert.doesNotMatch(read("src/features/me/components/account/AccountDesign.tsx"), /backHref/);
 assert.match(read("src/app/(public)/me/profile/page.tsx"), /backHref="\/me"/);

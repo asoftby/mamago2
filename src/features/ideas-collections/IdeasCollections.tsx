@@ -20,6 +20,7 @@ import {
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { AccountPage } from "@/components/account/AccountPage";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { IdeaItem } from "@/app/(public)/me/ideas/types";
@@ -771,28 +772,10 @@ export function IdeasCollections({
     />
   );
 
-  return (
+  const root = (
     <div className={styles.root} data-layout={layout}>
       {layout === "page" ? (
         <>
-          <div className={styles.top}>
-            <nav className={styles.crumbs} aria-label="Навигация">
-              <Link href="/me">← Профиль</Link>
-              <span aria-hidden>→</span>
-              <b>Мои идеи</b>
-            </nav>
-            <Link href="/me/plan" className={styles.planLink}>
-              Мой план →
-            </Link>
-          </div>
-          <div className={styles.kick}>
-            <i />
-            Мои идеи
-          </div>
-          <h1 className={styles.h1}>Мои идеи и коллекции</h1>
-          <p className={styles.lead}>
-            Сохраняйте понравившиеся активности, собирайте их в коллекции и переносите в план, когда удобно.
-          </p>
           {ideasPanel}
           {view === "collections" ? (
             <CollectionsDrawer
@@ -865,6 +848,22 @@ export function IdeasCollections({
         }}
       />
     </div>
+  );
+
+  if (layout !== "page") return root;
+  return (
+    <AccountPage
+      backHref="/me"
+      title="Мои идеи и коллекции"
+      lead="Сохраняйте понравившиеся активности, собирайте их в коллекции и переносите в план, когда удобно."
+      actions={
+        <Link href="/me/plan" className={styles.planLink}>
+          Мой план →
+        </Link>
+      }
+    >
+      {root}
+    </AccountPage>
   );
 }
 
@@ -1014,10 +1013,6 @@ function CollectionsDrawer({ body, onClose }: { body: ReactNode; onClose: () => 
       <aside className={styles.drawer} role="dialog" aria-label="Мои коллекции">
         <div className={styles.dhd}>
           <div>
-            <div className={styles.kick}>
-              <i />
-              Мои идеи
-            </div>
             <b>Мои коллекции</b>
           </div>
           <button type="button" className={styles.x} onClick={onClose} aria-label="Закрыть">
