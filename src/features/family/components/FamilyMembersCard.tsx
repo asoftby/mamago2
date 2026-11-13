@@ -42,7 +42,7 @@ const BTN_PRIMARY =
   "inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50";
 
 const ACC_INPUT =
-  "min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--line-2)] bg-white px-3 text-sm text-[var(--ink)]";
+  "min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--line-2)] bg-white px-3 text-sm !text-[15px] text-[var(--ink)]";
 
 function AccountWrap({ className, children }: { className?: string; children: ReactNode }) {
   return (
