@@ -3,7 +3,7 @@
  * safe booking state shown to other adults of the family (no contacts).
  */
 
-export type PlanBookingStatus = "NEW" | "CONFIRMED" | "REJECTED" | "CANCELLED" | "COMPLETED";
+export type PlanBookingStatus = "NEW" | "CONFIRMED" | "REJECTED" | "CANCELLED" | "COMPLETED" | "EXPIRED";
 
 export type PlanBookingState = {
   status: PlanBookingStatus;
@@ -15,6 +15,11 @@ export type PlanBookingState = {
   isMine: boolean;
   /** Display name of the adult who booked (null for own bookings and when unknown). */
   bookedByName: string | null;
+  /**
+   * Public organizer contacts, set only for the booker's own EXPIRED request
+   * ("organizer did not answer"). Never set for other adults or other statuses.
+   */
+  expiredContacts?: { phone: string | null; messageUrl: string | null } | null;
 };
 
 export function bookingStatusLabel(status: PlanBookingStatus): string {
@@ -29,6 +34,8 @@ export function bookingStatusLabel(status: PlanBookingStatus): string {
       return "Бронь отклонена";
     case "CANCELLED":
       return "Бронь отменена";
+    case "EXPIRED":
+      return "Организатор не ответил";
   }
 }
 

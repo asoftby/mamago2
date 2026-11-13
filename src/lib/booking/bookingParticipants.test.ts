@@ -67,6 +67,12 @@ const months = eventAgeRuleFromActivity({ agePolicy: "SPECIFIC", ageTags: ["3-5"
 assert.equal(months?.label, "6–11 лет");
 assert.deepEqual(childrenOutsideEventAge([{ name: "A", age: 3 }, { name: null, age: 8 }], rule), [{ name: "A", age: 3 }]);
 
+// months-only restriction (empty ageTags) still yields a rule
+const monthsOnly = eventAgeRuleFromActivity({ agePolicy: "SPECIFIC", ageTags: [], ageMinMonths: 72, ageMaxMonths: 132 });
+assert.equal(monthsOnly?.label, "6–11 лет");
+assert.equal(childAgeWarning(4, monthsOnly), "Событие для 6–11 лет");
+assert.equal(childAgeWarning(8, monthsOnly), null);
+
 // ── business formatting ──
 assert.equal(
   formatParticipantsLine({ adultsCount: 1, childrenCount: 2, children: [{ name: "Маша", age: 5 }, { name: null, age: 7 }] }),

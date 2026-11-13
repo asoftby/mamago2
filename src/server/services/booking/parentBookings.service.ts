@@ -90,7 +90,7 @@ export interface ParentBookingsResult {
 
 // ─── Query ────────────────────────────────────────────────────────────────────
 
-const PARENT_BOOKING_SELECT = {
+export const PARENT_BOOKING_SELECT = {
   id: true,
   status: true,
   createdAt: true,
@@ -215,7 +215,7 @@ function toParentPrice(snapshot: Prisma.JsonValue | null, totalByn: Prisma.Decim
   };
 }
 
-function mapRow(raw: {
+export function mapParentBookingRow(raw: {
   id: string;
   status: BookingStatus;
   createdAt: Date;
@@ -415,7 +415,13 @@ function mapRow(raw: {
     placeWebsite: raw.offer?.place?.website ?? null,
     placeInstagram: offerPlaceInstagramUrl ?? null,
   }) : null;
-  const organizerPhone = pendingCamp
+  // Contacts are exposed only after the organizer's response window closed
+  // (EXPIRED), after confirmation, or for a pending camp shift. A plain NEW
+  // request shows none; EXPIRED uses public publication contacts only (no
+  // private business phone).
+  const exposeContacts = raw.status !== BookingStatus.NEW || pendingCamp;
+  const expired = raw.status === BookingStatus.EXPIRED;
+  const organizerPhone = !exposeContacts ? null : pendingCamp
     ? pendingCampContacts?.phone ?? null
     : raw.offer?.contactPhone ??
     raw.offer?.bookingPhone ??
@@ -425,9 +431,9 @@ function mapRow(raw: {
     raw.place?.phone ??
     raw.offer?.place?.phone ??
     raw.activity?.place?.phone ??
-    raw.business?.phone ??
+    (expired ? null : raw.business?.phone) ??
     null;
-  const organizerWebsite = pendingCamp
+  const organizerWebsite = !exposeContacts ? null : pendingCamp
     ? pendingCampContacts?.website ?? null
     : raw.offer?.contactWebsite ??
     raw.activity?.organizer?.website ??
@@ -435,8 +441,8 @@ function mapRow(raw: {
     raw.offer?.place?.website ??
     raw.activity?.place?.website ??
     null;
-  const organizerTelegramUrl = offerTelegramUrl;
-  const organizerInstagramResolved = pendingCamp
+  const organizerTelegramUrl = exposeContacts ? offerTelegramUrl : null;
+  const organizerInstagramResolved = !exposeContacts ? null : pendingCamp
     ? pendingCampContacts?.instagram ?? null
     : offerInstagramUrl ||
     organizerInstagramUrl ||
@@ -495,7 +501,7 @@ export async function getParentBookings(userId: string): Promise<ParentBookingsR
     take: 100,
   });
 
-  const items = rows.map(mapRow);
+  const items = rows.map(mapParentBookingRow);
 
   const active = items
     .filter((b) => b.status === BookingStatus.NEW || b.status === BookingStatus.CONFIRMED)
@@ -515,7 +521,10 @@ export async function getParentBookings(userId: string): Promise<ParentBookingsR
 
   const cancelled = items
     .filter(
-      (b) => b.status === BookingStatus.REJECTED || b.status === BookingStatus.CANCELLED,
+      (b) =>
+        b.status === BookingStatus.REJECTED ||
+        b.status === BookingStatus.CANCELLED ||
+        b.status === BookingStatus.EXPIRED,
     )
     .sort((a, b) =>
       new Date(b.rejectedAt ?? b.createdAt).getTime() -

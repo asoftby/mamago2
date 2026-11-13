@@ -2,6 +2,7 @@
 
 import "@/styles/event-page.css";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PublicationPriceDisplay } from "@/components/shared/PublicationPriceDisplay";
@@ -49,6 +50,10 @@ type EventDecisionPanelProps = {
   isPlanned?: boolean;
   saveStatusLabel?: string | null;
   planDate?: string | null;
+  /** Own active booking (private, client-fetched): replaces the «Записаться» button. */
+  bookedState?: { text: string; shortText: string; href: string } | null;
+  /** Book another slot while a booking already exists. */
+  onBookOther?: () => void;
   className?: string;
   previewRegionClassName?: Partial<
     Record<"hero" | "venue" | "schedule" | "pricing", string | undefined>
@@ -100,6 +105,8 @@ export function EventDecisionPanel({
   isPlanned = false,
   saveStatusLabel,
   planDate,
+  bookedState,
+  onBookOther,
   className,
   previewRegionClassName: pr,
 }: EventDecisionPanelProps) {
@@ -269,7 +276,7 @@ export function EventDecisionPanel({
             </a>
           )}
 
-          {data.cta.simpleBooking && (
+          {data.cta.simpleBooking && !bookedState && (
             <button
               type="button"
               onClick={() => setBookingOpen(true)}
@@ -277,6 +284,16 @@ export function EventDecisionPanel({
             >
               {data.cta.simpleBooking.label ?? "Записаться"}
             </button>
+          )}
+
+          {data.cta.simpleBooking && bookedState && (
+            <Link
+              href={bookedState.href}
+              data-testid="event-booked-state"
+              className="flex min-h-14 flex-1 items-center justify-center rounded-[28px] border border-[#E86A3A] bg-[#FFE8DC] px-5 py-2 text-center text-[15px] font-semibold leading-snug text-[#141210]"
+            >
+              {bookedState.text}
+            </Link>
           )}
 
           {data.cta.phones && data.cta.phones.length > 0 && (
@@ -301,6 +318,16 @@ export function EventDecisionPanel({
           )}
         </div>
 
+
+        {data.cta.simpleBooking && bookedState && onBookOther && (
+          <button
+            type="button"
+            onClick={() => setBookingOpen(true)}
+            className="mt-3 text-[14px] font-medium text-[rgba(20,18,16,0.65)] underline underline-offset-4 hover:text-[#141210]"
+          >
+            Записаться на другое время
+          </button>
+        )}
 
         {data.cta.simpleBooking && (
           <EventSimpleBookingModal

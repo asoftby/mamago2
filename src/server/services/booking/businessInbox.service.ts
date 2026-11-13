@@ -3,6 +3,9 @@ import "server-only";
 import { childrenOutsideEventAge, eventAgeRuleFromActivity, formatParticipantsSummary, parseStoredChildren } from "@/lib/booking/bookingParticipants";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import {
+  resolveStandardSlotStart, standardResponseDeadline,
+} from "@/lib/booking/standardResponseDeadline";
 import { scanBusinessInboxPages } from "./businessInboxScan";
 import {
   bookingBucket, compareBookingDecisions,
@@ -72,13 +75,22 @@ function participantsForInbox(row: InboxRow) {
   };
 }
 
+/** Срок ответа: сохранённый responseDueAt, для старых STANDARD-заявок — расчёт по тому же правилу. */
+function effectiveResponseDueAt(row: InboxRow): Date | null {
+  if (row.responseDueAt || row.kind !== "STANDARD" || row.status !== "NEW") return row.responseDueAt;
+  return standardResponseDeadline(row.createdAt, resolveStandardSlotStart({
+    sessionStartsAt: row.session?.startsAt, offerSessionStartAt: row.offerSession?.startAt,
+    startsAt: row.startsAt, requestedDate: row.requestedDate, requestedTime: row.requestedTime,
+  }));
+}
+
 function mapDecision(row: InboxRow, now: Date) {
   const date = serviceEnd(row);
   const decision = bookingBucket({
     kind: row.kind, status: row.status, partyStage: row.partyStage,
     createdAt: row.createdAt, firstResponseAt: row.firstResponseAt,
     hasServiceDate: Boolean(date), serviceEndsAt: date,
-    responseDueAt: row.responseDueAt,
+    responseDueAt: effectiveResponseDueAt(row),
     quoteStatus: row.partyQuotes[0]?.status ?? null,
     quoteValidUntil: row.partyQuotes[0]?.validUntil ?? null,
   }, now);

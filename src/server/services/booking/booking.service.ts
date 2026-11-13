@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
  * - Заявки на места (placeId)
  */
 
+import { resolveStandardSlotStart, standardResponseDeadline } from "@/lib/booking/standardResponseDeadline";
 import prisma from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
@@ -197,15 +198,35 @@ async function resolvePublicParticipants(params: {
   }
 }
 
+/** Deadline already passed at creation (last-minute request) → no auto-cancel. */
+function initialResponseDeadline(
+  now: Date, data: Prisma.BookingRequestUncheckedCreateInput,
+): Date | undefined {
+  const start = resolveStandardSlotStart({
+    startsAt: data.startsAt instanceof Date ? data.startsAt : null,
+    requestedDate: data.requestedDate instanceof Date ? data.requestedDate : null,
+    requestedTime: data.requestedTime ?? null,
+  });
+  const due = standardResponseDeadline(now, start);
+  return due && due.getTime() > now.getTime() ? due : undefined;
+}
+
 async function createBookingWithInitialActivity(
   data: Prisma.BookingRequestUncheckedCreateInput,
   transaction?: Prisma.TransactionClient,
   actorId?: string,
 ): Promise<CreateBookingResult> {
   const now = new Date();
+  // STANDARD NEW requests from clients get an auto-expiry deadline. Manual
+  // (business-entered) and already-decided requests never expire by timer.
+  const responseDueAt = data.responseDueAt !== undefined ? data.responseDueAt
+    : (data.status ?? BookingStatus.NEW) === BookingStatus.NEW && data.source !== "MANUAL" &&
+      (data.kind ?? "STANDARD") === "STANDARD"
+      ? initialResponseDeadline(now, data)
+      : undefined;
   async function create(tx: Prisma.TransactionClient) {
     const booking = await tx.bookingRequest.create({
-      data: { ...data, lastActivityAt: now },
+      data: { ...data, ...(responseDueAt ? { responseDueAt } : {}), lastActivityAt: now },
       select: { id: true, status: true },
     });
     await tx.bookingActivity.create({

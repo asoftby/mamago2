@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { mapParentBookingRow, PARENT_BOOKING_SELECT } from "@/server/services/booking/parentBookings.service";
 import { planScopeFor, activePlanScopeFor, familyIdForWrite } from "./familyAccess";
 import { familyReadsEnabled } from "./familyScope";
 import {
@@ -160,6 +161,7 @@ export async function getPlanBookingStates(
     select: {
       planItemId: true,
       status: true,
+      id: true,
       createdAt: true,
       requestedDate: true,
       requestedTime: true,
@@ -174,6 +176,7 @@ export async function getPlanBookingStates(
     list.push(r);
     byItem.set(r.planItemId, list);
   }
+  const shown: Array<{ planItemId: string; id: string }> = [];
   for (const [planItemId, list] of byItem) {
     const row = pickBookingToShow(list.map((r) => ({ ...r, status: r.status as PlanBookingStatus })));
     if (!row) continue;
@@ -186,6 +189,23 @@ export async function getPlanBookingStates(
       isMine,
       bookedByName: isMine ? null : (row.user?.displayName?.trim() || null),
     });
+    if (row.status === "EXPIRED" && isMine) shown.push({ planItemId, id: row.id });
+  }
+  // Public organizer contacts for the booker's own expired requests: one batched
+  // query, only when such a request is shown; other adults never get contacts.
+  if (shown.length) {
+    const contactRows = await prisma.bookingRequest.findMany({
+      where: { id: { in: shown.map((entry) => entry.id) } },
+      select: PARENT_BOOKING_SELECT,
+    });
+    const byId = new Map(contactRows.map((r) => [r.id, mapParentBookingRow(r)]));
+    for (const entry of shown) {
+      const item = byId.get(entry.id);
+      const state = out.get(entry.planItemId);
+      if (item && state) {
+        state.expiredContacts = { phone: item.organizerPhone, messageUrl: item.organizerMessageUrl };
+      }
+    }
   }
   return out;
 }

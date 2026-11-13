@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { getPublicationPriceParts } from "@/components/shared/PublicationPriceDisplay";
+import Link from "next/link";
 import { Heart } from "lucide-react";
 
 export interface EventStickyActionBarProps {
@@ -17,6 +18,8 @@ export interface EventStickyActionBarProps {
   onBook?: () => void;
   /** Подпись кнопки записи; по умолчанию «Записаться». */
   bookLabel?: string;
+  /** Own active booking (private): replaces the book button with a link to «Мои записи». */
+  bookedState?: { text: string; shortText: string; href: string } | null;
   /** Если передан — показывает сердечко-кнопку рядом с primary */
   onPlan?: () => void;
   isPlanned?: boolean;
@@ -37,6 +40,7 @@ export function EventStickyActionBar({
   onPrimary,
   onBook,
   bookLabel = "Записаться",
+  bookedState,
   onPlan,
   isPlanned = false,
   isPrimaryLoading = false,
@@ -131,6 +135,14 @@ export function EventStickyActionBar({
                   <>{primaryLabel}</>
                 )}
               </a>
+            ) : bookedState ? (
+              <Link
+                href={bookedState.href}
+                title={bookedState.text}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#E86A3A] bg-[#FFE8DC] px-5 text-[14px] font-semibold text-[#141210]"
+              >
+                {bookedState.shortText}
+              </Link>
             ) : (
               <button
                 type="button"
@@ -234,6 +246,14 @@ export function EventStickyActionBar({
               <>{primaryLabel}</>
             )}
           </a>
+        ) : bookedState ? (
+          <Link
+            href={bookedState.href}
+            title={bookedState.text}
+            className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border border-[#E86A3A] bg-[#FFE8DC] px-5 text-[14px] font-semibold text-[#141210]"
+          >
+            {bookedState.shortText}
+          </Link>
         ) : onBook ? (
           <button
             type="button"

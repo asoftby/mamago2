@@ -10,6 +10,13 @@ import {
 import { prisma } from "@/lib/prisma";
 import { resolveIdeaPlanState } from "@/lib/plan/ideaPlanStatus";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
+import {
+  ACTIVE_BOOKING_STATUSES,
+  resolveBookingMoment,
+  type OwnEventBooking,
+} from "@/lib/event/ownEventBooking";
+
+const PRIVATE_HEADERS = { "Cache-Control": "private, no-store" } as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +29,8 @@ export async function GET(request: NextRequest) {
         planDate: null,
         planStartsAt: null,
         planItemId: null,
-      });
+        ownBookings: [],
+      }, { headers: PRIVATE_HEADERS });
     }
 
     const { searchParams } = new URL(request.url);
@@ -118,12 +126,38 @@ export async function GET(request: NextRequest) {
     // Check if saved as idea
     const isIdea = await hasIdea(user.id, activityId!);
 
-    // Check if in plan
-    const planItems = await prisma.planItem.findMany({
-      where: { ...(await activePlanScopeFor(user.id)), activityId: activityId! },
-      select: { id: true, date: true, startsAt: true },
-      orderBy: { date: "asc" },
-    });
+    // Plan items + the user's own active booking requests (private, one light query).
+    const [planItems, bookingRows] = await Promise.all([
+      (async () =>
+        prisma.planItem.findMany({
+          where: { ...(await activePlanScopeFor(user.id)), activityId: activityId! },
+          select: { id: true, date: true, startsAt: true },
+          orderBy: { date: "asc" },
+        }))(),
+      prisma.bookingRequest.findMany({
+        where: {
+          userId: user.id,
+          activityId: activityId!,
+          status: { in: [...ACTIVE_BOOKING_STATUSES] },
+        },
+        select: {
+          id: true,
+          status: true,
+          selectedSessionId: true,
+          startsAt: true,
+          requestedDate: true,
+          requestedTime: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+    ]);
+    const ownBookings: OwnEventBooking[] = [];
+    for (const row of bookingRows) {
+      if (row.status !== "NEW" && row.status !== "CONFIRMED") continue;
+      const { at, hasTime } = resolveBookingMoment(row);
+      ownBookings.push({ id: row.id, status: row.status, sessionId: row.selectedSessionId, at, hasTime });
+    }
     const planState = resolveIdeaPlanState(
       planItems.map((item) => ({ id: item.id, date: item.date })),
     );
@@ -140,7 +174,8 @@ export async function GET(request: NextRequest) {
       planDate: planState.plannedDate ?? null,
       planStartsAt: relevantPlanItem?.startsAt ?? null,
       planItemId: planState.planItemId ?? null,
-    });
+      ownBookings,
+    }, { headers: PRIVATE_HEADERS });
   } catch (error) {
     console.error("Check save status error:", error);
     return NextResponse.json(

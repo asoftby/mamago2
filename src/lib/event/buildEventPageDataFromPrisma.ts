@@ -44,6 +44,9 @@ export type ActivityForEventPageInput = {
   format: ActivityFormat;
   ageTags: string[];
   agePolicy: import("@prisma/client").AgePolicy;
+  /** Сохранённые границы возраста в месяцах (для правила возраста в окне записи). */
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
   priceText: string | null;
   priceFrom: number | null;
   currency: string | null;

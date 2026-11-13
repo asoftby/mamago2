@@ -17,7 +17,7 @@ import { PartyConfirmOverlay } from "./PartyConfirmOverlay";
 import {
   PartyReplyOverlay, PartyResolveOverlay, VisitOutcomeOverlay,
 } from "./InboxActionOverlays";
-import { formatInboxDate, formatInboxDateTime, formatInboxSchedule } from "./inboxFormat";
+import { formatInboxAutoCancel, formatInboxDate, formatInboxDateTime, formatInboxSchedule } from "./inboxFormat";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -210,6 +210,8 @@ function InboxCard({
   const isParty = item.kind === "PARTY";
   const deadline = formatInboxDateTime(item.deadline);
   const action = item.nextAction;
+  // Обещаем автоотмену только если срок сохранён на сервере (его проверяет cron) и ещё не прошёл.
+  const autoCancelAt = formatInboxAutoCancel(item.responseDueAt);
   const hint =
     item.bucket === "ARCHIVE"
       ? archiveLabel(item)
@@ -217,6 +219,8 @@ function InboxCard({
         ? `Ждём ответ клиента до ${deadline}`
         : action === "EXTEND_OR_CLOSE"
           ? "Срок предложения истёк — продлите или закройте"
+          : !isParty && action === "RESPOND" && item.responseDueAt && autoCancelAt
+            ? `Ответьте клиенту как можно раньше. ${autoCancelAt} заявка отменится автоматически`
           : (action === "RESPOND" || action === "RECONFIRM") && deadline
             ? `${NEXT_ACTION_LABEL[action]} до ${deadline}`
             : NEXT_ACTION_LABEL[action];

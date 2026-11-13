@@ -31,6 +31,14 @@ import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
+import {
+  bookingForSession,
+  bookingStateShortText,
+  bookingStateText,
+  MY_BOOKINGS_HREF,
+  pickDisplayedBooking,
+  type OwnEventBooking,
+} from "@/lib/event/ownEventBooking";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { FaqSection } from "@/components/public/FaqSection";
@@ -307,6 +315,32 @@ export function EventPageView({
     planItemId: null,
   });
 
+  // Private: the signed-in user's own active booking requests (guests: always empty).
+  const [ownBookings, setOwnBookings] = useState<OwnEventBooking[]>([]);
+  const displayedBooking = useMemo(
+    () => (isAuthenticated ? pickDisplayedBooking(ownBookings, new Date()) : null),
+    [isAuthenticated, ownBookings],
+  );
+  const bookedState = useMemo(
+    () =>
+      displayedBooking
+        ? {
+            text: bookingStateText(displayedBooking),
+            shortText: bookingStateShortText(displayedBooking),
+            href: MY_BOOKINGS_HREF,
+          }
+        : null,
+    [displayedBooking],
+  );
+  const getSessionBooking = useCallback(
+    (sessionId: string) => (isAuthenticated ? bookingForSession(ownBookings, sessionId) : null),
+    [isAuthenticated, ownBookings],
+  );
+  const hasOtherBookableSlot = useMemo(
+    () => sessions.some((s) => !bookingForSession(ownBookings, s.id)),
+    [sessions, ownBookings],
+  );
+
   const selectedSession = useMemo(
     () => sessions.find((s) => s.id === selectedId) ?? sessions[0],
     [sessions, selectedId],
@@ -384,6 +418,7 @@ export function EventPageView({
         planStartsAt: null,
         planItemId: null,
       });
+      setOwnBookings([]);
       return;
     }
     try {
@@ -397,6 +432,7 @@ export function EventPageView({
         planStartsAt: json.planStartsAt ?? null,
         planItemId: json.planItemId ?? null,
       });
+      setOwnBookings(Array.isArray(json.ownBookings) ? json.ownBookings : []);
     } catch {
     }
   }, [data.id, isAuthenticated]);
@@ -627,6 +663,8 @@ export function EventPageView({
               isPlanned={saveStatus.isIdea || saveStatus.inPlan}
               saveStatusLabel={saveStatusLabel}
               planDate={saveStatus.planDate}
+              bookedState={bookedState}
+              onBookOther={bookedState && hasOtherBookableSlot ? handleBook : undefined}
             />
           </div>
         }
@@ -695,6 +733,7 @@ export function EventPageView({
             onBook={hasSimpleBooking ? handleBook : undefined}
             bookLabel={data.cta.simpleBooking?.label}
             isPlanned={saveStatus.inPlan}
+            getSessionBooking={getSessionBooking}
             priceLabel={data.priceLabel}
             purchaseUrl={data.cta.purchaseUrl}
             buyLabel={data.cta.buyLabel}
@@ -739,6 +778,7 @@ export function EventPageView({
         onPrimary={handleBuy}
         onBook={hasSimpleBooking ? handleBook : undefined}
         bookLabel={data.cta.simpleBooking?.label}
+        bookedState={bookedState}
         onPlan={handlePlan}
         hasPurchaseUrl={hasPurchaseUrl}
       />

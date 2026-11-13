@@ -188,7 +188,7 @@ export function EventSimpleBookingModal({
             </Link>
           ) : (
             <p className="mb-3 text-center text-sm text-stone-600">
-              Заявка создана без привязки к аккаунту. Сохраните номер заявки. Для появления в «Моих записях» понадобится подтверждённая привязка.
+              Заявка создана без входа в аккаунт, поэтому она не появится в плане, в «Моих записях» и на странице события. Сохраните номер заявки — организатор свяжется с вами по телефону. Чтобы будущие записи отображались в плане и на странице события, войдите в аккаунт перед записью.
             </p>
           )}
           <button type="button" onClick={() => handleClose(false)} className="inline-flex min-h-12 w-full items-center justify-center rounded-full border text-[15px] font-semibold" style={{ borderColor: RS.line2 }}>
