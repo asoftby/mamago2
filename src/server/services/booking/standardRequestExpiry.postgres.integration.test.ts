@@ -75,6 +75,8 @@ test("overdue NEW request expires once, releases holds, notifies the client once
   assert.equal(occupied._sum.adultsCount, null);
   assert.equal(await prisma.bookingActivity.count({ where: { bookingId: due.id, type: "REQUEST_EXPIRED" } }), 1);
   assert.equal(await prisma.notification.count({ where: { userId: clientId, entityId: due.id } }), 1);
+  const notification = await prisma.notification.findFirstOrThrow({ where: { userId: clientId, entityId: due.id } });
+  assert.match(notification.body ?? "", /другое время/);
 
   // Repeat run changes nothing: no new activity, no second notification.
   const second = await expireStandardRequests(100);

@@ -2,6 +2,7 @@ import "server-only";
 
 import prisma from "@/lib/prisma";
 import { BookingStatus } from "@prisma/client";
+import { mapParentBookingRow, PARENT_BOOKING_SELECT } from "./parentBookings.service";
 import { notifyUserBookingExpired } from "@/server/services/notification.service";
 
 /**
@@ -52,12 +53,31 @@ export async function expireStandardRequests(limit = 50, now = new Date()) {
     if (didExpire) expiredRows.push(request);
   }
   let notified = 0;
-  for (const request of expiredRows) {
-    if (!request.userId) continue;
+  const recipients = expiredRows.filter((request) => request.userId);
+  // One query for all expired rows; public contacts come from the same mapper
+  // as "My bookings" (EXPIRED never uses the private business phone).
+  const contacts = new Map<string, { phone: string | null; message: string | null }>();
+  if (recipients.length) {
+    try {
+      const rows = await prisma.bookingRequest.findMany({
+        where: { id: { in: recipients.map((request) => request.id) } },
+        select: PARENT_BOOKING_SELECT,
+      });
+      for (const row of rows) {
+        const item = mapParentBookingRow(row);
+        contacts.set(item.id, { phone: item.organizerPhone, message: item.organizerMessageUrl });
+      }
+    } catch (error) {
+      console.error("[standard-expiry] contacts lookup failed", error);
+    }
+  }
+  for (const request of recipients) {
     try {
       const created = await notifyUserBookingExpired({
-        userId: request.userId, bookingId: request.id,
+        userId: request.userId!, bookingId: request.id,
         publicationTitle: request.offer?.title ?? request.activity?.title ?? request.place?.title ?? null,
+        organizerPhone: contacts.get(request.id)?.phone ?? null,
+        organizerMessageUrl: contacts.get(request.id)?.message ?? null,
       });
       if (created) notified++;
     } catch (error) {

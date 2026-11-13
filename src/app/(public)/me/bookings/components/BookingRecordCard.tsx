@@ -33,8 +33,9 @@ export function BookingRecordCard({ booking }: Props) {
   const isPending = status === BookingStatus.NEW;
   const isConfirmed = status === BookingStatus.CONFIRMED;
   const isCompleted = status === BookingStatus.COMPLETED;
+  const isExpired = status === BookingStatus.EXPIRED;
   const isCancelled =
-    status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED;
+    status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED || isExpired;
 
   const publicHref = booking.publicHref;
   const phoneHref = booking.organizerPhone
@@ -124,6 +125,26 @@ export function BookingRecordCard({ booking }: Props) {
       {isPending ? (
         <div className={styles.recDetails}>
           <p className={styles.detailsNote}>Ожидаем подтверждения от организатора</p>
+        </div>
+      ) : null}
+
+      {isExpired ? (
+        <div className={styles.recDetails}>
+          <p className={styles.detailsNote}>Организатор не ответил</p>
+          {phoneHref || messageHref ? (
+            <div className={styles.contactActions}>
+              {phoneHref ? (
+                <a href={phoneHref} className={styles.chip}>
+                  <Phone size={15} /> Позвонить
+                </a>
+              ) : null}
+              {messageHref ? (
+                <a href={messageHref} target="_blank" rel="noopener noreferrer" className={styles.chip}>
+                  <MessageCircle size={15} /> Написать
+                </a>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

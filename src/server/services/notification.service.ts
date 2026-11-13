@@ -1604,7 +1604,9 @@ export async function notifyUserBookingCancelled(params: NotifyUserBookingParams
  * Тип BOOKING_CANCELLED переиспользован (EXPIRED — терминальный статус, по
  * заявке уходит не более одного уведомления этого типа; dedup по заявке).
  */
-export async function notifyUserBookingExpired(params: NotifyUserBookingParams) {
+export async function notifyUserBookingExpired(
+  params: NotifyUserBookingParams & { organizerPhone?: string | null; organizerMessageUrl?: string | null },
+) {
   const dedup = await checkNotificationDedup(
     params.userId,
     "BOOKING_CANCELLED",
@@ -1619,7 +1621,12 @@ export async function notifyUserBookingExpired(params: NotifyUserBookingParams) 
     audience: "USER",
     type: "BOOKING_CANCELLED",
     title: "Заявка не подтверждена",
-    body: `Организатор не ответил вовремя, поэтому запись на ${title} не подтверждена и заявка отменена. Вы можете подать новую заявку.`,
+    body: [
+      `Организатор не ответил вовремя, поэтому запись на ${title} не подтверждена и заявка отменена.`,
+      ...(params.organizerPhone ? [`Связаться с организатором: ${params.organizerPhone}.`] : []),
+      ...(params.organizerMessageUrl ? [`Написать: ${params.organizerMessageUrl}`] : []),
+      "Вы можете записаться на другое время.",
+    ].join(" "),
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Мои записи",
