@@ -93,3 +93,21 @@ test("a request confirmed concurrently is not overwritten by expiry", async () =
   assert.equal(result.expired, 0);
   assert.equal(await statusOf(booking.id), BookingStatus.CONFIRMED);
 });
+
+test("a failed notification is retried on the next run without duplicates", async () => {
+  await fixture();
+  const booking = await create({ responseDueAt: past(), userId: clientId });
+  const failing = await expireStandardRequests(100, new Date(), {
+    notify: async () => { throw new Error("delivery down"); },
+  });
+  assert.equal(failing.notified, 0);
+  assert.equal(await statusOf(booking.id), BookingStatus.EXPIRED, "status change is committed");
+  assert.equal(await prisma.notification.count({ where: { userId: clientId, entityId: booking.id } }), 0);
+
+  const retry = await expireStandardRequests(100);
+  assert.equal(retry.expired, 0);
+  assert.equal(await prisma.notification.count({ where: { userId: clientId, entityId: booking.id } }), 1);
+
+  await expireStandardRequests(100);
+  assert.equal(await prisma.notification.count({ where: { userId: clientId, entityId: booking.id } }), 1);
+});

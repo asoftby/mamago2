@@ -12,7 +12,16 @@ import { notifyUserBookingExpired } from "@/server/services/notification.service
  * Capacity counts only NEW/CONFIRMED, so seats free up with the status change;
  * resource holds are released in the same transaction.
  */
-export async function expireStandardRequests(limit = 50, now = new Date()) {
+const NOTIFY_RETRY_WINDOW_MS = 7 * 86_400_000;
+
+export interface ExpireStandardOptions {
+  /** Injectable for failure tests; defaults to the real client notification. */
+  notify?: typeof notifyUserBookingExpired;
+}
+
+export async function expireStandardRequests(
+  limit = 50, now = new Date(), options: ExpireStandardOptions = {},
+) {
   const due = await prisma.bookingRequest.findMany({
     where: {
       kind: "STANDARD", status: BookingStatus.NEW, source: null,
@@ -20,14 +29,9 @@ export async function expireStandardRequests(limit = 50, now = new Date()) {
     },
     orderBy: { responseDueAt: "asc" },
     take: Math.min(100, Math.max(1, limit)),
-    select: {
-      id: true, userId: true,
-      offer: { select: { title: true } },
-      activity: { select: { title: true } },
-      place: { select: { title: true } },
-    },
+    select: { id: true },
   });
-  const expiredRows: typeof due = [];
+  let expired = 0;
   for (const request of due) {
     const didExpire = await prisma.$transaction(async (tx) => {
       const changed = await tx.bookingRequest.updateMany({
@@ -50,40 +54,59 @@ export async function expireStandardRequests(limit = 50, now = new Date()) {
       });
       return true;
     });
-    if (didExpire) expiredRows.push(request);
+    if (didExpire) expired++;
   }
+  // Notification intent is durable: the REQUEST_EXPIRED/RESPONSE_DEADLINE activity
+  // is written in the same transaction as the status change. Delivery is retried
+  // independently on every run until a notification exists (7-day window), so a
+  // failed send never loses the message and a repeat run never duplicates it.
+  const notified = await deliverExpiryNotifications(limit, now, options.notify ?? notifyUserBookingExpired);
+  return { expired, notified };
+}
+
+async function deliverExpiryNotifications(
+  limit: number, now: Date, notify: typeof notifyUserBookingExpired,
+) {
+  const activities = await prisma.bookingActivity.findMany({
+    where: {
+      type: "REQUEST_EXPIRED",
+      payload: { path: ["reason"], equals: "RESPONSE_DEADLINE" },
+      createdAt: { gte: new Date(now.getTime() - NOTIFY_RETRY_WINDOW_MS) },
+      booking: { kind: "STANDARD", status: BookingStatus.EXPIRED, userId: { not: null } },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 500,
+    select: { bookingId: true },
+  });
+  const ids = [...new Set(activities.map((activity) => activity.bookingId))];
+  if (!ids.length) return 0;
+  const already = new Set((await prisma.notification.findMany({
+    where: { entityType: "BOOKING", entityId: { in: ids }, type: "BOOKING_CANCELLED", audience: "USER" },
+    select: { entityId: true },
+  })).map((row) => row.entityId));
+  const pendingIds = ids.filter((id) => !already.has(id)).slice(0, Math.min(100, Math.max(1, limit)));
+  if (!pendingIds.length) return 0;
+  const rows = await prisma.bookingRequest.findMany({
+    where: { id: { in: pendingIds } },
+    select: { ...PARENT_BOOKING_SELECT, userId: true },
+  });
+  // Public contacts come from the same mapper as "My bookings" (EXPIRED never
+  // uses the private business phone); one query for the whole batch.
   let notified = 0;
-  const recipients = expiredRows.filter((request) => request.userId);
-  // One query for all expired rows; public contacts come from the same mapper
-  // as "My bookings" (EXPIRED never uses the private business phone).
-  const contacts = new Map<string, { phone: string | null; message: string | null }>();
-  if (recipients.length) {
+  for (const row of rows) {
+    const item = mapParentBookingRow(row);
+    const userId = row.userId;
+    if (!userId) continue;
     try {
-      const rows = await prisma.bookingRequest.findMany({
-        where: { id: { in: recipients.map((request) => request.id) } },
-        select: PARENT_BOOKING_SELECT,
-      });
-      for (const row of rows) {
-        const item = mapParentBookingRow(row);
-        contacts.set(item.id, { phone: item.organizerPhone, message: item.organizerMessageUrl });
-      }
-    } catch (error) {
-      console.error("[standard-expiry] contacts lookup failed", error);
-    }
-  }
-  for (const request of recipients) {
-    try {
-      const created = await notifyUserBookingExpired({
-        userId: request.userId!, bookingId: request.id,
-        publicationTitle: request.offer?.title ?? request.activity?.title ?? request.place?.title ?? null,
-        organizerPhone: contacts.get(request.id)?.phone ?? null,
-        organizerMessageUrl: contacts.get(request.id)?.message ?? null,
+      const created = await notify({
+        userId, bookingId: row.id, publicationTitle: item.display.title ?? null,
+        organizerPhone: item.organizerPhone, organizerMessageUrl: item.organizerMessageUrl,
       });
       if (created) notified++;
     } catch (error) {
-      // The status change is already committed; never fail the cron batch.
-      console.error("[standard-expiry] notification failed", request.id, error);
+      // Retried on the next run; the status change and intent are already committed.
+      console.error("[standard-expiry] notification failed", row.id, error);
     }
   }
-  return { expired: expiredRows.length, notified };
+  return notified;
 }
