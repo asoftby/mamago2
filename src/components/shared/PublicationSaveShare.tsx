@@ -30,6 +30,8 @@ export interface PublicationSaveShareProps {
   /** Most recent consented public savers, newest first; never family-private records. */
   visibleSavers?: readonly PublicSaver[];
   className?: string;
+  /** Overrides the save/share buttons grid, e.g. to stack them on narrow screens. */
+  actionsClassName?: string;
   footer?: ReactNode;
 }
 
@@ -44,6 +46,7 @@ export function PublicationSaveShare({
   saveCount,
   visibleSavers = [],
   className,
+  actionsClassName,
   footer,
 }: PublicationSaveShareProps) {
   const [remoteCount, setRemoteCount] = useState<number | null>(null);
@@ -86,6 +89,7 @@ export function PublicationSaveShare({
   return (
     <div className={cn("w-full", className)}>
       <PublicationActionButtons
+        className={actionsClassName}
         onShare={onShare}
         saveControl={
           <button

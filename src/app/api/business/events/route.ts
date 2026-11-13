@@ -190,8 +190,8 @@ export async function POST(request: NextRequest) {
       placeOwnerBusinessId = placeRow.ownerBusinessId;
     }
 
+    // Staff without their own business keep creating business-less content.
     const needsUserBusinessFallback =
-      !isPlatformContentStaff(user.role) &&
       placeOwnerBusinessId == null &&
       requestedBusinessId == null;
     const userBusinessId = needsUserBusinessFallback

@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { RS, RsChip, RsChipRow, RsConfirmBar, RsDateCards, RsInput, RsSection, RsSuccess, RsTextarea, RequestSheetFrame } from "@/components/request/requestSheetKit";
 import type { EventSimpleBookingData, EventBookingSlot } from "@/lib/event/eventPageTypes";
+import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
+import { pluralRu } from "@/lib/date/dateKey";
 
 /* ─────────────── validation ─────────────── */
 const schema = z.object({
@@ -51,6 +53,14 @@ function groupSlotsByDate(slots: EventBookingSlot[]): DateGroup[] {
   return Array.from(map.values());
 }
 
+type SlotSeats = Record<string, { capacity: number; remaining: number }>;
+
+function seatsLabel(seats: SlotSeats[string]) {
+  return seats.remaining > 0
+    ? `Осталось ${seats.remaining} ${pluralRu(seats.remaining, ["место", "места", "мест"])}`
+    : "Мест на это время нет";
+}
+
 function slotTimeLabel(slot: EventBookingSlot) {
   return slot.endTime ? `${slot.startTime}–${slot.endTime}` : slot.startTime;
 }
@@ -87,16 +97,31 @@ export function EventSimpleBookingModal({
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [dateId, setDateId] = useState("");
   const [timeId, setTimeId] = useState("");
+  const [seatsBySlot, setSeatsBySlot] = useState<SlotSeats>({});
   const inFlight = useRef(false);
   const initialSlot = slots.find((slot) => slot.id === initialSessionId);
 
   const selectedDate = dateGroups.find((group) => group.isoDate === (dateId || initialSlot?.isoDate)) ?? dateGroups[0];
   const selectedSlot = selectedDate?.slots.find((slot) => slot.id === (timeId || initialSlot?.id)) ?? selectedDate?.slots[0];
 
-  // В режиме time-slots нужен выбранный слот; в simple-booking слотов нет → сразу valid
-  const valid = slots.length === 0 || Boolean(selectedSlot);
+  const selectedSeats = selectedSlot ? seatsBySlot[selectedSlot.id] : undefined;
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
+  // В режиме time-slots нужен выбранный слот; в simple-booking слотов нет → сразу valid
+  const valid = (slots.length === 0 || Boolean(selectedSlot)) && selectedSeats?.remaining !== 0;
+
+  // Seats left are fetched when the window opens, not with the page: they change on every booking.
+  const hasTimedSlots = slots.some((slot) => slot.startTime);
+  useEffect(() => {
+    if (!open || !hasTimedSlots) return;
+    const controller = new AbortController();
+    fetch(`/api/public/events/${encodeURIComponent(booking.activityId)}/slot-availability`, { signal: controller.signal, cache: "no-store" })
+      .then((res) => (res.ok ? res.json() as Promise<{ slots?: SlotSeats }> : null))
+      .then((json) => { if (json?.slots) setSeatsBySlot(json.slots); })
+      .catch(() => { /* seats are informational; the server re-checks on submit */ });
+    return () => controller.abort();
+  }, [open, hasTimedSlots, booking.activityId]);
+
+  const { register, control, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { customerName: "", customerPhone: "", comment: "" },
   });
@@ -204,6 +229,11 @@ export function EventSimpleBookingModal({
                       </RsChip>
                     ))}
                   </RsChipRow>
+                  {selectedSeats ? (
+                    <p aria-live="polite" className={`m-0 mt-2 text-xs font-medium ${selectedSeats.remaining === 0 ? "text-[#B3261E]" : "text-[rgba(20,18,16,.55)]"}`}>
+                      {seatsLabel(selectedSeats)}
+                    </p>
+                  ) : null}
                 </RsSection>
               ) : null}
             </>
@@ -213,7 +243,19 @@ export function EventSimpleBookingModal({
             <RsInput placeholder="Как вас зовут" autoComplete="name" invalid={!!errors.customerName} {...register("customerName")} />
           </RsSection>
           <RsSection label="Телефон" error={errors.customerPhone?.message}>
-            <RsInput type="tel" inputMode="tel" placeholder="+375 XX XXX-XX-XX" autoComplete="tel" invalid={!!errors.customerPhone} {...register("customerPhone")} />
+            <Controller
+              control={control}
+              name="customerPhone"
+              render={({ field }) => (
+                <InternationalPhoneInput
+                  id="booking-phone"
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-invalid={!!errors.customerPhone}
+                  className="[&_.PhoneInput]:!h-[52px] [&_.PhoneInput]:!rounded-[14px] [&_.PhoneInput]:!border-[rgba(20,18,16,.10)] [&_.PhoneInput]:!bg-[#FAF7F1] [&_.PhoneInput]:!px-4 [&_.PhoneInputInput]:!text-[15px] [&_.PhoneInput--invalid]:!border-[#B3261E] [&.international-phone-field--invalid_.PhoneInput]:!border-[#B3261E]"
+                />
+              )}
+            />
           </RsSection>
           <RsSection label="Комментарий" hint="необязательно" error={errors.comment?.message}>
             <RsTextarea rows={3} placeholder="Количество мест, вопросы…" {...register("comment")} />

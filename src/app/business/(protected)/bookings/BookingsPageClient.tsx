@@ -1662,18 +1662,6 @@ export function BookingDetailsDrawer({
                     />
                   ) : null}
                 </div>
-
-                {booking.status === BookingStatus.NEW ? (
-                  <div className="mt-6 rounded-[22px] border border-blue-100 bg-blue-50/70 px-5 py-4">
-                    <div className="text-sm font-semibold text-blue-700">
-                      Почему заявка в статусе «Новая»?
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-blue-900/75">
-                      Клиент только что отправил заявку. Свяжитесь с ним, чтобы подтвердить участие
-                      и ответить на вопросы.
-                    </p>
-                  </div>
-                ) : null}
               </div>
             </aside>
           </div>
@@ -1737,9 +1725,9 @@ function ActionButton({
       disabled={loading}
       className={cn(
         "inline-flex h-14 w-full items-center justify-center rounded-2xl px-6 text-sm font-semibold transition sm:w-auto",
-        tone === "primary" && "bg-stone-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.22)] hover:bg-stone-800",
+        tone === "primary" && "bg-emerald-700 text-white shadow-[0_12px_26px_rgba(4,120,87,0.28)] hover:bg-emerald-800",
         tone === "secondary" && "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50",
-        tone === "ghost" && "border border-stone-200 bg-white text-stone-500 hover:bg-stone-50",
+        tone === "ghost" && "border border-stone-200 bg-white text-red-600 hover:bg-red-50",
         loading && "cursor-wait opacity-70",
       )}
     >

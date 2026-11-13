@@ -403,19 +403,7 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
     });
   }
 
-  // 02 Возраст
-  const ageBadge = activity.agePolicy === "ADULT_ONLY"
-    ? "Только 18+"
-    : formatAgeTagsCompact(activity.ageTags) ?? ageFromPlusBadgeFromAgeTags(activity.ageTags);
-  if (ageBadge) {
-    rows.push({
-      id: "age",
-      label: "Возраст",
-      value: ageBadge,
-    });
-  }
-
-  // 03 Время начала
+  // 02 Время начала (second block in the facts strip)
   if (activity.sessions.length > 0) {
     const uniqueTimes = [
       ...new Set(activity.sessions.map((s) => formatHHMM(s.startsAt))),
@@ -424,6 +412,18 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
       id: "time",
       label: "Время начала",
       value: uniqueTimes.join(", "),
+    });
+  }
+
+  // 03 Возраст
+  const ageBadge = activity.agePolicy === "ADULT_ONLY"
+    ? "Только 18+"
+    : formatAgeTagsCompact(activity.ageTags) ?? ageFromPlusBadgeFromAgeTags(activity.ageTags);
+  if (ageBadge) {
+    rows.push({
+      id: "age",
+      label: "Возраст",
+      value: ageBadge,
     });
   }
 

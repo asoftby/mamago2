@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
+import { resolveActivityBusinessIdForPatch } from "@/lib/auth/activityBusinessResolution";
+import { getUserBusinessId } from "@/lib/auth/placeAccess";
 import prisma from "@/lib/prisma";
 import { AgePolicy, ActivityType, ContentStatus, Prisma } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
@@ -305,6 +307,18 @@ export async function PATCH(
         placeRow,
         existing.businessId,
       );
+    }
+    {
+      // No business on the event → bookings have no recipient. Adopt the saver's own business.
+      const effectiveBusinessId = nextBusinessId !== undefined ? nextBusinessId : existing.businessId;
+      if (!effectiveBusinessId) {
+        const resolved = resolveActivityBusinessIdForPatch({
+          nextBusinessId,
+          existingBusinessId: existing.businessId,
+          userBusinessId: await getUserBusinessId(user.id),
+        });
+        if (resolved) nextBusinessId = resolved;
+      }
     }
     perf.mark("place-check");
 
