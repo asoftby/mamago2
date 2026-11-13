@@ -10,6 +10,7 @@ import {
   BookingValidationError,
 } from "@/server/services/booking/booking.service";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
+import { BOOKING_MAX_ADULTS, bookingChildrenInputSchema } from "@/lib/booking/bookingParticipants";
 
 const createBookingSchema = z.object({
   publicationType: z.nativeEnum(PublicationType),
@@ -21,9 +22,16 @@ const createBookingSchema = z.object({
   customerPhone: z.string().min(1),
   customerEmail: z.string().email().optional(),
   customerComment: z.string().optional(),
-  adultsCount: z.number().int().min(0).default(1),
-  childrenCount: z.number().int().min(0).default(0),
+  adultsCount: z.number().int().min(0).max(100).default(1),
+  childrenCount: z.number().int().min(0).max(100).default(0),
+  /** Состав группы (события). Если передан, `childrenCount` пересчитывается сервером. */
+  children: bookingChildrenInputSchema.optional(),
   planItemId: z.string().min(1).optional(),
+}).superRefine((value, ctx) => {
+  if (value.children === undefined) return;
+  if (value.adultsCount < 1 || value.adultsCount > BOOKING_MAX_ADULTS) {
+    ctx.addIssue({ code: "custom", path: ["adultsCount"], message: `Взрослых должно быть от 1 до ${BOOKING_MAX_ADULTS}` });
+  }
 });
 
 export async function POST(request: NextRequest) {
@@ -51,6 +59,7 @@ export async function POST(request: NextRequest) {
       customerComment: data.customerComment ?? null,
       adultsCount: data.adultsCount,
       childrenCount: data.childrenCount,
+      children: data.children,
       userId: user?.id ?? null,
       planItemId: data.planItemId ?? null,
     });

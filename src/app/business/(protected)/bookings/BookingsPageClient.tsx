@@ -1,5 +1,6 @@
 "use client";
 
+import { formatChildLabel, formatParticipantsLine } from "@/lib/booking/bookingParticipants";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -334,12 +335,15 @@ function buildOrderDetails(booking: BusinessBookingItem): string[] {
   } else if (booking.session?.startsAt) {
     details.push(`Сеанс: ${formatAbsoluteDate(booking.session.startsAt)} · ${formatTime(booking.session.startsAt)}`);
   }
-  const participants = [];
-  if (booking.adultsCount > 0) participants.push(`${booking.adultsCount} взросл.`);
-  if (booking.childrenCount > 0) participants.push(`${booking.childrenCount} ребёнок`);
-  if (participants.length > 0) {
-    details.push(`Участники: ${participants.join(" · ")}`);
-  }
+  const composition = formatParticipantsLine({
+    adultsCount: booking.adultsCount,
+    childrenCount: booking.childrenCount,
+    children: booking.participantChildren,
+    legacyChild: { name: booking.childName, age: booking.childAge },
+  });
+  if (composition) details.push(composition);
+  const ageNote = getParticipantAgeNote(booking);
+  if (ageNote) details.push(ageNote);
   return details;
 }
 
@@ -382,7 +386,16 @@ function getActionMeta(booking: BusinessBookingItem): { label: string; className
   return null;
 }
 
+/** Мягкая пометка для бизнеса: возраст ребёнка вне диапазона события. */
+function getParticipantAgeNote(booking: BusinessBookingItem): string | null {
+  if (booking.participantsOutsideAge.length === 0) return null;
+  const who = booking.participantsOutsideAge.map(formatChildLabel).join(", ");
+  return `Возраст вне диапазона события${booking.eventAgeLabel ? ` (${booking.eventAgeLabel})` : ""}: ${who}`;
+}
+
 function getParticipantLabel(booking: BusinessBookingItem): string | null {
+  // Состав группы уже показан строкой «Взрослые · Дети» в деталях — не дублируем первого ребёнка.
+  if (booking.participantChildren.length > 0) return null;
   if (!booking.childName && booking.childAge == null) return null;
   return [booking.childName, booking.childAge != null ? `${booking.childAge} лет` : null]
     .filter(Boolean)
@@ -1417,6 +1430,18 @@ function BookingListItem({
             {booking.customerName} · {booking.customerPhone}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
           </div>
           {participant ? <div className="mt-1 text-sm text-stone-400">{participant}</div> : null}
+          {booking.participantChildren.length > 0 ? (
+            <div className="mt-1 text-sm text-stone-400">
+              {formatParticipantsLine({
+                adultsCount: booking.adultsCount,
+                childrenCount: booking.childrenCount,
+                children: booking.participantChildren,
+              })}
+              {booking.participantsOutsideAge.length > 0 ? (
+                <span className="ml-2 text-amber-600">· возраст вне диапазона события</span>
+              ) : null}
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
             <span className={cn("rounded-full px-3 py-1 text-sm font-semibold", meta.chipClass)}>
               {meta.label}

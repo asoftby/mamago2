@@ -1,5 +1,6 @@
 import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import "server-only";
+import { childrenOutsideEventAge, eventAgeRuleFromActivity, formatParticipantsSummary, parseStoredChildren } from "@/lib/booking/bookingParticipants";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { scanBusinessInboxPages } from "./businessInboxScan";
@@ -32,8 +33,9 @@ const INBOX_SELECT = {
   session: { select: { startsAt: true } },
   offerSession: { select: { startAt: true, endAt: true } },
   offer: { select: { id: true, title: true } },
-  activity: { select: { id: true, title: true } },
+  activity: { select: { id: true, title: true, agePolicy: true, ageTags: true, ageMinMonths: true, ageMaxMonths: true } },
   place: { select: { id: true, title: true } },
+  adultsCount: true, childrenCount: true, participantChildren: true,
   partyOrderItem: { select: {
     id: true, partyOrderId: true,
     partyOrder: { select: { eventDate: true, timeFrom: true, timeTo: true } },
@@ -57,6 +59,17 @@ function serviceEnd(row: InboxRow): Date | null {
     minskEndOfDay(row.campShiftDateTo ?? row.requestedDate ??
       row.partyOrderItem?.partyOrder.eventDate ?? row.session?.startsAt ??
       row.offerSession?.startAt ?? row.startsAt);
+}
+
+/** Состав группы для карточки списка: без имён детей, только числа и возраст. */
+function participantsForInbox(row: InboxRow) {
+  if (row.kind !== "STANDARD" || row.childrenCount < 1) return { participantsSummary: null, participantsAgeMismatch: false };
+  const children = parseStoredChildren(row.participantChildren);
+  const rule = eventAgeRuleFromActivity(row.activity);
+  return {
+    participantsSummary: formatParticipantsSummary({ adultsCount: row.adultsCount, childrenCount: row.childrenCount, children }),
+    participantsAgeMismatch: childrenOutsideEventAge(children, rule).length > 0,
+  };
 }
 
 function mapDecision(row: InboxRow, now: Date) {
@@ -110,6 +123,7 @@ export async function getBusinessInbox({
       // No parent PII, contact, comments or personal info in this endpoint.
       title: row.offer?.title ?? row.activity?.title ?? row.place?.title ?? null,
       offerId: row.offer?.id ?? null,
+      ...participantsForInbox(row),
       partyOrderId: row.partyOrderItem?.partyOrderId ?? null,
       requestedDate: row.requestedDate ?? row.partyOrderItem?.partyOrder.eventDate ?? null,
       requestedTime: row.requestedTime ?? row.partyOrderItem?.partyOrder.timeFrom ?? null,
