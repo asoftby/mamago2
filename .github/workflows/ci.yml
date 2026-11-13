@@ -191,6 +191,8 @@ jobs:
           pnpm exec tsx src/components/business/wizard/event/steps/Step1Basics.interests.contract.test.ts
           pnpm exec tsx src/components/business/wizard/event/nativePrebooking.validation.test.ts
           pnpm exec tsx src/components/business/wizard/event/ctaStepMapper.test.ts
+          pnpm exec tsx src/lib/event/buildTimeSlotSuggestionsFromSchedule.test.ts
+          pnpm exec tsx src/features/publication-access/schedule/suggestions.test.ts
           pnpm exec tsx src/lib/event/eventRequestBookingColumns.test.ts
           pnpm exec tsx src/lib/event/eventSaveStatusLabel.test.ts
           pnpm exec tsx src/lib/content-editor/types.test.ts

@@ -19,6 +19,8 @@ import {
   mapEventFormDataToCtaStepValue,
 } from "../ctaStepMapper";
 import { resolveEventPricingParticipationCtaRenderMode } from "../ctaStepFeatureFlag";
+import { buildTimeSlotSuggestionsFromSchedule } from "@/lib/event/buildTimeSlotSuggestionsFromSchedule";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 interface Step5PricingParticipationProps {
   data: EventFormData;
@@ -187,6 +189,15 @@ export function Step5PricingParticipation({
       }),
     [data, eventId],
   );
+  // Defaults for «Даты и слоты» come from the schedule step already held in
+  // form state: no extra request, recomputed only when the schedule changes.
+  const timeSlotSuggestions = useMemo(
+    () =>
+      buildTimeSlotSuggestionsFromSchedule(data.scheduleItems, {
+        today: getLocalDateKey(new Date()),
+      }),
+    [data.scheduleItems],
+  );
   const currencyMark = renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" });
   // Placeholder редактора деталей — рич-текст-канон (текст BYN), без PUA-тофу.
   const pricingDetailsExample = normalizeRichTextCurrency(
@@ -308,6 +319,7 @@ export function Step5PricingParticipation({
           value={publicationAccess}
           onChange={(value) => onChange(buildEventAccessPatch(value))}
           allowedMethods={["details", "ticket", "timeslots", "prebooking", "request"]}
+          timeSlotSuggestions={timeSlotSuggestions}
           disabled={!isEditable}
         />
       )}
