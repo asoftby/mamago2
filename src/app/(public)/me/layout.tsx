@@ -17,5 +17,5 @@ export default async function MeLayout({ children }: { children: React.ReactNode
     await redirectToLogin();
   }
 
-  return <div className="min-w-0 antialiased">{children}</div>;
+  return <div className="me-page min-w-0 antialiased">{children}</div>;
 }
