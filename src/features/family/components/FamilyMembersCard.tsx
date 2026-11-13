@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Surface } from "@/components/ui/surface";
 import { H2, BodyMuted } from "@/components/ui/typography";
@@ -18,6 +18,8 @@ export type FamilyMembersCardProps = {
   invites: Array<{ id: string; createdAt: string }>;
   invitesEnabled: boolean;
   hasChildren: boolean;
+  /** "account" — стиль страницы /me (токены `.mg-acc`, рендерится внутри него). */
+  variant?: "card" | "account";
 };
 
 async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; data: Record<string, unknown> }> {
@@ -34,14 +36,26 @@ async function call(url: string, method: string, body?: unknown): Promise<{ ok: 
   }
 }
 
-const btn =
+const BTN =
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-900 hover:bg-neutral-50 disabled:opacity-50";
-const btnPrimary =
+const BTN_PRIMARY =
   "inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50";
+
+const ACC_INPUT =
+  "min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--line-2)] bg-white px-3 text-sm text-[var(--ink)]";
+
+function AccountWrap({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className={`card ${className ?? ""}`} style={{ padding: 20 }} data-testid="family-members-block">
+      {children}
+    </div>
+  );
+}
 
 export function FamilyMembersCard(props: FamilyMembersCardProps) {
   const router = useRouter();
-  const { myRole, adults, invites, invitesEnabled, hasChildren } = props;
+  const { myRole, adults, invites, invitesEnabled, hasChildren, variant = "card" } = props;
+  const acc = variant === "account";
   const actions = familyActions({ myRole, adultsCount: adults.length, invitesEnabled });
 
   const [busy, setBusy] = useState(false);
@@ -109,9 +123,20 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
       router.refresh();
     });
 
+  const Wrap = acc ? AccountWrap : Surface;
+  const btn = acc ? "btn btn-ghost btn-sm" : BTN;
+  const btnPrimary = acc ? "btn btn-primary btn-sm" : BTN_PRIMARY;
+  const inputCls = acc ? ACC_INPUT : "min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm";
+
   return (
-    <Surface className="mt-6 p-5 sm:p-6">
-      <H2>Взрослые в семье</H2>
+    <Wrap className={acc ? undefined : "mt-6 p-5 sm:p-6"}>
+      {acc ? (
+        <h2 className="serif" style={{ margin: 0, fontSize: 22, lineHeight: 1.1, letterSpacing: "-.015em" }}>
+          Взрослые в семье
+        </h2>
+      ) : (
+        <H2>Взрослые в семье</H2>
+      )}
       <ul className="mt-3 divide-y divide-neutral-100">
         {adults.map((a) => (
           <li key={a.userId} className="flex items-center justify-between gap-3 py-2.5">
@@ -141,7 +166,7 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
               placeholder="Email (необязательно)"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm"
+              className={inputCls}
             />
             <button type="button" className={btnPrimary} disabled={busy} onClick={createInvite}>
               {email.trim() ? "Отправить приглашение" : "Создать ссылку"}
@@ -178,7 +203,7 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
             <select
               value={transferTo}
               onChange={(e) => setTransferTo(e.target.value)}
-              className="min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm"
+              className={inputCls}
             >
               <option value="">Выберите взрослого</option>
               {others.map((a) => (
@@ -222,6 +247,6 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
           )}
         </div>
       ) : null}
-    </Surface>
+    </Wrap>
   );
 }

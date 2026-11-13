@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AddParticipantModal } from "@/components/children/AddParticipantModal";
+import { AddParticipantModal, type ParticipantChildData } from "@/components/children/AddParticipantModal";
+import { FamilyMembersCard, type FamilyMembersCardProps } from "@/features/family/components/FamilyMembersCard";
 import { getGreetingForHour } from "@/features/me/lib/accountGreeting";
 
 /* ============================================================
@@ -21,6 +22,10 @@ export type AccountFamilyMember = {
   hint?: string;
   /** Interest chips (children). When present, replaces `hint`. */
   interests?: string[];
+  /** "me" — текущий взрослый (правка через editAdult); "child" — ребёнок (childData). */
+  kind?: "me" | "child";
+  /** Полные данные ребёнка для модалки правки. */
+  childData?: ParticipantChildData;
 };
 
 export type AccountRoute = {
@@ -47,7 +52,8 @@ export type AccountDesignProps = {
   greeting: string;
   homeHref: string;
   family: AccountFamilyMember[];
-  manageFamilyHref: string;
+  /** Блок «Взрослые в семье / Пригласить» — null при выключенных флагах семьи. */
+  familyBlock?: Omit<FamilyMembersCardProps, "variant"> | null;
   bookingsHref: string;
   routes: AccountRoute[];
   createRouteHref: string;
@@ -133,7 +139,7 @@ export function AccountDesign(props: AccountDesignProps) {
     greeting,
     homeHref,
     family,
-    manageFamilyHref,
+    familyBlock,
     bookingsHref,
     routes,
     createRouteHref,
@@ -143,6 +149,12 @@ export function AccountDesign(props: AccountDesignProps) {
   } = props;
 
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<AccountFamilyMember | null>(null);
+  const closeMemberModal = () => {
+    setIsAddMemberOpen(false);
+    setEditingMember(null);
+  };
+  const editable = (m: AccountFamilyMember) => m.kind === "me" || (m.kind === "child" && !!m.childData);
   const [localGreeting, setLocalGreeting] = useState(greeting);
 
   useEffect(() => {
@@ -196,11 +208,21 @@ export function AccountDesign(props: AccountDesignProps) {
             <div className="kicker">
               <span className="caps">Моя семья</span>
               <span className="line" />
-              <Link href={manageFamilyHref}>Управлять →</Link>
             </div>
             <div className="member-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {family.map((m) => (
-                <div key={m.key} className="member-card" style={{ flex: "0 0 auto" }}>
+                <button
+                  key={m.key}
+                  type="button"
+                  className="member-card"
+                  style={{ flex: "0 0 auto" }}
+                  disabled={!editable(m)}
+                  aria-label={`Редактировать: ${m.name}`}
+                  onClick={() => {
+                    setEditingMember(m);
+                    setIsAddMemberOpen(true);
+                  }}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div
                       style={{
@@ -239,13 +261,16 @@ export function AccountDesign(props: AccountDesignProps) {
                   ) : (
                     <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 6, fontStyle: "italic" }}>{m.hint}</div>
                   )}
-                </div>
+                </button>
               ))}
               <button
                 type="button"
                 className="member-add"
                 style={{ flex: "0 0 auto", minWidth: 110 }}
-                onClick={() => setIsAddMemberOpen(true)}
+                onClick={() => {
+                  setEditingMember(null);
+                  setIsAddMemberOpen(true);
+                }}
                 aria-label="Добавить ребёнка"
               >
                 <div style={{ width: 38, height: 38, borderRadius: 99, border: "1.5px dashed var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -256,6 +281,11 @@ export function AccountDesign(props: AccountDesignProps) {
                 </span>
               </button>
             </div>
+            {familyBlock ? (
+              <div style={{ marginTop: 16 }}>
+                <FamilyMembersCard {...familyBlock} variant="account" />
+              </div>
+            ) : null}
           </Reveal>
         </section>
 
@@ -431,8 +461,10 @@ export function AccountDesign(props: AccountDesignProps) {
 
       <AddParticipantModal
         isOpen={isAddMemberOpen}
-        onClose={() => setIsAddMemberOpen(false)}
-        childOnly
+        onClose={closeMemberModal}
+        childData={editingMember?.kind === "child" ? editingMember.childData : undefined}
+        editAdult={editingMember?.kind === "me"}
+        childOnly={editingMember?.kind !== "me"}
       />
     </div>
   );
@@ -504,8 +536,9 @@ const CSS = `
 .mg-acc .member-card{
   display:flex;flex-direction:column;gap:6px;padding:14px;
   background:var(--paper);border:1px solid var(--line);border-radius:16px;
-  cursor:pointer;transition:all .18s;min-width:160px;
+  cursor:pointer;transition:all .18s;min-width:160px;text-align:left;font:inherit;
 }
+.mg-acc .member-card:disabled{cursor:default}
 .mg-acc .member-card:hover{border-color:var(--line);transform:none}
 .mg-acc .member-add{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -562,5 +595,6 @@ const CSS = `
   .mg-acc .mg-acc__hero-name{font-size:40px}
   .mg-acc .wrap{padding:0 16px}
   .mg-acc .member-row{overflow-x:auto}
+  .mg-acc .member-card{min-width:0;flex:1 1 140px !important}
 }
 `;

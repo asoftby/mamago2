@@ -32,7 +32,10 @@ export type FamilyOverview = {
 export async function listFamilyForUser(
   prisma: PrismaClient,
   userId: string,
-  deps: Deps = {},
+  deps: Deps & {
+    /** Default true. `false` skips the Child query (children is then []): for callers that already loaded them. */
+    includeChildren?: boolean;
+  } = {},
 ): Promise<FamilyOverview | null> {
   assertEnabled(deps);
   const now = (deps.now ?? (() => new Date()))();
@@ -47,11 +50,13 @@ export async function listFamilyForUser(
       orderBy: { joinedAt: "asc" },
       select: { userId: true, role: true, joinedAt: true, user: { select: { displayName: true, avatarUrl: true } } },
     }),
-    prisma.child.findMany({
-      where: { familyId: mine.familyId },
-      orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, birthDate: true },
-    }),
+    deps.includeChildren === false
+      ? Promise.resolve([] as FamilyOverview["children"])
+      : prisma.child.findMany({
+          where: { familyId: mine.familyId },
+          orderBy: { createdAt: "asc" },
+          select: { id: true, name: true, birthDate: true },
+        }),
     prisma.familyInvite.findMany({
       where: { familyId: mine.familyId, ...activeInviteWhere(now) },
       orderBy: { createdAt: "desc" },

@@ -23,6 +23,7 @@ import {
   type AccountParty,
 } from "@/features/me/components/account/AccountDesign";
 import { childScopeFor } from "@/server/family/familyAccess";
+import { loadFamilyBlockData } from "@/server/family/familyBlockData";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import {
   getGreetingForHour,
@@ -111,6 +112,7 @@ export default async function MePage({ searchParams }: PageProps) {
   const family: AccountFamilyMember[] = [
     {
       key: "me",
+      kind: "me",
       initial: firstName.charAt(0).toUpperCase(),
       name: user.displayName?.trim() || "Я",
       role: adultRole || "Родитель",
@@ -128,6 +130,19 @@ export default async function MePage({ searchParams }: PageProps) {
       const displayName = childDisplayName(child.name, index + 1);
       return {
         key: child.id,
+        kind: "child",
+        childData: {
+          id: child.id,
+          name: child.name,
+          birthDate: child.birthDate,
+          birthPrecision: child.birthPrecision,
+          systemInterests: systemInterestsData
+            .filter((i) => i.childId === child.id)
+            .map((i) => ({ interestSlug: i.interestSlug })),
+          customInterests: customInterestsData
+            .filter((c) => c.childId === child.id)
+            .map((c) => ({ label: c.label })),
+        },
         initial: displayName.charAt(0).toUpperCase(),
         name: displayName,
         role: ageLine(child),
@@ -136,6 +151,12 @@ export default async function MePage({ searchParams }: PageProps) {
       };
     }),
   ];
+
+  // Block «Взрослые в семье / Пригласить»: null while the family flags are off.
+  const familyBlock = await loadFamilyBlockData(prisma, user, { includeChildren: false });
+  const familyBlockProps = familyBlock
+    ? { ...familyBlock, hasChildren: childrenRaw.length > 0 }
+    : null;
 
   // ── Routes ──
   const routes: AccountRoute[] = userRoutes.map((r) => ({
@@ -170,7 +191,7 @@ export default async function MePage({ searchParams }: PageProps) {
       greeting={greeting}
       homeHref="/"
       family={family}
-      manageFamilyHref="/me/profile"
+      familyBlock={familyBlockProps}
       bookingsHref="/me/bookings"
       routes={routes}
       createRouteHref="/routes/new"
