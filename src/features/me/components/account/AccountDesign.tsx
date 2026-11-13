@@ -221,7 +221,7 @@ export function AccountDesign(props: AccountDesignProps) {
                       {m.initial}
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.005em" }}>{m.name}</div>
+                      <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, letterSpacing: "-.005em" }}>{m.name}</div>
                       <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1 }}>{m.role}</div>
                     </div>
                   </div>
@@ -265,7 +265,6 @@ export function AccountDesign(props: AccountDesignProps) {
             <div className="kicker">
               <span className="caps">Мои записи</span>
               <span className="line" />
-              <Link href={bookingsHref}>Все записи →</Link>
             </div>
             <Link href={bookingsHref} className="card booking-card" style={{ display: "flex", alignItems: "center", gap: 16, padding: "20px 24px" }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0, background: "var(--accent-soft)", color: "var(--accent-deep)", display: "flex", alignItems: "center", justifyContent: "center" }}>
