@@ -309,6 +309,15 @@ export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "sc
   return undefined;
 }
 
+/** Данные окна записи + возрастное правило события (мягкое предупреждение, запись не блокируется). */
+export function resolveSimpleBookingWithAgeRule(
+  activityId: string,
+  activity: ActivityForEventPageInput,
+): EventPageData["cta"]["simpleBooking"] {
+  const base = resolveSimpleBooking(activityId, activity);
+  return base ? { ...base, ageRule: eventAgeRuleFromActivity(activity) } : base;
+}
+
 export function resolveSimpleBooking(
   activityId: string,
   activity: ActivityForEventPageInput,
@@ -590,11 +599,7 @@ export function buildEventPageDataFromPrismaActivity(
     typeof posterWidth === "number" && posterWidth > 0 &&
     typeof posterHeight === "number" && posterHeight > 0;
 
-  const baseSimpleBooking = resolveSimpleBooking(activity.id, activity);
-  // Возрастное правило события для мягкого предупреждения в окне записи (запись не блокируется).
-  const simpleBooking = baseSimpleBooking
-    ? { ...baseSimpleBooking, ageRule: eventAgeRuleFromActivity(activity) }
-    : baseSimpleBooking;
+  const simpleBooking = resolveSimpleBookingWithAgeRule(activity.id, activity);
   const sessions: EventPageData["sessions"] = activity.sessions.map((s) => ({
     id: s.id,
     startsAt: s.startsAt.toISOString(),
