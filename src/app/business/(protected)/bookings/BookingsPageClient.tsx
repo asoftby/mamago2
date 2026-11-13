@@ -1202,7 +1202,7 @@ function BookingCalendarDayPanel({
                         <div className="mt-1 text-base font-semibold leading-tight text-stone-950">{booking.display.title}</div>
                       </div>
                       <div className="whitespace-nowrap text-sm font-semibold text-stone-900">
-                        {formatPriceLabel(booking) ?? "—"}
+                        {renderCurrencyText(formatPriceLabel(booking), { iconSize: "text" }) ?? "—"}
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-stone-500">
@@ -1391,7 +1391,7 @@ function BookingListItem({
         <div className="flex shrink-0 items-end justify-between gap-4 lg:min-w-[150px] lg:flex-col lg:items-end">
           <div className="text-right">
             <div className="text-[1.8rem] font-semibold leading-none tracking-tight text-stone-950 whitespace-nowrap sm:text-[2rem]">
-              {price ?? "—"}
+              {renderCurrencyText(price, { iconSize: "xs" }) ?? "—"}
             </div>
             <div className="mt-2 text-sm text-stone-400">{booking.display.typeLabel}</div>
           </div>
