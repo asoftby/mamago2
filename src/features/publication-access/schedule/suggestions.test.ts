@@ -130,4 +130,25 @@ const filled = mergeTimeSlotSuggestionsIntoDays(pickedDate, [suggestions[2]!]);
 assert.equal(filled[0]?.slots.length, 1);
 assert.equal(filled[0]?.slots[0]?.startTime, "10:00");
 
+// 9. A saved block whose date was edited keeps its date-derived id (`day-<old date>`).
+// Re-adding the old date from the schedule must create a block with a different id,
+// otherwise the editor patches/removes both blocks and React keys collide.
+const redated = flatSlotsToGroupedDays([
+  { id: "s1", date: "2026-11-20", startTime: "10:00", endTime: "12:00", capacity: 4 },
+]).map((day) => ({ ...day, date: "2026-11-27" }));
+assert.equal(redated[0]?.id, "day-2026-11-20");
+const reAdded = mergeTimeSlotSuggestionsIntoDays(redated, suggestions);
+assert.deepEqual(
+  reAdded.map((day) => day.date),
+  ["2026-11-20", "2026-11-21", "2026-11-27"],
+);
+assert.equal(new Set(reAdded.map((day) => day.id)).size, reAdded.length);
+assert.equal(reAdded.find((day) => day.date === "2026-11-27")?.id, "day-2026-11-20");
+// Removing the newly added block by id (as the editor does) leaves the re-dated one intact.
+const addedId = reAdded.find((day) => day.date === "2026-11-20")!.id;
+assert.deepEqual(
+  reAdded.filter((day) => day.id !== addedId).map((day) => day.date),
+  ["2026-11-21", "2026-11-27"],
+);
+
 console.log("publication-access schedule suggestions: OK");

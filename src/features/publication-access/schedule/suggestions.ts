@@ -1,4 +1,4 @@
-import { createEmptyScheduleSlot } from "./mappers";
+import { createEmptyScheduleDay, createEmptyScheduleSlot } from "./mappers";
 import type { ScheduleDay } from "./types";
 
 /**
@@ -51,6 +51,15 @@ export function mergeTimeSlotSuggestionsIntoDays(
   const next = days
     .filter((day) => !isPristineDay(day))
     .map((day) => ({ ...day, slots: [...day.slots] }));
+  // A block keeps its id when its date is edited, so a date-derived id for a
+  // new block could collide with an existing one (shared React key / patch target).
+  const usedIds = new Set(next.map((day) => day.id));
+  const newUniqueDayId = (): string => {
+    let id = createEmptyScheduleDay().id;
+    while (usedIds.has(id)) id = createEmptyScheduleDay().id;
+    usedIds.add(id);
+    return id;
+  };
 
   for (const suggestion of suggestions) {
     if (!suggestion.date || isCovered(next, suggestion)) continue;
@@ -62,7 +71,7 @@ export function mergeTimeSlotSuggestionsIntoDays(
     };
     const day = next.find((item) => item.date === suggestion.date);
     if (!day) {
-      next.push({ id: `day-${suggestion.date}`, date: suggestion.date, slots: [slot] });
+      next.push({ id: newUniqueDayId(), date: suggestion.date, slots: [slot] });
       continue;
     }
     const emptyIndex = day.slots.findIndex(
