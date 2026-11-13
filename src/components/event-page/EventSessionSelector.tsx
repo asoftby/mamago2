@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { EventPageSession } from "@/lib/event/eventPageTypes";
 import { SessionCard } from "@/components/shared/SessionCard";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+import {
+  MY_BOOKINGS_HREF,
+  type OwnEventBooking,
+} from "@/lib/event/ownEventBooking";
 
 const INITIAL_VISIBLE = 3;
 
@@ -51,6 +56,7 @@ export function EventSessionSelector({
   onBook,
   bookLabel,
   isPlanned = false,
+  getSessionBooking,
   priceLabel,
   purchaseUrl,
   buyLabel = "Купить билет",
@@ -65,6 +71,8 @@ export function EventSessionSelector({
   /** Подпись кнопки записи; по умолчанию «Записаться». */
   bookLabel?: string;
   isPlanned?: boolean;
+  /** Own active booking for a session (private, signed-in only). */
+  getSessionBooking?: (sessionId: string) => OwnEventBooking | null;
   priceLabel?: string;
   purchaseUrl?: string;
   buyLabel?: string;
@@ -101,7 +109,8 @@ export function EventSessionSelector({
           ? <>{startTimeLabel} · {priceNode}</>
           : startTimeLabel || undefined;
 
-        const hasAction = !!purchaseUrl || !!onBook;
+        const booked = purchaseUrl ? null : (getSessionBooking?.(s.id) ?? null);
+        const hasAction = (!!purchaseUrl || !!onBook) && !booked;
         return (
           <SessionCard
             key={s.id}
@@ -110,6 +119,17 @@ export function EventSessionSelector({
             title={getDateLabel(s.startsAt)}
             sessionTitle={s.title}
             subtitle={subtitle}
+            details={
+              booked ? (
+                <Link
+                  href={MY_BOOKINGS_HREF}
+                  data-testid="session-booked-state"
+                  className="inline-flex rounded-full border border-[#E86A3A] bg-[#FFE8DC] px-3.5 py-1.5 text-[13px] font-semibold text-[#141210]"
+                >
+                  {booked.status === "CONFIRMED" ? "Запись подтверждена" : "Запись оставлена — ждём подтверждения"}
+                </Link>
+              ) : undefined
+            }
             primaryLabel={hasAction ? (purchaseUrl ? buyLabel : (bookLabel ?? "Записаться")) : undefined}
             primaryHref={purchaseUrl}
             onPrimary={() => { onSelect(s.id); if (onBook) onBook(s.id); }}
