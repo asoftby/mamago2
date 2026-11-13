@@ -1,6 +1,6 @@
 "use client";
 
-import { BookingChatButton, BookingChatCompose } from "@/components/business/bookings/BookingChatButton";
+import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1473,7 +1473,9 @@ export function BookingDetailsDrawer({
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (!booking) return null;
-  const chatOpen = chat.open && chat.bookingId === booking.id;
+  const canChat =
+    booking.hasCustomerAccount && !booking.directThreadId && booking.directAvailable !== false;
+  const chatOpen = canChat && chat.open && chat.bookingId === booking.id;
 
   const meta = STATUS_META[booking.status];
   const action = getActionMeta(booking);
@@ -1505,8 +1507,6 @@ export function BookingDetailsDrawer({
     { label: "Стоимость", value: price ? renderCurrencyText(price, { iconSize: "text" }) : "—" },
   ];
 
-  const writeButtonClass =
-    "inline-flex h-12 w-full items-center justify-center rounded-2xl border border-stone-300 bg-white px-6 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-50";
 
   return (
     <Sheet
@@ -1527,6 +1527,12 @@ export function BookingDetailsDrawer({
           "data-[state=open]:duration-300 data-[state=closed]:duration-200",
         )}
         showCloseButton={false}
+        onEscapeKeyDown={(event) => {
+          if (chatOpen) {
+            event.preventDefault();
+            setChat({ bookingId: booking.id, open: false });
+          }
+        }}
       >
         <SheetTitle className="sr-only">Детали заявки</SheetTitle>
         {!isDesktop ? (
@@ -1535,15 +1541,18 @@ export function BookingDetailsDrawer({
           </div>
         ) : null}
 
-        {chatOpen ? (
-          <BookingChatCompose
-            booking={booking}
-            subtitle={booking.display.title}
-            onBack={() => setChat({ bookingId: booking.id, open: false })}
-            onClose={() => onOpenChange(false)}
-          />
-        ) : (
-          <>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div
+            className={cn(
+              "flex min-h-0 w-[200%] shrink-0 transition-transform duration-300 ease-out motion-reduce:transition-none",
+              chatOpen && "-translate-x-1/2",
+            )}
+          >
+          <div
+            className="flex w-1/2 shrink-0 flex-col"
+            inert={chatOpen}
+            aria-hidden={chatOpen}
+          >
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4 sm:px-6 sm:pt-6">
           <div className="flex items-center justify-between gap-3">
             <span
@@ -1718,15 +1727,8 @@ export function BookingDetailsDrawer({
                 {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
               </button>
             </div>
-          ) : (
+          ) : canComplete || canReject ? (
             <div className="flex flex-col gap-2">
-              {booking.hasCustomerAccount ? (
-                <BookingChatButton booking={booking} onCompose={() => setChat({ bookingId: booking.id, open: true })} />
-              ) : chatHref ? (
-                <a href={chatHref} className={writeButtonClass}>
-                  Написать клиенту
-                </a>
-              ) : null}
               {canComplete || canReject ? (
                 <div className="flex items-center justify-center gap-2">
                   {canComplete ? (
@@ -1752,10 +1754,27 @@ export function BookingDetailsDrawer({
                 </div>
               ) : null}
             </div>
-          )}
+          ) : null}
         </div>
-          </>
-        )}
+          </div>
+          <div
+            className="flex w-1/2 shrink-0 flex-col"
+            inert={!chatOpen}
+            aria-hidden={!chatOpen}
+          >
+            {canChat ? (
+              <BookingChatComposer
+                key={booking.id}
+                booking={booking}
+                subtitle={booking.display.title}
+                active={chatOpen}
+                onBack={() => setChat({ bookingId: booking.id, open: false })}
+                onClose={() => onOpenChange(false)}
+              />
+            ) : null}
+          </div>
+          </div>
+        </div>
       </SheetContent>
     </Sheet>
   );
