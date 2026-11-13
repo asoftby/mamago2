@@ -31,14 +31,18 @@ type Props = {
   className?: string;
   /** Same size as the drawer's primary actions. */
   large?: boolean;
+  /** Round icon-only button (next to the phone action). Renders nothing when chat is unavailable. */
+  iconOnly?: boolean;
 };
 
 const MAX_LEN = 2000;
 const buttonClass =
   "inline-flex h-10 items-center gap-2 rounded-full border border-stone-200 bg-white px-4 text-[14px] font-medium text-stone-800 transition-colors hover:border-stone-400";
 
-export function BookingChatButton({ booking, onOpened, className: extra, large }: Props) {
-  const className = [large ? "!h-14 w-full justify-center !rounded-2xl !px-6 !text-sm !font-semibold sm:w-auto" : "", extra ?? ""].join(" ");
+export function BookingChatButton({ booking, onOpened, className: extra, large, iconOnly }: Props) {
+  const iconClass =
+    "flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-800 transition hover:bg-stone-50";
+  const className = [large ? "!h-12 w-full justify-center !rounded-2xl !border-stone-300 !px-6 !text-[15px] !font-semibold !text-stone-950" : "", extra ?? ""].join(" ");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -49,13 +53,18 @@ export function BookingChatButton({ booking, onOpened, className: extra, large }
 
   if (booking.directThreadId) {
     return (
-      <Link href={`/business/direct/${booking.directThreadId}`} className={`${buttonClass} ${className ?? ""}`}>
-        <MessageCircle className="h-4 w-4" /> Открыть чат
+      <Link
+        href={`/business/direct/${booking.directThreadId}`}
+        className={iconOnly ? iconClass : `${buttonClass} ${className ?? ""}`}
+        aria-label={iconOnly ? "Открыть чат" : undefined}
+      >
+        <MessageCircle className={iconOnly ? "h-5 w-5" : "h-4 w-4"} /> {iconOnly ? null : "Открыть чат"}
       </Link>
     );
   }
 
   if (booking.directAvailable === false) {
+    if (iconOnly) return null;
     return (
       <p className={`text-[13px] text-stone-500 ${className ?? ""}`}>
         Сообщения клиентам для этого типа публикаций сейчас отключены платформой. Свяжитесь по телефону.
@@ -95,8 +104,13 @@ export function BookingChatButton({ booking, onOpened, className: extra, large }
 
   return (
     <>
-      <button type="button" className={`${buttonClass} ${className ?? ""}`} onClick={() => setOpen(true)}>
-        <MessageCircle className="h-4 w-4" /> Написать клиенту
+      <button
+        type="button"
+        className={iconOnly ? iconClass : `${buttonClass} ${className ?? ""}`}
+        onClick={() => setOpen(true)}
+        aria-label={iconOnly ? "Написать клиенту" : undefined}
+      >
+        <MessageCircle className={iconOnly ? "h-5 w-5" : "h-4 w-4"} /> {iconOnly ? null : "Написать клиенту"}
       </button>
       <ResponsiveOverlay
         open={open}

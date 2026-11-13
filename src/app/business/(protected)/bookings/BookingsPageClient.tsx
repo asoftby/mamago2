@@ -1,7 +1,6 @@
 "use client";
 
 import { BookingChatButton } from "@/components/business/bookings/BookingChatButton";
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -15,11 +14,8 @@ import {
   CircleX,
   Clock3,
   Inbox,
-  Mail,
   MessageCircle,
   Phone,
-  User2,
-  Users,
   X,
 } from "lucide-react";
 import { BookingStatus } from "@prisma/client";
@@ -315,35 +311,6 @@ function formatPriceLabel(booking: BusinessBookingItem): string | null {
   return null;
 }
 
-function buildOrderDetails(booking: BusinessBookingItem): string[] {
-  const details: string[] = [];
-  if (booking.campShiftTitle) {
-    details.push(
-      `${booking.campShiftTitle}${
-        booking.campShiftDateFrom && booking.campShiftDateTo
-          ? `: ${formatAbsoluteDate(booking.campShiftDateFrom)} — ${formatAbsoluteDate(booking.campShiftDateTo)}`
-          : ""
-      }`,
-    );
-  }
-  if (booking.requestedDate) {
-    details.push(
-      `Дата записи: ${formatAbsoluteDate(booking.requestedDate)}${
-        booking.requestedTime ? ` · ${booking.requestedTime}` : ""
-      }`,
-    );
-  } else if (booking.session?.startsAt) {
-    details.push(`Сеанс: ${formatAbsoluteDate(booking.session.startsAt)} · ${formatTime(booking.session.startsAt)}`);
-  }
-  const participants = [];
-  if (booking.adultsCount > 0) participants.push(`${booking.adultsCount} взросл.`);
-  if (booking.childrenCount > 0) participants.push(`${booking.childrenCount} ребёнок`);
-  if (participants.length > 0) {
-    details.push(`Участники: ${participants.join(" · ")}`);
-  }
-  return details;
-}
-
 function formatMetricHint(value: StatusFilter): string {
   if (value === "all") return "Всего заявок";
   if (value === BookingStatus.NEW) return "Нужно связаться";
@@ -388,22 +355,6 @@ function getParticipantLabel(booking: BusinessBookingItem): string | null {
   return [booking.childName, booking.childAge != null ? `${booking.childAge} лет` : null]
     .filter(Boolean)
     .join(", ");
-}
-
-function getHistoryLabel(booking: BusinessBookingItem): string {
-  if (booking.status === BookingStatus.EXPIRED) {
-    return "Срок подтверждения заявки истёк.";
-  }
-  if (booking.status === BookingStatus.CONFIRMED) {
-    return "Заявка подтверждена и ожидает проведения.";
-  }
-  if (booking.status === BookingStatus.COMPLETED) {
-    return "Услуга оказана, заявка завершена.";
-  }
-  if (booking.status === BookingStatus.REJECTED || booking.status === BookingStatus.CANCELLED) {
-    return "Заявка закрыта без дальнейших действий.";
-  }
-  return formatReceivedLabel(booking.createdAt);
 }
 
 function buildCalendarBuckets(items: BusinessBookingItem[]): Map<string, CalendarBookingBucket> {
@@ -1452,6 +1403,49 @@ function BookingListItem({
   );
 }
 
+function formatScheduleWithoutYear(booking: BusinessBookingItem): string {
+  return formatShortSchedule(booking).replaceAll(` ${new Date().getFullYear()} г.`, "");
+}
+
+function formatHistoryTime(dateIso: string): string {
+  const time = formatTime(dateIso);
+  if (isToday(dateIso)) return `сегодня, ${time}`;
+  if (isYesterday(dateIso)) return `вчера, ${time}`;
+  return `${formatAbsoluteDate(dateIso)}, ${time}`;
+}
+
+function getParticipantsValue(booking: BusinessBookingItem): string {
+  const parts: string[] = [];
+  if (booking.adultsCount > 0) parts.push(`Взрослые: ${booking.adultsCount}`);
+  if (booking.childrenCount > 0) {
+    const legacy = booking.childName
+      ? `${booking.childName}${booking.childAge != null ? ` (${booking.childAge})` : ""}`
+      : null;
+    parts.push(
+      booking.childrenCount === 1 && legacy
+        ? `Дети: ${legacy}`
+        : `Дети: ${booking.childrenCount}`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Уточняется";
+}
+
+function buildHistoryEntries(booking: BusinessBookingItem): { time: string | null; label: string }[] {
+  const entries: { time: string | null; label: string }[] = [
+    { time: formatHistoryTime(booking.createdAt), label: "Заявка получена" },
+  ];
+  const closing: Partial<Record<BookingStatus, string>> = {
+    [BookingStatus.CONFIRMED]: "Вы подтвердили",
+    [BookingStatus.COMPLETED]: "Заявка завершена",
+    [BookingStatus.REJECTED]: "Заявка отклонена",
+    [BookingStatus.CANCELLED]: "Заявка отменена",
+    [BookingStatus.EXPIRED]: "Срок подтверждения истёк",
+  };
+  const label = closing[booking.status];
+  if (label) entries.push({ time: null, label });
+  return entries;
+}
+
 export function BookingDetailsDrawer({
   open,
   booking,
@@ -1472,6 +1466,7 @@ export function BookingDetailsDrawer({
   onStatusChange: (id: string, status: BookingStatus) => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (!booking) return null;
@@ -1479,12 +1474,15 @@ export function BookingDetailsDrawer({
   const meta = STATUS_META[booking.status];
   const action = getActionMeta(booking);
   const price = formatPriceLabel(booking);
-  const details = buildOrderDetails(booking);
-  const participant = getParticipantLabel(booking);
-  const canConfirm = booking.status === BookingStatus.NEW;
-  const canReject =
-    booking.status === BookingStatus.NEW || booking.status === BookingStatus.CONFIRMED;
-  const canComplete = booking.status === BookingStatus.CONFIRMED;
+  const isNew = booking.status === BookingStatus.NEW;
+  const isConfirmed = booking.status === BookingStatus.CONFIRMED;
+  const canConfirm = isNew;
+  const canReject = isNew || isConfirmed;
+  const canComplete = isConfirmed;
+  const history = buildHistoryEntries(booking);
+  const showNav = isDesktop && total > 1;
+  const chatHref = booking.customerEmail ? `mailto:${booking.customerEmail}` : null;
+  const initial = (booking.customerName.trim().charAt(0) || "?").toUpperCase();
 
   const handleAction = async (status: BookingStatus) => {
     setUpdating(status);
@@ -1495,263 +1493,250 @@ export function BookingDetailsDrawer({
     }
   };
 
+  const orderRows: { label: string; value: string }[] = [
+    { label: "Когда", value: formatScheduleWithoutYear(booking) },
+    ...(booking.campShiftTitle ? [{ label: "Смена", value: booking.campShiftTitle }] : []),
+    { label: "Участники", value: getParticipantsValue(booking) },
+    ...(booking.display.meta ? [{ label: "Особенности", value: booking.display.meta }] : []),
+    { label: "Стоимость", value: price ?? "—" },
+  ];
+
+  const writeButtonClass =
+    "inline-flex h-12 w-full items-center justify-center rounded-2xl border border-stone-300 bg-white px-6 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-50";
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={isDesktop ? "right" : "bottom"}
         overlayClassName="bg-black/20 backdrop-blur-sm"
         className={cn(
-          "w-full gap-0 overflow-y-auto border-l-0 bg-white p-0",
+          "gap-0 overflow-hidden border-0 bg-white p-0",
           isDesktop
-            ? "h-full border-l sm:max-w-[80vw] xl:max-w-[640px]"
-            : "h-[92dvh] rounded-t-[28px] border-t",
+            ? "inset-y-3 right-3 h-auto w-[calc(100%-1.5rem)] sm:max-w-[580px] rounded-[28px] shadow-[0_24px_70px_rgba(15,23,42,0.18)]"
+            : "max-h-[92dvh] w-full rounded-t-[28px]",
           "data-[state=open]:duration-300 data-[state=closed]:duration-200",
         )}
         showCloseButton={false}
       >
         <SheetTitle className="sr-only">Детали заявки</SheetTitle>
-        <div className="min-h-full bg-white">
-          <div className="mx-auto flex w-full max-w-[680px] flex-col p-4 sm:p-6">
-            <aside className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
-              <div className="flex flex-col gap-4 border-b border-stone-100 px-5 pb-6 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-7 sm:pt-7">
-                <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className={cn("rounded-full px-3 py-1 text-sm font-semibold", meta.chipClass)}>
-                      {meta.label}
-                    </span>
-                    {action ? (
-                      <span className={cn("rounded-full px-3 py-1 text-sm font-medium", action.className)}>
-                        {action.label}
-                      </span>
+        {!isDesktop ? (
+          <div className="flex shrink-0 justify-center pt-2.5" aria-hidden="true">
+            <span className="h-1 w-10 rounded-full bg-stone-300" />
+          </div>
+        ) : null}
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4 sm:px-6 sm:pt-6">
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold",
+                isNew && "bg-[#FDE7DD] text-[#C2410C]",
+                isConfirmed && "bg-emerald-100/80 text-emerald-700",
+                !isNew && !isConfirmed && meta.chipClass,
+              )}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+              {isNew ? "Новая · ждёт ответа" : meta.label}
+            </span>
+            <div className="flex items-center gap-1">
+              {showNav ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onSelectPrev}
+                    disabled={selectedIndex <= 0}
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                    aria-label="Предыдущая заявка"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSelectNext}
+                    disabled={selectedIndex < 0 || selectedIndex >= total - 1}
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                    aria-label="Следующая заявка"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-stone-800 transition hover:bg-stone-100"
+                aria-label="Закрыть детали"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <h3 className="mt-5 text-[1.6rem] font-bold leading-tight tracking-tight text-stone-950 sm:text-[1.75rem]">
+            {booking.display.title}
+          </h3>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-mono text-[15px] text-stone-700">
+              {formatScheduleWithoutYear(booking)}
+              {price ? <span className="ml-3 font-semibold text-stone-950">{price}</span> : null}
+            </span>
+            <span className="text-[15px] text-stone-700">{booking.display.typeLabel}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-stone-500">
+            <span>{formatReceivedLabel(booking.createdAt)}</span>
+            {action?.label === "Нужно выбрать время" ? (
+              <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", action.className)}>
+                {action.label}
+              </span>
+            ) : null}
+          </div>
+
+          {isConfirmed ? (
+            <div className="mt-5 flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3.5 text-[15px] leading-snug text-emerald-800">
+              <Check className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Запись подтверждена. Клиент получил уведомление.</span>
+            </div>
+          ) : null}
+
+          <section className="mt-5 border-t border-stone-200 pt-5">
+            <div className="text-[13px] text-stone-500">Клиент</div>
+            <div className="mt-3 flex items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FDE7DD] text-lg font-semibold text-[#C2410C]">
+                {initial}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[17px] font-semibold text-stone-950">
+                  {booking.customerName}
+                </div>
+                <div className="mt-1 whitespace-nowrap font-mono text-[15px] text-stone-700">{booking.customerPhone}</div>
+                {booking.source === "MANUAL" ? (
+                  <div className="mt-0.5 text-xs text-stone-500">Добавлено вручную</div>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <a
+                  href={`tel:${booking.customerPhone}`}
+                  className="flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 text-stone-800 transition hover:bg-stone-50"
+                  aria-label="Позвонить клиенту"
+                >
+                  <Phone className="h-5 w-5" />
+                </a>
+                {booking.hasCustomerAccount ? (
+                  <BookingChatButton booking={booking} iconOnly />
+                ) : chatHref ? (
+                  <a
+                    href={chatHref}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 text-stone-800 transition hover:bg-stone-50"
+                    aria-label="Написать клиенту"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-5 border-t border-stone-200 pt-5">
+            <div className="text-[13px] text-stone-500">Заказ</div>
+            <dl className="mt-3 space-y-3.5">
+              {orderRows.map((row) => (
+                <div key={row.label} className="flex items-baseline justify-between gap-4">
+                  <dt className="shrink-0 text-base text-stone-500">{row.label}</dt>
+                  <dd className="min-w-0 text-right text-base font-semibold text-stone-950">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+            {booking.customerComment ? (
+              <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700">
+                <div className="text-xs text-stone-500">Комментарий клиента</div>
+                <div className="mt-1">{booking.customerComment}</div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="mt-5 border-t border-stone-200 pt-4">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((value) => !value)}
+              aria-expanded={historyOpen}
+              className="flex w-full items-center justify-between py-1 text-[14px] text-stone-500"
+            >
+              <span>История · {history.length}</span>
+              <ChevronDown className={cn("h-5 w-5 transition-transform", historyOpen && "rotate-180")} />
+            </button>
+            {historyOpen ? (
+              <ul className="mt-3 space-y-2.5">
+                {history.map((entry) => (
+                  <li key={entry.label} className="flex items-baseline gap-4 text-[15px]">
+                    {entry.time ? (
+                      <span className="shrink-0 font-mono text-[13px] text-stone-500">{entry.time}</span>
                     ) : null}
-                    <span className="text-sm text-stone-400">{formatReceivedLabel(booking.createdAt)}</span>
-                  </div>
-                  <h3 className="mt-5 text-[2rem] font-semibold leading-tight tracking-tight text-stone-950 sm:text-[2.25rem]">
-                    {booking.display.title}
-                  </h3>
-                  <div className="mt-2 text-lg text-stone-500">{formatShortSchedule(booking)}</div>
-                </div>
+                    <span className="text-stone-950">{entry.label}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        </div>
 
-                <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:shrink-0 sm:items-start">
-                  <div className="text-right">
-                    <div className="text-[1.5rem] font-semibold leading-none tracking-tight text-stone-950 whitespace-nowrap sm:text-[2.2rem]">
-                      {price ?? "—"}
-                    </div>
-                    <div className="mt-2 text-sm text-stone-400">{booking.display.typeLabel}</div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={onSelectPrev}
-                      disabled={selectedIndex <= 0}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label="Предыдущая заявка"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onSelectNext}
-                      disabled={selectedIndex < 0 || selectedIndex >= total - 1}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label="Следующая заявка"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onOpenChange(false)}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl text-stone-400 transition hover:bg-stone-50 hover:text-stone-700"
-                      aria-label="Закрыть детали"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="divide-y divide-stone-100 px-5 sm:px-7">
-                <DetailSection
-                  icon={<User2 className="h-5 w-5 text-blue-500" />}
-                  label="Клиент"
-                  primary={booking.customerName}
-                  secondary={[booking.customerPhone, booking.customerEmail, booking.source === "MANUAL" ? "Добавлено вручную" : null].filter(Boolean) as string[]}
-                  trailing={
-                    <div className="flex items-center gap-4 text-stone-400">
-                      <a href={`tel:${booking.customerPhone}`} className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-stone-50 hover:text-stone-700" aria-label="Позвонить клиенту">
-                        <Phone className="h-5 w-5" />
-                      </a>
-                      {booking.customerEmail ? (
-                        <a href={`mailto:${booking.customerEmail}`} className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-stone-50 hover:text-stone-700" aria-label="Написать клиенту">
-                          <Mail className="h-5 w-5" />
-                        </a>
-                      ) : (
-                        <MessageCircle className="h-5 w-5" />
-                      )}
-                    </div>
-                  }
-                />
-
-                {participant ? (
-                  <DetailSection
-                    icon={<Users className="h-5 w-5 text-orange-500" />}
-                    label="Участник"
-                    primary={participant}
-                    secondary={booking.display.meta ? [`Особенности: ${booking.display.meta}`] : ["Особенности: нет"]}
-                  />
-                ) : null}
-
-                <DetailSection
-                  icon={<CalendarDays className="h-5 w-5 text-orange-500" />}
-                  label="Детали заказа"
-                  primary={details[0] ?? "Детали уточняются"}
-                  secondary={details.slice(1)}
-                />
-
-                <DetailSection
-                  icon={<Clock3 className="h-5 w-5 text-stone-500" />}
-                  label="История статуса"
-                  primary={meta.label}
-                  secondary={[getHistoryLabel(booking)]}
-                />
-
-                {booking.customerComment ? (
-                  <DetailSection
-                    icon={<MessageCircle className="h-5 w-5 text-stone-500" />}
-                    label="Комментарий клиента"
-                    primary={booking.customerComment}
-                  />
-                ) : null}
-              </div>
-
-              <div className="px-5 pb-5 pt-6 sm:px-7 sm:pb-7">
-                <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center">
-                  {canConfirm ? (
-                    <ActionButton
-                      label="Подтвердить заявку"
-                      tone="primary"
-                      loading={updating === BookingStatus.CONFIRMED}
-                      onClick={() => handleAction(BookingStatus.CONFIRMED)}
-                    />
-                  ) : null}
+        <div className="shrink-0 border-t border-stone-200 bg-white px-5 pb-5 pt-4 sm:px-6">
+          {canConfirm ? (
+            <div className="flex flex-col gap-1 md:flex-row-reverse md:items-center md:gap-4">
+              <button
+                type="button"
+                onClick={() => handleAction(BookingStatus.CONFIRMED)}
+                disabled={updating !== null}
+                className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-stone-950 px-6 text-base font-semibold text-white transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70 md:flex-1"
+              >
+                {updating === BookingStatus.CONFIRMED ? "Сохраняем..." : "Подтвердить заявку"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAction(BookingStatus.REJECTED)}
+                disabled={updating !== null}
+                className="inline-flex h-12 w-full items-center justify-center rounded-2xl px-6 text-base font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70 md:w-auto"
+              >
+                {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {booking.hasCustomerAccount ? (
+                <BookingChatButton booking={booking} large />
+              ) : chatHref ? (
+                <a href={chatHref} className={writeButtonClass}>
+                  Написать клиенту
+                </a>
+              ) : null}
+              {canComplete || canReject ? (
+                <div className="flex items-center justify-center gap-2">
                   {canComplete ? (
-                    <ActionButton
-                      label="Завершить"
-                      tone="secondary"
-                      loading={updating === BookingStatus.COMPLETED}
+                    <button
+                      type="button"
                       onClick={() => handleAction(BookingStatus.COMPLETED)}
-                    />
-                  ) : null}
-                  <ActionLink href={`tel:${booking.customerPhone}`} label="Позвонить клиенту" />
-                  {booking.hasCustomerAccount ? (
-                    <BookingChatButton booking={booking} large />
-                  ) : booking.customerEmail ? (
-                    <ActionLink href={`mailto:${booking.customerEmail}`} label="Написать клиенту" />
+                      disabled={updating !== null}
+                      className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-100 disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {updating === BookingStatus.COMPLETED ? "Сохраняем..." : "Завершить"}
+                    </button>
                   ) : null}
                   {canReject ? (
-                    <ActionButton
-                      label="Отклонить"
-                      tone="ghost"
-                      loading={updating === BookingStatus.REJECTED}
+                    <button
+                      type="button"
                       onClick={() => handleAction(BookingStatus.REJECTED)}
-                    />
+                      disabled={updating !== null}
+                      className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+                    </button>
                   ) : null}
                 </div>
-
-                {booking.status === BookingStatus.NEW ? (
-                  <div className="mt-6 rounded-[22px] border border-blue-100 bg-blue-50/70 px-5 py-4">
-                    <div className="text-sm font-semibold text-blue-700">
-                      Почему заявка в статусе «Новая»?
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-blue-900/75">
-                      Клиент только что отправил заявку. Свяжитесь с ним, чтобы подтвердить участие
-                      и ответить на вопросы.
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </aside>
-          </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function DetailSection({
-  icon,
-  label,
-  primary,
-  secondary,
-  trailing,
-}: {
-  icon: ReactNode;
-  label: string;
-  primary: string;
-  secondary?: string[];
-  trailing?: ReactNode;
-}) {
-  return (
-    <section className="flex items-start justify-between gap-4 py-6">
-      <div className="flex min-w-0 gap-4">
-        <div className="mt-1">{icon}</div>
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-stone-500">{label}</div>
-          <div className="mt-3 text-[1.15rem] font-semibold leading-8 text-stone-900">
-            {primary}
-          </div>
-          {secondary?.length ? (
-            <div className="mt-2 space-y-1.5 text-base leading-7 text-stone-500">
-              {secondary.map((item) => (
-                <div key={item}>{item}</div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
-      {trailing}
-    </section>
-  );
-}
-
-function ActionButton({
-  label,
-  tone,
-  loading,
-  onClick,
-}: {
-  label: string;
-  tone: "primary" | "secondary" | "ghost";
-  loading: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={loading}
-      className={cn(
-        "inline-flex h-14 w-full items-center justify-center rounded-2xl px-6 text-sm font-semibold transition sm:w-auto",
-        tone === "primary" && "bg-stone-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.22)] hover:bg-stone-800",
-        tone === "secondary" && "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50",
-        tone === "ghost" && "border border-stone-200 bg-white text-stone-500 hover:bg-stone-50",
-        loading && "cursor-wait opacity-70",
-      )}
-    >
-      {loading ? "Сохраняем..." : label}
-    </button>
-  );
-}
-
-function ActionLink({ href, label }: { href: string; label: string }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-stone-200 bg-white px-6 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 sm:w-auto"
-    >
-      {label}
-    </a>
   );
 }
 
