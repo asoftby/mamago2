@@ -28,6 +28,21 @@ interface Step5PricingParticipationProps {
   isEditable: boolean;
   eventId?: string;
   ctaStepEnabled?: boolean;
+  /**
+   * Whether the event has a business that receives bookings. The server enables
+   * booking only with one (see deriveEventRequestBookingColumns); `undefined` = unknown.
+   */
+  hasBookingRecipient?: boolean;
+}
+
+/** Participation modes that need a business recipient to produce a booking CTA. */
+function needsBookingRecipient(data: EventFormData): boolean {
+  return (
+    data.participationMode === "time-slots" ||
+    data.participationMode === "simple-booking" ||
+    data.participationMode === "request" ||
+    (data.participationMode === "prebook" && data.prebookMethod === "internal")
+  );
 }
 
 function flattenEventTimeSlots(
@@ -173,7 +188,9 @@ export function Step5PricingParticipation({
   isEditable,
   eventId,
   ctaStepEnabled,
+  hasBookingRecipient,
 }: Step5PricingParticipationProps) {
+  const showNoRecipientWarning = hasBookingRecipient === false && needsBookingRecipient(data);
   const publicationAccess = useMemo(
     () => getPublicationAccessFromEvent(data),
     [data],
@@ -302,6 +319,19 @@ export function Step5PricingParticipation({
           disabled={!isEditable}
         />
       </div>
+
+      {showNoRecipientWarning && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950"
+        >
+          <p className="font-medium">Кнопка записи не появится на странице события</p>
+          <p className="mt-0.5 text-amber-900/90">
+            Событие не привязано к бизнесу, поэтому заявки некому получать. Выберите на шаге «Место»
+            площадку, которая принадлежит бизнесу, и сохраните событие.
+          </p>
+        </div>
+      )}
 
       {ctaRenderMode === "shared" ? (
         <CtaStep

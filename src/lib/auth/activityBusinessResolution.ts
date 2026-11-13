@@ -18,3 +18,22 @@ export function resolveActivityBusinessIdForCreate(input: {
     null
   );
 }
+
+/**
+ * Business scope of an existing activity being saved.
+ *
+ * An event that has no business (e.g. seeded or created by platform staff
+ * without one) cannot receive bookings. The person saving it supplies their
+ * own partner business; an existing business is never replaced by this fallback.
+ */
+export function resolveActivityBusinessIdForPatch(input: {
+  nextBusinessId: string | null | undefined;
+  existingBusinessId: string | null | undefined;
+  userBusinessId: string | null | undefined;
+}): string | null {
+  return (
+    (input.nextBusinessId !== undefined ? input.nextBusinessId : input.existingBusinessId) ??
+    input.userBusinessId ??
+    null
+  );
+}

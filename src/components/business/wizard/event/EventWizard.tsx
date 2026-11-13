@@ -1357,6 +1357,18 @@ function EventWizardInner({
       if (stepConfig.key === "organizer" || stepConfig.key === "location") {
         return <StepComponent {...commonProps} eventId={eventId ?? event?.id} />;
       }
+      if (stepConfig.key === "pricing") {
+        // Saved events keep their own business link; a new draft inherits the creator's business.
+        const hasBookingRecipient = Boolean(event ? event.businessId : business?.id);
+        return (
+          <StepComponent
+            {...commonProps}
+            wizardSessionId={wizardSessionId}
+            eventId={eventId ?? event?.id}
+            hasBookingRecipient={hasBookingRecipient}
+          />
+        );
+      }
       return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} eventId={eventId ?? event?.id} />;
     }
 

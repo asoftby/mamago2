@@ -104,7 +104,11 @@ export function EventSessionSelector({
         // Строим subtitle как ReactNode: время · цена (с SVG-символом рубля)
         const timeLabel = getTimeLabel(s.startsAt);
         const startTimeLabel = timeLabel ? `начало в ${timeLabel}` : "";
-        const priceNode = priceLabel ? renderPriceWithIcon(priceLabel, { iconSize: "sm" }) : null;
+        const priceNode = priceLabel ? (
+          <span className="text-[#141210]">
+            {renderPriceWithIcon(priceLabel, { iconSize: "mono" })}
+          </span>
+        ) : null;
         const subtitle = priceNode
           ? <>{startTimeLabel} · {priceNode}</>
           : startTimeLabel || undefined;

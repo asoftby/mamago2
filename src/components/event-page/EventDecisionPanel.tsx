@@ -348,6 +348,7 @@ export function EventDecisionPanel({
         {/* Unified save/share UI; the existing plan and share handlers remain authoritative. */}
         <PublicationSaveShare
           className="mt-4"
+          actionsClassName="grid-cols-1 sm:grid-cols-2"
           isSaved={isPlanned}
           savedLabel={saveStatusLabel}
           publicationKind="event"
