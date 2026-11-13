@@ -131,9 +131,11 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
   return (
     <Wrap className={acc ? undefined : "mt-6 p-5 sm:p-6"}>
       {acc ? (
-        <h2 className="!font-normal !tracking-[-0.015em]" style={{ margin: 0, fontSize: 22, lineHeight: 1.1 }}>
+        // A div with role="heading": the global `h1–h3 { font-weight: 600 !important; letter-spacing … }`
+        // rules do not match it, so the title can share the look of the bookings card title above.
+        <div role="heading" aria-level={2} style={{ margin: 0, fontSize: 22, lineHeight: 1.1, letterSpacing: "-.015em" }}>
           Взрослые в семье
-        </h2>
+        </div>
       ) : (
         <H2>Взрослые в семье</H2>
       )}
