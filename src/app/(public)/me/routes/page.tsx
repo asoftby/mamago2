@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { Container } from "@/components/ui/Container";
 import { RoutesClient } from "./RoutesClient";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 
@@ -69,11 +68,5 @@ export default async function RoutesPage() {
 
   const routes = await getUserRoutes(user.id);
 
-  return (
-    <div className="min-h-screen bg-[#FCFBF8]">
-      <Container className="max-w-[1200px] px-4 pb-28 pt-6 sm:px-6 sm:pb-32 sm:pt-8 lg:px-8 lg:pt-10">
-        <RoutesClient initialRoutes={routes} />
-      </Container>
-    </div>
-  );
+  return <RoutesClient initialRoutes={routes} />;
 }

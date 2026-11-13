@@ -24,12 +24,32 @@ const ON_SHELL = [
   "src/app/(public)/me/direct/DirectListClient.tsx",
   "src/app/(public)/me/direct/[threadId]/DirectThreadClient.tsx",
   "src/features/ideas-collections/IdeasCollections.tsx",
+  "src/app/(public)/me/wishlists/page.tsx",
+  "src/app/(public)/me/wishlists/[id]/page.tsx",
+  "src/app/(public)/me/events/page.tsx",
+  "src/app/(public)/me/routes/RoutesClient.tsx",
+  "src/app/(public)/me/day/[date]/page.tsx",
+  "src/app/(public)/me/birthdays/page.tsx",
+  "src/app/(public)/me/settings/family-city/page.tsx",
+  "src/components/settings/SettingsPageLayout.tsx",
+  "src/features/me/components/PartyOrderStatusScreen.tsx",
 ];
 for (const file of ON_SHELL) {
   const src = read(file);
   assert.match(src, /<AccountPage\b/, `${file} uses AccountPage`);
   assert.doesNotMatch(src, /mg-acc|<h1\b|styles\.(breadcrumbs|heroTitle|heroGrid|kick)\b/, `${file} has no bespoke page chrome`);
 }
+// Страницы без собственного контейнера/hero (каркас даёт AccountPage).
+for (const file of [
+  "src/app/(public)/me/wishlists/page.tsx",
+  "src/app/(public)/me/events/page.tsx",
+  "src/app/(public)/me/routes/page.tsx",
+  "src/app/(public)/me/day/[date]/page.tsx",
+  "src/app/(public)/me/birthdays/page.tsx",
+]) {
+  assert.doesNotMatch(read(file), /<main\b|min-h-screen|<Container\b/, `${file} has no bespoke container`);
+}
+// Исключения: превью, /me/plan, деталь записи-билета (не используется).
 // Бизнес-режим личной переписки не переведён на каркас кабинета.
 assert.match(read("src/app/(public)/me/direct/[threadId]/DirectThreadClient.tsx"), /businessPage/);
 // Только корневая /me без ссылки назад.

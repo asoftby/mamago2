@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { AccountPage } from "@/components/account/AccountPage";
 import { getCurrentUser } from "@/lib/auth/server";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { getWishlist } from "@/server/wishlist/wishlist.service";
@@ -30,13 +30,8 @@ export default async function WishlistEditorPage({ params }: PageProps) {
   }
 
   return (
-    <main className="mx-auto min-h-[70vh] w-full max-w-3xl px-4 py-8 sm:px-6">
-      <Link href="/me/wishlists" className="inline-flex min-h-11 items-center text-sm text-neutral-600 hover:text-neutral-900">
-        ← Списки желаний
-      </Link>
-      <div className="mt-3">
-        <WishlistEditor initial={wishlist} />
-      </div>
-    </main>
+    <AccountPage backHref="/me/wishlists" backLabel="← Списки желаний" title="Список желаний">
+      <WishlistEditor initial={wishlist} />
+    </AccountPage>
   );
 }
