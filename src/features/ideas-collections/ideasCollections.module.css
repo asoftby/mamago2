@@ -897,12 +897,9 @@ button.cr:hover > svg {
   }
 }
 @media (max-width: 759px) {
-  /* Phones: no breadcrumb trail; the plan shortcut stays on the right. */
-  .root[data-layout="page"] .crumbs {
-    display: none;
-  }
+  /* Phones: no top bar (breadcrumb trail and plan shortcut). */
   .root[data-layout="page"] .top {
-    justify-content: flex-end;
+    display: none;
   }
   .root[data-layout="page"] .crow,
   .root[data-layout="page"] .chips {
