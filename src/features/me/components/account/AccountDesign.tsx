@@ -243,7 +243,7 @@ export function AccountDesign(props: AccountDesignProps) {
                       {m.initial}
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 22, fontWeight: 400, lineHeight: 1.1, letterSpacing: "-.015em" }}>{m.name}</div>
+                      <div style={{ fontSize: 18, fontWeight: 400, lineHeight: 1.1, letterSpacing: "-.015em" }}>{m.name}</div>
                       <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1 }}>{m.role}</div>
                     </div>
                   </div>
