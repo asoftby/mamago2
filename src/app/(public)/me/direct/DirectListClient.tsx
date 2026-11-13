@@ -83,7 +83,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
               <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
-                ● Профиль · сообщения
+                Профиль · сообщения
               </span>
               <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--ink-3)" }} />
               <span className={styles.caps}>Переписки с организациями</span>

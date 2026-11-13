@@ -66,7 +66,7 @@ export function ParentBookingsClient({ bookings }: Props) {
           <Reveal>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
               <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
-                ● Профиль · записи
+                Профиль · записи
               </span>
               <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--ink-3)" }} />
               <span className={styles.caps}>Заявки и брони</span>

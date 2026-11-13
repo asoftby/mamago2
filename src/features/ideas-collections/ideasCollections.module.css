@@ -89,10 +89,7 @@
   color: var(--acd);
 }
 .kick i {
-  width: 7px;
-  height: 7px;
-  border-radius: 99px;
-  background: var(--ac);
+  display: none;
 }
 .h1 {
   margin: 14px 0 0;
@@ -900,6 +897,13 @@ button.cr:hover > svg {
   }
 }
 @media (max-width: 759px) {
+  /* Phones: no breadcrumb trail; the plan shortcut stays on the right. */
+  .root[data-layout="page"] .crumbs {
+    display: none;
+  }
+  .root[data-layout="page"] .top {
+    justify-content: flex-end;
+  }
   .root[data-layout="page"] .crow,
   .root[data-layout="page"] .chips {
     margin-left: -16px;
