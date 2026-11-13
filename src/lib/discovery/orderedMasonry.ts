@@ -44,3 +44,29 @@ export function columnCountForWidth(viewportWidth: number): number {
   if (viewportWidth >= 640) return 3;
   return 2;
 }
+
+export type StackedColumns = {
+  /** Top offset of every card (indexed like the input heights). */
+  tops: number[];
+  /** Column index of every card. */
+  columnOf: number[];
+  /** Total height of the tallest column. */
+  height: number;
+};
+
+/** Stacks cards of each column top to bottom using their measured heights. */
+export function stackColumns(columns: MasonryColumns, heights: readonly number[], rowGap: number): StackedColumns {
+  const tops = new Array<number>(heights.length).fill(0);
+  const columnOf = new Array<number>(heights.length).fill(0);
+  let height = 0;
+  columns.forEach((indices, column) => {
+    let y = 0;
+    for (const index of indices) {
+      tops[index] = y;
+      columnOf[index] = column;
+      y += heights[index] + rowGap;
+    }
+    height = Math.max(height, y - rowGap);
+  });
+  return { tops, columnOf, height: Math.max(height, 0) };
+}

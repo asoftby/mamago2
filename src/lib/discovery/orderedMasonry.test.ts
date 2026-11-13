@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { columnCountForWidth, distributeIntoColumns, estimateCardHeight } from "./orderedMasonry";
+import { columnCountForWidth, distributeIntoColumns, estimateCardHeight, stackColumns } from "./orderedMasonry";
 
 test("each card goes to the shortest column, ties to the leftmost", () => {
   assert.deepEqual(distributeIntoColumns([1, 1, 1, 1, 1], 3), [[0, 3], [1, 4], [2]]);
@@ -56,4 +56,14 @@ test("breakpoints match Tailwind sm/md and estimate includes the details block",
   assert.equal(columnCountForWidth(767), 3);
   assert.equal(columnCountForWidth(768), 4);
   assert.ok(estimateCardHeight(1.25, 2) > 1.25);
+});
+
+test("stackColumns stacks measured heights per column with row gap", () => {
+  const columns = distributeIntoColumns([1, 1, 1, 1, 1], 2); // [[0,2,4],[1,3]]
+  const heights = [100, 50, 70, 60, 30];
+  const stacked = stackColumns(columns, heights, 10);
+  assert.deepEqual(stacked.tops, [0, 0, 110, 60, 190]);
+  assert.deepEqual(stacked.columnOf, [0, 1, 0, 1, 0]);
+  assert.equal(stacked.height, 220);
+  assert.deepEqual(stackColumns([[], []], [], 10), { tops: [], columnOf: [], height: 0 });
 });

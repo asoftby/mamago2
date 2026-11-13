@@ -12,7 +12,7 @@ import {
   type FeedBucket,
   type KudaListingPage,
 } from "@/lib/discovery/kudaListingPagination";
-import { columnCountForWidth, distributeIntoColumns, estimateCardHeight } from "@/lib/discovery/orderedMasonry";
+import { columnCountForWidth, distributeIntoColumns, estimateCardHeight, stackColumns } from "@/lib/discovery/orderedMasonry";
 import { resolvePosterFrame } from "@/lib/media/posterFrame";
 import type { ActivityMock } from "@/types/activity";
 import type { ImplicitListingFilters } from "@/features/filters/discovery/discoveryFilterParams";
@@ -64,18 +64,31 @@ function useColumnCount(): number | null {
   return count;
 }
 
+const ROW_GAP_PX = 40; // gap-y-10
+
 /**
  * Ordered masonry: cards keep feed order and each goes to the shortest column
  * (estimated heights, see `orderedMasonry`). Append-only, so next pages never
- * move shown cards. Before the column count is known (SSR / hydration) every
- * card is rendered once, in feed order, in a plain responsive row grid; the
- * client then swaps to columns before the next paint. Keys are stable, so
- * cards are re-parented, not re-created, on a column-count change.
+ * move shown cards.
  *
- * Tab order follows columns (top to bottom, then next column), not strict feed
- * order: this is inherent to column masonry without extra tabindex hacks.
+ * All cards are children of ONE container and are only positioned, never
+ * re-parented: changing the column count (or hydrating) updates classes and
+ * inline offsets of the same DOM nodes, so React keeps every card instance
+ * (no remount, no cover reload, no repeated view analytics).
+ * - SSR / hydration (`columnCount == null`): plain responsive row grid, every
+ *   card once, in feed order.
+ * - Afterwards: container is `relative`, cards are `absolute`. Column
+ *   assignment is the pure `distributeIntoColumns` (estimated heights); vertical
+ *   offsets come from real heights read in one batch (no per-card observers).
+ *   Re-layout runs on column-count change, on added cards and on container
+ *   width change (one ResizeObserver on the container).
+ *
+ * Tab order follows feed order (DOM order), but visually the cards sit in
+ * columns, so Tab jumps between columns; keeping DOM in feed order is what
+ * makes SSR/SEO order exact. This is inherent to absolute masonry.
  */
 function KudaListingRows({ items, columnCount }: { items: RowItem[]; columnCount: number | null }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const columns = useMemo(
     () =>
       columnCount == null
@@ -87,23 +100,55 @@ function KudaListingRows({ items, columnCount }: { items: RowItem[]; columnCount
     [items, columnCount],
   );
 
-  if (!columns) {
-    return (
-      <div className={`grid grid-cols-2 items-start gap-y-10 sm:grid-cols-3 md:grid-cols-4 ${GAPS}`}>
-        {items.map(({ key, content }) => (
-          <div key={key} className="min-w-0">{content}</div>
-        ))}
-      </div>
-    );
-  }
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || !columns) return;
+    let lastWidth = -1;
+    let frame = 0;
+    const layout = () => {
+      const width = container.clientWidth;
+      lastWidth = width;
+      const gapX = parseFloat(getComputedStyle(container).columnGap) || 0;
+      const count = columns.length;
+      const colWidth = (width - gapX * (count - 1)) / count;
+      const cards = Array.from(container.children) as HTMLElement[];
+      // Write widths first, then read heights once (single reflow).
+      cards.forEach((card) => {
+        card.style.width = `${colWidth}px`;
+      });
+      const heights = cards.map((card) => card.offsetHeight);
+      const stacked = stackColumns(columns, heights, ROW_GAP_PX);
+      cards.forEach((card, index) => {
+        card.style.transform = `translate(${stacked.columnOf[index] * (colWidth + gapX)}px, ${stacked.tops[index]}px)`;
+      });
+      container.style.height = `${stacked.height}px`;
+    };
+    layout();
+    const observer = new ResizeObserver(() => {
+      if (container.clientWidth === lastWidth) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(layout);
+    });
+    observer.observe(container);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [columns]);
 
+  const masonry = columns != null;
   return (
-    <div className={`flex items-start ${GAPS}`}>
-      {columns.map((indices, column) => (
-        <div key={column} className="flex min-w-0 flex-1 flex-col gap-y-10">
-          {indices.map((index) => (
-            <div key={items[index].key} className="min-w-0">{items[index].content}</div>
-          ))}
+    <div
+      ref={containerRef}
+      className={
+        masonry
+          ? `relative ${GAPS}`
+          : `grid grid-cols-2 items-start gap-y-10 sm:grid-cols-3 md:grid-cols-4 ${GAPS}`
+      }
+    >
+      {items.map(({ key, content }) => (
+        <div key={key} className={masonry ? "absolute left-0 top-0 min-w-0" : "min-w-0"}>
+          {content}
         </div>
       ))}
     </div>
@@ -206,11 +251,11 @@ export function KudaMasonryListing({
   }, [storeKey, listing.items]);
 
   useLayoutEffect(() => {
-    if (pendingScrollRef.current == null) return;
+    if (pendingScrollRef.current == null || columnCount == null) return;
     const y = pendingScrollRef.current;
     pendingScrollRef.current = null;
     window.scrollTo(0, y);
-  }, [items]);
+  }, [items, columnCount]);
 
   // Persist loaded pages + scroll; mark the history entry for soft back nav.
   const snapshotRef = useRef<StoredListing | null>(null);
