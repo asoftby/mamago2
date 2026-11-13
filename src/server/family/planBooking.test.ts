@@ -35,4 +35,13 @@ const mine: PlanBookingState = { status: "CONFIRMED", label: "Подтвержд
 assert.equal(bookingCaption(mine), "Подтверждено · 12:00");
 assert.equal(bookingCaption({ ...mine, isMine: false, bookedByName: "Аня", requestedTime: null }), "Подтверждено · бронь: Аня");
 assert.equal(bookingCaption({ ...mine, isMine: false, bookedByName: null, requestedTime: null }), "Подтверждено · бронь: другой взрослый");
+
+// EXPIRED: labelled, inactive (never preferred over an active booking), still shown when alone.
+assert.equal(bookingStatusLabel("EXPIRED"), "Организатор не ответил");
+assert.equal(pickBookingToShow([
+  { id: "e", status: "EXPIRED" as const, createdAt: d("2026-10-05") },
+  { id: "n", status: "NEW" as const, createdAt: d("2026-10-01") },
+])?.id, "n");
+assert.equal(pickBookingToShow([{ id: "e", status: "EXPIRED" as const, createdAt: d("2026-10-05") }])?.id, "e");
+assert.equal(bookingCaption({ ...mine, status: "EXPIRED", label: bookingStatusLabel("EXPIRED") }), "Организатор не ответил · 12:00");
 console.log("planBooking.test: ok");

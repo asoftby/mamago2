@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { standardResponseDeadline } from "@/lib/booking/standardResponseDeadline";
 import { parsePriceData } from "@/lib/priceItems";
 import { calculateBookingPrice, BookingPriceError } from "./bookingPrice";
 import { BookingStatus, Prisma, PublicationType, ScheduleKind } from "@prisma/client";
@@ -278,6 +279,7 @@ export async function reserveSlot(input: ReserveSlotInput, manual?: ManualReserv
       }
       const status = manual?.status ?? BookingStatus.NEW;
       const confirmed = status === BookingStatus.CONFIRMED;
+      const responseDueAt = standardResponseDeadline(now, input.startsAt) ?? new Date(0);
       const booking = await tx.bookingRequest.create({
         data: {
           businessId,
@@ -300,6 +302,9 @@ export async function reserveSlot(input: ReserveSlotInput, manual?: ManualReserv
           endsAt: input.endsAt,
           seats,
           holdUntil: confirmed ? null : holdUntil,
+          // Client slot requests auto-expire if the business stays silent; a
+          // deadline already in the past (last-minute request) is not set.
+          ...(!manual && responseDueAt.getTime() > now.getTime() ? { responseDueAt } : {}),
           status,
           ...(manual ? {
             source: "MANUAL", manualRequestKey: manual.requestKey, manualRequestHash: manual.hash,

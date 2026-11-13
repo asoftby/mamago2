@@ -23,6 +23,11 @@ const classify = (changes: Partial<BookingBucketInput>) =>
 assert.deepEqual(classify({}).bucket, "ACTION_REQUIRED");
 assert.equal(classify({}).urgency, "CUSTOMER_WAITING");
 assert.equal(classify({ serviceEndsAt: days(2) }).deadline?.getTime(), days(2).getTime(), "date of service orders undated STANDARD responses");
+assert.equal(
+  classify({ serviceEndsAt: days(2), responseDueAt: days(1) }).deadline?.getTime(), days(1).getTime(),
+  "response deadline wins over end of service day for STANDARD NEW",
+);
+assert.equal(classify({ status: BookingStatus.EXPIRED, responseDueAt: days(-1) }).bucket, "ARCHIVE", "expired STANDARD goes to archive");
 assert.equal(classify({ status: BookingStatus.CONFIRMED, hasServiceDate: true, serviceEndsAt: days(1) }).bucket, "UPCOMING");
 assert.deepEqual(
   { b: classify({ status: BookingStatus.CONFIRMED, hasServiceDate: true, serviceEndsAt: days(-1) }).bucket,
