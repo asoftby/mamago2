@@ -29,13 +29,16 @@ type Props = {
   /** Called with the thread id after a thread was created or found. */
   onOpened?: (threadId: string) => void;
   className?: string;
+  /** Same size as the drawer's primary actions. */
+  large?: boolean;
 };
 
 const MAX_LEN = 2000;
 const buttonClass =
   "inline-flex h-10 items-center gap-2 rounded-full border border-stone-200 bg-white px-4 text-[14px] font-medium text-stone-800 transition-colors hover:border-stone-400";
 
-export function BookingChatButton({ booking, onOpened, className }: Props) {
+export function BookingChatButton({ booking, onOpened, className: extra, large }: Props) {
+  const className = [large ? "!h-14 w-full justify-center !rounded-2xl !px-6 !text-sm !font-semibold sm:w-auto" : "", extra ?? ""].join(" ");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
