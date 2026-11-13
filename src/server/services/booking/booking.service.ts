@@ -21,6 +21,14 @@ import {
   expireBookingUnitHolds, isAllocationOverlapError, lockBookingUnits,
 } from "@/server/services/booking/resourceAllocation";
 import { childScopeFor } from "@/server/family/familyAccess";
+import {
+  BookingParticipantsError,
+  requestedProfileChildIds,
+  resolveParticipants,
+  type BookingChildInput,
+  type ResolvedParticipants,
+  type StoredBookingChild,
+} from "@/lib/booking/bookingParticipants";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import {
   BookingMode,
@@ -75,6 +83,8 @@ export interface CreatePublicBookingInput {
   customerComment?: string | null;
   adultsCount?: number;
   childrenCount?: number;
+  /** Состав группы (только EVENT): при наличии `childrenCount` и дети берутся отсюда. */
+  children?: BookingChildInput[];
   userId?: string | null;
   /** Family Core M6: plan item the booking is made for (must be visible to the user). */
   planItemId?: string | null;
@@ -159,6 +169,33 @@ function validateBookingCustomer(input: {
   }
 
   return { customerName, customerPhone };
+}
+
+/**
+ * Профильные дети читаются только под ACL семьи (`childScopeFor`) и только если в запросе
+ * есть `childId`; гостю профиль недоступен. Один запрос в БД на заявку.
+ */
+async function resolvePublicParticipants(params: {
+  adultsCount: number;
+  children: BookingChildInput[];
+  userId: string | null;
+}): Promise<ResolvedParticipants> {
+  const ids = requestedProfileChildIds(params.children);
+  if (ids.length > 0 && !params.userId) {
+    throw new BookingValidationError("children", "Профиль доступен только после входа");
+  }
+  const profileChildren = ids.length > 0 && params.userId
+    ? await prisma.child.findMany({
+        where: { AND: [await childScopeFor(params.userId), { id: { in: ids } }] },
+        select: { id: true, name: true, birthDate: true },
+      })
+    : [];
+  try {
+    return resolveParticipants({ adultsCount: params.adultsCount, children: params.children, profileChildren });
+  } catch (error) {
+    if (error instanceof BookingParticipantsError) throw new BookingValidationError(error.field, error.message);
+    throw error;
+  }
 }
 
 /** Deadline already passed at creation (last-minute request) → no auto-cancel. */
@@ -603,8 +640,23 @@ async function createPublicationBooking(
   const customerComment = normalizeOptionalString(input.customerComment);
   const requestedDate = normalizeRequestedDate(input.requestedDate);
   const requestedTime = normalizeOptionalString(input.requestedTime);
-  const adultsCount = input.adultsCount ?? 1;
-  const childrenCount = input.childrenCount ?? 0;
+  let adultsCount = input.adultsCount ?? 1;
+  let childrenCount = input.childrenCount ?? 0;
+  let participantChildren: StoredBookingChild[] | null = null;
+
+  if (input.children !== undefined) {
+    if (manual || input.publicationType !== PublicationType.EVENT) {
+      throw new BookingValidationError("children", "Состав группы доступен только для событий");
+    }
+    const resolved = await resolvePublicParticipants({
+      adultsCount,
+      children: input.children,
+      userId: input.userId ?? null,
+    });
+    adultsCount = resolved.adultsCount;
+    childrenCount = resolved.childrenCount;
+    participantChildren = resolved.children;
+  }
 
   if (adultsCount < 0) {
     throw new BookingValidationError("adultsCount", "Количество взрослых не может быть отрицательным");
@@ -789,6 +841,12 @@ async function createPublicationBooking(
         customerComment: customerComment ?? undefined,
         adultsCount,
         childrenCount,
+        // Совместимость: одиночные поля заполняем первым ребёнком.
+        ...(participantChildren && participantChildren.length > 0 ? {
+          participantChildren,
+          childName: participantChildren[0]!.name ?? undefined,
+          childAge: participantChildren[0]!.age ?? undefined,
+        } : {}),
         status,
         ...source,
       }, tx, manual?.actorId);

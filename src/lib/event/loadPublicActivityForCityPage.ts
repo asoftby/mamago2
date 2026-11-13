@@ -211,6 +211,8 @@ export async function loadPublicActivityForCityPage(
     format: activity.format,
     ageTags: activity.ageTags,
     agePolicy: activity.agePolicy,
+    ageMinMonths: activity.ageMinMonths,
+    ageMaxMonths: activity.ageMaxMonths,
     priceText: activity.priceText,
     priceFrom: activity.priceFrom,
     priceTo: activity.priceTo,

@@ -25,6 +25,9 @@ export interface InboxItem {
   createdAt: string;
   title: string | null;
   offerId: string | null;
+  /** Состав группы (без имён детей) для карточки списка; null — нечего показывать. */
+  participantsSummary?: string | null;
+  participantsAgeMismatch?: boolean;
   partyOrderId: string | null;
   requestedDate: string | null;
   requestedTime: string | null;

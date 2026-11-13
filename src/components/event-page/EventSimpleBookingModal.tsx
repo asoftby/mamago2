@@ -7,6 +7,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { RS, RsChip, RsChipRow, RsConfirmBar, RsDateCards, RsInput, RsSection, RsSuccess, RsTextarea, RequestSheetFrame } from "@/components/request/requestSheetKit";
 import type { EventSimpleBookingData, EventBookingSlot } from "@/lib/event/eventPageTypes";
+import { BookingParticipantsField } from "./BookingParticipantsField";
+import {
+  INITIAL_PARTICIPANTS_DRAFT,
+  participantsDraftToPayload,
+  validateParticipantsDraft,
+  type ParticipantsDraft,
+} from "./participantsDraft";
 
 /* ─────────────── validation ─────────────── */
 const schema = z.object({
@@ -87,6 +94,8 @@ export function EventSimpleBookingModal({
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [dateId, setDateId] = useState("");
   const [timeId, setTimeId] = useState("");
+  const [participants, setParticipants] = useState<ParticipantsDraft>(INITIAL_PARTICIPANTS_DRAFT);
+  const [participantErrors, setParticipantErrors] = useState<Record<string, string>>({});
   const inFlight = useRef(false);
   const initialSlot = slots.find((slot) => slot.id === initialSessionId);
 
@@ -103,6 +112,9 @@ export function EventSimpleBookingModal({
 
   async function onSubmit(values: FormValues) {
     if (!valid || inFlight.current) return;
+    const childErrors = validateParticipantsDraft(participants);
+    setParticipantErrors(childErrors);
+    if (Object.keys(childErrors).length > 0) return;
     inFlight.current = true;
     setPhase("submitting");
     setApiError(null);
@@ -120,7 +132,7 @@ export function EventSimpleBookingModal({
           customerName: values.customerName.trim(),
           customerPhone: values.customerPhone.trim(),
           customerComment: values.comment.trim() || undefined,
-          adultsCount: 1, childrenCount: 0,
+          ...participantsDraftToPayload(participants),
         }),
       });
       const json = await res.json() as { error?: string; id?: string };
@@ -142,6 +154,8 @@ export function EventSimpleBookingModal({
       reset(); setPhase("form"); setApiError(null); setCreatedBookingId(null);
       setDateId("");
       setTimeId("");
+      setParticipants(INITIAL_PARTICIPANTS_DRAFT);
+      setParticipantErrors({});
     }
     onOpenChange(val);
   }
@@ -215,8 +229,15 @@ export function EventSimpleBookingModal({
           <RsSection label="Телефон" error={errors.customerPhone?.message}>
             <RsInput type="tel" inputMode="tel" placeholder="+375 XX XXX-XX-XX" autoComplete="tel" invalid={!!errors.customerPhone} {...register("customerPhone")} />
           </RsSection>
+          <BookingParticipantsField
+            value={participants}
+            onChange={setParticipants}
+            isAuthenticated={isAuthenticated}
+            ageRule={booking.ageRule ?? null}
+            errors={participantErrors}
+          />
           <RsSection label="Комментарий" hint="необязательно" error={errors.comment?.message}>
-            <RsTextarea rows={3} placeholder="Количество мест, вопросы…" {...register("comment")} />
+            <RsTextarea rows={3} placeholder="Вопросы организатору…" {...register("comment")} />
           </RsSection>
           {apiError ? <p role="alert" className="m-0 mb-3 rounded-2xl bg-[#FDECEA] px-4 py-3 text-sm font-semibold text-[#8C2A20]">{apiError}</p> : null}
 
