@@ -73,6 +73,14 @@ jobs:
         env:
           NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx src/server/services/booking/bookingLifecycle.postgres.integration.test.ts
+      - name: Expired request exposes only public organizer contacts
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/services/booking/parentBookingExpiredContacts.test.ts
+      - name: STANDARD request auto-expiry (idempotent, releases holds, notifies once)
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/services/booking/standardRequestExpiry.postgres.integration.test.ts
       - name: Manual PLACE resource occupancy, tenant ownership and lifecycle
         env:
           NODE_OPTIONS: "--conditions=react-server"

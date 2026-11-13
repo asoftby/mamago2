@@ -78,7 +78,9 @@ export function bookingBucket(input: BookingBucketInput, now = new Date()): Book
     // An undated PARTY must not enter STANDARD housekeeping after 30 days.
     return { bucket: "UPCOMING", urgency: null, action: "VIEW_UPCOMING", deadline: null };
   } else {
-    if (input.status === "NEW") return action("RESPOND", input.serviceEndsAt ?? null);
+    // Дедлайн ответа (responseDueAt или расчётный) важнее конца дня события;
+    // EXPIRED/CANCELLED/REJECTED ниже уходят в архив.
+    if (input.status === "NEW") return action("RESPOND", input.responseDueAt ?? input.serviceEndsAt ?? null);
     if (input.status !== "CONFIRMED") return archive();
   }
   const dateKnown = input.hasServiceDate ?? Boolean(input.serviceEndsAt);
