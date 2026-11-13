@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -14,16 +13,10 @@ import {
   CircleX,
   Clock3,
   Inbox,
-  Mail,
-  MessageCircle,
-  Phone,
-  User2,
-  Users,
-  X,
 } from "lucide-react";
 import { BookingStatus } from "@prisma/client";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { BookingDetailsSheet, type BookingSheetTone, type BookingSheetView } from "@/components/business/bookings/BookingDetailsSheet";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useNotificationStore } from "@/features/notifications/store";
@@ -1248,7 +1241,7 @@ function BookingCalendarDayPanel({
                         <div className="mt-1 text-base font-semibold leading-tight text-stone-950">{booking.display.title}</div>
                       </div>
                       <div className="whitespace-nowrap text-sm font-semibold text-stone-900">
-                        {formatPriceLabel(booking) ?? "—"}
+                        {renderCurrencyText(formatPriceLabel(booking)) ?? "—"}
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-stone-500">
@@ -1437,7 +1430,7 @@ function BookingListItem({
         <div className="flex shrink-0 items-end justify-between gap-4 lg:min-w-[150px] lg:flex-col lg:items-end">
           <div className="text-right">
             <div className="text-[1.8rem] font-semibold leading-none tracking-tight text-stone-950 whitespace-nowrap sm:text-[2rem]">
-              {price ?? "—"}
+              {price ? renderCurrencyText(price) : "—"}
             </div>
             <div className="mt-2 text-sm text-stone-400">{booking.display.typeLabel}</div>
           </div>
@@ -1470,293 +1463,54 @@ export function BookingDetailsDrawer({
   onSelectNext: () => void;
   onStatusChange: (id: string, status: BookingStatus) => Promise<void>;
 }) {
-  const [updating, setUpdating] = useState<BookingStatus | null>(null);
-  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const view = booking ? buildBookingSheetView(booking) : null;
+  return (
+    <BookingDetailsSheet
+      open={open}
+      view={view}
+      selectedIndex={selectedIndex}
+      total={total}
+      onOpenChange={onOpenChange}
+      onSelectPrev={onSelectPrev}
+      onSelectNext={onSelectNext}
+      onStatusChange={onStatusChange}
+    />
+  );
+}
 
-  if (!booking) return null;
-
-  const meta = STATUS_META[booking.status];
-  const action = getActionMeta(booking);
-  const price = formatPriceLabel(booking);
-  const details = buildOrderDetails(booking);
+function buildBookingSheetView(booking: BusinessBookingItem): BookingSheetView {
   const participant = getParticipantLabel(booking);
-  const canConfirm = booking.status === BookingStatus.NEW;
-  const canReject =
-    booking.status === BookingStatus.NEW || booking.status === BookingStatus.CONFIRMED;
-  const canComplete = booking.status === BookingStatus.CONFIRMED;
-
-  const handleAction = async (status: BookingStatus) => {
-    setUpdating(status);
-    try {
-      await onStatusChange(booking.id, status);
-    } finally {
-      setUpdating(null);
-    }
+  const tone: BookingSheetTone =
+    booking.status === BookingStatus.NEW
+      ? "new"
+      : booking.status === BookingStatus.CONFIRMED
+        ? "success"
+        : "neutral";
+  return {
+    id: booking.id,
+    status: booking.status,
+    title: booking.display.title,
+    typeLabel: booking.display.typeLabel,
+    schedule: formatShortSchedule(booking),
+    priceLabel: formatPriceLabel(booking),
+    statusLabel: STATUS_META[booking.status].label,
+    statusTone: tone,
+    actionLabel: getActionMeta(booking)?.label ?? null,
+    receivedLabel: formatReceivedLabel(booking.createdAt),
+    customerName: booking.customerName,
+    customerPhone: booking.customerPhone,
+    customerEmail: booking.customerEmail,
+    isManual: booking.source === "MANUAL",
+    participant: participant
+      ? {
+          primary: participant,
+          secondary: booking.display.meta ? [`Особенности: ${booking.display.meta}`] : ["Особенности: нет"],
+        }
+      : null,
+    details: buildOrderDetails(booking),
+    historyLabel: getHistoryLabel(booking),
+    customerComment: booking.customerComment,
   };
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side={isDesktop ? "right" : "bottom"}
-        overlayClassName="bg-black/20 backdrop-blur-sm"
-        className={cn(
-          "w-full gap-0 overflow-y-auto border-l-0 bg-white p-0",
-          isDesktop
-            ? "h-full border-l sm:max-w-[80vw] xl:max-w-[640px]"
-            : "h-[92dvh] rounded-t-[28px] border-t",
-          "data-[state=open]:duration-300 data-[state=closed]:duration-200",
-        )}
-        showCloseButton={false}
-      >
-        <SheetTitle className="sr-only">Детали заявки</SheetTitle>
-        <div className="min-h-full bg-white">
-          <div className="mx-auto flex w-full max-w-[680px] flex-col p-4 sm:p-6">
-            <aside className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
-              <div className="flex flex-col gap-4 border-b border-stone-100 px-5 pb-6 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-7 sm:pt-7">
-                <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className={cn("rounded-full px-3 py-1 text-sm font-semibold", meta.chipClass)}>
-                      {meta.label}
-                    </span>
-                    {action ? (
-                      <span className={cn("rounded-full px-3 py-1 text-sm font-medium", action.className)}>
-                        {action.label}
-                      </span>
-                    ) : null}
-                    <span className="text-sm text-stone-400">{formatReceivedLabel(booking.createdAt)}</span>
-                  </div>
-                  <h3 className="mt-5 text-[2rem] font-semibold leading-tight tracking-tight text-stone-950 sm:text-[2.25rem]">
-                    {booking.display.title}
-                  </h3>
-                  <div className="mt-2 text-lg text-stone-500">{formatShortSchedule(booking)}</div>
-                </div>
-
-                <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:shrink-0 sm:items-start">
-                  <div className="text-right">
-                    <div className="text-[1.5rem] font-semibold leading-none tracking-tight text-stone-950 whitespace-nowrap sm:text-[2.2rem]">
-                      {price ?? "—"}
-                    </div>
-                    <div className="mt-2 text-sm text-stone-400">{booking.display.typeLabel}</div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={onSelectPrev}
-                      disabled={selectedIndex <= 0}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label="Предыдущая заявка"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onSelectNext}
-                      disabled={selectedIndex < 0 || selectedIndex >= total - 1}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label="Следующая заявка"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onOpenChange(false)}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl text-stone-400 transition hover:bg-stone-50 hover:text-stone-700"
-                      aria-label="Закрыть детали"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="divide-y divide-stone-100 px-5 sm:px-7">
-                <DetailSection
-                  icon={<User2 className="h-5 w-5 text-blue-500" />}
-                  label="Клиент"
-                  primary={booking.customerName}
-                  secondary={[booking.customerPhone, booking.customerEmail, booking.source === "MANUAL" ? "Добавлено вручную" : null].filter(Boolean) as string[]}
-                  trailing={
-                    <div className="flex items-center gap-4 text-stone-400">
-                      <a href={`tel:${booking.customerPhone}`} className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-stone-50 hover:text-stone-700" aria-label="Позвонить клиенту">
-                        <Phone className="h-5 w-5" />
-                      </a>
-                      {booking.customerEmail ? (
-                        <a href={`mailto:${booking.customerEmail}`} className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-stone-50 hover:text-stone-700" aria-label="Написать клиенту">
-                          <Mail className="h-5 w-5" />
-                        </a>
-                      ) : (
-                        <MessageCircle className="h-5 w-5" />
-                      )}
-                    </div>
-                  }
-                />
-
-                {participant ? (
-                  <DetailSection
-                    icon={<Users className="h-5 w-5 text-orange-500" />}
-                    label="Участник"
-                    primary={participant}
-                    secondary={booking.display.meta ? [`Особенности: ${booking.display.meta}`] : ["Особенности: нет"]}
-                  />
-                ) : null}
-
-                <DetailSection
-                  icon={<CalendarDays className="h-5 w-5 text-orange-500" />}
-                  label="Детали заказа"
-                  primary={details[0] ?? "Детали уточняются"}
-                  secondary={details.slice(1)}
-                />
-
-                <DetailSection
-                  icon={<Clock3 className="h-5 w-5 text-stone-500" />}
-                  label="История статуса"
-                  primary={meta.label}
-                  secondary={[getHistoryLabel(booking)]}
-                />
-
-                {booking.customerComment ? (
-                  <DetailSection
-                    icon={<MessageCircle className="h-5 w-5 text-stone-500" />}
-                    label="Комментарий клиента"
-                    primary={booking.customerComment}
-                  />
-                ) : null}
-              </div>
-
-              <div className="px-5 pb-5 pt-6 sm:px-7 sm:pb-7">
-                <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center">
-                  {canConfirm ? (
-                    <ActionButton
-                      label="Подтвердить заявку"
-                      tone="primary"
-                      loading={updating === BookingStatus.CONFIRMED}
-                      onClick={() => handleAction(BookingStatus.CONFIRMED)}
-                    />
-                  ) : null}
-                  {canComplete ? (
-                    <ActionButton
-                      label="Завершить"
-                      tone="secondary"
-                      loading={updating === BookingStatus.COMPLETED}
-                      onClick={() => handleAction(BookingStatus.COMPLETED)}
-                    />
-                  ) : null}
-                  <ActionLink href={`tel:${booking.customerPhone}`} label="Позвонить клиенту" />
-                  {booking.customerEmail ? (
-                    <ActionLink href={`mailto:${booking.customerEmail}`} label="Написать клиенту" />
-                  ) : (
-                    <ActionButton
-                      label="Написать клиенту"
-                      tone="secondary"
-                      loading={false}
-                      onClick={() => toast.message("Добавим чат с клиентом в следующем обновлении")}
-                    />
-                  )}
-                  {canReject ? (
-                    <ActionButton
-                      label="Отклонить"
-                      tone="ghost"
-                      loading={updating === BookingStatus.REJECTED}
-                      onClick={() => handleAction(BookingStatus.REJECTED)}
-                    />
-                  ) : null}
-                </div>
-
-                {booking.status === BookingStatus.NEW ? (
-                  <div className="mt-6 rounded-[22px] border border-blue-100 bg-blue-50/70 px-5 py-4">
-                    <div className="text-sm font-semibold text-blue-700">
-                      Почему заявка в статусе «Новая»?
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-blue-900/75">
-                      Клиент только что отправил заявку. Свяжитесь с ним, чтобы подтвердить участие
-                      и ответить на вопросы.
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </aside>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function DetailSection({
-  icon,
-  label,
-  primary,
-  secondary,
-  trailing,
-}: {
-  icon: ReactNode;
-  label: string;
-  primary: string;
-  secondary?: string[];
-  trailing?: ReactNode;
-}) {
-  return (
-    <section className="flex items-start justify-between gap-4 py-6">
-      <div className="flex min-w-0 gap-4">
-        <div className="mt-1">{icon}</div>
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-stone-500">{label}</div>
-          <div className="mt-3 text-[1.15rem] font-semibold leading-8 text-stone-900">
-            {primary}
-          </div>
-          {secondary?.length ? (
-            <div className="mt-2 space-y-1.5 text-base leading-7 text-stone-500">
-              {secondary.map((item) => (
-                <div key={item}>{item}</div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
-      {trailing}
-    </section>
-  );
-}
-
-function ActionButton({
-  label,
-  tone,
-  loading,
-  onClick,
-}: {
-  label: string;
-  tone: "primary" | "secondary" | "ghost";
-  loading: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={loading}
-      className={cn(
-        "inline-flex h-14 w-full items-center justify-center rounded-2xl px-6 text-sm font-semibold transition sm:w-auto",
-        tone === "primary" && "bg-stone-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.22)] hover:bg-stone-800",
-        tone === "secondary" && "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50",
-        tone === "ghost" && "border border-stone-200 bg-white text-stone-500 hover:bg-stone-50",
-        loading && "cursor-wait opacity-70",
-      )}
-    >
-      {loading ? "Сохраняем..." : label}
-    </button>
-  );
-}
-
-function ActionLink({ href, label }: { href: string; label: string }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-stone-200 bg-white px-6 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 sm:w-auto"
-    >
-      {label}
-    </a>
-  );
 }
 
 function LoadingList() {

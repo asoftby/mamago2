@@ -25,6 +25,8 @@ export const RS = {
   accentSoft: "#FFE8DC",
   paper: "#FAF7F1",
   danger: "#B3261E",
+  success: "#047857",
+  successSoft: "#E6F4EC",
 } as const;
 
 const mono: CSSProperties = { fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase", letterSpacing: ".12em", fontSize: 10, color: RS.ink3 };
@@ -184,6 +186,8 @@ export function RsConfirmBar({
   busy,
   note,
   label = "выбрано",
+  tone = "accent",
+  busyLabel = "Отправляем…",
 }: {
   summary: ReactNode;
   actionLabel: string;
@@ -193,6 +197,10 @@ export function RsConfirmBar({
   note?: ReactNode;
   /** Подпись над итогом; по умолчанию «выбрано». */
   label?: string;
+  /** Цвет кнопки: акцентный по умолчанию, «success» — для подтверждающих действий. */
+  tone?: "accent" | "success";
+  /** Текст кнопки во время отправки. */
+  busyLabel?: string;
 }) {
   const off = disabled || busy;
   return (
@@ -210,7 +218,7 @@ export function RsConfirmBar({
             height: 46,
             padding: "0 20px",
             borderRadius: 999,
-            background: off ? "#DBD7D3" : RS.accent,
+            background: off ? "#DBD7D3" : tone === "success" ? RS.success : RS.accent,
             color: off ? RS.ink3 : "#fff",
             border: 0,
             fontSize: 14,
@@ -220,7 +228,7 @@ export function RsConfirmBar({
             flexShrink: 0,
           }}
         >
-          {busy ? "Отправляем…" : actionLabel}
+          {busy ? busyLabel : actionLabel}
         </button>
       </div>
       {note ? <p className="m-0 mt-2 text-center text-xs" style={{ color: RS.ink3 }}>{note}</p> : null}
