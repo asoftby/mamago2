@@ -58,7 +58,7 @@ export function BookingChatButton({ booking, onOpened, className: extra, large, 
         className={iconOnly ? iconClass : `${buttonClass} ${className ?? ""}`}
         aria-label={iconOnly ? "Открыть чат" : undefined}
       >
-        <MessageCircle className={iconOnly ? "h-5 w-5" : "h-4 w-4"} /> {iconOnly ? null : "Открыть чат"}
+        {iconOnly || !large ? <MessageCircle className={iconOnly ? "h-5 w-5" : "h-4 w-4"} /> : null} {iconOnly ? null : "Открыть чат"}
       </Link>
     );
   }
@@ -110,7 +110,7 @@ export function BookingChatButton({ booking, onOpened, className: extra, large, 
         onClick={() => setOpen(true)}
         aria-label={iconOnly ? "Написать клиенту" : undefined}
       >
-        <MessageCircle className={iconOnly ? "h-5 w-5" : "h-4 w-4"} /> {iconOnly ? null : "Написать клиенту"}
+        {iconOnly || !large ? <MessageCircle className={iconOnly ? "h-5 w-5" : "h-4 w-4"} /> : null} {iconOnly ? null : "Написать клиенту"}
       </button>
       <ResponsiveOverlay
         open={open}
