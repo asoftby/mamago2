@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import type { ParentBookingsResult, ParentBookingItem } from "@/server/services/booking/parentBookings.service";
 import { Reveal } from "./components/Reveal";
 import { IcCalendar } from "./components/icons";
@@ -61,15 +60,8 @@ export function ParentBookingsClient({ bookings }: Props) {
 
   return (
     <div className={styles.page}>
-      {/* Breadcrumbs */}
-      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
-        <Link href="/me">← Профиль</Link>
-        <span style={{ opacity: 0.5 }}>→</span>
-        <span style={{ color: "var(--ink)" }}>Мои записи</span>
-      </div>
-
       {/* Hero */}
-      <section style={{ paddingTop: 20, paddingBottom: 36 }}>
+      <section style={{ paddingTop: 36, paddingBottom: 36 }}>
         <div className={`${styles.wrap} ${styles.heroGrid}`}>
           <Reveal>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>

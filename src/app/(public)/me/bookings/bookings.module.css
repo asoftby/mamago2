@@ -98,25 +98,6 @@
   padding: 0 28px;
 }
 
-/* breadcrumbs */
-.breadcrumbs {
-  padding-top: 30px;
-  padding-bottom: 8px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--ink-3);
-  font-size: 13px;
-}
-.breadcrumbs a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.breadcrumbs a:hover {
-  color: var(--ink);
-}
-
 /* pills (filters) */
 .pill {
   display: inline-flex;
@@ -142,9 +123,13 @@
 }
 .pillSolid {
   background: var(--ink);
-  color: #faf7f1;
+  color: #fff;
   border-color: var(--ink);
   font-weight: 600;
+}
+/* `.page button { color: inherit }` is more specific than `.pillSolid` and made the label black on black. */
+.page .pillSolid {
+  color: #fff;
 }
 .pillSolid:hover {
   background: #000;
@@ -156,7 +141,7 @@
   color: var(--ink-3);
 }
 .pillSolid .count {
-  color: rgba(250, 247, 241, 0.55);
+  color: rgba(255, 255, 255, 0.65);
 }
 
 /* buttons */
@@ -570,6 +555,18 @@
   .heroSide {
     align-items: flex-start;
     justify-self: flex-start;
+  }
+}
+@media (max-width: 760px) {
+  /* Phone: the summary card spans the full content width. */
+  .heroSide {
+    align-items: stretch;
+    justify-self: stretch;
+    width: 100%;
+  }
+  .countCard {
+    min-width: 0;
+    width: 100%;
   }
 }
 @media (max-width: 760px) {
