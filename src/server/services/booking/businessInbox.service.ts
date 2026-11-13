@@ -2,6 +2,9 @@ import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import "server-only";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import {
+  resolveStandardSlotStart, standardResponseDeadline,
+} from "@/lib/booking/standardResponseDeadline";
 import { scanBusinessInboxPages } from "./businessInboxScan";
 import {
   bookingBucket, compareBookingDecisions,
@@ -59,13 +62,22 @@ function serviceEnd(row: InboxRow): Date | null {
       row.offerSession?.startAt ?? row.startsAt);
 }
 
+/** Срок ответа: сохранённый responseDueAt, для старых STANDARD-заявок — расчёт по тому же правилу. */
+function effectiveResponseDueAt(row: InboxRow): Date | null {
+  if (row.responseDueAt || row.kind !== "STANDARD" || row.status !== "NEW") return row.responseDueAt;
+  return standardResponseDeadline(row.createdAt, resolveStandardSlotStart({
+    sessionStartsAt: row.session?.startsAt, offerSessionStartAt: row.offerSession?.startAt,
+    startsAt: row.startsAt, requestedDate: row.requestedDate, requestedTime: row.requestedTime,
+  }));
+}
+
 function mapDecision(row: InboxRow, now: Date) {
   const date = serviceEnd(row);
   const decision = bookingBucket({
     kind: row.kind, status: row.status, partyStage: row.partyStage,
     createdAt: row.createdAt, firstResponseAt: row.firstResponseAt,
     hasServiceDate: Boolean(date), serviceEndsAt: date,
-    responseDueAt: row.responseDueAt,
+    responseDueAt: effectiveResponseDueAt(row),
     quoteStatus: row.partyQuotes[0]?.status ?? null,
     quoteValidUntil: row.partyQuotes[0]?.validUntil ?? null,
   }, now);

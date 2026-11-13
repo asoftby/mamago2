@@ -67,4 +67,10 @@ if ! run_job "/api/cron/wishlist-archive" "wishlist-archive"; then
   overall_status=1
 fi
 
+# STANDARD booking requests: unanswered past responseDueAt -> EXPIRED + client notification (idempotent, retried).
+if ! run_job "/api/cron/standard-booking-expiry" "standard-booking-expiry"; then
+  echo "[mamago-notifications] standard-booking-expiry failed" >&2
+  overall_status=1
+fi
+
 exit "$overall_status"

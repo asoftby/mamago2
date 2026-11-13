@@ -269,6 +269,24 @@ export function PlanItemCard({
               {bookingCaption(item.booking)}
             </span>
           )}
+          {item.booking?.expiredContacts?.phone && (
+            <a
+              href={`tel:${item.booking.expiredContacts.phone.replace(/[^\d+]/g, "")}`}
+              className="rounded-full bg-white px-2 py-1 text-[11px] text-neutral-700 underline"
+            >
+              Позвонить
+            </a>
+          )}
+          {item.booking?.expiredContacts?.messageUrl && (
+            <a
+              href={item.booking.expiredContacts.messageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full bg-white px-2 py-1 text-[11px] text-neutral-700 underline"
+            >
+              Написать
+            </a>
+          )}
           {unavailable && (
             <span
               className="font-mono text-[10px] uppercase tracking-[0.08em]"
