@@ -176,7 +176,7 @@ export function AccountDesign(props: AccountDesignProps) {
           <div className="hero-grid wrap">
             <Reveal>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-                <span className="caps" style={{ color: "var(--accent-deep)" }}>● Мой аккаунт</span>
+                <span className="caps" style={{ color: "var(--accent-deep)" }}>Мой аккаунт</span>
                 <span className="caps">{localGreeting}</span>
               </div>
               <h1 className="serif mg-acc__hero-name" style={{ margin: 0, lineHeight: 0.92, letterSpacing: "-.03em" }}>
