@@ -10,6 +10,7 @@ export * from "./components/AccessPublicPreview";
 export * from "./components/TimeSlotEditor";
 export * from "./schedule/types";
 export * from "./schedule/mappers";
+export * from "./schedule/suggestions";
 export * from "./components/schedule/ScheduleDaysEditor";
 export * from "./components/schedule/ScheduleDayCard";
 export * from "./components/schedule/ScheduleDayHeader";

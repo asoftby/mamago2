@@ -75,6 +75,22 @@ export function groupedDaysToFlatSlots(days: ScheduleDay[]): PublicationAccessTi
   return out;
 }
 
+/**
+ * Только полностью заполненные слоты (дата, начало, окончание, вместимость > 0)
+ * попадают в сохраняемое значение; черновые строки остаются в редакторе.
+ */
+export function scheduleDaysToPersistedSlots(days: ScheduleDay[]): PublicationAccessTimeSlot[] {
+  return groupedDaysToFlatSlots(days).filter((slot) => {
+    const capacityValid = typeof slot.capacity === "number" && slot.capacity > 0;
+    return Boolean(
+      slot.date?.trim() &&
+        slot.startTime?.trim() &&
+        slot.endTime?.trim() &&
+        capacityValid,
+    );
+  });
+}
+
 /** Пустой день (новая дата). */
 export function createEmptyScheduleDay(): ScheduleDay {
   return {
