@@ -146,6 +146,33 @@ export async function getDirectPlatformSettings(): Promise<DirectPlatformSetting
   return toDTO(row);
 }
 
+// ─── Availability gate (policy → can Direct be used for this publication type) ──
+
+export type DirectUnavailableReason = "DISABLED" | "NO_DIRECT_MODE";
+
+/**
+ * Pure policy check: Direct is available for a publication type when the type
+ * is enabled AND at least one of its allowed communication modes includes
+ * Direct (DIRECT_ONLY / DIRECT_AND_CONTACTS). A type limited to CONTACTS_ONLY /
+ * EXTERNAL_BOOKING never opens a Direct thread.
+ */
+export function evaluateDirectTypePolicy(
+  policy: DirectTypePolicy,
+): { available: true } | { available: false; reason: DirectUnavailableReason } {
+  if (!policy.enabled) return { available: false, reason: "DISABLED" };
+  const hasDirectMode = policy.allowedModes.some(
+    (m) => m === DirectCommunicationMode.DIRECT_ONLY || m === DirectCommunicationMode.DIRECT_AND_CONTACTS,
+  );
+  return hasDirectMode ? { available: true } : { available: false, reason: "NO_DIRECT_MODE" };
+}
+
+export async function getDirectAvailabilityForPublicationType(
+  publicationType: DirectPolicyPublicationType,
+): Promise<{ available: true } | { available: false; reason: DirectUnavailableReason }> {
+  const settings = await getDirectPlatformSettings();
+  return evaluateDirectTypePolicy(settings.publicationTypePolicy[publicationType]);
+}
+
 // ─── Update (validated, audited) ────────────────────────────────────────────
 
 export const updateDirectPlatformSettingsSchema = z.object({

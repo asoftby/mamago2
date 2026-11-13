@@ -92,6 +92,13 @@ export interface BusinessBookingItem {
   // Stale lead signals (computed)
   isStale: boolean;
   staleType: "BOOKING_STALE" | "BOOKING_NEEDS_ATTENTION" | null;
+
+  // Direct link. A guest request (no account) can never have a chat.
+  hasCustomerAccount: boolean;
+  /** Existing Direct thread for this request (id only, never message text). */
+  directThreadId: string | null;
+  /** Platform policy allows Direct for this publication type; null = not evaluated by the caller. */
+  directAvailable: boolean | null;
 }
 
 export interface GetBusinessBookingsOptions {
@@ -126,6 +133,7 @@ export interface GetBusinessBookingsResult {
 
 const BOOKING_SELECT = {
   id: true,
+  userId: true,
   status: true,
   source: true,
   publicationType: true,
@@ -199,6 +207,7 @@ function computeStale(
 function mapBooking(raw: {
   source: "MANUAL" | null;
   id: string;
+  userId: string | null;
   status: BookingStatus;
   publicationType: string;
   createdAt: Date;
@@ -325,7 +334,23 @@ function mapBooking(raw: {
 
     isStale,
     staleType,
+
+    hasCustomerAccount: raw.userId !== null,
+    directThreadId: null,
+    directAvailable: null,
   };
+}
+
+/** One query for the whole page of bookings (tenant-scoped); fills directThreadId in place. */
+async function attachDirectThreadIds(items: BusinessBookingItem[], businessId: string): Promise<void> {
+  const withAccount = items.filter((i) => i.hasCustomerAccount);
+  if (withAccount.length === 0) return;
+  const threads = await prisma.directThread.findMany({
+    where: { businessId, bookingRequestId: { in: withAccount.map((i) => i.id) } },
+    select: { id: true, bookingRequestId: true },
+  });
+  const byBooking = new Map(threads.map((t) => [t.bookingRequestId, t.id]));
+  for (const item of withAccount) item.directThreadId = byBooking.get(item.id) ?? null;
 }
 
 // ─── Query ────────────────────────────────────────────────────────────────────
@@ -385,6 +410,7 @@ export async function getBusinessBookings(
   });
 
   const items = sorted.map(mapBooking);
+  await attachDirectThreadIds(items, businessId);
 
   // ── Build counts ──
   const countMap = new Map(countRows.map((r) => [r.status, r._count._all]));
@@ -445,7 +471,10 @@ export async function getBusinessBookingById(
     where: { id: bookingId, businessId, kind: BookingKind.STANDARD },
     select: BOOKING_SELECT,
   });
-  return row ? mapBooking(row) : null;
+  if (!row) return null;
+  const item = mapBooking(row);
+  await attachDirectThreadIds([item], businessId);
+  return item;
 }
 
 // ─── Status update ────────────────────────────────────────────────────────────
@@ -705,5 +734,7 @@ export async function updateBookingStatus(
     }
   }
 
-  return mapBooking(updated);
+  const mapped = mapBooking(updated);
+  await attachDirectThreadIds([mapped], businessId);
+  return mapped;
 }

@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { CalendarDays, Phone, User, Baby, MessageSquare, Clock, AlertTriangle, BellDot } from "lucide-react";
+import { CalendarDays, Phone, User, Baby, MessageSquare, MessageCircle, Clock, AlertTriangle, BellDot } from "lucide-react";
 import { BookingStatus } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
@@ -169,6 +169,11 @@ export function BookingCard({ booking, onStatusChange }: BookingCardProps) {
           <span className="text-[14px] font-medium text-stone-900 truncate">
             {booking.customerName}
           </span>
+          {booking.directThreadId ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">
+              <MessageCircle className="h-3 w-3" /> Есть чат
+            </span>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">
