@@ -27,7 +27,7 @@ assert.equal(pickDisplayedBooking([], now), null);
 assert.equal(bookingForSession([near, far], "n")?.id, "n");
 assert.equal(bookingForSession([near, far], "other"), null);
 assert.equal(
-  bookingForSession([b("a", near.at, "NEW", "s"), b("c", near.at, "CONFIRMED", "s")], "s")?.id,
+  bookingForSession([b("a", "2026-11-16T07:00:00.000Z", "NEW", "s"), b("c", "2026-11-16T07:00:00.000Z", "CONFIRMED", "s")], "s")?.id,
   "c",
 );
 
