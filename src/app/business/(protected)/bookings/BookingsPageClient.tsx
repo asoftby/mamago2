@@ -1,6 +1,8 @@
 "use client";
 
-import { BookingChatButton } from "@/components/business/bookings/BookingChatButton";
+import { BookingChatButton, BookingChatCompose } from "@/components/business/bookings/BookingChatButton";
+import type { ReactNode } from "react";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -1467,9 +1469,11 @@ export function BookingDetailsDrawer({
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [chat, setChat] = useState<{ bookingId: string; open: boolean }>({ bookingId: "", open: false });
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (!booking) return null;
+  const chatOpen = chat.open && chat.bookingId === booking.id;
 
   const meta = STATUS_META[booking.status];
   const action = getActionMeta(booking);
@@ -1493,19 +1497,25 @@ export function BookingDetailsDrawer({
     }
   };
 
-  const orderRows: { label: string; value: string }[] = [
+  const orderRows: { label: string; value: ReactNode }[] = [
     { label: "Когда", value: formatScheduleWithoutYear(booking) },
     ...(booking.campShiftTitle ? [{ label: "Смена", value: booking.campShiftTitle }] : []),
     { label: "Участники", value: getParticipantsValue(booking) },
     ...(booking.display.meta ? [{ label: "Особенности", value: booking.display.meta }] : []),
-    { label: "Стоимость", value: price ?? "—" },
+    { label: "Стоимость", value: price ? renderCurrencyText(price, { iconSize: "text" }) : "—" },
   ];
 
   const writeButtonClass =
     "inline-flex h-12 w-full items-center justify-center rounded-2xl border border-stone-300 bg-white px-6 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-50";
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setChat({ bookingId: booking.id, open: false });
+        onOpenChange(next);
+      }}
+    >
       <SheetContent
         side={isDesktop ? "right" : "bottom"}
         overlayClassName="bg-black/20 backdrop-blur-sm"
@@ -1525,6 +1535,15 @@ export function BookingDetailsDrawer({
           </div>
         ) : null}
 
+        {chatOpen ? (
+          <BookingChatCompose
+            booking={booking}
+            subtitle={booking.display.title}
+            onBack={() => setChat({ bookingId: booking.id, open: false })}
+            onClose={() => onOpenChange(false)}
+          />
+        ) : (
+          <>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4 sm:px-6 sm:pt-6">
           <div className="flex items-center justify-between gap-3">
             <span
@@ -1578,7 +1597,7 @@ export function BookingDetailsDrawer({
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-mono text-[15px] text-stone-700">
               {formatScheduleWithoutYear(booking)}
-              {price ? <span className="ml-3 font-semibold text-stone-950">{price}</span> : null}
+              {price ? <span className="ml-3 font-semibold text-stone-950">{renderCurrencyText(price, { iconSize: "text" })}</span> : null}
             </span>
             <span className="text-[15px] text-stone-700">{booking.display.typeLabel}</span>
           </div>
@@ -1622,7 +1641,7 @@ export function BookingDetailsDrawer({
                   <Phone className="h-5 w-5" />
                 </a>
                 {booking.hasCustomerAccount ? (
-                  <BookingChatButton booking={booking} iconOnly />
+                  <BookingChatButton booking={booking} iconOnly onCompose={() => setChat({ bookingId: booking.id, open: true })} />
                 ) : chatHref ? (
                   <a
                     href={chatHref}
@@ -1702,7 +1721,7 @@ export function BookingDetailsDrawer({
           ) : (
             <div className="flex flex-col gap-2">
               {booking.hasCustomerAccount ? (
-                <BookingChatButton booking={booking} large />
+                <BookingChatButton booking={booking} onCompose={() => setChat({ bookingId: booking.id, open: true })} />
               ) : chatHref ? (
                 <a href={chatHref} className={writeButtonClass}>
                   Написать клиенту
@@ -1735,6 +1754,8 @@ export function BookingDetailsDrawer({
             </div>
           )}
         </div>
+          </>
+        )}
       </SheetContent>
     </Sheet>
   );
