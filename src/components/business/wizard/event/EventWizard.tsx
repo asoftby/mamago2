@@ -284,6 +284,7 @@ function EventWizardInner({
   event,
   userId,
   userRole,
+  business,
   onComplete,
   editorSurface,
   contentEditorNav,
