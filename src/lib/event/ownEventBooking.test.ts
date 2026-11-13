@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   bookingForSession,
-  bookingMomentIso,
+  resolveBookingMoment,
   bookingStateText,
   isActiveBookingStatus,
   pickDisplayedBooking,
@@ -12,7 +12,7 @@ import {
 
 const now = new Date("2026-11-13T09:00:00.000Z");
 const b = (id: string, at: string, status: "NEW" | "CONFIRMED" = "NEW", sessionId: string | null = id): OwnEventBooking => ({
-  id, at, status, sessionId,
+  id, at, status, sessionId, hasTime: true,
 });
 
 // nearest future wins, past ignored, input order irrelevant
@@ -41,12 +41,28 @@ assert.ok(!isActiveBookingStatus("EXPIRED") && !isActiveBookingStatus("CANCELLED
 
 // moment resolution
 const s = new Date("2026-11-16T07:00:00.000Z");
-assert.equal(bookingMomentIso({ startsAt: s, requestedDate: null, requestedTime: null }), s.toISOString());
-assert.equal(
-  bookingMomentIso({ startsAt: null, requestedDate: new Date("2026-11-16T00:00:00.000Z"), requestedTime: "10:00" }),
-  "2026-11-16T07:00:00.000Z",
+assert.deepEqual(resolveBookingMoment({ startsAt: s, requestedDate: null, requestedTime: null }), { at: s.toISOString(), hasTime: true });
+assert.deepEqual(
+  resolveBookingMoment({ startsAt: null, requestedDate: new Date("2026-11-16T00:00:00.000Z"), requestedTime: "10:00" }),
+  { at: "2026-11-16T07:00:00.000Z", hasTime: true },
 );
-assert.equal(bookingMomentIso({ startsAt: null, requestedDate: null, requestedTime: null }), null);
+assert.deepEqual(resolveBookingMoment({ startsAt: null, requestedDate: null, requestedTime: null }), { at: null, hasTime: false });
+
+// date-only (USE_PUBLICATION_DATES): date shown, never a time; end of day is only a threshold
+const dateOnly = resolveBookingMoment({ startsAt: null, requestedDate: new Date("2026-12-01T00:00:00.000Z"), requestedTime: null });
+assert.equal(dateOnly.hasTime, false);
+const dateOnlyBooking: OwnEventBooking = { id: "d", status: "CONFIRMED", sessionId: null, ...dateOnly };
+assert.equal(bookingStateText(dateOnlyBooking), "Запись подтверждена · 1 декабря");
+assert.ok(!/\d{2}:\d{2}/.test(bookingStateText(dateOnlyBooking)));
+assert.equal(pickDisplayedBooking([dateOnlyBooking], new Date("2026-12-01T10:00:00.000Z"))?.id, "d", "still future on the day itself");
+assert.equal(pickDisplayedBooking([dateOnlyBooking], new Date("2026-12-02T00:00:00.000Z")), null);
+
+// dateless active request (REQUEST_ONLY / pre-booking) stays visible
+const dateless: OwnEventBooking = { id: "x", status: "NEW", sessionId: null, at: null, hasTime: false };
+assert.equal(pickDisplayedBooking([dateless], now)?.id, "x");
+assert.equal(pickDisplayedBooking([dateless, far], now)?.id, "f", "dated booking wins");
+assert.equal(bookingStateText(dateless), "Заявка отправлена — ждём подтверждения");
+assert.equal(bookingStateText({ ...dateless, status: "CONFIRMED" }), "Заявка подтверждена");
 
 // privacy wiring: query is scoped to the current user, guests get an empty list, never cached
 const route = readFileSync("src/app/api/save/status/route.ts", "utf8");

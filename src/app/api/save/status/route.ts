@@ -12,7 +12,7 @@ import { resolveIdeaPlanState } from "@/lib/plan/ideaPlanStatus";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
 import {
   ACTIVE_BOOKING_STATUSES,
-  bookingMomentIso,
+  resolveBookingMoment,
   type OwnEventBooking,
 } from "@/lib/event/ownEventBooking";
 
@@ -154,9 +154,9 @@ export async function GET(request: NextRequest) {
     ]);
     const ownBookings: OwnEventBooking[] = [];
     for (const row of bookingRows) {
-      const at = bookingMomentIso(row);
-      if (!at || (row.status !== "NEW" && row.status !== "CONFIRMED")) continue;
-      ownBookings.push({ id: row.id, status: row.status, sessionId: row.selectedSessionId, at });
+      if (row.status !== "NEW" && row.status !== "CONFIRMED") continue;
+      const { at, hasTime } = resolveBookingMoment(row);
+      ownBookings.push({ id: row.id, status: row.status, sessionId: row.selectedSessionId, at, hasTime });
     }
     const planState = resolveIdeaPlanState(
       planItems.map((item) => ({ id: item.id, date: item.date })),
