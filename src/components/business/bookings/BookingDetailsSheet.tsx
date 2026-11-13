@@ -5,6 +5,8 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, Mail, Phone } from "lucide-react";
 import { BookingStatus } from "@prisma/client";
 import { RS, RequestSheetFrame, RsConfirmBar, RsSection } from "@/components/request/requestSheetKit";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { resolveBookingSheetPrice } from "./bookingSheetPrice";
 import { toast } from "@/lib/toast";
 
 export type BookingSheetTone = "new" | "success" | "neutral" | "warning";
@@ -16,8 +18,10 @@ export interface BookingSheetView {
   title: string;
   typeLabel: string;
   schedule: string;
-  /** Строка цены; символ BYN выводит карточка окна через BelarusianRubleIcon. */
-  priceLabel: string | null;
+  /** Структурированная цена «от» (priceFrom). */
+  priceFrom: number | null;
+  /** Свободный текст цены; показывается как есть. */
+  priceText: string | null;
   statusLabel: string;
   statusTone: BookingSheetTone;
   actionLabel: string | null;
@@ -117,7 +121,7 @@ export function BookingDetailsSheet({
       ? { label: "Завершить", status: BookingStatus.COMPLETED, tone: "accent" as const }
       : null;
 
-  const ticketMode = view.priceLabel && /^от\s/i.test(view.priceLabel) ? "FROM" : "UNKNOWN";
+  const price = resolveBookingSheetPrice(view.priceFrom, view.priceText);
 
   return (
     <RequestSheetFrame
@@ -128,8 +132,8 @@ export function BookingDetailsSheet({
       ticket={{
         title: view.title,
         venue: [view.typeLabel, view.schedule].filter(Boolean).join(" · "),
-        priceMode: ticketMode,
-        priceLabel: view.priceLabel,
+        priceMode: price.ticket.priceMode,
+        priceValue: price.ticket.priceValue,
       }}
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -137,6 +141,11 @@ export function BookingDetailsSheet({
         {view.actionLabel ? <Pill tone="warning">{view.actionLabel}</Pill> : null}
         <span className="text-xs" style={{ color: RS.ink3 }}>{view.receivedLabel}</span>
       </div>
+      {price.freeText ? (
+        <p className="mb-4 mt-0 text-sm font-semibold" style={{ color: RS.ink }}>
+          {renderCurrencyText(price.freeText)}
+        </p>
+      ) : null}
 
       {total > 1 ? (
         <div className="mb-4 flex items-center justify-between gap-3">
