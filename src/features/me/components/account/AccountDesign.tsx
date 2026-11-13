@@ -183,7 +183,7 @@ export function AccountDesign(props: AccountDesignProps) {
                 {userName}
                 <span style={{ fontStyle: "italic", color: "var(--accent-deep)" }}>.</span>
               </h1>
-              <p style={{ maxWidth: 520, marginTop: 22, marginBottom: 0, fontSize: 18, lineHeight: 1.5, color: "var(--ink-2)" }}>
+              <p style={{ maxWidth: 520, marginTop: 22, marginBottom: 0, fontSize: 16, lineHeight: 1.5, color: "var(--ink-2)" }}>
                 Семья, маршруты и&nbsp;праздники — всё в&nbsp;одном месте. Настройте профиль, чтобы рекомендации были точнее.
               </p>
             </Reveal>
