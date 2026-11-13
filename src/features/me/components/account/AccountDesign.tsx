@@ -243,7 +243,7 @@ export function AccountDesign(props: AccountDesignProps) {
                       {m.initial}
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, letterSpacing: "-.005em" }}>{m.name}</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.005em" }}>{m.name}</div>
                       <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1 }}>{m.role}</div>
                     </div>
                   </div>
@@ -301,7 +301,7 @@ export function AccountDesign(props: AccountDesignProps) {
                 <Ic.Cal />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="serif" style={{ fontSize: 22, lineHeight: 1.1, letterSpacing: "-.015em" }}>Заявки и&nbsp;бронирования</div>
+                <div style={{ fontSize: 22, lineHeight: 1.1, letterSpacing: "-.015em" }}>Заявки и&nbsp;бронирования</div>
                 <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 3 }}>Следите за&nbsp;статусом записей на&nbsp;занятия и&nbsp;события</div>
               </div>
               <span style={{ color: "var(--ink-3)", fontSize: 22 }}>→</span>
