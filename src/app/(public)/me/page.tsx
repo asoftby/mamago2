@@ -153,7 +153,7 @@ export default async function MePage({ searchParams }: PageProps) {
   ];
 
   // Block «Взрослые в семье / Пригласить»: null while the family flags are off.
-  const familyBlock = await loadFamilyBlockData(prisma, user);
+  const familyBlock = await loadFamilyBlockData(prisma, user, { includeChildren: false });
   const familyBlockProps = familyBlock
     ? { ...familyBlock, hasChildren: childrenRaw.length > 0 }
     : null;

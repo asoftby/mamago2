@@ -6,7 +6,7 @@ const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
 // /me loads the family once via the shared loader and passes it down.
 const mePage = read("src/app/(public)/me/page.tsx");
-assert.match(mePage, /loadFamilyBlockData\(prisma, user\)/, "/me loads family data once");
+assert.match(mePage, /loadFamilyBlockData\(prisma, user, \{ includeChildren: false \}\)/, "/me loads family data once without re-reading children");
 assert.match(mePage, /familyBlock=\{familyBlockProps\}/, "/me passes the family block to AccountDesign");
 assert.doesNotMatch(mePage, /manageFamilyHref/, "no more redirect to /me/profile");
 
