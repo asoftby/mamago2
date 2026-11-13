@@ -1,5 +1,6 @@
 "use client";
 
+import { BookingChatButton } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -1643,16 +1644,11 @@ export function BookingDetailsDrawer({
                     />
                   ) : null}
                   <ActionLink href={`tel:${booking.customerPhone}`} label="Позвонить клиенту" />
-                  {booking.customerEmail ? (
+                  {booking.hasCustomerAccount ? (
+                    <BookingChatButton booking={booking} large />
+                  ) : booking.customerEmail ? (
                     <ActionLink href={`mailto:${booking.customerEmail}`} label="Написать клиенту" />
-                  ) : (
-                    <ActionButton
-                      label="Написать клиенту"
-                      tone="secondary"
-                      loading={false}
-                      onClick={() => toast.message("Добавим чат с клиентом в следующем обновлении")}
-                    />
-                  )}
+                  ) : null}
                   {canReject ? (
                     <ActionButton
                       label="Отклонить"

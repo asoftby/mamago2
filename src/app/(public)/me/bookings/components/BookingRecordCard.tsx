@@ -16,6 +16,7 @@ import {
   timeLabel,
 } from "./bookingRecord";
 import { FeedbackWidget } from "../FeedbackWidget";
+import { DirectRequestModal } from "@/components/direct/DirectRequestModal";
 import styles from "../bookings.module.css";
 
 type Props = {
@@ -25,6 +26,7 @@ type Props = {
 export function BookingRecordCard({ booking }: Props) {
   const [hasFeedback, setHasFeedback] = useState(booking.hasFeedback);
   const [feedbackRating, setFeedbackRating] = useState(booking.feedbackRating);
+  const [directOpen, setDirectOpen] = useState(false);
 
   const { status, display } = booking;
   const tone = STATUS_TONE[status];
@@ -57,6 +59,17 @@ export function BookingRecordCard({ booking }: Props) {
       booking.organizerWebsite ||
       booking.address,
   );
+
+  const chatHref = booking.directThreadId ? `/me/direct/${booking.directThreadId}` : null;
+  // Expired request: let the customer write to the organizer themselves, if platform policy allows.
+  const canWriteOrganizer = isExpired && !chatHref && booking.directAvailable && booking.directPublicationType;
+  const directRef = booking.directPublicationType === "OFFER" && booking.offerId
+    ? { publicationType: "OFFER" as const, offerId: booking.offerId }
+    : booking.directPublicationType === "EVENT" && booking.activityId
+      ? { publicationType: "EVENT" as const, activityId: booking.activityId }
+      : booking.directPublicationType === "PLACE" && booking.placeId
+        ? { publicationType: "PLACE" as const, placeId: booking.placeId }
+        : null;
 
   const time = timeLabel(booking);
   const child = childLabel(booking);
@@ -131,8 +144,13 @@ export function BookingRecordCard({ booking }: Props) {
       {isExpired ? (
         <div className={styles.recDetails}>
           <p className={styles.detailsNote}>Организатор не ответил</p>
-          {phoneHref || messageHref ? (
+          {phoneHref || messageHref || canWriteOrganizer ? (
             <div className={styles.contactActions}>
+              {canWriteOrganizer && directRef ? (
+                <button type="button" className={styles.chip} onClick={() => setDirectOpen(true)}>
+                  <MessageCircle size={15} /> Написать организатору
+                </button>
+              ) : null}
               {phoneHref ? (
                 <a href={phoneHref} className={styles.chip}>
                   <Phone size={15} /> Позвонить
@@ -146,6 +164,27 @@ export function BookingRecordCard({ booking }: Props) {
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {chatHref ? (
+        <div className={styles.recDetails}>
+          <div className={styles.contactActions}>
+            <Link href={chatHref} className={styles.chip}>
+              <MessageCircle size={15} /> Чат с организатором
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {canWriteOrganizer && directRef ? (
+        <DirectRequestModal
+          open={directOpen}
+          onOpenChange={setDirectOpen}
+          publicationRef={directRef}
+          publicationTitle={display.title}
+          brandName={booking.organizerName ?? booking.businessName ?? "Организатор"}
+          bookingRequestId={booking.id}
+        />
       ) : null}
 
       {(isConfirmed || (isPending && Boolean(booking.campShiftId))) ? (

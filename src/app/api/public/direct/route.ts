@@ -7,12 +7,21 @@ import {
   createDirectThread,
   DirectThreadError,
 } from "@/server/services/direct/directThread.service";
-import { notifyDirectCreated } from "@/server/services/notification.service";
+import { notifyDirectCreated, notifyDirectMessage } from "@/server/services/notification.service";
+import {
+  BookingDirectError,
+  openCustomerDirectThreadForBooking,
+} from "@/server/services/direct/directBookingThread.service";
+import prisma from "@/lib/prisma";
+import { DirectSendLimitError } from "@/server/services/direct/directRiskSignal.service";
+import { DirectMessageError } from "@/server/services/direct/directMessage.service";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 const createThreadSchema = z
   .object({
-    publicationType: z.nativeEnum(PublicationType),
+    /** Customer writes to the organizer about their own booking request ("Мои записи"). */
+    bookingRequestId: z.string().min(1).max(64).optional(),
+    publicationType: z.nativeEnum(PublicationType).optional(),
     offerId: z.string().optional(),
     activityId: z.string().optional(),
     placeId: z.string().optional(),
@@ -21,7 +30,7 @@ const createThreadSchema = z
     childAge: z.string().max(20).optional(),
     guestsCount: z.string().max(10).optional(),
   })
-  .refine((v) => v.offerId || v.activityId || v.placeId, {
+  .refine((v) => v.bookingRequestId || (v.publicationType && (v.offerId || v.activityId || v.placeId)), {
     message: "publicationType reference is required",
   });
 
@@ -55,6 +64,43 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createThreadSchema.parse(body);
 
+    if (data.bookingRequestId) {
+      const result = await openCustomerDirectThreadForBooking({
+        bookingRequestId: data.bookingRequestId,
+        customerUserId: user.id,
+        message: composeInitialMessage(data),
+      });
+      const target = await prisma.directThread.findUnique({
+        where: { id: result.threadId },
+        select: { business: { select: { ownerUserId: true } } },
+      });
+      if (target) {
+        const notify = result.created
+          ? notifyDirectCreated({
+              ownerUserId: target.business.ownerUserId,
+              threadId: result.threadId,
+              threadNumber: result.threadNumber,
+            })
+          : result.appendedMessageId
+            ? notifyDirectMessage({
+                recipientUserId: target.business.ownerUserId,
+                recipientSurface: "BUSINESS",
+                threadId: result.threadId,
+                threadNumber: result.threadNumber,
+                messageId: result.appendedMessageId,
+              })
+            : Promise.resolve(null);
+        notify.catch((e) => console.error("[direct] booking notify failed:", e));
+      }
+      return NextResponse.json(
+        { threadId: result.threadId, threadNumber: result.threadNumber },
+        { status: result.created ? 201 : 200 },
+      );
+    }
+
+    if (!data.publicationType) {
+      return NextResponse.json({ error: "publicationType is required" }, { status: 400 });
+    }
     const thread = await createDirectThread({
       customerUserId: user.id,
       publicationType: data.publicationType,
@@ -80,6 +126,15 @@ export async function POST(request: NextRequest) {
         { error: "Validation error", details: error.issues },
         { status: 400 },
       );
+    }
+    if (error instanceof BookingDirectError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.httpStatus });
+    }
+    if (error instanceof DirectSendLimitError) {
+      return NextResponse.json({ error: error.message }, { status: error.kind === "FLOOD_LOCK" ? 429 : 403 });
+    }
+    if (error instanceof DirectMessageError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
     if (error instanceof DirectThreadError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

@@ -75,6 +75,12 @@ export interface ParentBookingItem {
   // Timestamps for sorting
   completedAt: string | null;
   rejectedAt: string | null;
+
+  /** Direct thread linked to this booking (viewer's own), no message text. */
+  directThreadId: string | null;
+  /** Platform policy allows opening Direct for this publication type. */
+  directAvailable: boolean;
+  directPublicationType: "OFFER" | "EVENT" | "PLACE" | null;
 }
 
 type ContactSocialLink = {
@@ -490,6 +496,9 @@ export function mapParentBookingRow(raw: {
     requestedTime: raw.requestedTime,
     hasFeedback: raw.feedback !== null,
     feedbackRating: raw.feedback?.rating ?? null,
+    directThreadId: null,
+    directAvailable: false,
+    directPublicationType: raw.offerId ? "OFFER" : raw.activityId ? "EVENT" : raw.placeId ? "PLACE" : null,
   };
 }
 

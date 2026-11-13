@@ -9,6 +9,7 @@
  * Body: { status: "CONFIRMED" | "REJECTED" | "COMPLETED" }
  */
 
+import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { BookingStatus } from "@prisma/client";
@@ -65,6 +66,7 @@ export async function PATCH(
         source: "business_status_endpoint",
       },
     });
+    await attachDirectAvailabilityToBusinessBookings([updated]);
     return NextResponse.json(updated);
   } catch (err) {
     if (err instanceof BookingOwnershipError) {
