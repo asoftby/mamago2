@@ -131,7 +131,7 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
   return (
     <Wrap className={acc ? undefined : "mt-6 p-5 sm:p-6"}>
       {acc ? (
-        <h2 className="serif" style={{ margin: 0, fontSize: 22, lineHeight: 1.1, letterSpacing: "-.015em" }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 400, lineHeight: 1.1, letterSpacing: "-.015em" }}>
           Взрослые в семье
         </h2>
       ) : (
