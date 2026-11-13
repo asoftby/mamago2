@@ -25,8 +25,13 @@ import {
   createEmptyScheduleDay,
   createEmptyScheduleSlot,
   flatSlotsToGroupedDays,
-  groupedDaysToFlatSlots,
+  scheduleDaysToPersistedSlots,
 } from "../schedule/mappers";
+import {
+  findMissingTimeSlotSuggestions,
+  mergeTimeSlotSuggestionsIntoDays,
+  type TimeSlotSuggestion,
+} from "../schedule/suggestions";
 import type { ScheduleDay, ScheduleSlot } from "../schedule/types";
 import { ScheduleSlotRow } from "./schedule/ScheduleSlotRow";
 
@@ -35,7 +40,21 @@ type TimeSlotEditorProps = {
   value: PublicationAccessTimeSlot[];
   onChange: (value: PublicationAccessTimeSlot[]) => void;
   disabled?: boolean;
+  /**
+   * Defaults from the owning entity (event schedule). They seed the editor
+   * only while it has no saved slots; afterwards they are offered through an
+   * explicit "add" action and never overwrite manual rows.
+   */
+  suggestions?: TimeSlotSuggestions;
 };
+
+export type TimeSlotSuggestions = {
+  suggestions: readonly TimeSlotSuggestion[];
+  /** The source produced more rows than it returned. */
+  truncated?: boolean;
+};
+
+const NO_SUGGESTIONS: readonly TimeSlotSuggestion[] = [];
 
 type SlotField = "startTime" | "endTime" | "capacity";
 type SlotErrors = Partial<Record<SlotField, string>>;
@@ -73,18 +92,6 @@ function sortDays(days: ScheduleDay[]): ScheduleDay[] {
   });
 }
 
-function toPersistedSlots(days: ScheduleDay[]): PublicationAccessTimeSlot[] {
-  return groupedDaysToFlatSlots(days).filter((slot) => {
-    const capacityValid = typeof slot.capacity === "number" && slot.capacity > 0;
-    return Boolean(
-      slot.date?.trim() &&
-        slot.startTime?.trim() &&
-        slot.endTime?.trim() &&
-        capacityValid,
-    );
-  });
-}
-
 function getEntityHintLabel(entityType: PublicationEntityType): string {
   return entityType === "offer"
     ? "Выберите день, когда откроется запись на предложение."
@@ -109,14 +116,24 @@ export function TimeSlotEditor({
   value,
   onChange,
   disabled,
+  suggestions,
 }: TimeSlotEditorProps) {
+  const suggestedSlots = suggestions?.suggestions ?? NO_SUGGESTIONS;
   const initialDays = useMemo(
     () => normalizeEditorDays(flatSlotsToGroupedDays(value)),
     [value],
   );
   const valueKey = serializeSlots(value);
   const lastEmitted = useRef(valueKey);
-  const [days, setDays] = useState<ScheduleDay[]>(initialDays);
+  const [days, setDays] = useState<ScheduleDay[]>(() =>
+    value.length === 0 && suggestedSlots.length > 0
+      ? normalizeEditorDays(mergeTimeSlotSuggestionsIntoDays([], suggestedSlots))
+      : initialDays,
+  );
+  const missingSuggestions = useMemo(
+    () => findMissingTimeSlotSuggestions(days, suggestedSlots),
+    [days, suggestedSlots],
+  );
   const [touched, setTouched] = useState<Record<string, DayTouched>>({});
 
   /* eslint-disable react-hooks/set-state-in-effect -- editor resyncs local grouped state when parent replaces slots */
@@ -133,7 +150,7 @@ export function TimeSlotEditor({
       const normalizedDays = normalizeEditorDays(sortDays(nextDays));
       setDays(normalizedDays);
 
-      const flat = toPersistedSlots(normalizedDays);
+      const flat = scheduleDaysToPersistedSlots(normalizedDays);
       const key = serializeSlots(flat);
       lastEmitted.current = key;
       onChange(flat);
@@ -193,6 +210,10 @@ export function TimeSlotEditor({
     commitDays([createDateSlotBlock()]);
   };
 
+  const handleAddFromSchedule = () => {
+    commitDays(mergeTimeSlotSuggestionsIntoDays(days, suggestedSlots));
+  };
+
   const sectionTitle = "Даты и слоты";
 
   return (
@@ -205,7 +226,9 @@ export function TimeSlotEditor({
           <div className="min-w-0">
             <h4 className="text-[14px] font-semibold text-foreground">{sectionTitle}</h4>
             <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-              Выберите дату и добавьте слоты, в которые гости смогут записаться.
+              {suggestedSlots.length > 0
+                ? "Даты и время по умолчанию берутся из расписания события. Их можно изменить, удалить или добавить свои. Укажите количество мест — без него слот не сохранится."
+                : "Выберите дату и добавьте слоты, в которые гости смогут записаться."}
             </p>
           </div>
         </div>
@@ -235,6 +258,34 @@ export function TimeSlotEditor({
       </div>
 
       <div className="space-y-4 px-5 py-5 sm:px-6">
+        {missingSuggestions.length > 0 ? (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-3"
+          >
+            <p className="min-w-0 flex-1 text-[12px] leading-5 text-foreground">
+              В расписании события есть даты и время, которых нет в слотах:{" "}
+              {missingSuggestions.length}. Уже заполненные слоты не изменятся.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddFromSchedule}
+              disabled={disabled}
+              className="h-9 rounded-xl border-primary/30 bg-background text-[12px] font-semibold text-primary hover:bg-primary/5 hover:text-primary focus-visible:ring-primary/20"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить из расписания
+            </Button>
+          </div>
+        ) : null}
+        {suggestions?.truncated ? (
+          <p className="text-[12px] leading-5 text-muted-foreground">
+            Расписание длинное: подставлены только ближайшие даты. Остальные можно добавить
+            вручную.
+          </p>
+        ) : null}
         {days.map((day, index) => {
           const dayTouched = touched[day.id];
           const showDateError = Boolean(dayTouched?.date && !day.date);

@@ -9,7 +9,7 @@ import { DEFAULT_ACCESS_METHODS_BY_ENTITY } from "../defaults";
 import { PUBLICATION_ACCESS_LABELS } from "../labels";
 import { AccessMethodCard } from "./AccessMethodCard";
 import { AccessPublicPreview } from "./AccessPublicPreview";
-import { TimeSlotEditor } from "./TimeSlotEditor";
+import { TimeSlotEditor, type TimeSlotSuggestions } from "./TimeSlotEditor";
 import type {
   PublicationAccess,
   PublicationAccessMethod,
@@ -23,6 +23,8 @@ export type PublicationAccessEditorProps = {
   allowedMethods?: PublicationAccessMethod[];
   disabled?: boolean;
   showPreview?: boolean;
+  /** Default dates/times for the time-slot editor (e.g. from the event schedule). */
+  timeSlotSuggestions?: TimeSlotSuggestions;
 };
 
 export function PublicationAccessEditor({
@@ -32,6 +34,7 @@ export function PublicationAccessEditor({
   allowedMethods,
   disabled,
   showPreview = true,
+  timeSlotSuggestions,
 }: PublicationAccessEditorProps) {
   const labels = PUBLICATION_ACCESS_LABELS[entityType];
   const methods = allowedMethods ?? DEFAULT_ACCESS_METHODS_BY_ENTITY[entityType];
@@ -191,6 +194,7 @@ export function PublicationAccessEditor({
                   entityType={entityType}
                   value={value.timeSlots ?? []}
                   onChange={(timeSlots) => update({ timeSlots })}
+                  suggestions={timeSlotSuggestions}
                   disabled={disabled}
                 />
               ) : null}
