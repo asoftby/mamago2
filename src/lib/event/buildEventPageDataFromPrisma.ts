@@ -1,4 +1,5 @@
 import type { ActivityFormat, EventVenueKind } from "@prisma/client";
+import { eventAgeRuleFromActivity } from "@/lib/booking/bookingParticipants";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
@@ -43,6 +44,9 @@ export type ActivityForEventPageInput = {
   format: ActivityFormat;
   ageTags: string[];
   agePolicy: import("@prisma/client").AgePolicy;
+  /** Сохранённые границы возраста в месяцах (для правила возраста в окне записи). */
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
   priceText: string | null;
   priceFrom: number | null;
   currency: string | null;
@@ -303,6 +307,15 @@ export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "sc
     }
   }
   return undefined;
+}
+
+/** Данные окна записи + возрастное правило события (мягкое предупреждение, запись не блокируется). */
+export function resolveSimpleBookingWithAgeRule(
+  activityId: string,
+  activity: ActivityForEventPageInput,
+): EventPageData["cta"]["simpleBooking"] {
+  const base = resolveSimpleBooking(activityId, activity);
+  return base ? { ...base, ageRule: eventAgeRuleFromActivity(activity) } : base;
 }
 
 export function resolveSimpleBooking(
@@ -586,7 +599,7 @@ export function buildEventPageDataFromPrismaActivity(
     typeof posterWidth === "number" && posterWidth > 0 &&
     typeof posterHeight === "number" && posterHeight > 0;
 
-  const simpleBooking = resolveSimpleBooking(activity.id, activity);
+  const simpleBooking = resolveSimpleBookingWithAgeRule(activity.id, activity);
   const sessions: EventPageData["sessions"] = activity.sessions.map((s) => ({
     id: s.id,
     startsAt: s.startsAt.toISOString(),

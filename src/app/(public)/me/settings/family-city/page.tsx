@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AccountPage } from "@/components/account/AccountPage";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -37,16 +37,16 @@ export default async function FamilyHomeCityPage() {
     select: { id: true, name: true },
   });
   return (
-    <main className="mx-auto max-w-xl px-4 py-8">
-      <Link href="/me/settings/profile" className="text-sm text-primary">← Профиль</Link>
-      <h1 className="mt-5 text-3xl font-semibold">Город проживания</h1>
-      <p className="mt-3 text-sm text-muted-foreground">
-        Город, в котором живёт семья. Он не меняется при временном просмотре афиши другого города.
-      </p>
-      {!membership ? <p className="mt-6 text-sm">Чтобы указать город проживания, сначала создайте семейный профиль.</p>
-        : membership.role !== "OWNER" ? <p className="mt-6 text-sm">Изменить город может владелец семьи.</p>
+    <AccountPage
+      backHref="/me/settings/profile"
+      backLabel="← Профиль"
+      title="Город проживания"
+      lead="Город, в котором живёт семья. Он не меняется при временном просмотре афиши другого города."
+    >
+      {!membership ? <p className="text-sm">Чтобы указать город проживания, сначала создайте семейный профиль.</p>
+        : membership.role !== "OWNER" ? <p className="text-sm">Изменить город может владелец семьи.</p>
         : (
-          <form action={saveFamilyHomeCity} className="mt-6 space-y-4">
+          <form action={saveFamilyHomeCity} className="space-y-4">
             <label htmlFor="cityId" className="block text-sm font-medium">Город</label>
             <select id="cityId" name="cityId" required defaultValue={membership.family.homeCityId ?? ""}
               className="w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm">
@@ -58,6 +58,6 @@ export default async function FamilyHomeCityPage() {
             </button>
           </form>
         )}
-    </main>
+    </AccountPage>
   );
 }

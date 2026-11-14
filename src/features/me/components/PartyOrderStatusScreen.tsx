@@ -4,9 +4,10 @@ import { PartyPackageBrief } from "@/components/birthday/PartyPackageBrief";
 import type { PackageChangeScope } from "@/lib/birthday/packageChangeScope";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { AccountPage } from "@/components/account/AccountPage";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, CheckCircle2, Clock3 } from "lucide-react";
+import { CheckCircle2, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type PartyOrderScreenData = {
@@ -118,28 +119,21 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
   };
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="mx-auto w-full max-w-3xl space-y-7 px-4 sm:px-6">
-        <Link href="/me/birthdays" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Мои праздники
-        </Link>
-        <header className="space-y-2">
-          <h1 className="font-editorial text-3xl text-foreground sm:text-4xl">
-            Праздник {party.childName}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {party.date ? new Date(party.date + "T12:00:00Z").toLocaleDateString("ru-RU", {
+    <AccountPage
+      backHref="/me/birthdays"
+      backLabel="← Мои праздники"
+      title={`Праздник ${party.childName}`}
+      lead={<>
+        {party.date ? new Date(party.date + "T12:00:00Z").toLocaleDateString("ru-RU", {
               day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
-            }) : "Дата уточняется"}
-            {party.time ? " · " + party.time : ""}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Вы можете принимать предложения исполнителей. Бронирование считается завершённым
-            только после подтверждения исполнителем.
-          </p>
-        </header>
-
+            }) : "Дата уточняется"}{party.time ? " · " + party.time : ""}
+        <span className="mt-2 block">
+          Вы можете принимать предложения исполнителей. Бронирование считается завершённым
+          только после подтверждения исполнителем.
+        </span>
+      </>}
+    >
+      <div className="space-y-7">
         {orderNotices[party.status] ? (
           <p role="status" className="rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground">
             {orderNotices[party.status]}
@@ -156,7 +150,7 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             const offerExpired = stage === "QUOTED" && quote?.canAccept !== true;
             const confirmed = stage === "CONFIRMED";
             return (
-              <section key={item.id} className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-6">
+              <section key={item.id} className="space-y-3 rounded-[var(--radius-card)] border border-border bg-card p-6 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
                     <h2 className="text-lg font-semibold text-foreground">{item.title}</h2>
@@ -209,7 +203,7 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
           })}
         </div>
         {party.savedOffers && party.savedOffers.length > 0 ? (
-          <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-6">
+          <section className="space-y-3 rounded-[var(--radius-card)] border border-border bg-card p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-foreground">Идеи для сценария</h2>
             <p className="text-sm text-muted-foreground">
               Сохранённые предложения не забронированы и не включены в стоимость праздника.
@@ -255,6 +249,6 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
           </section>
         ) : null}
       </div>
-    </div>
+    </AccountPage>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatChildLabel, formatParticipantsLine } from "@/lib/booking/bookingParticipants";
 import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
@@ -352,7 +353,16 @@ function getActionMeta(booking: BusinessBookingItem): { label: string; className
   return null;
 }
 
+/** Мягкая пометка для бизнеса: возраст ребёнка вне диапазона события. */
+function getParticipantAgeNote(booking: BusinessBookingItem): string | null {
+  if (booking.participantsOutsideAge.length === 0) return null;
+  const who = booking.participantsOutsideAge.map(formatChildLabel).join(", ");
+  return `Возраст вне диапазона события${booking.eventAgeLabel ? ` (${booking.eventAgeLabel})` : ""}: ${who}`;
+}
+
 function getParticipantLabel(booking: BusinessBookingItem): string | null {
+  // Состав группы уже показан строкой «Взрослые · Дети» в деталях — не дублируем первого ребёнка.
+  if (booking.participantChildren.length > 0) return null;
   if (!booking.childName && booking.childAge == null) return null;
   return [booking.childName, booking.childAge != null ? `${booking.childAge} лет` : null]
     .filter(Boolean)
@@ -1371,6 +1381,18 @@ function BookingListItem({
             {booking.customerName} · {booking.customerPhone}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
           </div>
           {participant ? <div className="mt-1 text-sm text-stone-400">{participant}</div> : null}
+          {booking.participantChildren.length > 0 ? (
+            <div className="mt-1 text-sm text-stone-400">
+              {formatParticipantsLine({
+                adultsCount: booking.adultsCount,
+                childrenCount: booking.childrenCount,
+                children: booking.participantChildren,
+              })}
+              {booking.participantsOutsideAge.length > 0 ? (
+                <span className="ml-2 text-amber-600">· возраст вне диапазона события</span>
+              ) : null}
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
             <span className={cn("rounded-full px-3 py-1 text-sm font-semibold", meta.chipClass)}>
               {meta.label}
@@ -1417,19 +1439,12 @@ function formatHistoryTime(dateIso: string): string {
 }
 
 function getParticipantsValue(booking: BusinessBookingItem): string {
-  const parts: string[] = [];
-  if (booking.adultsCount > 0) parts.push(`Взрослые: ${booking.adultsCount}`);
-  if (booking.childrenCount > 0) {
-    const legacy = booking.childName
-      ? `${booking.childName}${booking.childAge != null ? ` (${booking.childAge})` : ""}`
-      : null;
-    parts.push(
-      booking.childrenCount === 1 && legacy
-        ? `Дети: ${legacy}`
-        : `Дети: ${booking.childrenCount}`,
-    );
-  }
-  return parts.length > 0 ? parts.join(" · ") : "Уточняется";
+  return formatParticipantsLine({
+    adultsCount: booking.adultsCount,
+    childrenCount: booking.childrenCount,
+    children: booking.participantChildren,
+    legacyChild: { name: booking.childName, age: booking.childAge },
+  }) || "Уточняется";
 }
 
 function buildHistoryEntries(booking: BusinessBookingItem): { time: string | null; label: string }[] {
@@ -1503,6 +1518,7 @@ export function BookingDetailsDrawer({
     { label: "Когда", value: formatScheduleWithoutYear(booking) },
     ...(booking.campShiftTitle ? [{ label: "Смена", value: booking.campShiftTitle }] : []),
     { label: "Участники", value: getParticipantsValue(booking) },
+    ...(getParticipantAgeNote(booking) ? [{ label: "Возраст", value: getParticipantAgeNote(booking) }] : []),
     ...(booking.display.meta ? [{ label: "Особенности", value: booking.display.meta }] : []),
     { label: "Стоимость", value: price ? renderCurrencyText(price, { iconSize: "text" }) : "—" },
   ];

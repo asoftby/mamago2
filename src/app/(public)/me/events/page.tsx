@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { ActivityType } from "@prisma/client";
 import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
 import { EventsList } from "@/app/business/(protected)/events/EventsList";
-import { Container } from "@/components/ui/Container";
+import { AccountPage } from "@/components/account/AccountPage";
 import { getPartnerCabinetBusiness } from "@/server/permissions/business-permissions";
 
 interface SearchParams {
@@ -52,17 +52,12 @@ export default async function MeEventsPage({
   });
 
   return (
-    <Container className="py-8 sm:py-10">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Мои события</h1>
-          <p className="mt-2 text-gray-600">
-            Управляйте вашими событиями и отслеживайте их статус
-          </p>
-        </div>
-
-        <EventsList activities={activities} currentView={view} />
-      </div>
-    </Container>
+    <AccountPage
+      title="Мои события"
+      lead="Управляйте вашими событиями и отслеживайте их статус"
+      backHref="/me"
+    >
+      <EventsList activities={activities} currentView={view} />
+    </AccountPage>
   );
 }
