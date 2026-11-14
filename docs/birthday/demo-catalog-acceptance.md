@@ -1,0 +1,24 @@
+# Приёмка каталога PR A
+
+Локальная PostgreSQL 16, Node 22.23.2, Chrome. Основание: dev `812c07ef5be2935318096610741fef170bd851dc`; проверяется реализация в task-only PR каталога. Даты seed относительные, не фиксируйте календарную дату в автотесте.
+
+| ID | Данные / действие | Ожидание | Фактический результат | Статус | Доказательство / исправление |
+| --- | --- | --- | --- | --- | --- |
+| A01 | seed дважды | 37 Offer, 35 в Минске, 10 категорий, 5 пакетов | Совпадает; скрытые DRAFT/другой город не попадают в минский API | PASS | `catalog.integration.test.ts`, `catalog.test.ts` |
+| A02 | PROD/другой host/port/db/host override; seed и cleanup | Отказ до подключения | Процесс завершён, TCP-подключений нет | PASS | `catalog.test.ts` |
+| A03 | Family Core и обычная форма входа родителя | Реальный bcrypt/session; ребёнок и второй взрослый из профиля | Вход и выбор ребёнка выполнены в Chrome | PASS | Chrome desktop, штатный login и child modal |
+| A04 | Игровая комната + аниматор/торт/шары/фото; Save | 5 позиций, EXACT 650 | Серверный черновик и фиксированная сумма 650 | PASS | Chrome → POST PartyOrder + PATCH |
+| A05 | Заменить аниматора на ведущего бизнеса 2, удалить/вернуть шары, reload | Остальные позиции сохранены; EXACT 550 + FROM 150 | Состав восстановлен, минимум от 700 | PASS | Chrome 320/390/1200, ширина контента = viewport |
+| A06 | Возраст 8, группа 5–10, формат заведения | Совместимые варианты двух бизнесов каждой категории | Первоначальный вариант 2 имел OFF_SITE; исправлен на BOTH и защищён тестом | PASS | `catalog.test.ts`, повторная Chrome-проверка карточек |
+| A07 | `venue-1`/`package-all` 12–14 и 14–16 | Оба недоступны в занятом интервале, оба доступны после | Совпадает; запасной ресурс пакета убран по ревью | PASS | PG availability assertions |
+| A08 | Snapshot 900, удаление с кредитом 100, каталог 950, reread | Оценка старого заказа 800 | Совпадает; повторный seed не сбрасывает ручную цену | PASS | PG snapshot assertions |
+| A09 | Чужая идея; ручные Offer/BookingUnit; cleanup | Полный отказ без удаления чужих данных | Чужая идея, ручные Offer/BookingUnit и обе модели владения дополнительной площадкой проверены отдельно, затем cleanup/reseed | PASS | PG cleanup assertions; исправления независимого и GitHub-ревью |
+| A10 | Пакет, четыре политики и мобильные экраны | REQUIRED без удаления; NO_REFUND 900; FIXED_CREDIT + замена отдельно; QUOTE_REQUIRED неизвестен; reload | Все четыре правила проверены в обычном UI: 900 → 800 + FROM 150 → неизвестная цена пакета + FROM 150; состав восстановлен | PASS | Chrome 320/390/1200, без горизонтального переполнения; отправка отдельно A14 |
+| A11 | Точный район | Отбор по району | Текущий birthday API/StepPick не передаёт и не фильтрует district | BLOCKED | Площадки имеют тестовые метки районов; новый фильтр не добавляется в seed PR |
+| A12 | Возраст после reload сохранённого состава | Сохранить прежнюю eligibility | Session serializer удаляет `partyForChild`; точный ageMonths становится null, появляются старшие варианты | FAIL | Существующий дефект; исправление/регрессия запланированы в PR C. Сам состав/цены сохраняются |
+| A14 | Пакет выбран через «В заведении», затем изменён | Отправка в существующий quote flow | UI сохраняет VENUE, но поддержка изменений ограничена PACKAGE; появляется ошибочная блокировка «выездного» пакета | BLOCKED | Исправление и сквозная регрессия необходимы в PR C; venueMode вручную не подменялся |
+| A13 | Изменение HOME/OUTDOOR пакетов | Сохранить защитную блокировку | Полный изменённый mobile flow пока не реализован | BLOCKED | Не обходить guards; полная приёмка H фиксируется в PR C |
+
+Для C сценарии A–H не помечены PASS этой таблицей: здесь подтверждена пригодность seed, а не завершение финального семейного продукта. Скриншоты тестовой сессии и результаты exact-HEAD gate/CI прикладываются к PR/отчёту. Не отправлять реальные уведомления; local runner не наследует transport credentials.
+
+Stacked follow-up: dev advanced to `3d7f6c1eaf3f2e40f0839b2927129f85d29c7c4f` (#1176), without overlapping fixture files. The parent branch is normally merged with that base so PR B contains only its own changes. Existing read-only CI workflows now accept the two explicit birthday parent branch patterns; no push/deploy triggers or check requirements are weakened. A new final-SHA full gate is necessary for this actual base/CI change; the prior e367 gate and six successful checks remain historical evidence, not proof for the new SHA.

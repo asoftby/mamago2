@@ -10,6 +10,8 @@ on:
       - main
       - dev
       - "feat/birthday-package-business-rules-*"
+      - "test/birthday-complete-demo-catalog-*"
+      - "feat/birthday-final-scenario-family-*"
 
 jobs:
   typecheck:
