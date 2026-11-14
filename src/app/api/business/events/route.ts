@@ -191,12 +191,18 @@ export async function POST(request: NextRequest) {
     }
 
     const needsUserBusinessFallback =
-      !isPlatformContentStaff(user.role) &&
       placeOwnerBusinessId == null &&
       requestedBusinessId == null;
-    const userBusinessId = needsUserBusinessFallback
-      ? await getUserBusinessId(user.id)
-      : null;
+    // A platform editor can own an event without a Business. Only their own
+    // Business (if any), not an unrelated partner account, is a valid fallback.
+    const userBusinessId = !needsUserBusinessFallback
+      ? null
+      : isPlatformContentStaff(user.role)
+        ? (await prisma.business.findUnique({
+            where: { ownerUserId: user.id },
+            select: { id: true },
+          }))?.id ?? null
+        : await getUserBusinessId(user.id);
 
     const resolvedBusinessId = resolveActivityBusinessIdForCreate({
       placeOwnerBusinessId,
