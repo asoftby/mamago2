@@ -52,14 +52,16 @@ export function BookingParticipantsField({ value, onChange, isAuthenticated, age
   // Один запрос за детьми профиля — только для вошедших.
   useEffect(() => {
     if (!isAuthenticated) return;
-    const controller = new AbortController();
-    fetch("/api/public/bookings/camp-shift/prefill", { credentials: "include", signal: controller.signal })
+    let cancelled = false;
+    fetch("/api/public/bookings/camp-shift/prefill", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((json: { children?: ProfileChild[] } | null) => {
-        if (json?.children) setProfile(json.children.map((c) => ({ id: c.id, name: c.name, age: c.age })));
+        if (!cancelled && json?.children) setProfile(json.children.map((c) => ({ id: c.id, name: c.name, age: c.age })));
       })
       .catch(() => {});
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated]);
 
   const toggleProfile = (id: string) => {
