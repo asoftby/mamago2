@@ -59,12 +59,13 @@ export async function getEventSlotAvailability(activityId: string): Promise<Even
     select: { id: true, scheduleJson: true, bookingMode: true, bookingCapacityPerSlot: true },
   });
   if (!activity) return null;
-  const [sessions, bookings] = await Promise.all([
-    prisma.activitySession.findMany({
-      where: { activityId: activity.id, withdrawnAt: null, startsAt: { gt: now }, OR: [{ isSaleOpen: null }, { isSaleOpen: true }] },
-      select: { id: true, startsAt: true },
-    }),
-    prisma.bookingRequest.findMany({
+  // First resolve available sessions, then scope active requests to them.
+  // A request may have a selectedSessionId but no requestedDate.
+  const sessions = await prisma.activitySession.findMany({
+    where: { activityId: activity.id, withdrawnAt: null, startsAt: { gt: now }, OR: [{ isSaleOpen: null }, { isSaleOpen: true }] },
+    select: { id: true, startsAt: true },
+  });
+  const bookings = await prisma.bookingRequest.findMany({
       where: {
         activityId: activity.id,
         publicationType: PublicationType.EVENT,
@@ -77,8 +78,7 @@ export async function getEventSlotAvailability(activityId: string): Promise<Even
         ],
       },
       select: { adultsCount: true, childrenCount: true, requestedDate: true, requestedTime: true, session: { select: { startsAt: true } } },
-    }),
-  ]);
+  });
   return computeEventSlotAvailability({
     sessions,
     configured: getEventBookingSchedule(activity.scheduleJson, activity.bookingMode),
