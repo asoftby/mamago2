@@ -1,7 +1,7 @@
 "use client";
 
-import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import { formatChildLabel, formatParticipantsLine } from "@/lib/booking/bookingParticipants";
+import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1518,7 +1518,7 @@ export function BookingDetailsDrawer({
     { label: "Когда", value: formatScheduleWithoutYear(booking) },
     ...(booking.campShiftTitle ? [{ label: "Смена", value: booking.campShiftTitle }] : []),
     { label: "Участники", value: getParticipantsValue(booking) },
-    ...(getParticipantAgeNote(booking) ? [{ label: "Возраст", value: getParticipantAgeNote(booking)! }] : []),
+    ...(getParticipantAgeNote(booking) ? [{ label: "Возраст", value: getParticipantAgeNote(booking) }] : []),
     ...(booking.display.meta ? [{ label: "Особенности", value: booking.display.meta }] : []),
     { label: "Стоимость", value: price ? renderCurrencyText(price, { iconSize: "text" }) : "—" },
   ];
@@ -1638,7 +1638,7 @@ export function BookingDetailsDrawer({
           {isConfirmed ? (
             <div className="mt-5 flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3.5 text-[15px] leading-snug text-emerald-800">
               <Check className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Запись подтверждена. Клиент получил уведомление.</span>
+              <span>Запись подтверждена. При необходимости свяжитесь с клиентом.</span>
             </div>
           ) : null}
 
