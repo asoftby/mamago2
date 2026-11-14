@@ -83,7 +83,8 @@ export const workListQuerySchema = z.strictObject({
   kind: workKind.optional(),
   status: workStatus.optional(),
   assigneeId: id.optional(),
-  due: z.enum(["TODAY", "OVERDUE", "NO_DUE"]).optional(),
+  due: z.enum(["TODAY", "OVERDUE", "UPCOMING", "NO_DUE"]).optional(),
+  openOnly: z.enum(["true"]).transform(() => true).optional(),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   take: z.coerce.number().int().min(1).max(50).default(30),
 });
