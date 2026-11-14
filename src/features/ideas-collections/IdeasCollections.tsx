@@ -149,23 +149,24 @@ export function IdeasCollections({
 
   // Идеи (кроме статей) приходят с сервера страницы или из /api/me/ideas; статьи догружаем отдельно, как раньше.
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
     async function load() {
       if (initialIdeas === undefined) {
         try {
-          const response = await fetch("/api/me/ideas", { cache: "no-store", signal: controller.signal });
+          const response = await fetch("/api/me/ideas", { cache: "no-store" });
           if (!response.ok) throw new Error("load_failed");
           const data = (await response.json()) as {
             ideas?: IdeaItem[];
             collections?: CollectionSummary[];
             memberships?: CollectionMemberships;
           };
+          if (cancelled) return;
           setIdeas(data.ideas ?? []);
           setCollections(data.collections ?? []);
           setMemberships(data.memberships ?? {});
           setLoaded(true);
-        } catch (error) {
-          if ((error as Error).name === "AbortError") return;
+        } catch {
+          if (cancelled) return;
           setLoadFailed(true);
           setLoaded(true);
           return;
@@ -173,9 +174,10 @@ export function IdeasCollections({
       }
       // Статьи — необязательная догрузка: её сбой не должен прятать уже загруженные идеи.
       try {
-        const articles = await fetch("/api/ideas/articles", { signal: controller.signal });
+        const articles = await fetch("/api/ideas/articles");
         if (!articles.ok) return;
         const data = (await articles.json()) as { items?: IdeaItem[] };
+        if (cancelled) return;
         if (Array.isArray(data.items) && data.items.length > 0) {
           setIdeas((current) => mergeIdeas(current, data.items ?? []));
         }
@@ -184,7 +186,9 @@ export function IdeasCollections({
       }
     }
     void load();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [initialIdeas]);
 
   useEffect(() => {
