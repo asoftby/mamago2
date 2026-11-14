@@ -31,3 +31,16 @@ assert.match(reviews, /safe-area-inset-bottom/, "Review reply actions must accou
 assert.doesNotMatch(reviews, /max-h-\[90vh\]/, "Review modal must not regress to a fixed desktop viewport height");
 
 console.log("businessMobileLayoutContract.test.ts: OK");
+
+// BYN glyph U+E901 is a private-use font glyph: it must never reach the DOM as text in booking prices.
+assert.doesNotMatch(
+  bookings.replace(/\\uE901/gi, ""),
+  //,
+  "Booking prices must not embed the raw BYN glyph",
+);
+assert.equal(
+  (bookings.match(/renderCurrencyText\(/g) ?? []).length >= 4,
+  true,
+  "Every booking price must be rendered through renderCurrencyText",
+);
+assert.doesNotMatch(bookings, /\{price \?\? "—"\}|\{formatPriceLabel\(booking\) \?\? "—"\}/, "Raw price strings must not be rendered as text");

@@ -6,11 +6,11 @@
  * - `BookingChatButton`: кнопка. Гостевая заявка (нет аккаунта) → ничего; тред уже есть →
  *   «Открыть чат» (ссылка в /business/direct/{id}); политика платформы отключила Direct →
  *   для иконки ничего, для большой кнопки понятное состояние; иначе вызывает `onCompose`.
- * - `BookingChatCompose`: отдельный шаг внутри модалки (форма первого сообщения →
+ * - `BookingChatComposer`: отдельный шаг внутри модалки (форма первого сообщения →
  *   POST /api/business/bookings/{id}/direct).
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Loader2, MessageCircle, X } from "lucide-react";
@@ -81,18 +81,27 @@ export function BookingChatButton({
 }
 
 /** Chat step rendered inside the details drawer in place of the details view. */
-export function BookingChatCompose({
+export function BookingChatComposer({
   booking,
   subtitle,
+  active,
   onBack,
   onClose,
 }: {
   booking: BookingChatTarget;
   subtitle?: string;
+  /** True while the step is visible; focuses the field when it becomes visible. */
+  active: boolean;
   onBack: () => void;
   onClose: () => void;
 }) {
   const router = useRouter();
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setTimeout(() => fieldRef.current?.focus({ preventScroll: true }), 320);
+    return () => window.clearTimeout(timer);
+  }, [active]);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,7 +169,7 @@ export function BookingChatCompose({
           value={message}
           onChange={(e) => setMessage(e.target.value.slice(0, MAX_LEN))}
           rows={7}
-          autoFocus
+          ref={fieldRef}
           placeholder="Например: здравствуйте! Подтверждаем возможность записи, уточните, пожалуйста…"
           className="mt-5 w-full resize-none rounded-2xl border border-stone-200 bg-stone-50 p-4 text-[15px] text-stone-900 outline-none focus:border-stone-400"
         />
