@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,6 +62,8 @@ function slotTimeLabel(slot: EventBookingSlot) {
   return slot.endTime ? `${slot.startTime}–${slot.endTime}` : slot.startTime;
 }
 
+type SlotSeats = Record<string, { capacity: number; remaining: number }>;
+
 /* ─────────────── main component ─────────────── */
 type Props = {
   open: boolean;
@@ -96,14 +98,39 @@ export function EventSimpleBookingModal({
   const [timeId, setTimeId] = useState("");
   const [participants, setParticipants] = useState<ParticipantsDraft>(INITIAL_PARTICIPANTS_DRAFT);
   const [participantErrors, setParticipantErrors] = useState<Record<string, string>>({});
+  const [seatsBySlot, setSeatsBySlot] = useState<SlotSeats>({});
   const inFlight = useRef(false);
   const initialSlot = slots.find((slot) => slot.id === initialSessionId);
 
   const selectedDate = dateGroups.find((group) => group.isoDate === (dateId || initialSlot?.isoDate)) ?? dateGroups[0];
   const selectedSlot = selectedDate?.slots.find((slot) => slot.id === (timeId || initialSlot?.id)) ?? selectedDate?.slots[0];
 
-  // В режиме time-slots нужен выбранный слот; в simple-booking слотов нет → сразу valid
-  const valid = slots.length === 0 || Boolean(selectedSlot);
+  const selectedSeats = selectedSlot ? seatsBySlot[selectedSlot.id] : undefined;
+  // The write API remains the transactional authority for remaining capacity.
+  const valid = (slots.length === 0 || Boolean(selectedSlot)) && selectedSeats?.remaining !== 0;
+
+  // Fetch advisory availability when the booking sheet opens, not during page view.
+  const hasTimedSlots = slots.some((slot) => Boolean(slot.startTime));
+  useEffect(() => {
+    if (!open || !hasTimedSlots) return;
+    const controller = new AbortController();
+    fetch(`/api/public/events/${encodeURIComponent(booking.activityId)}/slot-availability`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then((response) => response.ok
+        ? response.json() as Promise<{ slots?: SlotSeats }>
+        : null)
+      .then((body) => {
+        if (!controller.signal.aborted && body?.slots) {
+          setSeatsBySlot(body.slots);
+        }
+      })
+      .catch(() => {
+        // The booking write API still validates capacity if this read fails.
+      });
+    return () => controller.abort();
+  }, [open, hasTimedSlots, booking.activityId]);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -218,6 +245,11 @@ export function EventSimpleBookingModal({
                       </RsChip>
                     ))}
                   </RsChipRow>
+                  {selectedSeats && (
+                    <p role="status" className={`mt-2 text-xs font-medium ${selectedSeats.remaining === 0 ? "text-red-700" : "text-stone-600"}`}>
+                      Свободных мест: {selectedSeats.remaining}
+                    </p>
+                  )}
                 </RsSection>
               ) : null}
             </>
