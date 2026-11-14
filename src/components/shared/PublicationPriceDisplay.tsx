@@ -31,7 +31,7 @@ export function PublicationPriceDisplay({ label, className, showLabel = true, co
           {price.amount}
         </span>
         {price.suffix && <span className="inline-flex items-center font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
-          {renderCurrencyText(price.suffix, { iconSize: "sm" })}
+          {renderCurrencyText(price.suffix, { iconSize: "md" })}
         </span>}
       </div>
     </div>
