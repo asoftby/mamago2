@@ -39,12 +39,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.wrap {
-  max-width: var(--maxw);
-  margin: 0 auto;
-  padding: 0 28px;
-}
-
 .serif {
   font-family: var(--font-display);
   font-weight: 400;
@@ -60,64 +54,6 @@
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--ink-3);
-}
-
-.breadcrumbs {
-  padding-top: 30px;
-  padding-bottom: 8px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--ink-3);
-  font-size: 13px;
-}
-.breadcrumbs a:hover {
-  color: var(--ink);
-}
-
-.heroGrid {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 48px;
-  align-items: flex-end;
-}
-.heroTitle {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(38px, 4.5vw, 58px);
-  line-height: 1.02;
-  letter-spacing: -0.03em;
-}
-.heroTitleAccent {
-  font-family: var(--font-display);
-  font-style: italic;
-  color: var(--primary);
-}
-.heroLead {
-  max-width: 540px;
-  margin-top: 22px;
-  margin-bottom: 0;
-  font-size: 18px;
-  line-height: 1.5;
-  color: var(--ink-2);
-}
-.heroSide {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-end;
-}
-.countCard {
-  padding: 14px 16px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  min-width: 240px;
-  text-align: right;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .filters {
@@ -349,20 +285,7 @@
   color: var(--ink-3);
 }
 
-@media (max-width: 900px) {
-  .heroGrid {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-  .heroSide {
-    align-items: flex-start;
-    justify-self: flex-start;
-  }
-}
 @media (max-width: 620px) {
-  .wrap {
-    padding: 0 18px;
-  }
   .recMain {
     grid-template-columns: 44px 1fr;
   }
@@ -724,4 +647,63 @@
 
 @media (max-width: 390px) {
   .businessThread { padding: 14px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Личные сообщения /me/direct: вид как у «Моя семья» (каркас AccountPage).
+   Селекторы с `.page` не затрагивают бизнес-кабинет (`.businessPage`).
+══════════════════════════════════════════════════════════════════ */
+.page {
+  --font-display: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --ink: #0a0a0a;
+  --ink-2: #404040;
+  --ink-3: #525252;
+  --line: #e7e0da;
+  --line-2: #d4cdc6;
+  min-height: 0;
+  min-width: 0;
+}
+.page .caps,
+.page .recKicker,
+.page .roleHint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.page .recCard,
+.page .topCard,
+.page .empty {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 20px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.page .recCard:hover {
+  border-color: var(--line-2);
+  transform: none;
+}
+.page .recTitle,
+.page .topCardTitle {
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+.page .emptyTitle {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.threadWrapPersonal {
+  max-width: none;
+  padding: 0 0 24px;
+}
+.threadWrapPersonal .topCard {
+  margin-top: 0;
+}
+.page .pillSolid {
+  color: #fff;
+}
+.page .pillSolid .count {
+  color: rgba(255, 255, 255, 0.7);
 }

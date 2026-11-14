@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { AccountPage } from "@/components/account/AccountPage";
 import { MessageSquare, Search } from "lucide-react";
 import type {
   ConversationTab,
@@ -71,51 +72,18 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
   const total = initialCounts.ALL;
 
   return (
+    <AccountPage
+      backHref="/me"
+      title="Мои сообщения"
+      lead={
+        total > 0
+          ? `Одна переписка на каждую организацию. Всего ${total}: ${initialCounts.ACTIVE} активны, ${initialCounts.WAITING} ждут ответа.`
+          : "Одна переписка на каждую организацию — все ваши заявки и вопросы к ней в одном месте."
+      }
+    >
     <div className={styles.page}>
-      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
-        <Link href="/me">← Профиль</Link>
-        <span style={{ opacity: 0.5 }}>→</span>
-        <span style={{ color: "var(--ink)" }}>Мои сообщения</span>
-      </div>
-
-      <section style={{ paddingTop: 20, paddingBottom: 36 }}>
-        <div className={`${styles.wrap} ${styles.heroGrid}`}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-              <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
-                ● Профиль · сообщения
-              </span>
-              <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--ink-3)" }} />
-              <span className={styles.caps}>Переписки с организациями</span>
-            </div>
-            <h1 className={styles.heroTitle}>
-              Мои <span className={styles.heroTitleAccent}>сообщения</span>
-            </h1>
-            <p className={styles.heroLead}>
-              Одна переписка на каждую организацию — все ваши заявки и вопросы к ней в одном месте.
-            </p>
-          </div>
-
-          {total > 0 ? (
-            <div className={styles.heroSide}>
-              <div className={styles.countCard}>
-                <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
-                  ● переписок
-                </span>
-                <div className={styles.serif} style={{ fontSize: 34, lineHeight: 1, letterSpacing: "-.02em" }}>
-                  {total}
-                </div>
-                <div className={styles.mono} style={{ fontSize: 11, color: "var(--ink-3)", letterSpacing: ".06em", textTransform: "uppercase" }}>
-                  ● {initialCounts.ACTIVE} активны · {initialCounts.WAITING} ждут ответа
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
       {total > 0 ? (
-        <section className={styles.wrap} style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+        <section style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
           <div className={styles.filters}>
             {TABS.map((t) => (
               <button
@@ -125,7 +93,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
                 className={`${styles.pill} ${t.value === tab ? styles.pillSolid : ""}`.trim()}
               >
                 {t.label}
-                <span className={styles.count}>{String(initialCounts[t.value]).padStart(2, "0")}</span>
+                <span className={styles.count}>{initialCounts[t.value]}</span>
               </button>
             ))}
           </div>
@@ -145,7 +113,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
         </section>
       ) : null}
 
-      <section className={styles.wrap} style={{ paddingBottom: 80 }}>
+      <section>
         {visible.length > 0 ? (
           <div className={styles.recList}>
             {visible.map((item) => (
@@ -185,6 +153,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
         )}
       </section>
     </div>
+    </AccountPage>
   );
 }
 
@@ -194,13 +163,13 @@ function EmptyState({ hasAnyConversations }: { hasAnyConversations: boolean }) {
       <div className={styles.emptySpark}>
         <MessageSquare size={32} />
       </div>
-      <h3 className={styles.emptyTitle}>
+      <h2 className={styles.emptyTitle}>
         {hasAnyConversations ? (
-          <>Ничего не <span className={styles.emptyTitleAccent}>найдено</span></>
+          <>Ничего не найдено</>
         ) : (
-          <>Здесь будут ваши <span className={styles.emptyTitleAccent}>сообщения</span></>
+          <>Здесь будут ваши сообщения</>
         )}
-      </h3>
+      </h2>
       <p className={styles.emptyLead}>
         {hasAnyConversations
           ? "Переписок с таким статусом или именем нет. Попробуйте другой фильтр или запрос."
