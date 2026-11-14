@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Surface } from "@/components/ui/surface";
 import { H2, BodyMuted } from "@/components/ui/typography";
@@ -18,8 +18,6 @@ export type FamilyMembersCardProps = {
   invites: Array<{ id: string; createdAt: string }>;
   invitesEnabled: boolean;
   hasChildren: boolean;
-  /** "account" — стиль страницы /me (токены `.mg-acc`, рендерится внутри него). */
-  variant?: "card" | "account";
 };
 
 async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; data: Record<string, unknown> }> {
@@ -41,21 +39,9 @@ const BTN =
 const BTN_PRIMARY =
   "inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50";
 
-const ACC_INPUT =
-  "min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--line-2)] bg-white px-3 text-sm !text-[15px] text-[var(--ink)]";
-
-function AccountWrap({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <div className={`card ${className ?? ""}`} style={{ padding: 20 }} data-testid="family-members-block">
-      {children}
-    </div>
-  );
-}
-
 export function FamilyMembersCard(props: FamilyMembersCardProps) {
   const router = useRouter();
-  const { myRole, adults, invites, invitesEnabled, hasChildren, variant = "card" } = props;
-  const acc = variant === "account";
+  const { myRole, adults, invites, invitesEnabled, hasChildren } = props;
   const actions = familyActions({ myRole, adultsCount: adults.length, invitesEnabled });
 
   const [busy, setBusy] = useState(false);
@@ -123,22 +109,13 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
       router.refresh();
     });
 
-  const Wrap = acc ? AccountWrap : Surface;
-  const btn = acc ? "btn btn-ghost btn-sm" : BTN;
-  const btnPrimary = acc ? "btn btn-primary btn-sm" : BTN_PRIMARY;
-  const inputCls = acc ? ACC_INPUT : "min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm";
+  const btn = BTN;
+  const btnPrimary = BTN_PRIMARY;
+  const inputCls = "min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm";
 
   return (
-    <Wrap className={acc ? undefined : "mt-6 p-5 sm:p-6"}>
-      {acc ? (
-        // A div with role="heading": the global `h1–h3 { font-weight: 600 !important; letter-spacing … }`
-        // rules do not match it, so the title can share the look of the bookings card title above.
-        <div role="heading" aria-level={2} style={{ margin: 0, fontSize: 22, lineHeight: 1.1, letterSpacing: "-.015em" }}>
-          Взрослые в семье
-        </div>
-      ) : (
-        <H2>Взрослые в семье</H2>
-      )}
+    <Surface className="mt-6 p-5 sm:p-6" data-testid="family-members-block">
+      <H2>Взрослые в семье</H2>
       <ul className="mt-3 divide-y divide-neutral-100">
         {adults.map((a) => (
           <li key={a.userId} className="flex items-center justify-between gap-3 py-2.5">
@@ -157,7 +134,7 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
       {actions.canInvite ? (
         <div className="mt-5 border-t border-neutral-100 pt-5">
           <h3 className="text-base font-semibold text-neutral-900">Пригласить взрослого</h3>
-          <BodyMuted className="mt-1 !text-[13px] md:!text-[13px]">
+          <BodyMuted className="mt-1">
             Ссылка одноразовая и действует 7 дней. Email нужен только чтобы отправить письмо — мы его не сохраняем.
           </BodyMuted>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -249,6 +226,6 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
           )}
         </div>
       ) : null}
-    </Wrap>
+    </Surface>
   );
 }

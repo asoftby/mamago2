@@ -1,15 +1,15 @@
 /* «Мои идеи и коллекции» — один набор стилей для страницы /me/ideas (data-layout="page")
    и экрана внутри виджета «Мой план» (data-layout="sheet"). Токены — из дизайн-хендоффа. */
 .root {
-  --ink: #141210;
-  --ink2: #3a332b;
-  --ink3: #6f675e;
-  --paper: #f8f5ef;
-  --ln: #ece6dd;
-  --ln2: #dcd4c9;
+  --ink: #0a0a0a;
+  --ink2: #404040;
+  --ink3: #525252;
+  --paper: #ffffff;
+  --ln: #e7e0da;
+  --ln2: #d4cdc6;
   --ac: #e86a3a;
   --acd: #c24e22;
-  --mono: var(--font-mono), Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace;
+  --mono: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   position: relative;
   min-width: 0;
   color: var(--ink);
@@ -35,32 +35,7 @@
   font-family: var(--mono);
 }
 
-/* ——— шапка страницы ——— */
-.top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 28px;
-}
-.crumbs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  color: var(--ink3);
-}
-.crumbs a {
-  color: inherit;
-  text-decoration: none;
-}
-.crumbs a:hover {
-  color: var(--ink);
-}
-.crumbs b {
-  font-weight: 600;
-  color: var(--ink);
-}
+/* ——— кнопка «Мой план» в шапке AccountPage ——— */
 .planLink {
   display: inline-flex;
   align-items: center;
@@ -77,35 +52,6 @@
 .planLink:hover {
   border-color: var(--ink);
 }
-.kick {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--acd);
-}
-.kick i {
-  display: none;
-}
-.h1 {
-  margin: 14px 0 0;
-  font-size: clamp(34px, 6vw, 56px);
-  font-weight: 800;
-  line-height: 1.02;
-  letter-spacing: -0.035em;
-}
-.lead {
-  margin: 14px 0 36px;
-  max-width: 640px;
-  font-size: 17px;
-  line-height: 1.5;
-  color: var(--ink3);
-}
-
 /* ——— секции ——— */
 .sh {
   display: flex;
@@ -164,7 +110,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 20px;
+  border-radius: var(--radius-card, 20px);
   background: var(--paper);
   border: 1px solid var(--ln);
   display: grid;
@@ -343,7 +289,7 @@
   gap: 14px;
   align-items: stretch;
   padding: 12px;
-  border-radius: 22px;
+  border-radius: var(--radius-card, 20px);
   background: var(--paper);
   border: 1px solid var(--ln);
   transition: border-color 0.2s;
@@ -398,8 +344,6 @@
 .k {
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--ink3);
   white-space: nowrap;
   overflow: hidden;
@@ -506,8 +450,6 @@ a.t:hover {
   padding: 8px 10px 4px;
   font-family: var(--mono);
   font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--ink3);
 }
 .menu button {
@@ -547,7 +489,7 @@ a.t:hover {
   text-align: center;
   margin-top: 14px;
   padding: 28px 20px;
-  border-radius: 22px;
+  border-radius: var(--radius-card, 20px);
   border: 1.5px dashed var(--ln2);
 }
 .empty b {
@@ -631,8 +573,6 @@ a.t:hover {
 }
 .sort .mono {
   font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--ink3);
   margin-right: 6px;
 }
@@ -666,7 +606,7 @@ a.t:hover {
   width: 100%;
   min-height: 84px;
   padding: 10px 16px 10px 10px !important;
-  border-radius: 22px;
+  border-radius: var(--radius-card, 20px);
   background: var(--paper) !important;
   border: 1px solid var(--ln) !important;
   text-align: left;
@@ -897,10 +837,6 @@ button.cr:hover > svg {
   }
 }
 @media (max-width: 759px) {
-  /* Phones: no top bar (breadcrumb trail and plan shortcut). */
-  .root[data-layout="page"] .top {
-    display: none;
-  }
   .root[data-layout="page"] .crow,
   .root[data-layout="page"] .chips {
     margin-left: -16px;

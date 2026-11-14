@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
-import { Container } from "@/components/ui/Container";
+import { AccountPage } from "@/components/account/AccountPage";
 import { Surface } from "@/components/ui/surface";
-import { H2, BodyMuted } from "@/components/ui/typography";
+import { BodyMuted } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
-import { ArrowLeft, PartyPopper } from "lucide-react";
+import { PartyPopper } from "lucide-react";
 import type { UserBirthdayParty } from "@/features/me/types/userBirthdayParty";
 import { sortPartiesForProfile } from "@/features/me/lib/userBirthdayPartyUi";
 import { BirthdayPartyCard } from "@/features/me/components/BirthdayPartyCard";
@@ -31,25 +31,11 @@ export default async function MeBirthdaysPage() {
   const archive = sorted.filter(isArchived);
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <Container className="max-w-4xl">
-        <div className="mb-6">
-          <Link
-            href="/me"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            К профилю
-          </Link>
-        </div>
-
-        <div className="space-y-2 mb-6">
-          <H2>Мои праздники</H2>
-          <BodyMuted className="text-sm">
-            Черновики, заявки и завершённые дни рождения
-          </BodyMuted>
-        </div>
-
+    <AccountPage
+      backHref="/me"
+      title="Мои праздники"
+      lead="Черновики, заявки и завершённые дни рождения"
+    >
         {parties.length === 0 ? (
           <Surface variant="elevated" className="p-8 text-center">
             <BodyMuted className="mb-4">
@@ -67,9 +53,9 @@ export default async function MeBirthdaysPage() {
           <div className="space-y-8">
             {active.length > 0 && (
               <section className="space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h2 className="text-base font-semibold text-neutral-900">
                   Активные
-                </h3>
+                </h2>
                 <div className="space-y-2.5">
                   {active.map((p) => (
                     <BirthdayPartyCard key={p.id} party={p} />
@@ -79,9 +65,9 @@ export default async function MeBirthdaysPage() {
             )}
             {archive.length > 0 && (
               <section className="space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h2 className="text-base font-semibold text-neutral-900">
                   Архив
-                </h3>
+                </h2>
                 <div className="space-y-2.5">
                   {archive.map((p) => (
                     <BirthdayPartyCard key={p.id} party={p} />
@@ -91,7 +77,6 @@ export default async function MeBirthdaysPage() {
             )}
           </div>
         )}
-      </Container>
-    </div>
+    </AccountPage>
   );
 }

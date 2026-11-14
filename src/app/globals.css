@@ -670,8 +670,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   }
 }
 
-/* Personal account (/me/*): one page-title size on phones. !important is needed because several
-   pages set the title size in CSS modules, inline <style> blocks or Tailwind utilities. */
+/* Личный кабинет /me/*: единый размер заголовка страницы на телефоне (эталон — «Моя семья»). */
 @media (max-width: 767px) {
   .me-page h1 {
     font-size: 34px !important;
