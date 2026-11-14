@@ -190,7 +190,6 @@ export default async function MePage({ searchParams }: PageProps) {
       userName={firstName}
       greeting={greeting}
       settingsHref="/me/settings"
-      homeHref="/"
       family={family}
       familyBlock={familyBlockProps}
       bookingsHref="/me/bookings"

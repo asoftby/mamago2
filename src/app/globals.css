@@ -669,3 +669,10 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
     font-size: 16px !important;
   }
 }
+
+/* Личный кабинет /me/*: единый размер заголовка страницы на телефоне (эталон — «Моя семья»). */
+@media (max-width: 767px) {
+  .me-page h1 {
+    font-size: 34px !important;
+  }
+}

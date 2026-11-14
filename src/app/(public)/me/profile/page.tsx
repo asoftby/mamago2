@@ -9,6 +9,7 @@ import { ChildrenCard } from "@/features/me/components/ChildrenCard";
 import { childScopeFor } from "@/server/family/familyAccess";
 import { loadFamilyBlockData } from "@/server/family/familyBlockData";
 import { FamilyMembersCard } from "@/features/family/components/FamilyMembersCard";
+import { AccountPage } from "@/components/account/AccountPage";
 import { wishlistEnabled } from "@/server/wishlist/wishlistPure";
 
 export default async function FamilyProfilePage() {
@@ -30,16 +31,11 @@ export default async function FamilyProfilePage() {
   const displayName = user.displayName?.trim() || user.email?.split("@")[0] || "Я";
 
   return (
-    <main className="mx-auto min-h-[70vh] w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <Link href="/me" className="inline-flex min-h-11 items-center text-sm text-neutral-600 hover:text-neutral-900">
-        ← Мой аккаунт
-      </Link>
-      <header className="mb-6 mt-3">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">Моя семья</h1>
-        <p className="mt-2 max-w-2xl text-neutral-600">
-          Используем профиль семьи для более точных рекомендаций и планов.
-        </p>
-      </header>
+    <AccountPage
+      backHref="/me"
+      title="Моя семья"
+      lead="Используем профиль семьи для более точных рекомендаций и планов."
+    >
       <ChildrenCard
         adult={{
           displayName,
@@ -79,6 +75,6 @@ export default async function FamilyProfilePage() {
           hasChildren={children.length > 0}
         />
       ) : null}
-    </main>
+    </AccountPage>
   );
 }
