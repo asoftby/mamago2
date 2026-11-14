@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { BookingMode } from "@prisma/client";
+import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import {
   resolveActivityBusinessIdForCreate,
   resolveActivityBusinessIdForPatch,
@@ -41,9 +43,6 @@ assert.equal(
   "creator-business",
 );
 
-
-import { BookingMode } from "@prisma/client";
-import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 
 // Real-world legacy event pattern: PUBLISHED, time-slots configured but
 // booking columns disabled because the author Business recipient is missing.
