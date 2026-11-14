@@ -34,9 +34,9 @@ async function call(url: string, method: string, body?: unknown): Promise<{ ok: 
   }
 }
 
-const btn =
+const BTN =
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-900 hover:bg-neutral-50 disabled:opacity-50";
-const btnPrimary =
+const BTN_PRIMARY =
   "inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50";
 
 export function FamilyMembersCard(props: FamilyMembersCardProps) {
@@ -109,8 +109,12 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
       router.refresh();
     });
 
+  const btn = BTN;
+  const btnPrimary = BTN_PRIMARY;
+  const inputCls = "min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm";
+
   return (
-    <Surface className="mt-6 p-5 sm:p-6">
+    <Surface className="mt-6 p-5 sm:p-6" data-testid="family-members-block">
       <H2>Взрослые в семье</H2>
       <ul className="mt-3 divide-y divide-neutral-100">
         {adults.map((a) => (
@@ -141,7 +145,7 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
               placeholder="Email (необязательно)"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm"
+              className={inputCls}
             />
             <button type="button" className={btnPrimary} disabled={busy} onClick={createInvite}>
               {email.trim() ? "Отправить приглашение" : "Создать ссылку"}
@@ -178,7 +182,7 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
             <select
               value={transferTo}
               onChange={(e) => setTransferTo(e.target.value)}
-              className="min-h-11 flex-1 rounded-xl border border-neutral-300 px-3 text-sm"
+              className={inputCls}
             >
               <option value="">Выберите взрослого</option>
               {others.map((a) => (

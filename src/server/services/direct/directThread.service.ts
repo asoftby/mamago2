@@ -2,10 +2,13 @@
  * Direct thread command layer.
  *
  * Architectural invariants enforced here (see Direct Phase 0/0.5 audit):
- *  - A thread can only be created by a customer (createDirectThread always
- *    takes the authenticated User as customerUserId — there is no
- *    "create on behalf of business" entrypoint, which is how rule
- *    "Business никогда не может создать Direct первым" is enforced).
+ *  - createDirectThread (this file) is customer-only: it always takes the
+ *    authenticated User as customerUserId and the first message is CUSTOMER.
+ *    The single exception to "business never writes first" is a reply to a
+ *    customer's BookingRequest — see openBusinessDirectThreadForBooking in
+ *    directBookingThread.service.ts (requires BookingRequest.userId and
+ *    business membership, one thread per bookingRequestId). There is still no
+ *    "create on behalf of business" entrypoint without a booking request.
  *  - A thread always resolves to exactly one owning Business via the
  *    publication (resolveBusinessFromPublication) — if the publication has
  *    no owning Business, thread creation fails (rule 5).

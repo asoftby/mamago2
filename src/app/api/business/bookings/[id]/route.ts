@@ -9,6 +9,7 @@ import {
   BookingOwnershipError,
   BookingStatusTransitionError,
 } from "@/server/services/booking/bookingQuery.service";
+import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
 
 const updateBookingSchema = z.object({
@@ -31,6 +32,7 @@ export async function GET(
   const { id } = await params;
   const item = await getBusinessBookingById(id, business.id);
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  await attachDirectAvailabilityToBusinessBookings([item]);
   return NextResponse.json(item, { headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -63,6 +65,7 @@ export async function PATCH(
       },
     });
 
+    await attachDirectAvailabilityToBusinessBookings([updatedBooking]);
     return NextResponse.json(updatedBooking);
 
   } catch (error) {

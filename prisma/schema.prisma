@@ -6497,8 +6497,11 @@ model BookingFeedback {
 // DIRECT MODULE (Phase 1 — Core)
 // ============================================================================
 // Коммуникационный слой платформы вокруг публикации (Offer/Event/Place).
-// Не чат, не мессенджер: инициирует всегда customer, business никогда не пишет
-// первым, customer не пишет customer, business не пишет business.
+// Не чат, не мессенджер: инициирует customer; business не пишет первым, кроме
+// одного исключения — ответ на заявку клиента (BookingRequest с userId): тогда
+// бизнес открывает тред с bookingRequestId (ровно один тред на заявку, см.
+// directBookingThread.service.ts). Гость без аккаунта чата не имеет.
+// customer не пишет customer, business не пишет business.
 // Сообщения immutable — soft moderation (hiddenAt) вместо edit/delete.
 // Полиморфная привязка к публикации по образцу BookingRequest (publicationType +
 // offerId/activityId/placeId nullable) вместо отдельной ConversationParticipant
@@ -6520,7 +6523,8 @@ model DirectThread {
   businessId     String
   customerUserId String
 
-  /// Опциональная связь с заявкой (BookingRequest), из которой мог вырасти Direct.
+  /// Связь с заявкой (BookingRequest). Если задана, тред мог быть открыт и бизнесом
+  /// (первое сообщение BUSINESS) — единственный путь «бизнес пишет первым».
   bookingRequestId String? @unique
 
   status DirectThreadStatus @default(OPEN)

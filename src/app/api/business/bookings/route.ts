@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { BookingStatus } from "@prisma/client";
+import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { getBusinessBookings } from "@/server/services/booking/bookingQuery.service";
 
 export async function GET(request: NextRequest) {
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
       weekStart,
     });
 
+    await attachDirectAvailabilityToBusinessBookings(result.items);
     return NextResponse.json(result);
   } catch (error) {
     console.error("[GET /api/business/bookings]", error);

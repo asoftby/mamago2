@@ -1759,6 +1759,11 @@ export interface NotifyDirectMessageParams {
   threadNumber: number;
   /** Конкретное сообщение — dedup ключ (каждое сообщение пингует отдельно). */
   messageId: string;
+  /**
+   * Первое сообщение организатора по заявке клиента (тред открыт бизнесом):
+   * другой заголовок/текст, тот же тип и тот же dedup-ключ по messageId.
+   */
+  organizerReplyToBooking?: boolean;
 }
 
 /** Уведомление о новом сообщении в Direct-треде (другой стороне). */
@@ -1777,8 +1782,12 @@ export async function notifyDirectMessage(params: NotifyDirectMessageParams) {
     userId: params.recipientUserId,
     audience: params.recipientSurface,
     type: "DIRECT_NEW_MESSAGE",
-    title: `Новое сообщение в ${formatDirectThreadNumber(params.threadNumber)}`,
-    body: "У вас новое сообщение.",
+    title: params.organizerReplyToBooking
+      ? `Организатор написал вам по заявке (${formatDirectThreadNumber(params.threadNumber)})`
+      : `Новое сообщение в ${formatDirectThreadNumber(params.threadNumber)}`,
+    body: params.organizerReplyToBooking
+      ? "Организатор ответил на вашу заявку в личных сообщениях."
+      : "У вас новое сообщение.",
     entityType: "DIRECT_THREAD",
     entityId: params.messageId,
     ctaLabel: "Открыть диалог",

@@ -4,16 +4,39 @@ import { readFileSync } from "node:fs";
 
 const source = readFileSync(new URL("./KudaMasonryListing.tsx", import.meta.url), "utf8");
 
-test("Kuda listing fills four columns at desktop widths and keeps mobile responsive", () => {
-  assert.ok(source.includes("grid grid-cols-2 items-start"));
-  assert.ok(source.includes("sm:grid-cols-3"));
-  assert.ok(source.includes("md:grid-cols-4"));
-  assert.ok(!source.includes("min-[1025px]:grid-cols-4"));
+test("Kuda listing is an ordered masonry with 2 / 3 / 4 responsive columns", () => {
+  assert.ok(source.includes("distributeIntoColumns"));
+  assert.ok(source.includes("(min-width: 640px)") && source.includes("(min-width: 768px)"));
+  assert.ok(source.includes("sm:grid-cols-3") && source.includes("md:grid-cols-4"));
+  assert.ok(source.includes("stackColumns"));
 });
 
-test("main and alternative feeds share the same ordered row grid", () => {
-  assert.ok(source.includes("<KudaListingRows items={toMasonry(primary, listing.offset)} />"));
-  assert.ok(source.includes("...toMasonry(secondary, listing.offset + primary.length)"));
+test("SSR / hydration renders each card once in feed order (no per-breakpoint DOM copies)", () => {
+  assert.ok(source.includes("columnCount == null"));
+  assert.ok(source.includes("useState<number | null>(null)"));
+  assert.ok(!source.includes("hidden sm:") && !source.includes("sm:hidden"));
+});
+
+test("main and alternative feeds both use the masonry with their own rows", () => {
+  assert.ok(source.includes("<KudaListingRows items={primaryRows} columnCount={columnCount} />"));
+  assert.ok(source.includes("<KudaListingRows items={secondaryRows} columnCount={columnCount} />"));
   assert.equal(source.split("<KudaListingRows").length - 1, 2);
-  assert.ok(!source.includes("OrderedMasonryGrid"));
+});
+
+test("no per-card observers; priority covers, analytics and back-restore are kept", () => {
+  assert.ok(!source.includes("observer.observe(card"));
+  assert.ok(source.includes("PRIORITY_COUNT") && source.includes("AnalyticsCardViewTracker"));
+  assert.ok(source.includes("isBackForwardNavigation") && source.includes("sessionStorage"));
+});
+
+test("cards are never re-parented when the column count changes (identity preserved)", () => {
+  // One container, one keyed card list: no per-column wrapper elements.
+  assert.equal(source.split("items.map(({ key, content })").length - 1, 1);
+  assert.ok(!source.includes("flex-col"));
+  assert.ok(!source.includes("columns.map("));
+  assert.ok(!source.includes("createPortal"));
+  // Positioning is imperative on the same nodes.
+  assert.ok(source.includes("card.style.transform"));
+  // Only one observer, on the container; none per card.
+  assert.equal(source.split("new ResizeObserver").length - 1, 1);
 });

@@ -102,10 +102,12 @@ type Props = {
   /** Pre-fill on resume-after-login. */
   initialValues?: Partial<FormValues>;
   bookingIntent?: boolean;
+  /** Write to the organizer about the customer's own booking request (links the thread to it). */
+  bookingRequestId?: string;
 };
 
 export function DirectRequestModal({
-  open, onOpenChange, publicationRef, publicationTitle, brandName, initialValues, bookingIntent = false,
+  open, onOpenChange, publicationRef, publicationTitle, brandName, initialValues, bookingIntent = false, bookingRequestId,
 }: Props) {
   const router = useRouter();
   const currentPath = useCurrentPath();
@@ -142,7 +144,7 @@ export function DirectRequestModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ...publicationRef, ...values }),
+        body: JSON.stringify({ ...publicationRef, ...values, ...(bookingRequestId ? { bookingRequestId } : {}) }),
       });
 
       if (res.status === 401) {

@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AccountPage } from "@/components/account/AccountPage";
 import { toast } from "@/lib/toast";
-import { RoutesHeader } from "./components/RoutesHeader";
+import { RoutesHeaderActions } from "./components/RoutesHeader";
 import { RoutesTabs, type RoutesFilter } from "./components/RoutesTabs";
 import { RoutesGrid } from "./components/RoutesGrid";
 import { RoutesEmptyState } from "./components/RoutesEmptyState";
@@ -101,7 +102,13 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
     routes.length === 0 ? "INITIAL" : filter === "DRAFT" ? "DRAFT" : "PUBLISHED";
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <AccountPage
+      backHref="/me"
+      title="Мои маршруты"
+      lead="Маршруты, которые вы создали — черновики и опубликованные"
+      actions={<RoutesHeaderActions totalCount={routes.length} />}
+    >
+      <div className="space-y-6">
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -123,8 +130,6 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <RoutesHeader totalCount={routes.length} />
-
       {routes.length > 0 ? (
         <RoutesTabs value={filter} items={tabItems} onChange={setFilter} />
       ) : null}
@@ -138,6 +143,7 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
       ) : (
         <RoutesEmptyState variant={emptyVariant} />
       )}
-    </div>
+      </div>
+    </AccountPage>
   );
 }

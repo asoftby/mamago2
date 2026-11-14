@@ -14,9 +14,11 @@
  *   - Business sees only threads on publications it owns (membership via
  *     canAccessBusinessResource — OWNER/MANAGER, or ADMIN ops override).
  *   - Admin/Moderator sees everything.
- *   - There is no "business creates a thread" path — see
- *     createDirectThread() in directThread.service.ts, which always takes
- *     the authenticated customer as the initiator.
+ *   - A business may open a thread only as a reply to a customer's
+ *     BookingRequest (openBusinessDirectThreadForBooking in
+ *     directBookingThread.service.ts); otherwise createDirectThread() in
+ *     directThread.service.ts always takes the authenticated customer as
+ *     the initiator.
  */
 
 import { NextResponse } from "next/server";

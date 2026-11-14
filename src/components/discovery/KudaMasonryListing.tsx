@@ -12,6 +12,8 @@ import {
   type FeedBucket,
   type KudaListingPage,
 } from "@/lib/discovery/kudaListingPagination";
+import { columnCountForWidth, distributeIntoColumns, estimateCardHeight, stackColumns } from "@/lib/discovery/orderedMasonry";
+import { resolvePosterFrame } from "@/lib/media/posterFrame";
 import type { ActivityMock } from "@/types/activity";
 import type { ImplicitListingFilters } from "@/features/filters/discovery/discoveryFilterParams";
 
@@ -36,12 +38,118 @@ const STORE_TTL_MS = 30 * 60 * 1000;
 /** Eager/high-priority covers: the first row(s) on phones and desktop. */
 const PRIORITY_COUNT = 4;
 
-/** The catalog preserves feed order without orphaned cards in middle columns. */
-function KudaListingRows({ items }: { items: Array<{ key: string; content: ReactNode }> }) {
+type RowItem = { key: string; content: ReactNode; coverRatio: number };
+
+const GAPS = "gap-x-5 sm:gap-x-6 lg:gap-x-8";
+
+/**
+ * Viewport-driven column count. `null` until the first client layout effect
+ * (SSR + hydration render), then 2 / 3 / 4 matching Tailwind `sm` / `md`.
+ * Only matchMedia change events trigger updates (no per-resize work).
+ */
+function useColumnCount(): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const sm = window.matchMedia("(min-width: 640px)");
+    const md = window.matchMedia("(min-width: 768px)");
+    const update = () => setCount(columnCountForWidth(md.matches ? 768 : sm.matches ? 640 : 0));
+    update();
+    sm.addEventListener("change", update);
+    md.addEventListener("change", update);
+    return () => {
+      sm.removeEventListener("change", update);
+      md.removeEventListener("change", update);
+    };
+  }, []);
+  return count;
+}
+
+const ROW_GAP_PX = 40; // gap-y-10
+
+/**
+ * Ordered masonry: cards keep feed order and each goes to the shortest column
+ * (estimated heights, see `orderedMasonry`). Append-only, so next pages never
+ * move shown cards.
+ *
+ * All cards are children of ONE container and are only positioned, never
+ * re-parented: changing the column count (or hydrating) updates classes and
+ * inline offsets of the same DOM nodes, so React keeps every card instance
+ * (no remount, no cover reload, no repeated view analytics).
+ * - SSR / hydration (`columnCount == null`): plain responsive row grid, every
+ *   card once, in feed order.
+ * - Afterwards: container is `relative`, cards are `absolute`. Column
+ *   assignment is the pure `distributeIntoColumns` (estimated heights); vertical
+ *   offsets come from real heights read in one batch (no per-card observers).
+ *   Re-layout runs on column-count change, on added cards and on container
+ *   width change (one ResizeObserver on the container).
+ *
+ * Tab order follows feed order (DOM order), but visually the cards sit in
+ * columns, so Tab jumps between columns; keeping DOM in feed order is what
+ * makes SSR/SEO order exact. This is inherent to absolute masonry.
+ */
+function KudaListingRows({ items, columnCount }: { items: RowItem[]; columnCount: number | null }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const columns = useMemo(
+    () =>
+      columnCount == null
+        ? null
+        : distributeIntoColumns(
+            items.map((item) => estimateCardHeight(item.coverRatio, columnCount)),
+            columnCount,
+          ),
+    [items, columnCount],
+  );
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || !columns) return;
+    let lastWidth = -1;
+    let frame = 0;
+    const layout = () => {
+      const width = container.clientWidth;
+      lastWidth = width;
+      const gapX = parseFloat(getComputedStyle(container).columnGap) || 0;
+      const count = columns.length;
+      const colWidth = (width - gapX * (count - 1)) / count;
+      const cards = Array.from(container.children) as HTMLElement[];
+      // Write widths first, then read heights once (single reflow).
+      cards.forEach((card) => {
+        card.style.width = `${colWidth}px`;
+      });
+      const heights = cards.map((card) => card.offsetHeight);
+      const stacked = stackColumns(columns, heights, ROW_GAP_PX);
+      cards.forEach((card, index) => {
+        card.style.transform = `translate(${stacked.columnOf[index] * (colWidth + gapX)}px, ${stacked.tops[index]}px)`;
+      });
+      container.style.height = `${stacked.height}px`;
+    };
+    layout();
+    const observer = new ResizeObserver(() => {
+      if (container.clientWidth === lastWidth) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(layout);
+    });
+    observer.observe(container);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [columns]);
+
+  const masonry = columns != null;
   return (
-    <div className="grid grid-cols-2 items-start gap-x-5 gap-y-10 sm:grid-cols-3 sm:gap-x-6 md:grid-cols-4 lg:gap-x-8">
+    <div
+      ref={containerRef}
+      className={
+        masonry
+          ? `relative ${GAPS}`
+          : `grid grid-cols-2 items-start gap-y-10 sm:grid-cols-3 md:grid-cols-4 ${GAPS}`
+      }
+    >
       {items.map(({ key, content }) => (
-        <div key={key} className="min-w-0">{content}</div>
+        <div key={key} className={masonry ? "absolute left-0 top-0 min-w-0" : "min-w-0"}>
+          {content}
+        </div>
       ))}
     </div>
   );
@@ -83,7 +191,7 @@ function isBackForwardNavigation(): boolean {
  *
  * - SSR renders exactly the requested page (indexable, see CityShell). The
  *   client appends next pages from `/api/discovery/events/page` to the same
- *   row-aligned grid, so an incomplete final row always starts at the left.
+ *   same ordered masonry (shortest column first), so shown cards never move.
  * - Back from an event: loaded pages and scroll position
  *   are restored from sessionStorage (keyed by the listing URL).
  * - The «Популярное у других семей» layer keeps its position after all
@@ -109,6 +217,7 @@ export function KudaMasonryListing({
   const [totalPages, setTotalPages] = useState(listing.totalPages);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const columnCount = useColumnCount();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const restoredRef = useRef(false);
   const pendingScrollRef = useRef<number | null>(null);
@@ -142,11 +251,11 @@ export function KudaMasonryListing({
   }, [storeKey, listing.items]);
 
   useLayoutEffect(() => {
-    if (pendingScrollRef.current == null) return;
+    if (pendingScrollRef.current == null || columnCount == null) return;
     const y = pendingScrollRef.current;
     pendingScrollRef.current = null;
     window.scrollTo(0, y);
-  }, [items]);
+  }, [items, columnCount]);
 
   // Persist loaded pages + scroll; mark the history entry for soft back nav.
   const snapshotRef = useRef<StoredListing | null>(null);
@@ -227,12 +336,13 @@ export function KudaMasonryListing({
   const primary = useMemo(() => items.filter((item) => item.feedBucket === "primary"), [items]);
   const secondary = useMemo(() => items.filter((item) => item.feedBucket === "secondary"), [items]);
 
-  const toMasonry = (list: KudaListingItem[], positionBase: number) =>
+  const toMasonry = useCallback((list: KudaListingItem[], positionBase: number): RowItem[] =>
     list.map((activity, index) => {
       const position = positionBase + index;
       const card = activityMockToEventCard(activity, citySlug);
       return {
         key: activity.id,
+        coverRatio: resolvePosterFrame(card.imageWidth, card.imageHeight).ratio,
         content: (
           <AnalyticsCardViewTracker
             threshold={0.5}
@@ -266,7 +376,14 @@ export function KudaMasonryListing({
           </AnalyticsCardViewTracker>
         ),
       };
-    });
+    }),
+    [citySlug, filterSummary],
+  );
+  const primaryRows = useMemo(() => toMasonry(primary, listing.offset), [toMasonry, primary, listing.offset]);
+  const secondaryRows = useMemo(
+    () => toMasonry(secondary, listing.offset + primary.length),
+    [toMasonry, secondary, listing.offset, primary.length],
+  );
 
   const nextHref = listingPageHref(pathname, query, lastPage + 1);
   const prevHref = listing.page > 1 ? listingPageHref(pathname, query, listing.page - 1) : null;
@@ -274,13 +391,13 @@ export function KudaMasonryListing({
   return (
     <div className="space-y-8">
       {primary.length > 0 ? (
-        <KudaListingRows items={toMasonry(primary, listing.offset)} />
+        <KudaListingRows items={primaryRows} columnCount={columnCount} />
       ) : null}
 
       {secondary.length > 0 && listing.secondaryHeading ? (
         <div className="space-y-4">
           <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">{listing.secondaryHeading}</h2>
-          <KudaListingRows items={toMasonry(secondary, listing.offset + primary.length)} />
+          <KudaListingRows items={secondaryRows} columnCount={columnCount} />
         </div>
       ) : null}
 

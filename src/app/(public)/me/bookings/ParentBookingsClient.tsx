@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import { AccountPage } from "@/components/account/AccountPage";
 import type { ParentBookingsResult, ParentBookingItem } from "@/server/services/booking/parentBookings.service";
-import { Reveal } from "./components/Reveal";
 import { IcCalendar } from "./components/icons";
 import { BookingRecordCard } from "./components/BookingRecordCard";
 import { BookingEmptyStateActions } from "./BookingEmptyStateActions";
@@ -60,65 +59,18 @@ export function ParentBookingsClient({ bookings }: Props) {
   const total = counts.ALL;
 
   return (
-    <div className={styles.page}>
-      {/* Breadcrumbs */}
-      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
-        <Link href="/me">← Профиль</Link>
-        <span style={{ opacity: 0.5 }}>→</span>
-        <span style={{ color: "var(--ink)" }}>Мои записи</span>
-      </div>
-
-      {/* Hero */}
-      <section style={{ paddingTop: 20, paddingBottom: 36 }}>
-        <div className={`${styles.wrap} ${styles.heroGrid}`}>
-          <Reveal>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-              <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
-                ● Профиль · записи
-              </span>
-              <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--ink-3)" }} />
-              <span className={styles.caps}>Заявки и брони</span>
-            </div>
-            <h1 className={styles.heroTitle}>
-              Мои{" "}
-              <span className={styles.heroTitleAccent}>записи</span>
-            </h1>
-            <p className={styles.heroLead}>
-              Заявки на&nbsp;занятия, лагеря и&nbsp;мероприятия. Следите за&nbsp;статусом — мы&nbsp;напомним
-              накануне каждой.
-            </p>
-          </Reveal>
-
-          {total > 0 ? (
-            <Reveal className={styles.heroSide}>
-              <div className={styles.countCard}>
-                <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
-                  ● в записях
-                </span>
-                <div className={styles.serif} style={{ fontSize: 34, lineHeight: 1, letterSpacing: "-.02em" }}>
-                  {total} {pluralBookings(total)}
-                </div>
-                <div
-                  className={styles.mono}
-                  style={{
-                    fontSize: 11,
-                    color: "var(--ink-3)",
-                    letterSpacing: ".06em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  ● {counts.ACTIVE} активны · {counts.COMPLETED} завершены
-                </div>
-              </div>
-            </Reveal>
-          ) : null}
-        </div>
-      </section>
-
-      {/* Filters */}
-      {total > 0 ? (
-        <section className={styles.wrap} style={{ marginBottom: 24 }}>
-          <Reveal className={styles.filters}>
+    <AccountPage
+      backHref="/me"
+      title="Мои записи"
+      lead={
+        total > 0
+          ? `Заявки на занятия, лагеря и мероприятия. Всего ${total} ${pluralBookings(total)}: ${counts.ACTIVE} активны, ${counts.COMPLETED} завершены. Мы напомним накануне каждой.`
+          : "Заявки на занятия, лагеря и мероприятия. Следите за статусом — мы напомним накануне каждой."
+      }
+    >
+      <div className={styles.page}>
+        {total > 0 ? (
+          <div className={styles.filters}>
             {FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -127,15 +79,12 @@ export function ParentBookingsClient({ bookings }: Props) {
                 className={`${styles.pill} ${f.value === filter ? styles.pillSolid : ""}`.trim()}
               >
                 {f.label}
-                <span className={styles.count}>{String(counts[f.value]).padStart(2, "0")}</span>
+                <span className={styles.count}>{counts[f.value]}</span>
               </button>
             ))}
-          </Reveal>
-        </section>
-      ) : null}
+          </div>
+        ) : null}
 
-      {/* List / Empty */}
-      <section className={styles.wrap} style={{ paddingBottom: 80 }}>
         {visible.length > 0 ? (
           <div className={styles.recList}>
             {visible.map((b) => (
@@ -145,30 +94,28 @@ export function ParentBookingsClient({ bookings }: Props) {
         ) : (
           <EmptyState empty={total === 0} />
         )}
-      </section>
-    </div>
+      </div>
+    </AccountPage>
   );
 }
 
 function EmptyState({ empty }: { empty: boolean }) {
   return (
-    <Reveal className={styles.empty}>
+    <div className={styles.empty}>
       <div className={styles.emptySpark}>
         <IcCalendar />
       </div>
-      <h3 className={styles.emptyTitle}>
+      <h2 className={styles.emptyTitle}>
         {empty ? (
           <>
-            Здесь будут{" "}
-            <span className={styles.emptyTitleAccent}>ваши записи</span>
+            Здесь будут ваши записи
           </>
         ) : (
           <>
-            В этой группе{" "}
-            <span className={styles.emptyTitleAccent}>пока пусто</span>
+            В этой группе пока пусто
           </>
         )}
-      </h3>
+      </h2>
       <p className={styles.emptyLead}>
         {empty
           ? "Когда вы запишетесь на занятие, лагерь или мероприятие — всё появится здесь."
@@ -180,6 +127,6 @@ function EmptyState({ empty }: { empty: boolean }) {
           kudaButtonClassName={`${styles.btn} ${styles.btnGhost}`}
         />
       </div>
-    </Reveal>
+    </div>
   );
 }

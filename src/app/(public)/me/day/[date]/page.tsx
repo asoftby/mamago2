@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPlanItemsByDate } from "@/server/services/plan.service";
-import { Container } from "@/components/ui/Container";
+import { AccountPage } from "@/components/account/AccountPage";
 import { CalendarDays, ExternalLink } from "lucide-react";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -34,15 +34,7 @@ export default async function DayPage({ params }: PageProps) {
   });
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <Container className="max-w-2xl">
-        <div className="mb-6">
-          <Link href="/me/plan" className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors">
-            ← Мой план
-          </Link>
-          <h1 className="text-2xl font-bold text-neutral-900 mt-1 capitalize">{dateLabel}</h1>
-        </div>
-
+    <AccountPage backHref="/me/plan" backLabel="← Мой план" title={<span className="capitalize">{dateLabel}</span>}>
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center mb-4">
@@ -64,7 +56,7 @@ export default async function DayPage({ params }: PageProps) {
               const unavailable =
                 availability === "business_disabled" || availability === "missing_activity";
               return (
-                <div key={item.id} className="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white">
+                <div key={item.id} className="flex items-center gap-3.5 px-4 py-3.5 rounded-[var(--radius-card)] border border-border bg-card shadow-sm">
                   <div className="w-8 h-8 rounded-xl bg-neutral-900 text-white flex items-center justify-center text-sm font-bold shrink-0">
                     {index + 1}
                   </div>
@@ -101,7 +93,6 @@ export default async function DayPage({ params }: PageProps) {
             })}
           </div>
         )}
-      </Container>
-    </div>
+    </AccountPage>
   );
 }
