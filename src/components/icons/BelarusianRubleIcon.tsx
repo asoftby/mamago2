@@ -4,7 +4,7 @@ import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 
 interface BelarusianRubleIconProps {
   className?: string;
-  size?: "default" | "sm" | "card" | "text" | "xs" | "storyPrice";
+  size?: "default" | "sm" | "md" | "mono" | "card" | "text" | "xs" | "storyPrice";
 }
 
 const ICON_SIZE = {
@@ -14,11 +14,15 @@ const ICON_SIZE = {
   /** Крупные суммы (text-3xl / text-4xl) */
   xs: { width: "0.5em", height: "0.62em", align: "-0.05em", translateY: undefined },
   sm: { width: "0.56em", height: "0.72em", align: "middle", translateY: "-0.03em" },
+  md: { width: "0.84em", height: "1.08em", align: "baseline", translateY: undefined },
+  mono: { width: "0.59em", height: "0.73em", align: "baseline", translateY: undefined },
   /** Event and offer card prices: 1px taller than the previous 12px caption glyph. */
   card: { width: "calc(0.56em + 0.78px)", height: "calc(0.72em + 1px)", align: "middle", translateY: "-0.03em" },
   /** Story modal price: visually matches the cap height of 17px price text. */
   storyPrice: { width: "0.69em", height: "0.86em", align: "-0.08em", translateY: undefined },
 } as const;
+
+const BASELINE_SIZES: ReadonlySet<keyof typeof ICON_SIZE> = new Set(["text", "xs", "storyPrice", "md", "mono"]);
 
 /**
  * Официальный графический символ белорусского рубля (BYN).
@@ -74,7 +78,7 @@ export function renderPriceWithIcon(
     <span
       className={cn(
         "inline-flex gap-[0.18em] leading-none",
-        iconSize === "text" || iconSize === "xs" || iconSize === "storyPrice" ? "items-baseline" : "items-center align-middle",
+        BASELINE_SIZES.has(iconSize) ? "items-baseline" : "items-center align-middle",
       )}
     >
       {parts.flatMap((part, i) => {
