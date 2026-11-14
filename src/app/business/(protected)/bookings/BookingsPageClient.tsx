@@ -1622,7 +1622,7 @@ export function BookingDetailsDrawer({
           {isConfirmed ? (
             <div className="mt-5 flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3.5 text-[15px] leading-snug text-emerald-800">
               <Check className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Запись подтверждена. Клиент получил уведомление.</span>
+              <span>Запись подтверждена. При необходимости свяжитесь с клиентом.</span>
             </div>
           ) : null}
 
