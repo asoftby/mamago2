@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
+import { resolveActivityBusinessIdForPatch } from "@/lib/auth/activityBusinessResolution";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -199,6 +200,7 @@ export async function PATCH(
         title: true,
         description: true,
         businessId: true,
+        ownerUserId: true,
         cityId: true,
         nextOccurrenceAt: true,
         scheduleJson: true,
@@ -305,6 +307,20 @@ export async function PATCH(
         placeRow,
         existing.businessId,
       );
+    }
+    // Legacy author-owned events may have no booking recipient. Recover only
+    // the author's own business, never the current editor's or organizer's.
+    // A venue-linked business and any existing event recipient are preserved.
+    if (nextBusinessId === undefined && !existing.businessId) {
+      const authorBusiness = await prisma.business.findUnique({
+        where: { ownerUserId: existing.ownerUserId },
+        select: { id: true },
+      });
+      const resolved = resolveActivityBusinessIdForPatch({
+        existingBusinessId: existing.businessId,
+        authorBusinessId: authorBusiness?.id ?? null,
+      });
+      if (resolved) nextBusinessId = resolved;
     }
     perf.mark("place-check");
 
