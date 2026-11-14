@@ -113,23 +113,26 @@ export function EventSimpleBookingModal({
   const hasTimedSlots = slots.some((slot) => Boolean(slot.startTime));
   useEffect(() => {
     if (!open || !hasTimedSlots) return;
-    const controller = new AbortController();
+    // Do not abort the request during sheet cleanup: a development AbortError
+    // can surface in the React overlay. Ignore results after closing instead.
+    let cancelled = false;
     fetch(`/api/public/events/${encodeURIComponent(booking.activityId)}/slot-availability`, {
-      signal: controller.signal,
       cache: "no-store",
     })
       .then((response) => response.ok
         ? response.json() as Promise<{ slots?: SlotSeats }>
         : null)
       .then((body) => {
-        if (!controller.signal.aborted && body?.slots) {
+        if (!cancelled && body?.slots) {
           setSeatsBySlot(body.slots);
         }
       })
       .catch(() => {
         // The booking write API still validates capacity if this read fails.
       });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [open, hasTimedSlots, booking.activityId]);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
@@ -183,6 +186,8 @@ export function EventSimpleBookingModal({
       setTimeId("");
       setParticipants(INITIAL_PARTICIPANTS_DRAFT);
       setParticipantErrors({});
+      // Never show an outdated seat count when the sheet is reopened.
+      setSeatsBySlot({});
     }
     onOpenChange(val);
   }
