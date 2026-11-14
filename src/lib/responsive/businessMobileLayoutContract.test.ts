@@ -21,7 +21,7 @@ assert.match(bookings, /inline:\s*"center"/, "Selected mobile booking day should
 assert.match(bookings, /hidden overflow-hidden[^\n]*sm:block/, "The dense seven-column month grid must be tablet/desktop only");
 assert.match(bookings, /min-h-11 shrink-0 snap-start/, "Booking filter rails must keep 44px snap targets");
 assert.match(bookings, /h-\[92dvh\]/, "Booking detail sheet must use dynamic viewport height");
-assert.match(bookings, /grid grid-cols-1 gap-3 sm:flex/, "Booking detail actions must stack on phones");
+assert.match(bookings, /flex flex-col gap-1 md:flex-row-reverse/, "Booking detail actions must stack on phones");
 assert.match(balance, /break-words text-3xl[^\n]*sm:text-5xl/, "Long balance values must wrap and scale on phones");
 assert.match(history, /divide-y divide-stone-100 md:hidden/, "Billing history must use operational cards on phones");
 assert.match(history, /hidden md:block/, "Billing table must remain available from tablet width");
@@ -31,3 +31,16 @@ assert.match(reviews, /safe-area-inset-bottom/, "Review reply actions must accou
 assert.doesNotMatch(reviews, /max-h-\[90vh\]/, "Review modal must not regress to a fixed desktop viewport height");
 
 console.log("businessMobileLayoutContract.test.ts: OK");
+
+// BYN glyph U+E901 is a private-use font glyph: it must never reach the DOM as text in booking prices.
+assert.doesNotMatch(
+  bookings.replace(/\\uE901/gi, ""),
+  //,
+  "Booking prices must not embed the raw BYN glyph",
+);
+assert.equal(
+  (bookings.match(/renderCurrencyText\(/g) ?? []).length >= 4,
+  true,
+  "Every booking price must be rendered through renderCurrencyText",
+);
+assert.doesNotMatch(bookings, /\{price \?\? "—"\}|\{formatPriceLabel\(booking\) \?\? "—"\}/, "Raw price strings must not be rendered as text");

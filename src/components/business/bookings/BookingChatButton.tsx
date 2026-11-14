@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * «Написать клиенту» / «Открыть чат» для заявки в кабинете бизнеса.
+ * «Написать клиенту» для заявки в кабинете бизнеса, встроенное в модалку деталей заявки.
  *
- * - гостевая заявка (нет аккаунта) → ничего не рисуем, вызывающий код оставляет телефон;
- * - тред уже есть → «Открыть чат» (ссылка в /business/direct/{id});
- * - политика платформы отключила Direct → понятное состояние вместо кнопки;
- * - иначе форма первого сообщения → POST /api/business/bookings/{id}/direct.
+ * - `BookingChatButton`: кнопка. Гостевая заявка (нет аккаунта) → ничего; тред уже есть →
+ *   «Открыть чат» (ссылка в /business/direct/{id}); политика платформы отключила Direct →
+ *   для иконки ничего, для большой кнопки понятное состояние; иначе вызывает `onCompose`.
+ * - `BookingChatComposer`: отдельный шаг внутри модалки (форма первого сообщения →
+ *   POST /api/business/bookings/{id}/direct).
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, MessageCircle } from "lucide-react";
-import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
+import { ChevronLeft, Loader2, MessageCircle, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 
 export type BookingChatTarget = {
@@ -24,44 +24,87 @@ export type BookingChatTarget = {
   directAvailable: boolean | null;
 };
 
-type Props = {
-  booking: BookingChatTarget;
-  /** Called with the thread id after a thread was created or found. */
-  onOpened?: (threadId: string) => void;
-  className?: string;
-  /** Same size as the drawer's primary actions. */
-  large?: boolean;
-};
-
 const MAX_LEN = 2000;
-const buttonClass =
-  "inline-flex h-10 items-center gap-2 rounded-full border border-stone-200 bg-white px-4 text-[14px] font-medium text-stone-800 transition-colors hover:border-stone-400";
+const iconClass =
+  "flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-800 transition hover:bg-stone-50";
+const wideClass =
+  "inline-flex h-12 w-full items-center justify-center rounded-2xl border border-stone-300 bg-white px-6 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-50";
 
-export function BookingChatButton({ booking, onOpened, className: extra, large }: Props) {
-  const className = [large ? "!h-14 w-full justify-center !rounded-2xl !px-6 !text-sm !font-semibold sm:w-auto" : "", extra ?? ""].join(" ");
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+export function BookingChatButton({
+  booking,
+  onCompose,
+  iconOnly,
+}: {
+  booking: BookingChatTarget;
+  onCompose: () => void;
+  /** Round icon-only button (next to the phone action). */
+  iconOnly?: boolean;
+}) {
   if (!booking.hasCustomerAccount) return null;
+  const className = iconOnly ? iconClass : wideClass;
+  const icon = iconOnly ? <MessageCircle className="h-5 w-5" /> : null;
+  const label = iconOnly ? null : "Написать клиенту";
 
   if (booking.directThreadId) {
     return (
-      <Link href={`/business/direct/${booking.directThreadId}`} className={`${buttonClass} ${className ?? ""}`}>
-        <MessageCircle className="h-4 w-4" /> Открыть чат
+      <Link
+        href={`/business/direct/${booking.directThreadId}`}
+        className={className}
+        aria-label={iconOnly ? "Открыть чат" : undefined}
+      >
+        {icon}
+        {iconOnly ? null : "Открыть чат"}
       </Link>
     );
   }
 
   if (booking.directAvailable === false) {
+    if (iconOnly) return null;
     return (
-      <p className={`text-[13px] text-stone-500 ${className ?? ""}`}>
+      <p className="text-center text-[13px] text-stone-500">
         Сообщения клиентам для этого типа публикаций сейчас отключены платформой. Свяжитесь по телефону.
       </p>
     );
   }
+
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={onCompose}
+      aria-label={iconOnly ? "Написать клиенту" : undefined}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+/** Chat step rendered inside the details drawer in place of the details view. */
+export function BookingChatComposer({
+  booking,
+  subtitle,
+  active,
+  onBack,
+  onClose,
+}: {
+  booking: BookingChatTarget;
+  subtitle?: string;
+  /** True while the step is visible; focuses the field when it becomes visible. */
+  active: boolean;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setTimeout(() => fieldRef.current?.focus({ preventScroll: true }), 320);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     const text = message.trim();
@@ -83,8 +126,6 @@ export function BookingChatButton({ booking, onOpened, className: extra, large }
         return;
       }
       toast.success("Сообщение отправлено");
-      setOpen(false);
-      onOpened?.(json.threadId);
       router.push(`/business/direct/${json.threadId}`);
     } catch {
       setError("Ошибка соединения. Попробуйте ещё раз.");
@@ -95,48 +136,64 @@ export function BookingChatButton({ booking, onOpened, className: extra, large }
 
   return (
     <>
-      <button type="button" className={`${buttonClass} ${className ?? ""}`} onClick={() => setOpen(true)}>
-        <MessageCircle className="h-4 w-4" /> Написать клиенту
-      </button>
-      <ResponsiveOverlay
-        open={open}
-        onOpenChange={(v) => {
-          if (!submitting) setOpen(v);
-        }}
-        a11yTitle="Написать клиенту"
-        variant="framed"
-        title="Написать клиенту"
-        subtitle={booking.customerName ? `Заявка от ${booking.customerName}` : undefined}
-        footer={
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4 sm:px-6 sm:pt-6">
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={submit}
+            onClick={onBack}
             disabled={submitting}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1 rounded-full pl-2 pr-4 text-[15px] font-semibold text-stone-800 transition hover:bg-stone-100 disabled:opacity-60"
           >
-            {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Отправить"}
+            <ChevronLeft className="h-5 w-5" />
+            Заявка
           </button>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value.slice(0, MAX_LEN))}
-            rows={5}
-            placeholder="Например: здравствуйте! Подтверждаем возможность записи, уточните, пожалуйста…"
-            className="w-full resize-none rounded-2xl border border-stone-200 bg-stone-50 p-3 text-[15px] text-stone-900 outline-none focus:border-[#EF8759]"
-          />
-          <p className="text-[12px] text-stone-500">
-            Клиент получит уведомление и ответит в личных сообщениях. Не отправляйте телефоны и ссылки на внешние
-            мессенджеры — такие сообщения отмечаются системой безопасности.
-          </p>
-          {error ? (
-            <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              {error}
-            </p>
-          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-stone-800 transition hover:bg-stone-100"
+            aria-label="Закрыть детали"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-      </ResponsiveOverlay>
+
+        <h3 className="mt-5 text-[1.6rem] font-bold leading-tight tracking-tight text-stone-950 sm:text-[1.75rem]">
+          Написать клиенту
+        </h3>
+        <div className="mt-2 text-[15px] text-stone-600">
+          {booking.customerName ? `Заявка от ${booking.customerName}` : null}
+          {subtitle ? <span className="block text-[13px] text-stone-500">{subtitle}</span> : null}
+        </div>
+
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value.slice(0, MAX_LEN))}
+          rows={7}
+          ref={fieldRef}
+          placeholder="Например: здравствуйте! Подтверждаем возможность записи, уточните, пожалуйста…"
+          className="mt-5 w-full resize-none rounded-2xl border border-stone-200 bg-stone-50 p-4 text-[15px] text-stone-900 outline-none focus:border-stone-400"
+        />
+        <p className="mt-3 text-[13px] leading-5 text-stone-500">
+          Клиент получит уведомление и ответит в личных сообщениях. Не отправляйте телефоны и ссылки на внешние
+          мессенджеры — такие сообщения отмечаются системой безопасности.
+        </p>
+        {error ? (
+          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            {error}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="shrink-0 border-t border-stone-200 bg-white px-5 pb-5 pt-4 sm:px-6">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={submitting}
+          className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-stone-950 px-6 text-base font-semibold text-white transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70"
+        >
+          {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Отправить"}
+        </button>
+      </div>
     </>
   );
 }
