@@ -308,20 +308,6 @@ export async function PATCH(
         existing.businessId,
       );
     }
-    // Legacy author-owned events may have no booking recipient. Recover only
-    // the author's own business, never the current editor's or organizer's.
-    // A venue-linked business and any existing event recipient are preserved.
-    if (nextBusinessId === undefined && !existing.businessId) {
-      const authorBusiness = await prisma.business.findUnique({
-        where: { ownerUserId: existing.ownerUserId },
-        select: { id: true },
-      });
-      const resolved = resolveActivityBusinessIdForPatch({
-        existingBusinessId: existing.businessId,
-        authorBusinessId: authorBusiness?.id ?? null,
-      });
-      if (resolved) nextBusinessId = resolved;
-    }
     perf.mark("place-check");
 
     // Merge, а не полная замена: неизвестные форме ключи scheduleJson
@@ -333,6 +319,27 @@ export async function PATCH(
             (body.scheduleJson ?? {}) as Record<string, unknown>,
           )
         : ((existing.scheduleJson ?? {}) as Record<string, unknown>);
+
+    // Only assign a booking recipient when internal booking is requested.
+    // A normal informational event must not silently join a Business.
+    const mode = nextScheduleJson.participationMode;
+    const usesInternalBooking =
+      existing.bookingEnabled ||
+      mode === "time-slots" ||
+      mode === "simple-booking" ||
+      mode === "request" ||
+      (mode === "prebook" && nextScheduleJson.prebookMethod === "internal");
+    if (usesInternalBooking && nextBusinessId === undefined && !existing.businessId) {
+      const authorBusiness = await prisma.business.findUnique({
+        where: { ownerUserId: existing.ownerUserId },
+        select: { id: true },
+      });
+      const resolved = resolveActivityBusinessIdForPatch({
+        existingBusinessId: existing.businessId,
+        authorBusinessId: authorBusiness?.id ?? null,
+      });
+      if (resolved) nextBusinessId = resolved;
+    }
 
     const organizerInput =
       body.organizerInput && typeof body.organizerInput === "object"
