@@ -63,7 +63,8 @@ export function SettingsScaffold(props: {
     <SettingsPageLayout
       title={props.title}
       maxWidthClassName={props.maxWidthClassName}
-      fallbackHref={homeHref}
+      backHref={props.currentSectionId === "home" ? (props.context.surfaceScope === "ADMIN" ? "/admin" : "/me") : homeHref}
+      backLabel={props.currentSectionId === "home" ? (props.context.surfaceScope === "ADMIN" ? "← Админка" : "← Мой аккаунт") : "← Настройки"}
     >
       {sections}
     </SettingsPageLayout>

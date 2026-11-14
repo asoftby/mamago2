@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { AccountPage } from "@/components/account/AccountPage";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
@@ -39,17 +40,12 @@ export default async function WishlistsPage({ searchParams }: PageProps) {
   const archived = wishlists.filter((w) => w.status === "ARCHIVED");
 
   return (
-    <main className="mx-auto min-h-[70vh] w-full max-w-3xl px-4 py-8 sm:px-6">
-      <Link href="/me/profile" className="inline-flex min-h-11 items-center text-sm text-neutral-600 hover:text-neutral-900">
-        ← Моя семья
-      </Link>
-      <header className="mb-6 mt-3">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-950">Списки желаний</h1>
-        <p className="mt-2 text-neutral-600">
-          Составьте список подарков и поделитесь ссылкой: гости отметят, что берут, без регистрации.
-        </p>
-      </header>
-
+    <AccountPage
+      backHref="/me/profile"
+      backLabel="← Моя семья"
+      title="Списки желаний"
+      lead="Составьте список подарков и поделитесь ссылкой: гости отметят, что берут, без регистрации."
+    >
       {active.length > 0 ? (
         <ul className="mb-6 space-y-2">
           {active.map((w) => (
@@ -74,7 +70,7 @@ export default async function WishlistsPage({ searchParams }: PageProps) {
           </ul>
         </section>
       ) : null}
-    </main>
+    </AccountPage>
   );
 }
 
@@ -89,7 +85,7 @@ function WishlistRow({
   return (
     <Link
       href={`/me/wishlists/${w.id}`}
-      className="block rounded-2xl border border-neutral-200 bg-white p-4 hover:border-neutral-300"
+      className="block rounded-[var(--radius-card)] border border-border bg-card p-4 shadow-sm hover:border-neutral-300"
     >
       <span className="block font-medium text-neutral-950">{w.title}</span>
       <span className="mt-0.5 block text-sm text-neutral-600">{meta}</span>
