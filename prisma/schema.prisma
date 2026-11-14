@@ -6362,6 +6362,8 @@ model BookingRequest {
   // Данные ребёнка (для лагерей и детских занятий)
   childName String?
   childAge  Int?
+  /// Дети в заявке на событие: [{ name: string|null, age: number|null }]. Только имя и возраст (zod: storedBookingChildrenSchema).
+  participantChildren Json?
 
   // Количество
   adultsCount   Int @default(1)

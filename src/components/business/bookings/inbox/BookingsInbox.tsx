@@ -270,6 +270,12 @@ function InboxCard({
             {item.title ?? (isParty ? "Заявка на праздник" : "Заявка")}
           </h3>
           <p className="text-sm text-stone-600">{formatInboxSchedule(item)}</p>
+          {item.participantsSummary ? (
+            <p className="text-sm text-stone-500">
+              {item.participantsSummary}
+              {item.participantsAgeMismatch ? <span className="ml-2 text-amber-600">· возраст вне диапазона события</span> : null}
+            </p>
+          ) : null}
           <p className={cn("flex items-center gap-1.5 text-sm", urgent ? "font-medium text-sky-800" : "text-stone-500")}>
             <Clock3 className="h-4 w-4 shrink-0" />
             {hint}

@@ -12,6 +12,12 @@ import { buildBookingDisplay } from "./booking.formatters";
 import type { BookingDisplay } from "./booking.types";
 import { recordStatusChanged } from "./bookingActivity.service";
 import {
+  childrenOutsideEventAge,
+  eventAgeRuleFromActivity,
+  parseStoredChildren,
+  type StoredBookingChild,
+} from "@/lib/booking/bookingParticipants";
+import {
   notifyUserBookingConfirmed,
   notifyUserBookingCancelled,
   notifyUserBookingCompleted,
@@ -83,6 +89,12 @@ export interface BusinessBookingItem {
   // Counts
   adultsCount: number;
   childrenCount: number;
+  /** Дети из заявки (только имя и возраст). */
+  participantChildren: StoredBookingChild[];
+  /** Дети, чей возраст вне диапазона события (мягкая пометка, решение за бизнесом). */
+  participantsOutsideAge: StoredBookingChild[];
+  /** Подпись диапазона события, если он задан («6–11 лет»). */
+  eventAgeLabel: string | null;
 
   // Date/time (for non-camp bookings)
   requestedDate: string | null;
@@ -149,7 +161,10 @@ const BOOKING_SELECT = {
   placeId: true,
   offer: { select: { id: true, title: true, slug: true, priceFrom: true, priceText: true } },
   activity: {
-    select: { id: true, title: true, slug: true, priceFrom: true, priceText: true, currency: true },
+    select: {
+      id: true, title: true, slug: true, priceFrom: true, priceText: true, currency: true,
+      agePolicy: true, ageTags: true, ageMinMonths: true, ageMaxMonths: true,
+    },
   },
   place: { select: { id: true, title: true, slug: true } },
 
@@ -173,6 +188,7 @@ const BOOKING_SELECT = {
 
   childName: true,
   childAge: true,
+  participantChildren: true,
 
   adultsCount: true,
   childrenCount: true,
@@ -229,6 +245,10 @@ function mapBooking(raw: {
     priceFrom: number | null;
     priceText: string | null;
     currency: string | null;
+    agePolicy?: string | null;
+    ageTags?: string[] | null;
+    ageMinMonths?: number | null;
+    ageMaxMonths?: number | null;
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
   classGroupId: string | null;
@@ -249,6 +269,7 @@ function mapBooking(raw: {
   customerComment: string | null;
   childName: string | null;
   childAge: number | null;
+  participantChildren?: unknown;
   adultsCount: number;
   childrenCount: number;
   requestedDate: Date | null;
@@ -288,6 +309,8 @@ function mapBooking(raw: {
   });
 
   const { isStale, staleType } = computeStale(raw.status, raw.createdAt, raw.lastActivityAt);
+  const participantChildren = parseStoredChildren(raw.participantChildren);
+  const ageRule = eventAgeRuleFromActivity(raw.activity);
 
   return {
     id: raw.id,
@@ -301,7 +324,16 @@ function mapBooking(raw: {
     activityId: raw.activityId,
     placeId: raw.placeId,
     offer: raw.offer,
-    activity: raw.activity,
+    activity: raw.activity
+      ? {
+          id: raw.activity.id,
+          title: raw.activity.title,
+          slug: raw.activity.slug,
+          priceFrom: raw.activity.priceFrom,
+          priceText: raw.activity.priceText,
+          currency: raw.activity.currency,
+        }
+      : null,
     place: raw.place,
 
     classGroupId: raw.classGroupId,
@@ -327,6 +359,9 @@ function mapBooking(raw: {
 
     adultsCount: raw.adultsCount,
     childrenCount: raw.childrenCount,
+    participantChildren,
+    participantsOutsideAge: childrenOutsideEventAge(participantChildren, ageRule),
+    eventAgeLabel: ageRule ? ageRule.label : null,
 
     requestedDate,
     requestedTime: raw.requestedTime,

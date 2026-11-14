@@ -76,6 +76,8 @@ export type EventSimpleBookingData = {
   slots?: EventBookingSlot[];
   /** Подпись кнопки записи; по умолчанию «Записаться». */
   label?: string;
+  /** Возрастное ограничение события — для мягкого предупреждения о возрасте детей. */
+  ageRule?: import("@/lib/booking/bookingParticipants").EventAgeRule | null;
 };
 
 export type EventPageCtaConfig = {
