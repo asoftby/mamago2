@@ -17,6 +17,11 @@ const noFlashScript = source("src/lib/cookies/no-flash-cookie-shell-script.ts");
 assert.match(shell, /useState\(true\)/);
 assert.ok(!shell.includes("cookies()") && !shell.includes("headers()"));
 assert.match(shell, /id="mamago-cookie-shell"/);
+// Dimmed full-screen overlay: bottom sheet on mobile, centered dialog on desktop.
+const shellRootClass = shell.match(/id="mamago-cookie-shell"[\s\S]*?className="([^"]+)"/)?.[1] ?? "";
+for (const cls of ["fixed", "inset-0", "bg-black/45", "items-end", "sm:items-center"]) {
+  assert.ok(shellRootClass.split(/\s+/).includes(cls), `cookie shell root must include ${cls}`);
+}
 assert.match(shell, /hasValidConsentCookieValue\(readOwnCookieValue\(\)\)/);
 assert.match(shell, /rootRef\.current\.style\.display\s*=\s*"none"/);
 assert.match(shell, /await acceptFromShell\(categories\)/);
