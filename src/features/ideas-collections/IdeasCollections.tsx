@@ -857,14 +857,8 @@ export function IdeasCollections({
   if (layout !== "page") return root;
   return (
     <AccountPage
-      backHref="/me"
       title="Мои идеи и коллекции"
       lead="Сохраняйте понравившиеся активности, собирайте их в коллекции и переносите в план, когда удобно."
-      actions={
-        <Link href="/me/plan" className={styles.planLink}>
-          Мой план →
-        </Link>
-      }
     >
       {root}
     </AccountPage>
