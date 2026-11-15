@@ -398,11 +398,13 @@ export function PlanPageClient({
     <div className="min-h-screen bg-white">
       <PlanProfileCompletionGate />
 
-      <Container className="pt-10 pb-2">
-        <header>
-          <h1 className="text-[clamp(36px,4vw,54px)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[var(--text-main)]">
+      {/* Шапка в стиле каркаса кабинета (AccountPage), как на /me/ideas. */}
+      <Container className="pt-8">
+        <header className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">Мой план</h1>
+          <p className="mt-2 max-w-2xl text-neutral-600">
             {weekItems.length > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
-          </h1>
+          </p>
         </header>
       </Container>
 
