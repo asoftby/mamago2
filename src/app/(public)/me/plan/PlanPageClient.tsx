@@ -25,7 +25,7 @@ import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { PlanNewTaskDialog } from "./PlanNewTaskDialog";
 import { PlanStickyCounter } from "@/features/my-plan/components/PlanStickyCounter";
-import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
+import { addDays, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
   upsertCalendarWeekItem,
@@ -400,11 +400,7 @@ export function PlanPageClient({
 
       <Container className="pt-10 pb-2">
         <header>
-          <div className="flex items-center gap-2 font-mono text-[12.5px] font-medium uppercase tracking-[.16em] text-[#C24E22]">
-            Мой план
-            <span className="text-[var(--text-muted)]">{monthName(selectedDate)}</span>
-          </div>
-          <h1 className="mt-2.5 text-[clamp(36px,4vw,54px)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[var(--text-main)]">
+          <h1 className="text-[clamp(36px,4vw,54px)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[var(--text-main)]">
             {weekItems.length > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
           </h1>
         </header>
