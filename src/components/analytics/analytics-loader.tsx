@@ -20,7 +20,6 @@ import type { ExternalAnalyticsConfig } from "@/lib/analytics/externalAnalyticsT
 import { useCookieConsent } from "@/hooks/use-cookie-consent";
 
 type AnalyticsWindow = Window & {
-  [gaDisableKey: `ga-disable-${string}`]: boolean | undefined;
   dataLayer?: unknown[];
   gtag?: (...args: unknown[]) => void;
   ym?: ((...args: unknown[]) => void) & {
@@ -156,8 +155,9 @@ export function AnalyticsLoader({
   // re-accept only toggle ga-disable and the consent state.
   useEffect(() => {
     if (!config.enabled || !googleId) return;
-    const w = analyticsWindow();
-    const disableKey = `ga-disable-${googleId}` as const;
+    // Google's documented global kill switch: window["ga-disable-<ID>"].
+    const w = window as unknown as Record<string, boolean | undefined>;
+    const disableKey = `ga-disable-${googleId}`;
 
     if (!canUseAnalytics) {
       if (googleInitializedRef.current) {
