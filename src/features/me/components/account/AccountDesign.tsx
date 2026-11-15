@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarCheck, Plus, Settings } from "lucide-react";
+import { ArrowRight, CalendarCheck, Plus } from "lucide-react";
 import { AccountCard, AccountPage } from "@/components/account/AccountPage";
 import { BodyMuted } from "@/components/ui/typography";
 import { AddParticipantModal, type ParticipantChildData } from "@/components/children/AddParticipantModal";
@@ -49,7 +49,6 @@ export type AccountParty = {
 export type AccountDesignProps = {
   userName: string;
   greeting: string;
-  settingsHref: string;
   family: AccountFamilyMember[];
   /** Блок «Взрослые в семье / Пригласить» — null при выключенных флагах семьи. */
   familyBlock?: Omit<FamilyMembersCardProps, "variant"> | null;
@@ -63,8 +62,6 @@ export type AccountDesignProps = {
 
 const MEMBER =
   "flex min-h-11 w-full flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-neutral-300 disabled:cursor-default sm:w-56";
-const GHOST_BTN =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-900 hover:bg-neutral-50";
 const PRIMARY_BTN =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800";
 
@@ -72,7 +69,6 @@ export function AccountDesign(props: AccountDesignProps) {
   const {
     userName,
     greeting,
-    settingsHref,
     family,
     familyBlock,
     bookingsHref,
@@ -105,11 +101,6 @@ export function AccountDesign(props: AccountDesignProps) {
     <AccountPage
       title={userName}
       lead={`${localGreeting}! Семья, маршруты и праздники — всё в одном месте. Настройте профиль, чтобы рекомендации были точнее.`}
-      actions={
-        <Link href={settingsHref} className={GHOST_BTN}>
-          <Settings className="h-4 w-4" aria-hidden="true" /> Настройки
-        </Link>
-      }
     >
       <div className="space-y-6">
         <AccountCard title="Моя семья">
