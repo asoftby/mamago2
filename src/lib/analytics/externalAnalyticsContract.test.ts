@@ -20,37 +20,44 @@ function main() {
     loader.includes("canUseAnalytics"),
     "AnalyticsLoader must react to analytics consent",
   );
+  // Option (b), 2026-11-16: Google is fully consent-gated like Yandex.
+  const googleEffect =
+    loader.match(/\/\/ Google is fully consent-gated[\s\S]*?\}, \[canUseAnalytics, config\.enabled, googleId\]\);/)?.[0] ?? "";
+  assert.ok(googleEffect, "Google lifecycle must be one effect keyed on canUseAnalytics");
+  const deniedBranch = googleEffect.match(/if \(!canUseAnalytics\) \{([\s\S]*?)\n    \}\n/)?.[1] ?? "";
   assert.ok(
-    !loader.includes("ga-disable-"),
-    "Ordinary denied consent must not use ga-disable, which would suppress Advanced Consent Mode pings",
+    deniedBranch.includes("return;") &&
+      !deniedBranch.includes("mamago-google-analytics") &&
+      !deniedBranch.includes('"config"') &&
+      !deniedBranch.includes('"default"'),
+    "Without analytics consent Google must not be loaded, configured or given a consent default",
   );
   assert.ok(
-    loader.includes('gtag("consent", "default", GOOGLE_DEFAULT_CONSENT)') &&
-      loader.includes('analytics_storage: "denied"') &&
+    googleEffect.indexOf("if (!canUseAnalytics)") <
+      googleEffect.indexOf('"mamago-google-analytics"'),
+    "Google script insertion must come after the analytics-consent gate",
+  );
+  assert.ok(
+    /w\[disableKey\] = true;[\s\S]*?"consent", "update", GOOGLE_DENIED_CONSENT/.test(deniedBranch) &&
+      /googleInitializedRef\.current/.test(deniedBranch),
+    "Revoke after load must set ga-disable-<id> and deny analytics_storage (gtag.js cannot be unloaded)",
+  );
+  assert.ok(
+    /w\[disableKey\] = false;[\s\S]*?"consent", "update", GOOGLE_GRANTED_ANALYTICS_CONSENT/.test(googleEffect),
+    "Re-accept after revoke must clear ga-disable and grant analytics_storage",
+  );
+  assert.ok(
+    /const GOOGLE_GRANTED_ANALYTICS_CONSENT\s*=\s*\{\s*\.\.\.GOOGLE_DENIED_CONSENT,\s*analytics_storage:\s*"granted",\s*\}\s*as const/.test(loader) &&
       loader.includes('ad_storage: "denied"') &&
       loader.includes('ad_user_data: "denied"') &&
       loader.includes('ad_personalization: "denied"'),
-    "GA4 must queue a denied consent default for analytics and every advertising category",
+    "Granting analytics must keep every advertising consent category denied",
   );
   assert.ok(
-    /const GOOGLE_DEFAULT_CONSENT\s*=\s*\{[\s\S]*?\.\.\.GOOGLE_DENIED_CONSENT,[\s\S]*?wait_for_update:\s*500,[\s\S]*?\}\s*as const/.test(loader),
-    "GA default consent must wait briefly for async restoration of a persisted choice",
+    !loader.includes("wait_for_update"),
+    "wait_for_update is not needed: Google is initialized only once consent is known",
   );
-  const consentUpdate = loader.match(/ensureGtag\(\)\("consent", "update", \{([\s\S]*?)\}\);/);
-  assert.ok(
-    consentUpdate && !consentUpdate[1].includes("wait_for_update"),
-    "wait_for_update must never be included in consent update",
-  );
-  assert.ok(
-    loader.includes("const { canUseAnalytics, hasValidConsent } = useCookieConsent()") &&
-      /if \(!config\.enabled \|\| !googleId \|\| !hasValidConsent\) return;[\s\S]*?ensureGtag\(\)\("consent", "update"/.test(loader),
-    "Google consent update must not run while CookieConsent state is still unknown",
-  );
-  assert.ok(
-    /\[canUseAnalytics, config\.enabled, googleId, hasValidConsent\]/.test(loader),
-    "Once consent becomes valid, Google update must react to the current analytics choice",
-  );
-  const consentDefault = loader.indexOf('gtag("consent", "default", GOOGLE_DEFAULT_CONSENT)');
+  const consentDefault = loader.indexOf('gtag("consent", "default", GOOGLE_GRANTED_ANALYTICS_CONSENT)');
   const googleScript = loader.indexOf('"mamago-google-analytics"');
   const googleJs = loader.indexOf('gtag("js", new Date())');
   const googleConfig = loader.indexOf('gtag("config", googleId');
@@ -60,10 +67,6 @@ function main() {
       googleScript < googleJs &&
       googleJs < googleConfig,
     "GA order must be consent default -> script -> js -> config",
-  );
-  assert.ok(
-    loader.includes('analytics_storage: canUseAnalytics ? "granted" : "denied"'),
-    "Accept and revoke must update analytics_storage without changing advertising consent",
   );
   assert.ok(
     loader.includes("allow_google_signals: false") &&
@@ -127,13 +130,9 @@ function main() {
     "AnalyticsLoader must send gtag('config', measurementId, ...) once during initialization",
   );
   assert.ok(
-    /if\s*\(googleInitializedRef\.current\)\s*return/.test(loader) &&
+    /if\s*\(googleInitializedRef\.current\)\s*\{[^}]*"consent", "update"[^}]*return;\s*\}/.test(loader) &&
       /googleInitializedRef\.current\s*=\s*true/.test(loader),
     "Google script/js/config initialization must be guarded against consent-update reinitialization",
-  );
-  assert.ok(
-    !/if\s*\(!canUseAnalytics\)[\s\S]{0,500}mamago-google-analytics/.test(loader),
-    "Google script loading must not be inside the denied-consent branch",
   );
   assert.ok(
     /if\s*\(!canUseAnalytics\)[\s\S]{0,500}"destruct"/.test(loader),
@@ -178,7 +177,12 @@ function main() {
   const revisionMatch = consentConfig.match(/revision:\s*(\d+)/);
   assert.ok(
     revisionMatch && Number(revisionMatch[1]) === 2,
-    "Cookie consent revision must be 2 for the Advanced Consent Mode semantics change",
+    "Cookie consent revision must stay 2: gating GA on consent is stricter, existing choices stay valid",
+  );
+  assert.ok(
+    !consentConfig.includes("до вашего согласия") &&
+      !consentConfig.includes("До согласия Google"),
+    "Consent copy must not claim Google runs before consent",
   );
   assert.ok(
     consentConfig.includes("_ym_"),

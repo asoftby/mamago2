@@ -14,10 +14,7 @@ type RunConfig = Parameters<typeof import("vanilla-cookieconsent").run>[0];
 
 export const BANNER = {
   title: "Мы используем cookies",
-  // Must keep disclosing that GA4 loads before consent (cookieless, Advanced
-  // Consent Mode) — see AnalyticsLoader and docs/cookies-and-telemetry.md.
-  description:
-    "Они нужны для работы сайта. Google Analytics до вашего согласия собирает статистику посещений без cookies; Яндекс.Метрика и реклама подключаются только с согласия.",
+  description: "Они нужны, чтобы сайт работал и становился удобнее для вас.",
   acceptAll: "Принять все",
   necessaryOnly: "Только необходимые",
   customize: "Настроить",
@@ -38,7 +35,7 @@ const PREFERENCES = {
     analytics: {
       title: "Внешняя веб-аналитика",
       description:
-        "Разрешает Google Analytics 4 использовать аналитические cookies и подключает Яндекс.Метрику. До согласия Google получает только измерения без аналитических и рекламных cookies, а Метрика не загружается. Это не отключает учёт действий внутри mamaGo на наших серверах.",
+        "Подключает Google Analytics 4 и Яндекс.Метрику. Без согласия они не загружаются и ничего не получают. Это не отключает учёт действий внутри mamaGo на наших серверах.",
     },
     marketing: {
       title: "Маркетинг и реклама",

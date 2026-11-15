@@ -7,9 +7,10 @@
  * Contract:
  * - rendered only for public pages;
  * - runtime config is fail-closed on the server;
- * - Google uses Advanced Consent Mode and loads after a denied default;
- * - Yandex remains fully gated by analytics consent;
- * - consent withdrawal updates Google consent and destructs Yandex;
+ * - Google and Yandex are fully gated by analytics consent: no script, no
+ *   request to Google/Yandex before the visitor accepts analytics;
+ * - consent withdrawal disables Google (ga-disable + denied consent; the
+ *   loaded gtag.js cannot be unloaded) and destructs Yandex;
  * - Google pageviews rely on GA4 Enhanced Measurement history changes;
  * - Yandex SPA views use defer:true + explicit hit calls.
  */
@@ -77,12 +78,12 @@ const GOOGLE_DENIED_CONSENT = {
   ad_personalization: "denied",
 } as const;
 
-const GOOGLE_DEFAULT_CONSENT = {
+// Google is initialized only after analytics consent, so the default already
+// reflects it. Advertising categories are a separate mamaGo choice and stay
+// denied regardless.
+const GOOGLE_GRANTED_ANALYTICS_CONSENT = {
   ...GOOGLE_DENIED_CONSENT,
-  // CookieConsent restores a persisted choice asynchronously. Give it time
-  // to publish the returning visitor's real state before the initial config
-  // sends measurement; this option belongs only on the default command.
-  wait_for_update: 500,
+  analytics_storage: "granted",
 } as const;
 
 function clearYandexLocalStorage(): void {
@@ -141,7 +142,7 @@ export function AnalyticsLoader({
 }: {
   config: ExternalAnalyticsConfig;
 }) {
-  const { canUseAnalytics, hasValidConsent } = useCookieConsent();
+  const { canUseAnalytics } = useCookieConsent();
   const yandexActiveRef = useRef(false);
   const googleInitializedRef = useRef(false);
   const [yandexReady, setYandexReady] = useState(false);
@@ -149,14 +150,33 @@ export function AnalyticsLoader({
   const googleId = config.enabled ? config.googleAnalyticsId : null;
   const yandexId = config.enabled ? config.yandexMetrikaId : null;
 
-  // Google lifecycle is independent of analytics consent. The denied default
-  // MUST be queued before gtag.js is inserted; initialization happens once.
+  // Google is fully consent-gated: nothing is queued or loaded until the
+  // visitor accepts analytics. The script is inserted once; later revoke and
+  // re-accept only toggle ga-disable and the consent state.
   useEffect(() => {
     if (!config.enabled || !googleId) return;
-    if (googleInitializedRef.current) return;
+    // Google's documented global kill switch: window["ga-disable-<ID>"].
+    const w = window as unknown as Record<string, boolean | undefined>;
+    const disableKey = `ga-disable-${googleId}`;
+
+    if (!canUseAnalytics) {
+      if (googleInitializedRef.current) {
+        // gtag.js cannot be unloaded: stop all sends (incl. cookieless pings)
+        // and drop analytics storage until consent is given again.
+        w[disableKey] = true;
+        ensureGtag()("consent", "update", GOOGLE_DENIED_CONSENT);
+      }
+      return;
+    }
+
+    w[disableKey] = false;
+    if (googleInitializedRef.current) {
+      ensureGtag()("consent", "update", GOOGLE_GRANTED_ANALYTICS_CONSENT);
+      return;
+    }
 
     const gtag = ensureGtag();
-    gtag("consent", "default", GOOGLE_DEFAULT_CONSENT);
+    gtag("consent", "default", GOOGLE_GRANTED_ANALYTICS_CONSENT);
     ensureExternalScript(
       "mamago-google-analytics",
       `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
@@ -168,21 +188,9 @@ export function AnalyticsLoader({
       allow_ad_personalization_signals: false,
     });
     googleInitializedRef.current = true;
-  }, [config.enabled, googleId]);
+  }, [canUseAnalytics, config.enabled, googleId]);
 
-  // Do not turn the initial unknown snapshot into an explicit denied update:
-  // that would end wait_for_update before CookieConsent restores the actual
-  // persisted choice. Updates start only once the CMP has a valid decision.
-  useEffect(() => {
-    if (!config.enabled || !googleId || !hasValidConsent) return;
-
-    ensureGtag()("consent", "update", {
-      ...GOOGLE_DENIED_CONSENT,
-      analytics_storage: canUseAnalytics ? "granted" : "denied",
-    });
-  }, [canUseAnalytics, config.enabled, googleId, hasValidConsent]);
-
-  // Yandex remains fully consent-gated and is destroyed on revoke.
+  // Yandex is fully consent-gated and is destroyed on revoke.
   useEffect(() => {
     if (!config.enabled) return;
 

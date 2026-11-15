@@ -7,7 +7,7 @@
 | Категория в баннере | Что управляет |
 |---------------------|----------------|
 | **Необходимые** | Всегда включены. Базовые cookies, сессия, безопасность, работа основных функций (вход, план, избранное и т.д.). |
-| **Внешняя веб-аналитика** | Разрешает GA4 использовать analytics storage/cookies и подключает Yandex Metrica. До согласия GA4 работает в Advanced Consent Mode с `analytics_storage=denied`, а Yandex не загружается. PostHog и другие провайдеры фактически не используются. |
+| **Внешняя веб-аналитика** | Подключает GA4 и Yandex Metrica. До согласия ни один из них не загружается и не получает запросов. PostHog и другие провайдеры фактически не используются. |
 | **Маркетинг и реклама** | Только **сторонние** рекламные/маркетинговые технологии (Meta Pixel, TikTok и т.д.). Подключаются через `MarketingLoader` при согласии. Управляется отдельным флагом `marketing`, независимым от `analytics`: согласие на аналитику **не** включает рекламу/персонализацию автоматически. |
 
 ## Четыре источника правды — зоны ответственности
@@ -33,12 +33,12 @@
 
 Реализация: `src/components/analytics/analytics-loader.tsx` (`AnalyticsLoader`), рантайм-конфиг из `src/server/services/analytics/externalAnalyticsConfig.ts` → `src/lib/analytics/externalAnalyticsConfig.ts` (чистый resolver).
 
-### GA4: Advanced Consent Mode
+### GA4: полный consent gate (с 2026-11-16)
 
-- При включённом PROD runtime-конфиге `AnalyticsLoader` сначала создаёт `dataLayer`/официально совместимый `gtag`, затем ставит consent default: `analytics_storage`, `ad_storage`, `ad_user_data`, `ad_personalization` = `denied` и `wait_for_update=500`. Пауза даёт CookieConsent восстановить сохранённый выбор returning user до initial measurement; пока `hasValidConsent=false`, consent update не отправляется, а после восстановления/выбора отправляется реальное состояние без `wait_for_update`. Только после default добавляется `gtag.js`, вызываются `gtag("js", ...)` и один `gtag("config", ...)`.
-- До согласия Google tag может отправлять cookieless measurement, но наш код не разрешает analytics/ad cookies. После принятия `analytics` выполняется consent update с `analytics_storage=granted`; после отзыва — `analytics_storage=denied`. Все рекламные consent-поля всегда остаются `denied`.
-- `ga-disable-*` не используется для обычного denied consent: он подавил бы cookieless measurement и сломал цель Advanced Consent Mode. Google Signals и ad-personalization signals явно выключены.
-- Инициализация Google отделена от consent update и защищена от повторов: смена согласия не добавляет второй script, не повторяет `js`/`config` и не создаёт второй initial page view.
+- До согласия на `analytics` GA4 не загружается: нет `dataLayer`-вызовов, `gtag.js` и запросов к Google (ни cookies, ни cookieless pings). Решение владельца: вариант «не грузить GA до согласия»; цена — GA4 не видит посетителей без согласия (first-party `UserEvent` и Search Console не затронуты).
+- После согласия `AnalyticsLoader` один раз создаёт `dataLayer`/официально совместимый `gtag`, ставит consent default `analytics_storage=granted`, а `ad_storage`, `ad_user_data`, `ad_personalization` = `denied`, затем добавляет `gtag.js`, вызывает `gtag("js", ...)` и один `gtag("config", ...)`. `wait_for_update` не нужен: состояние согласия уже известно.
+- Отзыв после загрузки: `gtag.js` выгрузить нельзя, поэтому выставляется `window["ga-disable-<ID>"] = true` (прекращает любые отправки) и consent update `analytics_storage=denied`. Повторное согласие снимает `ga-disable` и отправляет update `granted`, не добавляя второй script и не повторяя `js`/`config`.
+- Google Signals и ad-personalization signals явно выключены.
 
 ### Yandex: полный consent gate
 
@@ -50,7 +50,7 @@
 
 При отзыве `analytics` `AnalyticsLoader`:
 
-- обновляет Google consent до `analytics_storage=denied`, сохраняя рекламные категории `denied`;
+- если GA4 был загружен — выставляет `ga-disable-<ID>` и обновляет Google consent до `analytics_storage=denied`, сохраняя рекламные категории `denied`;
 - если Yandex-счётчик был активен — вызывает `ym(counterId, "destruct")`;
 - очищает доступные first-party GA/Yandex cookies через cookie-consent `autoClear` (`/^_ga/`, `_gid`, `_gat`, `gcl_*`, `/^_ym_/`) и Yandex localStorage через `clearYandexLocalStorage()`.
 - Cookies, установленные самим доменом `yandex.ru` (не нашим доменом), браузер не позволяет очистить со страницы mamaGo — это ограничение платформы, не баг.
@@ -98,7 +98,7 @@ External Analytics Coverage = observed GA4 traffic / first-party mamaGo traffic
 
 ## Расширение в будущем
 
-- Новые сторонние аналитические провайдеры по умолчанию полностью гейтятся категорией `analytics`; исключение для cookieless режима требует отдельного документированного consent-контракта, как у GA4.
+- Новые сторонние аналитические провайдеры по умолчанию полностью гейтятся категорией `analytics`; исключений для cookieless режима нет (GA4 тоже полностью гейтится).
 - Любые рекламные пиксели — только за `canUseMarketing` / категорию `marketing`.
 - Изменение политики по продуктовой телеметрии (гейтинг по согласию, отдельная категория) — **отдельное продуктово-юридическое решение**, не часть этого документа.
 
