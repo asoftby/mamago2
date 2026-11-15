@@ -52,6 +52,18 @@ export function CookieConsentShell() {
     // in the provider and must never replace this UI after hydration.
   }, []);
 
+  // The shell is a modal on a dimmed backdrop: keep the page behind it still.
+  useEffect(() => {
+    if (!mounted || preferencesOpen || typeof document === "undefined") return;
+    if (hasValidConsentCookieValue(readOwnCookieValue()) || isConsentBot()) return;
+    const html = document.documentElement;
+    const previousOverflow = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = previousOverflow;
+    };
+  }, [mounted, preferencesOpen]);
+
   useEffect(() => {
     if (!preferencesOpen || typeof document === "undefined") return;
 
@@ -121,9 +133,9 @@ export function CookieConsentShell() {
       aria-modal="true"
       aria-labelledby="mamago-cookie-shell-title"
       aria-describedby="mamago-cookie-shell-desc"
-      className="fixed inset-x-0 bottom-0 z-[10050] flex justify-center px-3 pb-3 sm:justify-start sm:px-4 sm:pb-4"
+      className="fixed inset-0 z-[10050] flex items-end justify-center bg-black/45 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:px-4 sm:pb-4"
     >
-      <div className="w-full max-w-md rounded-2xl border border-black/5 bg-white p-4 shadow-2xl sm:p-5">
+      <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-black/5 bg-white p-4 shadow-2xl sm:p-5">
         <h2
           id="mamago-cookie-shell-title"
           className="text-base font-semibold text-neutral-900"
