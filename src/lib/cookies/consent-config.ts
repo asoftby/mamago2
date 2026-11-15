@@ -15,7 +15,7 @@ type RunConfig = Parameters<typeof import("vanilla-cookieconsent").run>[0];
 export const BANNER = {
   title: "Cookies и данные",
   description:
-    "Для работы сайта нужны необходимые cookies и базовые данные сервиса. Google Analytics до вашего согласия работает без аналитических и рекламных cookies; Яндекс.Метрика и рекламные технологии подключаются только с согласия.",
+    "Необходимые cookies нужны для работы сайта. Аналитику и рекламу включаем только с вашего согласия.",
   acceptAll: "Принять все",
   necessaryOnly: "Только необходимые",
   customize: "Настроить",
