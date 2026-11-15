@@ -18,3 +18,17 @@ export function resolveActivityBusinessIdForCreate(input: {
     null
   );
 }
+
+/**
+ * Existing events retain their booking business. If a legacy event lacks one,
+ * its author's own Business is the only safe automatic recipient.
+ *
+ * The editor may be a moderator or an employee, not the author. Never adopt
+ * the editor's business, and never infer the recipient from the Organizer.
+ */
+export function resolveActivityBusinessIdForPatch(input: {
+  existingBusinessId: string | null;
+  authorBusinessId: string | null;
+}): string | null {
+  return input.existingBusinessId ?? input.authorBusinessId;
+}

@@ -284,6 +284,7 @@ function EventWizardInner({
   event,
   userId,
   userRole,
+  business,
   onComplete,
   editorSurface,
   contentEditorNav,
@@ -1356,6 +1357,19 @@ function EventWizardInner({
     ) {
       if (stepConfig.key === "organizer" || stepConfig.key === "location") {
         return <StepComponent {...commonProps} eventId={eventId ?? event?.id} />;
+      }
+      if (stepConfig.key === "pricing") {
+        // Ownership is by event author, independent of the Organizer.
+        // The legacy Business inbox still requires a booking recipient.
+        const hasBookingRecipient = Boolean(event ? event.businessId : business?.id);
+        return (
+          <StepComponent
+            {...commonProps}
+            wizardSessionId={wizardSessionId}
+            eventId={eventId ?? event?.id}
+            hasBookingRecipient={hasBookingRecipient}
+          />
+        );
       }
       return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} eventId={eventId ?? event?.id} />;
     }

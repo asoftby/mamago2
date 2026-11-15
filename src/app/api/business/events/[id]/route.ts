@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
+import { resolveActivityBusinessIdForPatch } from "@/lib/auth/activityBusinessResolution";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -199,6 +200,7 @@ export async function PATCH(
         title: true,
         description: true,
         businessId: true,
+        ownerUserId: true,
         cityId: true,
         nextOccurrenceAt: true,
         scheduleJson: true,
@@ -317,6 +319,27 @@ export async function PATCH(
             (body.scheduleJson ?? {}) as Record<string, unknown>,
           )
         : ((existing.scheduleJson ?? {}) as Record<string, unknown>);
+
+    // Only assign a booking recipient when internal booking is requested.
+    // A normal informational event must not silently join a Business.
+    const mode = nextScheduleJson.participationMode;
+    const usesInternalBooking =
+      existing.bookingEnabled ||
+      mode === "time-slots" ||
+      mode === "simple-booking" ||
+      mode === "request" ||
+      (mode === "prebook" && nextScheduleJson.prebookMethod === "internal");
+    if (usesInternalBooking && nextBusinessId === undefined && !existing.businessId) {
+      const authorBusiness = await prisma.business.findUnique({
+        where: { ownerUserId: existing.ownerUserId },
+        select: { id: true },
+      });
+      const resolved = resolveActivityBusinessIdForPatch({
+        existingBusinessId: existing.businessId,
+        authorBusinessId: authorBusiness?.id ?? null,
+      });
+      if (resolved) nextBusinessId = resolved;
+    }
 
     const organizerInput =
       body.organizerInput && typeof body.organizerInput === "object"

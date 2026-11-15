@@ -28,6 +28,15 @@ interface Step5PricingParticipationProps {
   isEditable: boolean;
   eventId?: string;
   ctaStepEnabled?: boolean;
+  /** Whether this event has a compatible booking inbox recipient. */
+  hasBookingRecipient?: boolean;
+}
+
+function needsBookingRecipient(data: EventFormData): boolean {
+  return data.participationMode === "time-slots"
+    || data.participationMode === "simple-booking"
+    || data.participationMode === "request"
+    || (data.participationMode === "prebook" && data.prebookMethod === "internal");
 }
 
 function flattenEventTimeSlots(
@@ -173,11 +182,14 @@ export function Step5PricingParticipation({
   isEditable,
   eventId,
   ctaStepEnabled,
+  hasBookingRecipient,
 }: Step5PricingParticipationProps) {
   const publicationAccess = useMemo(
     () => getPublicationAccessFromEvent(data),
     [data],
   );
+  const showNoRecipientWarning =
+    hasBookingRecipient === false && needsBookingRecipient(data);
   const ctaRenderMode = useMemo(
     () => resolveEventPricingParticipationCtaRenderMode(ctaStepEnabled),
     [ctaStepEnabled],
@@ -302,6 +314,18 @@ export function Step5PricingParticipation({
           disabled={!isEditable}
         />
       </div>
+
+      {showNoRecipientWarning && (
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+          <p className="font-medium">Кнопка записи пока не появится на странице события</p>
+          <p className="mt-0.5 text-amber-900/90">
+            Событие принадлежит автору, независимо от организатора. Но для встроенной записи
+            текущая система должна знать, куда доставлять заявки. У этой публикации
+            нет подключённого получателя. Привяжите собственный бизнес автора
+            или выберите внешний способ связи до устранения ограничения.
+          </p>
+        </div>
+      )}
 
       {ctaRenderMode === "shared" ? (
         <CtaStep
