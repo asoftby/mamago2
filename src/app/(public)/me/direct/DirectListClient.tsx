@@ -73,7 +73,6 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
 
   return (
     <AccountPage
-      backHref="/me"
       title="Мои сообщения"
       lead={
         total > 0

@@ -55,7 +55,6 @@ export default async function MeEventsPage({
     <AccountPage
       title="Мои события"
       lead="Управляйте вашими событиями и отслеживайте их статус"
-      backHref="/me"
     >
       <EventsList activities={activities} currentView={view} />
     </AccountPage>

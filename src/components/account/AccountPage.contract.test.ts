@@ -52,8 +52,11 @@ for (const file of [
 // Исключения: превью, /me/plan, деталь записи-билета (не используется).
 // Бизнес-режим личной переписки не переведён на каркас кабинета.
 assert.match(read("src/app/(public)/me/direct/[threadId]/DirectThreadClient.tsx"), /businessPage/);
-// Только корневая /me без ссылки назад.
-assert.doesNotMatch(read("src/features/me/components/account/AccountDesign.tsx"), /backHref/);
-assert.match(read("src/app/(public)/me/profile/page.tsx"), /backHref="\/me"/);
+// Ссылки «← Мой аккаунт» нет нигде: страницы не ведут назад на корневую /me.
+assert.doesNotMatch(shell, /"← Мой аккаунт"/);
+assert.doesNotMatch(read("src/components/settings/SettingsScaffold.tsx"), /"← Мой аккаунт"/);
+for (const file of ON_SHELL) {
+  assert.doesNotMatch(read(file), /backHref="\/me"/, `${file} has no back link to /me`);
+}
 
 console.log("AccountPage.contract.test: ok");

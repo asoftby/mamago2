@@ -32,7 +32,6 @@ export default async function MeBirthdaysPage() {
 
   return (
     <AccountPage
-      backHref="/me"
       title="Мои праздники"
       lead="Черновики, заявки и завершённые дни рождения"
     >

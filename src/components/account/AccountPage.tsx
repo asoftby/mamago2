@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export type AccountPageProps = {
   title: ReactNode;
   lead?: ReactNode;
-  /** Родительская страница. Не передавайте на корневой `/me`. */
+  /** Родительская страница (не `/me`: ссылку «Мой аккаунт» не показываем). */
   backHref?: string;
   backLabel?: string;
   /** Кнопки справа от заголовка (например «Настройки»). */
@@ -25,7 +25,7 @@ export function AccountPage({
   title,
   lead,
   backHref,
-  backLabel = "← Мой аккаунт",
+  backLabel = "← Назад",
   actions,
   className,
   children,

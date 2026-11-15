@@ -60,7 +60,6 @@ export function ParentBookingsClient({ bookings }: Props) {
 
   return (
     <AccountPage
-      backHref="/me"
       title="Мои записи"
       lead={
         total > 0
