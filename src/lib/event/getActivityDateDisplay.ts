@@ -124,7 +124,7 @@ export function getActivityDateDisplay(
   }
 
   if (startKey <= todayKey && endKey >= todayKey) {
-    return endKey === todayKey ? "до сегодня" : `до ${formatLocalPlanDate(endKey, "ru-RU")}`;
+    return endKey === todayKey ? "Только сегодня" : `до ${formatLocalPlanDate(endKey, "ru-RU")}`;
   }
 
   if (dateKeys.length === 1) {

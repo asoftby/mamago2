@@ -45,7 +45,6 @@ export function EventStickyActionBar({
   isPlanned = false,
   isPrimaryLoading = false,
   isPlanLoading = false,
-  isPrimaryDisabled = false,
   hasPurchaseUrl = true,
   className,
 }: EventStickyActionBarProps) {
@@ -111,7 +110,7 @@ export function EventStickyActionBar({
                 </span>
                 {suffix ? (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    {renderCurrencyText(suffix, { iconSize: "sm" })}
+                    {renderCurrencyText(suffix, { iconSize: "md" })}
                   </span>
                 ) : null}
               </div>
@@ -222,7 +221,7 @@ export function EventStickyActionBar({
                 </span>
                 {suffix ? (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    {renderCurrencyText(suffix, { iconSize: "sm" })}
+                    {renderCurrencyText(suffix, { iconSize: "md" })}
                   </span>
                 ) : null}
               </>
