@@ -6,7 +6,6 @@
  * under `/settings/*` intentionally do not own rendering anymore.
  */
 
-import Link from "next/link";
 import { Building2, FileText } from "lucide-react";
 import { ProfileSettingsClient } from "@/app/(public)/me/settings/profile/ProfileSettingsClient";
 import { NotificationPreferencesClient } from "@/app/(public)/me/settings/notifications/NotificationPreferencesClient";
@@ -21,7 +20,6 @@ import { BusinessAccountHub } from "@/components/settings/BusinessAccountHub";
 import { SettingsScaffold } from "@/components/settings/SettingsScaffold";
 import { buildSettingsHomeHref } from "@/lib/settings/registry";
 import { requireSettingsContext } from "@/lib/settings/resolveSettingsContext";
-import prisma from "@/lib/prisma";
 import type { SettingsScope } from "@/lib/settings/types";
 import { getNotificationSettingsSurfaceData } from "@/server/services/notificationSettings.service";
 
@@ -65,26 +63,6 @@ export async function renderProfileSettingsPage(surfaceScope: SettingsScope = "U
     context.viewer.displayName ?? context.viewer.email?.split("@")[0] ?? "?"
   ).charAt(0);
 
-  // Only the user profile shows the family residence. A family member
-  // may view it; only its active OWNER can change it.
-  const membership =
-    surfaceScope === "USER"
-      ? await prisma.familyMembership.findFirst({
-          where: {
-            userId: context.viewer.id,
-            leftAt: null,
-            family: { archivedAt: null },
-          },
-          select: { role: true, family: { select: { homeCityId: true } } },
-        })
-      : null;
-  const homeCity = membership?.family.homeCityId
-    ? await prisma.city.findUnique({
-        where: { id: membership.family.homeCityId },
-        select: { name: true },
-      })
-    : null;
-
   return (
     <SettingsScaffold
       context={context}
@@ -97,24 +75,6 @@ export async function renderProfileSettingsPage(surfaceScope: SettingsScope = "U
         avatarUrl={context.viewer.avatarUrl}
         displayName={context.viewer.displayName}
       />
-      {surfaceScope === "USER" ? (
-        <section id="residence-city" className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
-          <h2 className="text-base font-semibold text-neutral-900">Город проживания</h2>
-          <p className="mt-2 text-sm text-neutral-600">
-            Город, где живёт ваша семья. Временный просмотр афиши другого города его не меняет.
-          </p>
-          <div className="mt-4 flex min-h-11 items-center justify-between gap-3">
-            <span className="text-sm font-medium text-neutral-900">
-              {homeCity?.name ?? "Не указан"}
-            </span>
-            {membership?.role === "OWNER" ? (
-              <Link
-                href="/me/settings/family-city"
-                className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-primary hover:underline"
-              >
-                {homeCity ? "Изменить" : "Указать"}
-              </Link>
-            ) : null}
           </div>
           {!membership ? (
             <p className="mt-2 text-xs text-neutral-500">
