@@ -669,7 +669,7 @@ export function IdeasCollections({
           ? "Нажмите «⋯» на любой идее и выберите эту коллекцию"
           : activeFilter === "none"
             ? "Каждая сохранённая идея уже лежит в какой-нибудь коллекции"
-            : "Нажимайте ♡ на событиях, местах и статьях — они появятся здесь"}
+            : "Нажимайте ♡ на событиях, занятиях, праздниках и статьях и сохраняйте в идеи"}
       </span>
       {activeFilter === "all" ? (
         <Link href={discoveryHref} onClick={(event) => openIdea(event, discoveryHref)}>
