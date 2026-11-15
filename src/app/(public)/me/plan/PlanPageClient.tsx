@@ -401,7 +401,6 @@ export function PlanPageClient({
       <Container className="pt-10 pb-2">
         <header>
           <div className="flex items-center gap-2 font-mono text-[12.5px] font-medium uppercase tracking-[.16em] text-[#C24E22]">
-            <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#C24E22]" />
             Мой план
             <span className="text-[var(--text-muted)]">{monthName(selectedDate)}</span>
           </div>
