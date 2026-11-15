@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,41 @@ const BETA_ABOVE_PLAN_PX = 74;
 const BETA_TUCK_DELTA_PX = BETA_ABOVE_PLAN_PX - PLAN_BOTTOM_PX;
 
 const STORAGE_KEY = "beta-tip-dismissed";
+
+/** Зазор между верхом плашки и плавающими кнопками над ней. */
+const CLEARANCE_GAP_PX = 8;
+
+/**
+ * Пока плашка видна, публикует на `<html>` CSS-переменную: сколько места снизу окна она занимает
+ * (её `bottom` + высота + зазор). Плавающие кнопки (например «Добавим что-нибудь?» на `/me/plan`)
+ * поднимаются на это значение; после закрытия плашки переменная удаляется и кнопки опускаются.
+ * Скрытая через CSS копия (другой брейкпоинт) имеет высоту 0 и переменную не задаёт.
+ */
+function usePublishBottomClearance(ref: RefObject<HTMLElement | null>, visible: boolean, cssVar: string) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!visible || !el) return;
+    const root = document.documentElement;
+    const update = () => {
+      const height = el.offsetHeight;
+      if (height === 0) {
+        root.style.removeProperty(cssVar);
+        return;
+      }
+      const bottom = parseFloat(getComputedStyle(el).bottom) || 0;
+      root.style.setProperty(cssVar, `${Math.ceil(bottom + height + CLEARANCE_GAP_PX)}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      root.style.removeProperty(cssVar);
+    };
+  }, [ref, visible, cssVar]);
+}
 
 function useBetaTipVisible() {
   const [visible, setVisible] = useState(false);
@@ -95,6 +130,9 @@ export function BetaTipMobile({
   dockAbovePlan?: boolean;
 }) {
   const { visible, dismiss } = useBetaTipVisible();
+  const ref = useRef<HTMLDivElement>(null);
+  // Над пилюлей плана (dockAbovePlan) плашка живёт в общем стеке и места у края не занимает.
+  usePublishBottomClearance(ref, visible && !dockAbovePlan, "--beta-tip-clearance-mobile");
 
   if (!visible) return null;
 
@@ -102,6 +140,7 @@ export function BetaTipMobile({
 
   return (
     <div
+      ref={ref}
       className="pointer-events-none fixed z-50 left-3 right-3 transition-transform duration-[220ms] ease-out motion-reduce:transition-none lg:hidden"
       style={{
         bottom: `calc(${restingBottom}px + env(safe-area-inset-bottom, 0px))`,
@@ -119,11 +158,13 @@ export function BetaTipMobile({
 /** Десктопный баннер — фиксирован внизу слева. */
 export function BetaTip() {
   const { visible, dismiss } = useBetaTipVisible();
+  const ref = useRef<HTMLDivElement>(null);
+  usePublishBottomClearance(ref, visible, "--beta-tip-clearance-desktop");
 
   if (!visible) return null;
 
   return (
-    <div className="hidden lg:block fixed z-50 left-4 bottom-4 w-[min(100vw-2rem,280px)] animate-in fade-in slide-in-from-bottom-4 pointer-events-none">
+    <div ref={ref} className="hidden lg:block fixed z-50 left-4 bottom-4 w-[min(100vw-2rem,280px)] animate-in fade-in slide-in-from-bottom-4 pointer-events-none">
       <BetaTipContent variant="desktop" onDismiss={dismiss} />
     </div>
   );
