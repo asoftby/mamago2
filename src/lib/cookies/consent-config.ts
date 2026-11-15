@@ -14,7 +14,10 @@ type RunConfig = Parameters<typeof import("vanilla-cookieconsent").run>[0];
 
 export const BANNER = {
   title: "Мы используем cookies",
-  description: "Они нужны, чтобы сайт работал и становился удобнее для вас.",
+  // Must keep disclosing that GA4 loads before consent (cookieless, Advanced
+  // Consent Mode) — see AnalyticsLoader and docs/cookies-and-telemetry.md.
+  description:
+    "Они нужны для работы сайта. Google Analytics до вашего согласия собирает статистику посещений без cookies; Яндекс.Метрика и реклама подключаются только с согласия.",
   acceptAll: "Принять все",
   necessaryOnly: "Только необходимые",
   customize: "Настроить",

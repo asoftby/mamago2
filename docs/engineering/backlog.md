@@ -6092,3 +6092,18 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: решение владельца; для варианта 2 нужен признак источника координат в карточках и публичных блоках.
 - Acceptance criteria: принято решение по вариантам; Google-координаты не показываются на негугловской карте и не хранятся дольше разрешённого срока (или есть письменное подтверждение допустимости).
 - Source: проверка условий Google при PR «собственный список подсказок адреса», 2026-11-08.
+
+---
+
+## [BACKLOG-238] `cookieConsentShellContract.test.ts` падает на чистом `dev`: `consent-manager.ts` больше не использует `requestAnimationFrame`
+
+- Status: OPEN
+- Priority: P3
+- Area: Cookie consent / тесты
+- Added: 2026-11-15
+- Reason deferred: замечено при PR «вернуть в баннер cookies раскрытие про Google Analytics до согласия»; к нему не относится.
+- Context: `src/components/providers/cookieConsentShellContract.test.ts` (построчная проверка исходника) ждёт в `src/lib/cookies/consent-manager.ts` `showPreferences();…requestAnimationFrame` и проверку класса `show--preferences`; `openCookiePreferencesFromShell` теперь ждёт официальное событие `cc:onModalShow`. Тест падает с `AssertionError` на чистом `dev` (`16b03d8e9`), не подключён к CI / `check:push`.
+- Current state: не чинился. Причина падения установлена (устаревшие ожидания).
+- Dependencies: нет.
+- Acceptance criteria: ожидания обновлены под `cc:onModalShow` и тест подключён в CI, либо устаревшие проверки удалены с обоснованием.
+- Source: прогон теста на чистом `dev` при PR раскрытия GA в баннере, 2026-11-15.

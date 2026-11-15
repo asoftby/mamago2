@@ -326,6 +326,7 @@ jobs:
       - name: Public shell regressions
         run: |
           pnpm exec tsx src/components/shell/PublicFooter.contract.test.ts
+          pnpm exec tsx src/lib/cookies/consentBannerDisclosure.test.ts
           pnpm exec tsx src/lib/fontsLocal.test.ts
           pnpm exec tsx src/lib/responsive/mobileHeaderBreakpointContract.test.ts
           pnpm test:responsive-public-mobile
