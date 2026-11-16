@@ -71,6 +71,7 @@ export default async function OffersPage({
           kind: true,
           status: true,
           archivedAt: true,
+          rejectionReason: true,
           description: true,
           coverImage: true,
           priceFrom: true,
