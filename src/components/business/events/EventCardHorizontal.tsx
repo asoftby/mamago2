@@ -75,6 +75,7 @@ interface Activity {
   isPromoted?: boolean;
   /** Server-computed Boost eligibility and free quota; never infer from card status. */
   boostDisabled?: boolean;
+  /** Timer only for a successfully activated free Boost on this event. */
   boostNextFreeAt?: string | null;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
@@ -276,7 +277,7 @@ export function EventCardHorizontal({
               className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
             >
               <Zap className="h-4 w-4 shrink-0" />
-              Продвинуть
+              Продвигать
             </BoostLauncher>
 
             {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
