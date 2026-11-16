@@ -27,7 +27,6 @@ import {
   FormStickyActionBar,
   formWizardPhaseFromFlags,
 } from "@/components/form-shell";
-import { WizardProgress } from "@/components/ui/wizard-progress";
 import { MobileEventWizardProgress } from "./MobileEventWizardProgress";
 import { Button } from "@/components/ui/button";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
@@ -1488,13 +1487,6 @@ function EventWizardInner({
           currentStep={currentStep}
           onStepChange={handleGoToStep}
         />
-        <div className="hidden sm:block">
-          <WizardProgress
-            steps={progressSteps}
-            currentStep={currentStep}
-            onStepChange={handleGoToStep}
-          />
-        </div>
       </FormWizardHeader>
 
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
