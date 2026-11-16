@@ -43,6 +43,7 @@ interface Offer {
   status: OfferStatus;
   /** Server-computed Boost eligibility and free quota. */
   boostDisabled?: boolean;
+  /** Timer only for a successfully activated free Boost on this offer. */
   boostNextFreeAt?: string | null;
   rejectionReason?: string | null;
   archivedAt: Date | null;
@@ -239,7 +240,7 @@ export function OfferCardHorizontal({
               )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Продвинуть
+              Продвигать
             </BoostLauncher>}
 
             {onArchive && offer.status !== "DRAFT" ? (
