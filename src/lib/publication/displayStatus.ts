@@ -33,7 +33,7 @@ export interface PublicationDisplayStatus {
 
 const META: Record<PublicationDisplayStatusKey, PublicationDisplayStatus> = {
   active: { key: "active", label: "Активно", tone: "success" },
-  past: { key: "past", label: "Прошло", tone: "muted" },
+  past: { key: "past", label: "Уже прошло", tone: "muted" },
   draft: { key: "draft", label: "Черновик", tone: "muted" },
   pending: { key: "pending", label: "На модерации", tone: "warning" },
   needsRevision: { key: "needsRevision", label: "Требует правок", tone: "warning" },
