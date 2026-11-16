@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import {
   createDailyFreeBoost,
+  getFreeBoostDialogState,
   type FreeBoostPublicationType,
 } from "@/server/services/promotion/dailyFreeBoost.service";
 
@@ -36,6 +37,9 @@ export async function createDailyFreeBoostAction(input: {
       ...parsed.data,
     });
     revalidatePath("/business/dashboard");
+    revalidatePath("/business/events");
+    revalidatePath("/business/offers");
+    revalidatePath("/business/boost");
     return { ok: true as const };
   } catch (error) {
     return {
@@ -46,4 +50,17 @@ export async function createDailyFreeBoostAction(input: {
           : "Не удалось поднять публикацию.",
     };
   }
+}
+
+/** Server-scoped read action: the client never supplies an arbitrary business ID. */
+export async function getFreeBoostDialogStateAction() {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false as const, error: "Сессия истекла." };
+  const business = await getMyBusiness(user.id);
+  if (!business) return { ok: false as const, error: "Бизнес не найден." };
+  const data = await getFreeBoostDialogState({
+    userId: user.id,
+    businessId: business.id,
+  });
+  return { ok: true as const, data };
 }
