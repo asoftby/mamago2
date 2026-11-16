@@ -57,6 +57,7 @@ export type DashboardData = {
       title: string;
       publicationType: "EVENT" | "OFFER";
       activeBoostUntil: string | null;
+      activeFreeBoostUntil: string | null;
       eligible: boolean;
       reason: string | null;
     }>;
