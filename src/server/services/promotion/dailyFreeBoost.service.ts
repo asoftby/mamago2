@@ -285,6 +285,31 @@ export async function createDailyFreeBoost(params: {
   }
 }
 
+/** Lightweight, fresh snapshot for the inline Boost confirmation dialog. */
+export async function getFreeBoostDialogState(params: {
+  businessId: string;
+  userId: string;
+  now?: Date;
+}) {
+  const now = params.now ?? new Date();
+  const [candidates, latestFreeBoost] = await Promise.all([
+    getFreeBoostCandidates({ ...params, now }),
+    prisma.boost.findFirst({
+      where: { businessId: params.businessId, isFreeDaily: true },
+      orderBy: [{ startAt: "desc" }, { createdAt: "desc" }],
+      select: { startAt: true },
+    }),
+  ]);
+  const nextFreeAt = latestFreeBoost
+    ? new Date(latestFreeBoost.startAt.getTime() + BOOST_DURATION_MS)
+    : null;
+  return {
+    candidates,
+    availableToday: !nextFreeAt || now >= nextFreeAt,
+    nextFreeAt: nextFreeAt && now < nextFreeAt ? nextFreeAt.toISOString() : null,
+  };
+}
+
 export async function getDailyFreeBoostDashboardData(params: {
   businessId: string;
   userId: string;
