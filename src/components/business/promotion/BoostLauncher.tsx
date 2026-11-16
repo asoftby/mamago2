@@ -156,9 +156,10 @@ export function BoostLauncher({
                         type="button"
                         key={itemKey}
                         onClick={() => setSelectedKey(itemKey)}
+                        disabled={!item.eligible || Boolean(item.activeBoostUntil)}
                         aria-pressed={selectedKey === itemKey}
                         className={cn(
-                          "w-full rounded-xl border p-3 text-left text-sm",
+                          "w-full rounded-xl border p-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50",
                           selectedKey === itemKey
                             ? "border-stone-900 bg-stone-50"
                             : "border-stone-200 hover:bg-stone-50",
