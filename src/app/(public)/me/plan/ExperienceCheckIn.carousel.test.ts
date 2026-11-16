@@ -2,28 +2,25 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const ui = readFileSync(new URL("./ExperienceCheckIn.tsx", import.meta.url), "utf8");
+const planFeedback = readFileSync(
+  new URL("../../../../features/my-plan/components/v3/PlanFeedbackCard.tsx", import.meta.url),
+  "utf8",
+);
 const api = readFileSync(new URL("../../../api/plan/experiences/[id]/attendance/route.ts", import.meta.url), "utf8");
 const service = readFileSync(new URL("../../../../server/services/experience/experience.service.ts", import.meta.url), "utf8");
 
-assert.match(ui, /aria-roledescription="карусель"/);
-assert.match(ui, /Предыдущее посещение/);
-assert.match(ui, /Следующее посещение/);
-assert.match(ui, /\{index \+ 1\} из \{visible\.length\}/);
-assert.match(ui, /visible\.map\(\(card, cardIndex\) =>/);
-assert.match(ui, /hidden=\{cardIndex !== index\}/);
-assert.match(ui, /onFinishedRef\.current\(\)/);
-assert.match(ui, /onFinishedRef\.current = onFinished/);
-assert.match(ui, /key=\{card\.id\}/);
-assert.match(ui, /aria-label="Закрыть карточку посещения"/);
-assert.match(ui, /mamago:experience-snooze:/);
-assert.match(ui, /Мы не были/);
-assert.match(ui, /markNotAttended\(\)/);
-assert.match(ui, /method: "PATCH"/);
-assert.match(ui, /attendance: "NOT_ATTENDED"/);
-assert.match(ui, /canCorrectAttendance !== false/);
-assert.match(ui, /PhoneVerificationModal/);
-assert.match(ui, /EMOJI_RATING_OPTIONS/);
-assert.match(ui, /Отправить отзыв/);
+// Desktop /me/plan reuses the overlay check-in card instead of a parallel light design.
+assert.match(ui, /PlanFeedbackCard/);
+assert.match(ui, /MY_PLAN_V3_TOKENS/);
+assert.match(ui, /onOpenVisits/);
+assert.match(ui, /awaitingFeedback/);
+assert.match(ui, /router\.refresh\(\)/);
+
+assert.match(planFeedback, /mamago:plan-feedback-snooze:/);
+assert.match(planFeedback, /aria-label="Закрыть вопрос о посещении"/);
+assert.match(planFeedback, /Мы не ходили/);
+assert.match(planFeedback, /PhoneVerificationModal/);
+assert.match(planFeedback, /PLAN_FACES/);
 
 assert.match(api, /export async function PATCH/);
 assert.match(api, /getCurrentUser/);

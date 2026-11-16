@@ -124,7 +124,7 @@ export function AccountDesign(props: AccountDesignProps) {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={m.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
                   ) : (
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-base font-semibold text-orange-700">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-base font-semibold text-primary">
                       {m.initial}
                     </span>
                   )}
@@ -168,7 +168,7 @@ export function AccountDesign(props: AccountDesignProps) {
           className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <AccountCard className="flex items-center gap-4 transition-colors hover:border-neutral-300">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-primary">
               <CalendarCheck className="h-6 w-6" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">

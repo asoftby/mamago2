@@ -167,8 +167,8 @@ function IdeasRow({ count, onOpenHistory, historyOpen }: { count: number; onOpen
         href="/me/ideas"
         className="group flex min-h-20 w-full items-center gap-3.5 rounded-[22px] border border-[var(--border)] bg-[var(--surface-subtle)] py-3 pr-[18px] pl-3.5 no-underline transition-colors hover:border-[var(--text-main)] hover:bg-white"
       >
-        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] bg-white text-[var(--text-main)]">
-          <Heart className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
+        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Heart className="h-[19px] w-[19px] fill-current" strokeWidth={1.8} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-[var(--text-main)]">
@@ -411,6 +411,7 @@ export function PlanPageClient({
             <ExperienceCheckIn
               candidates={experienceCandidates}
               recentExperiences={recentExperiences}
+              onOpenVisits={() => setArchiveOpen(true)}
             />
           </div>
         </header>
@@ -468,7 +469,7 @@ export function PlanPageClient({
                   {weekItems.length === 0 ? "Нет событий" : `${weekItems.length} ${pluralizeEvents(weekItems.length)}`}
                 </span>
                 {weekItems.length > 0 && (
-                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#C24E22]">
+                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-primary">
                     Посмотреть все <span aria-hidden="true">→</span>
                   </span>
                 )}

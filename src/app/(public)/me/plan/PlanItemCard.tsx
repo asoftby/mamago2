@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { CalendarDays, StickyNote } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
-import { formatHHMM } from "@/lib/formatters/date";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { planEntryDisplay } from "@/features/my-plan/lib/planEntryDisplay";
 import { removePlanEntry } from "@/features/my-plan/lib/removePlanEntry";
 import { resolvePlanItemCategoryLabel } from "@/features/my-plan/lib/planItemMeta";
@@ -26,10 +26,6 @@ export type VisibilityChange = (
   itemId: string,
   next: { visibility: "PRIVATE" | "FAMILY"; updatedAt: string },
 ) => void;
-
-function formatTime(iso: string | null): string | null {
-  return formatHHMM(iso) || null;
-}
 
 export function PlanItemCard({
   item,
@@ -65,12 +61,11 @@ export function PlanItemCard({
   const category = presentation.isCatalog
     ? resolvePlanItemCategoryLabel(item.activity)
     : null;
-  const time = entryDisplay.time;
-  const endTime = formatTime(item.endsAt);
-  const age = item.activity?.ageLabel ?? null;
   const price = item.activity?.priceLabel ?? null;
   const venueName = presentation.isCatalog ? item.activity?.venueName ?? null : presentation.locationLabel;
   const venueAddress = presentation.isCatalog ? item.activity?.venueAddress ?? null : null;
+  /** Under-title meta: place (точка) · price; time lives in the booking badge when present. */
+  const placeLabel = venueName ?? venueAddress ?? null;
   const unavailable = presentation.isCatalog && (
     item.planAvailability === "business_disabled" ||
     item.planAvailability === "missing_activity"
@@ -82,10 +77,9 @@ export function PlanItemCard({
       ? publicActivityPath(item.activityId, "minsk", item.activity?.slug)
       : null;
 
-  const timeLabel = time
-    ? `${time}${endTime ? `–${endTime}` : ""}`
-    : (!presentation.isCatalog ? "Весь день" : null);
-  const metaLine = [age, timeLabel, price].filter(Boolean).join(" · ");
+  const metaParts = [placeLabel].filter(Boolean) as string[];
+  const hasMeta = metaParts.length > 0 || Boolean(price);
+  const bookingConfirmed = item.booking?.status === "CONFIRMED";
 
   const handleRemove = async () => {
     if (removing) return;
@@ -223,19 +217,21 @@ export function PlanItemCard({
           <span
             aria-label={presentation.isCatalog ? "Событие" : "Заметка"}
             title={presentation.isCatalog ? "Событие" : "Заметка"}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{
-              color: presentation.isCatalog ? "#C24E22" : "#C98A19",
-              background: presentation.isCatalog ? "#FFF0EA" : "#FFF4D9",
-            }}
+            className={
+              presentation.isCatalog
+                ? "inline-flex h-7 w-7 items-center justify-center rounded-lg bg-brand-soft text-primary"
+                : "inline-flex h-7 w-7 items-center justify-center rounded-lg"
+            }
+            style={
+              presentation.isCatalog
+                ? undefined
+                : { color: "#C98A19", background: "#FFF4D9" }
+            }
           >
             {presentation.isCatalog ? <CalendarDays size={14} /> : <StickyNote size={14} />}
           </span>
           {category && (
-            <span
-              className="font-mono text-[10px] uppercase tracking-[0.12em]"
-              style={{ color: "var(--primary)" }}
-            >
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-primary">
               {category}
             </span>
           )}
@@ -264,7 +260,11 @@ export function PlanItemCard({
           {item.booking && (
             <span
               className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
-              style={{ background: "rgba(20,18,16,.06)", color: "rgba(20,18,16,.78)" }}
+              style={
+                bookingConfirmed
+                  ? { background: "var(--success-soft)", color: "var(--success-hover)" }
+                  : { background: "rgba(20,18,16,.06)", color: "rgba(20,18,16,.78)" }
+              }
             >
               {bookingCaption(item.booking)}
             </span>
@@ -320,33 +320,27 @@ export function PlanItemCard({
           </h3>
         )}
 
-        {(venueName || venueAddress) && (
-          <div className="mt-0.5 flex min-w-0 flex-col gap-0.5">
-            {venueName && (
-              <span
-                className="truncate text-[13px] font-medium max-sm:text-[12px]"
-                style={{ color: "#3A332B" }}
-              >
-                {venueName}
-              </span>
-            )}
-            {venueAddress && (
-              <span
-                className="truncate text-[12px] max-sm:text-[11px]"
-                style={{ color: "rgba(20,18,16,.55)" }}
-              >
-                {venueAddress}
-              </span>
-            )}
-          </div>
-        )}
-
-        {metaLine && (
+        {hasMeta && (
           <span
-            className="mt-0.5 text-[13px] max-sm:text-[11px]"
+            className="mt-0.5 inline-flex min-w-0 flex-wrap items-baseline gap-x-[0.35em] text-[13px] max-sm:text-[11px]"
             style={{ color: "rgba(20,18,16,.58)" }}
           >
-            {metaLine}
+            {metaParts.map((part, index) => (
+              <span key={`m${index}`} className="inline-flex min-w-0 items-baseline gap-x-[0.35em]">
+                {index > 0 ? <span aria-hidden="true">·</span> : null}
+                <span className="truncate">{part}</span>
+              </span>
+            ))}
+            {price ? (
+              <span className="inline-flex shrink-0 items-baseline gap-x-[0.35em]">
+                {metaParts.length > 0 ? <span aria-hidden="true">·</span> : null}
+                {price === "Бесплатно" ? (
+                  price
+                ) : (
+                  renderCurrencyText(price, { iconSize: "sm" })
+                )}
+              </span>
+            ) : null}
           </span>
         )}
         <span className="mt-0.5 text-[12px] font-medium text-[#6B6258]">{participantName || "Вся семья"}</span>

@@ -1,12 +1,35 @@
 "use client";
 
+import {
+  EMOJI_RATING_OPTIONS,
+  type EmojiRatingType,
+} from "@/lib/content-rating/emojiRating";
+
 export type PlanSentiment = "LIKE" | "NEUTRAL" | "DISLIKE";
 
+type PlanMouth = "meh" | "good" | "super";
+
+/** Maps plan mouth keys → shared article/review emoji rating types. */
+const MOUTH_TO_EMOJI_TYPE: Record<PlanMouth, EmojiRatingType> = {
+  meh: "dislike",
+  good: "neutral",
+  super: "like",
+};
+
+const EMOJI_BY_TYPE = Object.fromEntries(
+  EMOJI_RATING_OPTIONS.map((option) => [option.type, option.emoji]),
+) as Record<EmojiRatingType, string>;
+
 /** Порядок и подписи как в дизайне v3: «Не очень · Хорошо · Супер». */
-export const PLAN_FACES: Array<{ sentiment: PlanSentiment; mouth: "meh" | "good" | "super"; label: string }> = [
-  { sentiment: "DISLIKE", mouth: "meh", label: "Не очень" },
-  { sentiment: "NEUTRAL", mouth: "good", label: "Хорошо" },
-  { sentiment: "LIKE", mouth: "super", label: "Супер" },
+export const PLAN_FACES: Array<{
+  sentiment: PlanSentiment;
+  mouth: PlanMouth;
+  label: string;
+  emoji: string;
+}> = [
+  { sentiment: "DISLIKE", mouth: "meh", label: "Не очень", emoji: EMOJI_BY_TYPE.dislike },
+  { sentiment: "NEUTRAL", mouth: "good", label: "Хорошо", emoji: EMOJI_BY_TYPE.neutral },
+  { sentiment: "LIKE", mouth: "super", label: "Супер", emoji: EMOJI_BY_TYPE.like },
 ];
 
 export const PLAN_FACE_LABEL: Record<PlanSentiment, string> = {
@@ -15,34 +38,19 @@ export const PLAN_FACE_LABEL: Record<PlanSentiment, string> = {
   LIKE: "Супер",
 };
 
-const MOUTH = {
-  meh: <path d="M8.5 16c1-.8 2.2-1.2 3.5-1.2s2.5.4 3.5 1.2" />,
-  good: <path d="M8.5 14.2c.9 1.1 2.1 1.7 3.5 1.7s2.6-.6 3.5-1.7" />,
-  super: <path d="M7.6 13.4h8.8c-.4 2.5-2.2 4.1-4.4 4.1s-4-1.6-4.4-4.1z" />,
-};
-
-export function PlanFace({ mouth, size = 28 }: { mouth: "meh" | "good" | "super"; size?: number }) {
+export function PlanFace({ mouth, size = 28 }: { mouth: PlanMouth; size?: number }) {
+  const emoji = EMOJI_BY_TYPE[MOUTH_TO_EMOJI_TYPE[mouth]];
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <span
       aria-hidden
-      className="shrink-0"
+      className="inline-flex shrink-0 items-center justify-center leading-none select-none"
+      style={{ fontSize: size, width: size, height: size }}
     >
-      <circle cx="12" cy="12" r="9.2" />
-      <circle cx="9" cy="10" r=".9" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="10" r=".9" fill="currentColor" stroke="none" />
-      {MOUTH[mouth]}
-    </svg>
+      {emoji}
+    </span>
   );
 }
 
-export function sentimentMouth(sentiment: PlanSentiment): "meh" | "good" | "super" {
+export function sentimentMouth(sentiment: PlanSentiment): PlanMouth {
   return PLAN_FACES.find((f) => f.sentiment === sentiment)!.mouth;
 }

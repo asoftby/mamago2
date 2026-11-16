@@ -22,10 +22,10 @@ export const MY_PLAN_V3_TOKENS = {
   "--mp-font-display": "var(--font-display)",
   "--mp-font-ui": "var(--font-sans)",
   "--mp-font-meta": "var(--font-mono)",
-  /** Выбранный чип, плитка и поле: персиковый фон с оранжевой обводкой, тёмный текст. */
-  "--mp-chip-on-bg": "#f7c3ad",
-  "--mp-chip-on-tx": "var(--text-main)",
-  "--mp-chip-on-line": "#f3a684",
+  /** Выбранный чип/плитка: те же --plan-selected* (globals), что и активный день PlanCalendar. */
+  "--mp-chip-on-bg": "var(--plan-selected)",
+  "--mp-chip-on-tx": "var(--plan-on-selected)",
+  "--mp-chip-on-line": "var(--plan-selected-line)",
   "--mp-chip-line": "var(--border-strong)",
   "--plan-ink": "var(--text-main)",
   "--plan-surface": "var(--surface)",

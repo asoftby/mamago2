@@ -14,6 +14,14 @@ import { cn } from "@/lib/utils";
 const STICKY_CTA_FOOTER_PAD =
   "pb-[calc(46px+1.25rem+45px+env(safe-area-inset-bottom))]";
 
+/**
+ * Floating PlanStickyCounter on /me/plan: button 62px + same bottom inset as the bar
+ * (`max(1.25rem, safe-area, --beta-tip-clearance-*)`) + 45px gap to copyright.
+ * Must track beta-tip CSS vars — a fixed 120px left the bar covering footer nav when the tip lifts it.
+ */
+const PLAN_STICKY_FOOTER_PAD =
+  "pb-[calc(62px+45px+max(1.25rem,env(safe-area-inset-bottom,0px),var(--beta-tip-clearance-mobile,0px),var(--beta-tip-clearance-desktop,0px)))]";
+
 /** Заголовок колонки — тёмный текст того же цвета, что раньше был у ссылок. */
 const FOOTER_HEADING_CLASS =
   "text-[14px] font-normal text-[#3A332B]";
@@ -40,7 +48,7 @@ export function PublicFooter({ withStickyCtaClearance = false, withPlanStickyCle
         className={cn(
           "pt-12 md:pt-16",
           withPlanStickyClearance
-            ? "pb-[calc(120px+env(safe-area-inset-bottom))] md:pb-[120px]"
+            ? PLAN_STICKY_FOOTER_PAD
             : withStickyCtaClearance
               ? cn(STICKY_CTA_FOOTER_PAD, "lg:pb-16")
               : "pb-4 md:pb-[105px]",

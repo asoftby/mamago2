@@ -3,7 +3,10 @@
 import { Plus } from "lucide-react";
 import { MY_PLAN_V3_TOKENS } from "./v3/myPlanV3Tokens";
 
-/** Обычный отступ снизу, но не ниже места, которое занимает открытая beta-плашка. */
+/**
+ * Обычный отступ снизу, но не ниже места, которое занимает открытая beta-плашка.
+ * PublicFooter plan clearance uses the same max() so footer nav stays above this bar.
+ */
 const FLOATING_PADDING_BOTTOM =
   "max(1.25rem, env(safe-area-inset-bottom, 0px), var(--beta-tip-clearance-mobile, 0px), var(--beta-tip-clearance-desktop, 0px))";
 

@@ -342,6 +342,10 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --plan-accent: var(--plan-family-accent); /* fills: dots, today ring */
   --plan-accent-ink: #c24e22; /* text on light backgrounds */
   --plan-on-ink: #faf7f1;
+  /* Active day / chip (same peach as «Мой план» modal PlanDayRibbon + --mp-chip-on-*). */
+  --plan-selected: #f7c3ad;
+  --plan-selected-line: #f3a684;
+  --plan-on-selected: #141210;
   /* Child dot palette (deterministic by childId); orange is reserved for Family */
   --plan-child-1: #2f8f83;
   --plan-child-2: #3b6fd4;
@@ -362,6 +366,9 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --plan-accent: var(--plan-family-accent);
   --plan-accent-ink: #f59a74;
   --plan-on-ink: #141210;
+  --plan-selected: #f7c3ad;
+  --plan-selected-line: #f3a684;
+  --plan-on-selected: #141210;
   --plan-child-1: #4fb3a5;
   --plan-child-2: #6e95ee;
   --plan-child-3: #a98be0;

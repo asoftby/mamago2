@@ -161,12 +161,12 @@ button.monthLabel:hover { color: var(--plan-ink); }
 .cellMobile.today:not(.selected) { box-shadow: inset 0 0 0 1.5px var(--plan-accent); }
 
 .selected {
-  background: var(--plan-ink);
-  border-color: var(--plan-ink);
-  color: var(--plan-on-ink);
+  background: var(--plan-selected);
+  border-color: var(--plan-selected-line);
+  color: var(--plan-on-selected);
 }
-.selected:hover { border-color: var(--plan-ink); }
-.selected .dow { color: var(--plan-on-ink); opacity: 0.6; }
+.selected:hover { border-color: var(--plan-selected-line); }
+.selected .dow { color: var(--plan-on-selected); opacity: 0.6; }
 .selected .dowMonth { opacity: 0.85; }
 .selected .dot { opacity: 0.9; }
 
@@ -203,7 +203,7 @@ button.monthLabel:hover { color: var(--plan-ink); }
 }
 .monthDayOther { color: var(--plan-faint); }
 .monthDayToday { color: var(--plan-accent-ink); }
-.monthDay.monthDaySelected { background: var(--plan-ink); color: var(--plan-on-ink); }
+.monthDay.monthDaySelected { background: var(--plan-selected); color: var(--plan-on-selected); }
 .monthDay:focus-visible { outline: 2px solid var(--plan-accent-ink); outline-offset: 1px; }
 .monthDot { width: 4px; height: 4px; border-radius: 999px; background: currentColor; }
 .monthDotSlot { display: flex; gap: 2px; height: 4px; }
@@ -262,7 +262,10 @@ button.monthLabel:hover { color: var(--plan-ink); }
   background: var(--plan-cell);
 }
 .widget .cell:hover { border-color: var(--plan-line); }
-.widget .cell.selected { background: var(--plan-ink); border-color: var(--plan-ink); }
+.widget .cell.selected {
+  background: var(--plan-selected);
+  border-color: var(--plan-selected-line);
+}
 .widget .cell.today:not(.selected) { border: 1.5px solid var(--plan-ink); box-shadow: none; }
 .widget .cell.today:not(.selected) .num,
 .widget .cell.today:not(.selected) .dow { color: var(--plan-ink); }
@@ -316,7 +319,10 @@ button.monthLabel:hover { color: var(--plan-ink); }
 .rootPage .cell:not(.cellMobile).today:not(.selected) { border: 1.5px solid var(--plan-ink); }
 .rootPage .cell:not(.cellMobile).today:not(.selected) .num { color: var(--plan-ink); }
 .rootPage .cell:not(.cellMobile).today:not(.selected) .dow { color: var(--plan-muted); }
-.rootPage .cell:not(.cellMobile).selected { background: var(--plan-ink); border-color: var(--plan-ink); }
+.rootPage .cell:not(.cellMobile).selected {
+  background: var(--plan-selected);
+  border-color: var(--plan-selected-line);
+}
 .rootPage .cell:not(.cellMobile).selected .dow { opacity: 0.66; }
 .rootPage .cell:not(.cellMobile) .dot { width: 6px; height: 6px; }
 }

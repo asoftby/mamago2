@@ -84,13 +84,15 @@
   border-color: var(--ink);
 }
 .page .pillSolid {
-  background: var(--ink);
-  color: #fff;
-  border-color: var(--ink);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
   font-weight: 600;
 }
 .pillSolid:hover {
-  background: #000;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
 }
 .pill .count {
   font-family: var(--font-mono);
@@ -98,7 +100,7 @@
   color: var(--ink-3);
 }
 .page .pillSolid .count {
-  color: rgba(255, 255, 255, 0.7);
+  color: color-mix(in srgb, var(--primary-foreground) 70%, transparent);
 }
 
 /* buttons */
@@ -300,6 +302,9 @@
 .detailsNote {
   font-size: 13px;
   color: var(--ink-3);
+}
+.detailsNotePending {
+  color: #7A1F2B;
 }
 .contactCard {
   background: rgba(20, 18, 16, 0.02);
