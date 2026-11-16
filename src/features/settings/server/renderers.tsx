@@ -67,7 +67,6 @@ export async function renderProfileSettingsPage(surfaceScope: SettingsScope = "U
     <SettingsScaffold
       context={context}
       title={surfaceScope === "USER" ? "Профиль" : "Имя и аватар"}
-      maxWidthClassName="max-w-md"
       currentSectionId="profile"
     >
       <ProfileSettingsClient
