@@ -86,7 +86,7 @@ export default async function EventsPage({
     orderBy: { createdAt: "desc" },
   });
   const now = new Date();
-  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions, freeBoost] = await Promise.all([
+  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions, upcomingSessions, freeBoost] = await Promise.all([
     getPerformanceMetricsByEntity({
       events: activities.map((activity) => ({
         id: activity.id,
@@ -124,6 +124,19 @@ export default async function EventsPage({
           },
           _max: { startsAt: true },
         }),
+    // Keep the card date aligned with the session-based publication status.
+    // A denormalized nextOccurrenceAt may lag after editing sessions.
+    activities.length === 0
+      ? Promise.resolve([])
+      : prisma.activitySession.groupBy({
+          by: ["activityId"],
+          where: {
+            activityId: { in: activities.map((activity) => activity.id) },
+            withdrawnAt: null,
+            startsAt: { gte: now },
+          },
+          _min: { startsAt: true },
+        }),
     getFreeBoostDialogState({ businessId: business.id, userId: user.id, now }),
   ]);
   const lastSessionStartByActivity = new Map(
@@ -132,6 +145,11 @@ export default async function EventsPage({
     ),
   );
 
+  const nextSessionStartByActivity = new Map(
+    upcomingSessions.flatMap((row) =>
+      row._min.startsAt ? [[row.activityId, row._min.startsAt] as const] : [],
+    ),
+  );
   const activePromotionIds = new Set(activePromotions.map((promotion) => promotion.publicationId));
   const boostCandidates = new Map(
     freeBoost.candidates.filter((candidate) => candidate.publicationType === "EVENT").map((candidate) => [candidate.id, candidate]),
@@ -141,9 +159,13 @@ export default async function EventsPage({
     .map((activity) => {
       const promotionPerformance = promotionPerformanceByActivity.get(activity.id) ?? null;
       const lastSessionStart = lastSessionStartByActivity.get(activity.id);
+      const nextSessionStart = nextSessionStartByActivity.get(activity.id);
       const boostCandidate = boostCandidates.get(activity.id);
       return {
         ...activity,
+        // The card shows the nearest future session, or the last past session.
+        // Only events without sessions fall back to nextOccurrenceAt.
+        displayOccurrenceAt: nextSessionStart ?? lastSessionStart ?? activity.nextOccurrenceAt,
         temporalState: getEventTemporalState({
           scheduleMode: activity.scheduleMode,
           nextOccurrenceAt: activity.nextOccurrenceAt,
