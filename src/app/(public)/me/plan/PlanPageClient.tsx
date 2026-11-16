@@ -405,6 +405,14 @@ export function PlanPageClient({
           <p className="mt-2 max-w-2xl text-neutral-600">
             {weekItems.length > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
           </p>
+          {/* Явный чек-ин после события, сразу под подзаголовком; модалкой автоматически не открывается.
+              Пустая обёртка (нет кандидатов) отступа не даёт. */}
+          <div className="max-w-2xl [&:not(:empty)]:mt-4">
+            <ExperienceCheckIn
+              candidates={experienceCandidates}
+              recentExperiences={recentExperiences}
+            />
+          </div>
         </header>
       </Container>
 
@@ -443,12 +451,8 @@ export function PlanPageClient({
             <IdeasRow count={initialIdeas.length} historyOpen={archiveOpen} onOpenHistory={openHistory} />
           </div>
 
-          <aside className="flex min-w-0 flex-col gap-3.5 lg:sticky lg:top-6">
-            {/* Explicit post-event check-in; never opened as an automatic modal. */}
-            <ExperienceCheckIn
-              candidates={experienceCandidates}
-              recentExperiences={recentExperiences}
-            />
+          {/* На узкой ширине блок идёт перед списком дня (order-first), на десктопе — правая колонка. */}
+          <aside className="order-first flex min-w-0 flex-col gap-3.5 lg:order-none lg:sticky lg:top-6">
             <div className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface-subtle)]">
               <button
                 type="button"
