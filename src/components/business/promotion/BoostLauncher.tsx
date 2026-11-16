@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Clock3, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getBoostRemainingMinutes, formatBoostCountdown } from "@/lib/promotion/boostCountdown";
 import {
   Dialog,
   DialogContent,
@@ -58,7 +59,7 @@ export function BoostLauncher({
     const nextAt = Date.parse(cooldownUntil);
     if (!Number.isFinite(nextAt)) return;
     const update = () => {
-      setRemainingMinutes(Math.max(0, Math.ceil((nextAt - Date.now()) / 60_000)));
+      setRemainingMinutes(getBoostRemainingMinutes(cooldownUntil, Date.now()));
     };
     update();
     // No polling or requests: only local clock arithmetic, recalculated every 15s.
@@ -67,9 +68,7 @@ export function BoostLauncher({
   }, [cooldownUntil, disabled]);
 
   const coolingDown = !disabled && Boolean(cooldownUntil) && remainingMinutes !== 0;
-  const countdownLabel = remainingMinutes === null
-    ? "24:00"
-    : `${String(Math.floor(remainingMinutes / 60)).padStart(2, "0")}:${String(remainingMinutes % 60).padStart(2, "0")}`;
+  const countdownLabel = remainingMinutes === null ? "24:00" : formatBoostCountdown(remainingMinutes);
 
   function showDialog() {
     if (disabled || coolingDown) return;
