@@ -38,6 +38,8 @@ test("Unavailable Boost buttons are disabled before opening the dialog", () => {
   const launcher = read("src/components/business/promotion/BoostLauncher.tsx");
   assert.match(launcher, /disabled={disabled \|\| coolingDown}/);
   assert.match(launcher, /cooldownUntil/);
+  assert.match(launcher, /Boolean\(cooldownUntil\) && remainingMinutes !== 0/);
+  assert.match(launcher, /router\.refresh\(\)/);
   assert.match(launcher, /setInterval\(update, 15_000\)/);
   assert.match(launcher, /if \(disabled \|\| coolingDown\) return/);
   assert.match(launcher, /disabled={!item\.eligible \|\| Boolean\(item\.activeBoostUntil\)}/);
@@ -45,20 +47,23 @@ test("Unavailable Boost buttons are disabled before opening the dialog", () => {
   const eventsPage = read("src/app/business/(protected)/events/page.tsx");
   const eventCard = read("src/components/business/events/EventCardHorizontal.tsx");
   assert.match(eventsPage, /getFreeBoostDialogState/);
-  assert.match(eventsPage, /boostNextFreeAt: freeBoost.nextFreeAt/);
+  assert.match(eventsPage, /boostNextFreeAt: boostCandidate\?\.activeFreeBoostUntil/);
   assert.match(eventCard, /disabled={activity\.boostDisabled !== false/);
   assert.match(eventCard, /cooldownUntil={activity\.boostNextFreeAt}/);
+  assert.match(eventCard, /Продвигать/);
 
   const offersPage = read("src/app/business/(protected)/offers/page.tsx");
   const offerCard = read("src/components/business/offers/OfferCardHorizontal.tsx");
   assert.match(offersPage, /getFreeBoostDialogState/);
-  assert.match(offersPage, /boostNextFreeAt: freeBoost.nextFreeAt/);
+  assert.match(offersPage, /boostNextFreeAt: boostCandidates\.get\(offer\.id\)\?\.activeFreeBoostUntil/);
   assert.match(offerCard, /disabled={offer\.boostDisabled !== false}/);
   assert.match(offerCard, /cooldownUntil={offer\.boostNextFreeAt}/);
+  assert.match(offerCard, /Продвигать/);
 
   const dashboard = read("src/components/business/dashboard/DailyFreeBoostCard.tsx");
   assert.match(dashboard, /disabled={disabled}/);
-  assert.match(dashboard, /cooldownUntil={data\.nextFreeAt}/);
+  assert.match(dashboard, /cooldownUntil={selectedCandidate\?\.activeFreeBoostUntil \?\? null}/);
+  assert.match(dashboard, /Продвигать/);
   assert.doesNotMatch(dashboard, /Почему нет публикаций\?|Проверить доступность публикаций/);
 });
 
