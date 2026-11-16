@@ -30,7 +30,7 @@ assert.equal(hasValidConsentCookieValue(undefined), false);
 assert.equal(hasValidConsentCookieValue(null), false);
 assert.equal(hasValidConsentCookieValue(""), false);
 assert.equal(hasValidConsentCookieValue("not%20json%20at%20all"), false);
-assert.equal(CONSENT_REVISION, 2, "Advanced Consent Mode semantics require revision 2");
+assert.equal(CONSENT_REVISION, 2, "Consent revision stays 2 (GA gating since 2026-11-16 is stricter; existing choices stay valid)");
 assert.equal(
   hasValidConsentCookieValue(encodeCookieValue(validRecord({ revision: 1 }))),
   false,

@@ -6092,3 +6092,38 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: решение владельца; для варианта 2 нужен признак источника координат в карточках и публичных блоках.
 - Acceptance criteria: принято решение по вариантам; Google-координаты не показываются на негугловской карте и не хранятся дольше разрешённого срока (или есть письменное подтверждение допустимости).
 - Source: проверка условий Google при PR «собственный список подсказок адреса», 2026-11-08.
+
+---
+
+## [BACKLOG-238] `cookieConsentShellContract.test.ts` падает на чистом `dev`: `consent-manager.ts` больше не использует `requestAnimationFrame`
+
+- Status: OPEN
+- Priority: P3
+- Area: Cookie consent / тесты
+- Added: 2026-11-15
+- Reason deferred: замечено при PR «вернуть в баннер cookies раскрытие про Google Analytics до согласия»; к нему не относится.
+- Context: `src/components/providers/cookieConsentShellContract.test.ts` (построчная проверка исходника) ждёт в `src/lib/cookies/consent-manager.ts` `showPreferences();…requestAnimationFrame` и проверку класса `show--preferences`; `openCookiePreferencesFromShell` теперь ждёт официальное событие `cc:onModalShow`. Тест падает с `AssertionError` на чистом `dev` (`16b03d8e9`), не подключён к CI / `check:push`.
+- Current state: не чинился. Причина падения установлена (устаревшие ожидания).
+- Dependencies: нет.
+- Acceptance criteria: ожидания обновлены под `cc:onModalShow` и тест подключён в CI, либо устаревшие проверки удалены с обоснованием.
+- Source: прогон теста на чистом `dev` при PR раскрытия GA в баннере, 2026-11-15.
+
+---
+
+## [BACKLOG-239] `pnpm audit --prod` на `dev`: 4 открытых advisory (2 low, 2 moderate) в транзитивных зависимостях
+
+- Status: OPEN
+- Priority: P2
+- Area: Зависимости / безопасность
+- Added: 2026-11-16
+- Reason deferred: найдено при сверке `main` и `dev` перед финальной сборкой; к дрейфу `main` не относится (override'ы из `main` эти пакеты не закрывают), уровень low/moderate, release-blocker не определён.
+- Context: `pnpm audit --prod --audit-level=low` на `dev` (`0d18696cb`) показал 4 advisory:
+  - `deepmerge` 4.3.1 (low, `GHSA-gcqx-w48m-w2h4`) — путь `@react-email/render > html-to-text > deepmerge`; патч-версии в advisory не указано (`fix <0.0.0`);
+  - `glob` 13.0.6 (moderate, `GHSA-3g3m-2fjr-6pw4`, исправлено в `>=14.0.2`) — путь `@sentry/nextjs > @sentry/bundler-plugins > glob`;
+  - `minimatch` 10.2.3 (moderate, `GHSA-g3hv-75wg-m249`, исправлено в `>=11.0.1`) — путь `@sentry/nextjs > @sentry/bundler-plugins > glob > minimatch`;
+  - `fast-xml-parser` 5.11.0 (low, `GHSA-474x-hrwr-fgx4`, исправлено в `>=5.12.0`) — прямая зависимость.
+  CI-job `audit` на `dev` при этом зелёный (порог, судя по всему, выше `moderate`). GitHub Dependabot показывает 20 открытых уязвимостей (5 critical, 3 high, 8 moderate, 4 low) на default-ветке `main`; сопоставление с `dev` не проводилось.
+- Current state: не чинилось. `fast-xml-parser` — прямая зависимость (путь `.>fast-xml-parser`), остальные три транзитивные; выбор между обновлением `@sentry/nextjs`, `@react-email/render` и `pnpm.overrides` не сделан, совместимость патч-версий не проверялась.
+- Dependencies: нет. При обновлении `@sentry/nextjs` учесть, что это затрагивает сборку (source maps, bundler plugin).
+- Acceptance criteria: `pnpm audit --prod --audit-level=low` на `dev` без находок либо оставшиеся находки зафиксированы здесь с обоснованием (нет патча / недостижимый путь); `pnpm build` и CI зелёные; после обновления `main` перепроверить список Dependabot и закрыть/обновить запись.
+- Source: сверка `main` и `dev`, `pnpm audit` 2026-11-16; PR сверки `main` — [asoftby/mamago2#1276](https://github.com/asoftby/mamago2/pull/1276).
