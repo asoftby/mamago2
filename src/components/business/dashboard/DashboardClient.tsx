@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
 import { shouldAutoOpenBusinessTour } from "@/lib/business/shouldAutoOpenBusinessTour";
 import Link from "next/link";
-import { CirclePlay } from "lucide-react";
+import { CirclePlay, Settings } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -510,10 +510,11 @@ export function DashboardClient({ data, defaultPeriod = "week", verificationBann
           actions={
             <Link
               href={data.hrefs.settings}
-              className="inline-flex min-h-10 items-center rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               title="Настройки бизнеса"
             >
               {data.legalName ?? data.businessName}{data.city ? ` · ${data.city}` : ""}
+              <Settings className="h-4 w-4 shrink-0 text-stone-400" aria-hidden="true" />
             </Link>
           }
         />
