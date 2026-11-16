@@ -29,7 +29,6 @@ import {
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 import { PublicationStatusChip } from "@/components/business/shared/PublicationStatusChip";
-import { isPublicationActive } from "@/lib/publication/displayStatus";
 import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -37,6 +36,8 @@ import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPub
 import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
+import { EVENT_PROMOTE_BLOCK_TITLE, getEventPromoteBlockReason } from "@/lib/promotion/canPromoteEvent";
+import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
 
 interface Activity {
@@ -71,7 +72,7 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
-  /** Состояние по расписанию, вычисляется на сервере (getEventTemporalState). */
+  /** Сессионное состояние (getEventTemporalState по неотозванным сеансам); считает страница списка. */
   temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
   promotionPerformance?: ActivityPromotionPerformance | null;
@@ -162,6 +163,7 @@ export function EventCardHorizontal({
 
   const canDeleteEvent = canShowEventDeleteAction(activity.status);
   const canArchiveEvent = canShowEventArchiveAction(activity.status);
+  const promoteBlockReason = getEventPromoteBlockReason(activity.status, activity.temporalState);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 
@@ -189,13 +191,6 @@ export function EventCardHorizontal({
     }
   };
 
-  const canPromote =
-    !activity.isPromoted &&
-    activity.status === ContentStatus.PUBLISHED &&
-    isPublicationActive({
-      status: activity.status,
-      temporalState: activity.temporalState,
-    });
   const updatedLine = formatUpdatedAgo(activity.updatedAt, activity.createdAt);
   const createdLine = `Создано: ${format(new Date(activity.createdAt), "d MMMM yyyy", { locale: ru })}`;
 
@@ -274,14 +269,26 @@ export function EventCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {canPromote ? (
-              <Link
-                href={buildBusinessBoostHref("EVENT", activity.id)}
-                className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
-              >
-                <Zap className="h-4 w-4 shrink-0" />
-                Продвинуть
-              </Link>
+            {!activity.isPromoted ? (
+              promoteBlockReason ? (
+                <button
+                  type="button"
+                  disabled
+                  title={EVENT_PROMOTE_BLOCK_TITLE[promoteBlockReason]}
+                  className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
+                >
+                  <Zap className="h-4 w-4 shrink-0" />
+                  Продвинуть
+                </button>
+              ) : (
+                <Link
+                  href={buildBusinessBoostHref("EVENT", activity.id)}
+                  className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
+                >
+                  <Zap className="h-4 w-4 shrink-0" />
+                  Продвинуть
+                </Link>
+              )
             ) : null}
 
             {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
