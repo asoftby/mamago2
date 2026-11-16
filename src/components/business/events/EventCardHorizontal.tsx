@@ -70,6 +70,7 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
+  displayOccurrenceAt?: Date | null;
   /** Сессионное состояние (getEventTemporalState по неотозванным сеансам); считает страница списка. */
   temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
@@ -114,9 +115,10 @@ function buildEventSubtitle(activity: Activity): string {
   if (activity.place?.title) {
     parts.push(`Где проходит: ${activity.place.title}`);
   }
-  if (activity.nextOccurrenceAt) {
+  const displayedDate = activity.displayOccurrenceAt ?? activity.nextOccurrenceAt;
+  if (displayedDate) {
     parts.push(
-      format(new Date(activity.nextOccurrenceAt), "d MMM yyyy", {
+      format(new Date(displayedDate), "d MMM yyyy", {
         locale: ru,
       }),
     );
