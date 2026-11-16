@@ -27,7 +27,6 @@ import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
-import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
 
 interface Offer {
   id: string;
@@ -42,6 +41,8 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
+  /** Server-computed Boost eligibility and free quota. */
+  boostDisabled?: boolean;
   rejectionReason?: string | null;
   archivedAt: Date | null;
   dateFrom: Date | null;
@@ -227,8 +228,9 @@ export function OfferCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {offer.status === "PUBLISHED" && !offer.archivedAt && !offer.place.archivedAt && isBoostableOfferProductType(offer.kind, offer.productType ?? null) && <BoostLauncher
+            {<BoostLauncher
               target={{ id: offer.id, publicationType: "OFFER", title: offer.title }}
+              disabled={offer.boostDisabled !== false}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
                 BUSINESS_PUBLICATION_ACTION_PROMOTE,
