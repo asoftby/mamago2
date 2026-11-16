@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurchase.service";
 import { listBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 import { BoostPurchaseClient } from "@/app/business/(protected)/offers/[id]/boost/BoostPurchaseClient";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
 export default async function EventBoostPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -21,10 +22,10 @@ export default async function EventBoostPage({ params }: { params: Promise<{ id:
   const regions = await listBoostTargetRegions();
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="rounded-3xl border border-stone-200 bg-white p-6">
-        <h1 className="text-2xl font-bold text-stone-950">Boost события: {event.title}</h1>
-        <p className="mt-2 text-sm text-stone-600">Продвигайте событие в выбранных областях или по всей Беларуси.</p>
-      </div>
+      <BusinessSectionHeader
+        title={`Boost события: ${event.title}`}
+        description="Продвигайте событие в выбранных областях или по всей Беларуси."
+      />
       {event.status !== "PUBLISHED" ? (
         <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Boost доступен только для опубликованного события.</p>
       ) : (

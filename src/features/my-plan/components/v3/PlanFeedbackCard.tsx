@@ -8,6 +8,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { PLAN_FACES, PlanFace, type PlanSentiment } from "./PlanFace";
 import {
+  patchExperienceAttendanceCorrection,
   postExperienceAttendance,
   postExperienceFeedback,
   type PlanExperienceFeed,
@@ -25,7 +26,13 @@ function formatPlannedDay(dateKey: string, todayIso: string): string {
 
 type Current =
   | { kind: "ask"; planItemId: string; title: string; plannedDate: string }
-  | { kind: "rate"; experienceId: string; title: string; plannedDate: string };
+  | {
+      kind: "rate";
+      experienceId: string;
+      title: string;
+      plannedDate: string;
+      canCorrectAttendance?: boolean;
+    };
 
 /**
  * «Как вам прошедшее?» — один тап по лицу засчитывает визит (attendance = ATTENDED),
@@ -105,7 +112,13 @@ function FeedbackCard({
       toast.error("Не получилось сохранить посещение");
       return;
     }
-    setOverride({ kind: "rate", experienceId: experience.id, title: current.title, plannedDate: current.plannedDate });
+    setOverride({
+      kind: "rate",
+      experienceId: experience.id,
+      title: current.title,
+      plannedDate: current.plannedDate,
+      canCorrectAttendance: true,
+    });
     await persistRating(experience.id, sentiment, comment.trim());
   }
 
@@ -120,6 +133,29 @@ function FeedbackCard({
     }
     setHidden(true);
     toast.success("Хорошо, вопрос убрали");
+    onChanged();
+  }
+
+  // Own unrated ATTENDED visits can still be corrected before a rating is saved.
+  async function correctAttendance() {
+    if (
+      !current ||
+      current.kind !== "rate" ||
+      current.canCorrectAttendance === false ||
+      busy ||
+      saved
+    ) {
+      return;
+    }
+    setBusy(true);
+    const ok = await patchExperienceAttendanceCorrection(current.experienceId);
+    setBusy(false);
+    if (!ok) {
+      toast.error("Не получилось изменить посещение. Попробуйте ещё раз.");
+      return;
+    }
+    setHidden(true);
+    toast.success("Отметили, что вы не были");
     onChanged();
   }
 
@@ -214,6 +250,18 @@ function FeedbackCard({
               </button>
               </div>
             ) : null}
+            {!saved && current.kind === "rate" && current.canCorrectAttendance !== false ? (
+              <div className="text-center">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void correctAttendance()}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-[13.5px] font-medium text-white/75 underline decoration-white/35 underline-offset-[3px] transition-colors hover:text-white"
+                >
+                  Мы не ходили
+                </button>
+              </div>
+            ) : null}
           </>
         ) : (
           <div>
@@ -293,7 +341,13 @@ export function PlanFeedbackCard({
   const cards: Array<{ id: string; base: Current }> = [
     ...(feed?.awaitingFeedback ?? []).map((row) => ({
       id: `r:${row.id}`,
-      base: { kind: "rate", experienceId: row.id, title: row.title, plannedDate: row.plannedDate } as Current,
+      base: {
+        kind: "rate",
+        experienceId: row.id,
+        title: row.title,
+        plannedDate: row.plannedDate,
+        canCorrectAttendance: row.canCorrectAttendance,
+      } as Current,
     })),
     ...(feed?.pending ?? []).map((row) => ({
       id: `a:${row.planItemId}`,

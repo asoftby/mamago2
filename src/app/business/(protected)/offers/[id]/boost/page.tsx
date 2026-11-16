@@ -6,6 +6,7 @@ import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurcha
 import { BoostPurchaseClient } from "./BoostPurchaseClient";
 import { listBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
 export default async function OfferBoostPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -24,11 +25,11 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="rounded-3xl border border-stone-200 bg-white p-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">Explicit paid action</p>
-        <h1 className="mt-2 text-2xl font-bold text-stone-950">Boost: {offer.title}</h1>
-        <p className="mt-2 text-sm text-stone-600">Boost — единственное платное действие first PROD. Лиды и контакты бесплатны.</p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="Explicit paid action"
+        title={`Boost: ${offer.title}`}
+        description="Boost — единственное платное действие first PROD. Лиды и контакты бесплатны."
+      />
       {offer.status !== "PUBLISHED" || offer.archivedAt || !isBoostableOfferProductType(offer.kind, offer.productType) ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
           Boost доступен только для опубликованной активной услуги, которая участвует в каталожной выдаче.

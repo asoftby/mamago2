@@ -73,4 +73,22 @@ assert.match(
   "Cookie preferences root may become visible only for the explicit preferences modal",
 );
 
+assert.match(
+  footerSource,
+  /PLAN_STICKY_FOOTER_PAD\s*=\s*"pb-\[calc\(62px\+45px\+max\(1\.25rem,env\(safe-area-inset-bottom,0px\),var\(--beta-tip-clearance-mobile,0px\),var\(--beta-tip-clearance-desktop,0px\)\)\)\]"/,
+  "Plan sticky footer clearance tracks PlanStickyCounter height + beta-tip CSS vars",
+);
+assert.doesNotMatch(
+  footerSource,
+  /pb-\[calc\(120px\+env\(safe-area-inset-bottom\)\)\]/,
+  "Fixed 120px plan clearance is gone — it left the floating add bar covering footer nav",
+);
+
+const layoutSource = readFileSync(new URL("../../app/(public)/PublicLayoutBody.tsx", import.meta.url), "utf8");
+assert.match(
+  layoutSource,
+  /isMyPlanFullPageRoute\(pathname\)/,
+  "Plan sticky footer clearance uses the shared full-page plan route helper",
+);
+
 console.log("PublicFooter contract tests: OK");

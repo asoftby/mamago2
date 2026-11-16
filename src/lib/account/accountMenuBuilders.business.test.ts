@@ -37,6 +37,11 @@ const model = buildBusinessAccountModel({
 const settings = model.mainItems.find((row) => row.key === "settings");
 assert.ok(settings && settings.type === "button", "business menu must have a «Настройки» row");
 assert.equal(settings.label, "Настройки");
+assert.equal(
+  settings.type === "button" ? settings.activeHref : null,
+  "/settings",
+  "business «Настройки» must highlight /settings (not /me/settings)",
+);
 settings.onClick();
 assert.equal(settingsCalls, 1, "row must call onGoToSettings (business surface in business mode)");
 

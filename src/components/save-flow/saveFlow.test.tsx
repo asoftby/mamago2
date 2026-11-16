@@ -17,10 +17,13 @@ assert.deepEqual({ ...C }, {
   ink2: "#3A332B", ink3: "rgba(20,18,16,.55)", line: "rgba(20,18,16,.10)", line2: "rgba(20,18,16,.18)",
   accent: "#E86A3A", accentDeep: "#C24E22", accentSoft: "#FFE8DC", green: "#1F8A5B", greenBg: "rgba(31,138,91,.12)",
 });
-// The only tokens shared with myPlanV3Tokens must stay identical to it.
+// Chip-on aliases resolve to shared --plan-selected* (hex frozen in C + globals.css).
 const v3 = MY_PLAN_V3_TOKENS as Record<string, string>;
-assert.equal(C.peach.toLowerCase(), v3["--mp-chip-on-bg"]);
-assert.equal(C.peachLine.toLowerCase(), v3["--mp-chip-on-line"]);
+assert.equal(v3["--mp-chip-on-bg"], "var(--plan-selected)");
+assert.equal(v3["--mp-chip-on-line"], "var(--plan-selected-line)");
+assert.equal(v3["--mp-chip-on-tx"], "var(--plan-on-selected)");
+assert.equal(C.peach.toLowerCase(), "#f7c3ad");
+assert.equal(C.peachLine.toLowerCase(), "#f3a684");
 
 // Dates (local, no TZ shifts).
 assert.deepEqual(fmtDateChip("2026-12-05"), { dow: "сб", day: "5", month: "дек", monthIdx: 11, year: 2026 });

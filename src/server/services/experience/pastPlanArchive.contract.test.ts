@@ -26,9 +26,13 @@ test("history includes places, offers, manually entered tasks, and attendance st
 });
 
 test("check-in is optional and can be postponed without losing history", () => {
-  assert.match(checkIn, /Оценить →/);
-  assert.match(checkIn, /Напомнить завтра/);
-  assert.match(checkIn, /experience-snooze/);
-  assert.match(checkIn, /setExitState\("hidden"\)/);
-  assert.match(checkIn, /onFinishedRef\.current\(\)/);
+  // Desktop /me/plan reuses PlanFeedbackCard (overlay), including 24h snooze on dismiss.
+  assert.match(checkIn, /PlanFeedbackCard/);
+  const planFeedback = readFileSync(
+    new URL("../../../features/my-plan/components/v3/PlanFeedbackCard.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(planFeedback, /Напомнить завтра/);
+  assert.match(planFeedback, /mamago:plan-feedback-snooze:/);
+  assert.match(planFeedback, /86400000/);
 });

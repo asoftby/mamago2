@@ -38,6 +38,14 @@ test("My Plan uses bounded calendar ranges, URL date state, cached weeks, and vi
   assert.match(week, /Сегодня/);
 });
 
+test("plan day cards keep start time even without a booking badge", () => {
+  const card = read("src/app/(public)/me/plan/PlanItemCard.tsx");
+  assert.match(card, /entryDisplay\.time/);
+  assert.match(card, /const timeLabel = time/);
+  assert.match(card, /metaParts = \[timeLabel, placeLabel\]/);
+  assert.match(card, /bookingCaption\(item\.booking\)/);
+});
+
 test("manual and Telegram records can be edited through source-scoped endpoints", () => {
   const card = read("src/app/(public)/me/plan/PlanItemCard.tsx");
   const presentation = read("src/features/my-plan/lib/familyCalendar.ts");

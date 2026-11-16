@@ -37,7 +37,7 @@ async function call(url: string, method: string, body?: unknown): Promise<{ ok: 
 const BTN =
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-900 hover:bg-neutral-50 disabled:opacity-50";
 const BTN_PRIMARY =
-  "inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-50";
 
 export function FamilyMembersCard(props: FamilyMembersCardProps) {
   const router = useRouter();

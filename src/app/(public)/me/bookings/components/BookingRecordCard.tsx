@@ -122,7 +122,7 @@ export function BookingRecordCard({ booking }: Props) {
         {/* Правый рельс */}
         <div className={styles.recRail}>
           <span className={styles.statusPill} style={{ background: tone.bg, color: tone.color }}>
-            {tone.dot} {tone.label}
+            {tone.label}
           </span>
           {publicHref ? (
             <div className={styles.recActions}>
@@ -137,7 +137,9 @@ export function BookingRecordCard({ booking }: Props) {
       {/* Детали по статусу */}
       {isPending ? (
         <div className={styles.recDetails}>
-          <p className={styles.detailsNote}>Ожидаем подтверждения от организатора</p>
+          <p className={`${styles.detailsNote} ${styles.detailsNotePending}`}>
+            Ожидаем подтверждения от организатора
+          </p>
         </div>
       ) : null}
 
