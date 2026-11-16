@@ -42,7 +42,7 @@ export function BoostLauncher({
   children: ReactNode;
   className?: string;
   disabled?: boolean;
-  /** Server-provided next free activation; the countdown runs only in the browser. */
+  /** End of an active free Boost on this target, never the business-wide quota. */
   cooldownUntil?: string | null;
 }) {
   const router = useRouter();
@@ -55,19 +55,31 @@ export function BoostLauncher({
   const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!cooldownUntil || disabled) return;
+    if (!cooldownUntil) {
+      setRemainingMinutes(null);
+      return;
+    }
     const nextAt = Date.parse(cooldownUntil);
     if (!Number.isFinite(nextAt)) return;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    let refreshed = false;
     const update = () => {
-      setRemainingMinutes(getBoostRemainingMinutes(cooldownUntil, Date.now()));
+      const remaining = getBoostRemainingMinutes(cooldownUntil, Date.now());
+      setRemainingMinutes(remaining);
+      if (remaining === 0 && !refreshed) {
+        refreshed = true;
+        if (intervalId) clearInterval(intervalId);
+        // Re-read server eligibility/quota when an active free Boost finishes.
+        router.refresh();
+      }
     };
     update();
-    // No polling or requests: only local clock arithmetic, recalculated every 15s.
-    const intervalId = setInterval(update, 15_000);
-    return () => clearInterval(intervalId);
-  }, [cooldownUntil, disabled]);
+    // One browser-only timer per active FREE Boost, no API polling.
+    if (!refreshed) intervalId = setInterval(update, 15_000);
+    return () => { if (intervalId) clearInterval(intervalId); };
+  }, [cooldownUntil, router]);
 
-  const coolingDown = !disabled && Boolean(cooldownUntil) && remainingMinutes !== 0;
+  const coolingDown = Boolean(cooldownUntil) && remainingMinutes !== 0;
   const countdownLabel = remainingMinutes === null ? "24:00" : formatBoostCountdown(remainingMinutes);
 
   function showDialog() {
