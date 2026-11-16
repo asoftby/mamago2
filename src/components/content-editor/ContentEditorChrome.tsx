@@ -43,7 +43,7 @@ export function ContentEditorChrome({
   return (
     <div className={cn("min-h-0 flex flex-1 flex-col", className)}>
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="flex w-full items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Link
               href={backHref}
