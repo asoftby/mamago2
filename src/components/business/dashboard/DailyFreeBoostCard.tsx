@@ -33,9 +33,9 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
   const eligibleCount = data.candidates.filter(
     (candidate) => candidate.eligible && !candidate.activeBoostUntil,
   ).length;
-  const disabled = !data.availableToday || (target
+  const disabled = target
     ? !initialCandidate?.eligible || Boolean(initialCandidate.activeBoostUntil)
-    : eligibleCount === 0);
+    : eligibleCount === 0;
 
   return (
     <BusinessSurfaceCard className="flex flex-col gap-4 p-5">
@@ -83,6 +83,7 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
       <BoostLauncher
         target={target}
         disabled={disabled}
+        cooldownUntil={data.nextFreeAt}
         className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-semibold text-stone-800 transition hover:bg-stone-100"
       >
         {target ? "Продвинуть выбранную публикацию" : "Продвинуть публикацию"}
