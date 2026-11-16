@@ -114,6 +114,7 @@ export default async function MePage({ searchParams }: PageProps) {
       key: "me",
       kind: "me",
       initial: firstName.charAt(0).toUpperCase(),
+      avatarUrl: user.avatarUrl ?? null,
       name: user.displayName?.trim() || "Я",
       role: adultRole || "Родитель",
       hint: preferenceDisplayLine?.trim() || "Настроим рекомендации",

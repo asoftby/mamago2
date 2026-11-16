@@ -15,6 +15,8 @@ import { getGreetingForHour } from "@/features/me/lib/accountGreeting";
 export type AccountFamilyMember = {
   key: string;
   initial: string;
+  /** Adult only: children have no photo by product decision. */
+  avatarUrl?: string | null;
   name: string;
   role: string;
   /** Italic helper line when the member has no interest chips. */
@@ -118,9 +120,14 @@ export function AccountDesign(props: AccountDesignProps) {
                 }}
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-base font-semibold text-orange-700">
-                    {m.initial}
-                  </span>
+                  {m.kind === "me" && m.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-base font-semibold text-orange-700">
+                      {m.initial}
+                    </span>
+                  )}
                   <span className="min-w-0">
                     <span className="block truncate text-base font-semibold text-neutral-900">{m.name}</span>
                     <span className="block text-sm text-neutral-600">{m.role}</span>

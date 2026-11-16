@@ -1,6 +1,11 @@
-export { metadata } from "@/app/settings/profile/page";
-import { renderProfileSettingsPage } from "@/features/settings/server/renderers";
+import { redirect } from "next/navigation";
 
-export default async function MeProfileSettingsPage() {
-  return renderProfileSettingsPage("USER");
+export { metadata } from "@/app/settings/profile/page";
+
+/**
+ * The user profile (name, photo, role, interests) is edited inline in
+ * «Моя семья» on /me. This route stays only as a redirect for old links.
+ */
+export default function MeProfileSettingsPage() {
+  redirect("/me");
 }

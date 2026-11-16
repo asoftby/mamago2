@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getCurrentAuthState } from "@/lib/auth/getCurrentAuthState";
 import { prisma } from "@/lib/prisma";
 import { buildMeProfileUpdateData } from "@/lib/account/buildMeProfileUpdateData";
+import { resolveAvatarUrlUpdate } from "@/lib/account/resolveAvatarUrlUpdate";
 
 /**
  * GET /api/auth/me
@@ -46,6 +47,20 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({}));
 
     const updateData = buildMeProfileUpdateData(body);
+
+    // Avatar: only the user's own uploaded media (or null to remove).
+    // One indexed lookup (uploadedById) and only when avatarUrl is sent.
+    const avatarUpdate = await resolveAvatarUrlUpdate(body, async (url) => {
+      const asset = await prisma.mediaAsset.findFirst({
+        where: { uploadedById: user.id, publicUrl: url, status: { notIn: ["DELETED", "BLOCKED"] } },
+        select: { id: true },
+      });
+      return !!asset;
+    });
+    if (avatarUpdate.kind === "invalid") {
+      return NextResponse.json({ error: "Не удалось сохранить фото" }, { status: 400 });
+    }
+    if (avatarUpdate.kind === "set") updateData.avatarUrl = avatarUpdate.avatarUrl;
 
     const updated = await prisma.user.update({
       where: { id: user.id },
