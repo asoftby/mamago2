@@ -16,6 +16,7 @@ import { getPerformanceMetricsByEntity } from "@/server/services/business/busine
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { businessPublicationDayRange } from "@/lib/business/publicationAnalyticsRange";
 import { getPromotionPerformanceByActivityIds } from "@/server/services/promotion/boostPerformance.service";
+import { getFreeBoostDialogState } from "@/server/services/promotion/dailyFreeBoost.service";
 
 interface SearchParams {
   view?: "active" | "archived" | "archive";
@@ -85,7 +86,7 @@ export default async function EventsPage({
     orderBy: { createdAt: "desc" },
   });
   const now = new Date();
-  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions] = await Promise.all([
+  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions, freeBoost] = await Promise.all([
     getPerformanceMetricsByEntity({
       events: activities.map((activity) => ({
         id: activity.id,
@@ -123,6 +124,7 @@ export default async function EventsPage({
           },
           _max: { startsAt: true },
         }),
+    getFreeBoostDialogState({ businessId: business.id, userId: user.id, now }),
   ]);
   const lastSessionStartByActivity = new Map(
     lastSessions.flatMap((row) =>
@@ -131,11 +133,15 @@ export default async function EventsPage({
   );
 
   const activePromotionIds = new Set(activePromotions.map((promotion) => promotion.publicationId));
+  const boostCandidates = new Map(
+    freeBoost.candidates.filter((candidate) => candidate.publicationType === "EVENT").map((candidate) => [candidate.id, candidate]),
+  );
 
   const activitiesWithMetrics = activities
     .map((activity) => {
       const promotionPerformance = promotionPerformanceByActivity.get(activity.id) ?? null;
       const lastSessionStart = lastSessionStartByActivity.get(activity.id);
+      const boostCandidate = boostCandidates.get(activity.id);
       return {
         ...activity,
         temporalState: getEventTemporalState({
@@ -146,6 +152,7 @@ export default async function EventsPage({
         }),
         isPromoted:
           activePromotionIds.has(activity.id) || promotionPerformance?.isPromoted === true,
+        boostDisabled: !freeBoost.availableToday || !boostCandidate?.eligible || Boolean(boostCandidate.activeBoostUntil),
         promotionPerformance,
         metrics: {
       ...(metricsByEntity.get(`EVENT:${activity.id}`) ?? {
