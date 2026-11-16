@@ -90,7 +90,6 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
       {data.candidates.length > 0 && (
         <p className="text-xs text-stone-500">
           Доступно для Boost: {eligibleCount} из {data.candidates.length}.
-
         </p>
       )}
     </BusinessSurfaceCard>
