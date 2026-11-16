@@ -43,6 +43,7 @@ interface Offer {
   status: OfferStatus;
   /** Server-computed Boost eligibility and free quota. */
   boostDisabled?: boolean;
+  boostNextFreeAt?: string | null;
   rejectionReason?: string | null;
   archivedAt: Date | null;
   dateFrom: Date | null;
@@ -231,6 +232,7 @@ export function OfferCardHorizontal({
             {<BoostLauncher
               target={{ id: offer.id, publicationType: "OFFER", title: offer.title }}
               disabled={offer.boostDisabled !== false}
+              cooldownUntil={offer.boostNextFreeAt}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
                 BUSINESS_PUBLICATION_ACTION_PROMOTE,
