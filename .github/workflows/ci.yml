@@ -277,6 +277,7 @@ jobs:
           pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
           pnpm exec tsx src/server/services/ranking/businessQualityBoost.test.ts
           pnpm exec tsx src/components/business/events/boostBadgePolicy.test.ts
+          pnpm exec tsx src/lib/publication/displayStatus.test.ts
           pnpm exec tsx src/features/city-home/lib/personaRanking.test.ts
           pnpm exec tsx src/server/place/placeDetailPerf.test.ts
 
