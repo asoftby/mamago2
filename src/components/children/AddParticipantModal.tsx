@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,12 @@ import {
 } from "@/components/children/ChildBirthFields";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { BodyMuted } from "@/components/ui/typography";
-import { ArrowLeft, Baby, RefreshCw, UserRound } from "lucide-react";
+import { ArrowLeft, Baby, Camera, RefreshCw, UserRound } from "lucide-react";
 import { useChildInterests } from "@/hooks/useChildInterests";
 import { cn } from "@/lib/utils";
 import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
+import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import { FAMILY_ROLE_OPTIONS as FAMILY_ROLES } from "@/lib/family/adultPersonaOptions";
 import {
   AlertDialog,
@@ -188,6 +190,10 @@ function ParticipantFlow({
   const [formatSignals, setFormatSignals] = useState<AdultPersonaSignalChip[]>([]);
   const [selectedPreferenceIds, setSelectedPreferenceIds] = useState<string[]>([]);
   const [selectedFormatId, setSelectedFormatId] = useState<string | null>(null);
+  // Photo is adult-only by product decision: children have no photo.
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -208,6 +214,8 @@ function ParticipantFlow({
     setFamilyRole("");
     setSelectedPreferenceIds([]);
     setSelectedFormatId(null);
+    setAvatarPreview(null);
+    setAvatarFile(null);
     setError(null);
     setIsLoading(false);
     setIsDeleting(false);
@@ -223,6 +231,7 @@ function ParticipantFlow({
       const fromEmail =
         typeof me.email === "string" ? me.email.split("@")[0] : "";
       setAdultName(trimmed || fromEmail || "");
+      setAvatarPreview(typeof me.avatarUrl === "string" && me.avatarUrl ? me.avatarUrl : null);
       setFamilyRole(me.familyRole ?? "");
       const pids = me.preferenceSignalIds;
       setSelectedPreferenceIds(Array.isArray(pids) ? pids : []);
@@ -400,11 +409,19 @@ function ParticipantFlow({
       setIsLoading(true);
       setError(null);
       try {
+        // Same upload path as the former settings profile page (useProfileSave):
+        // HEIC → JPEG on the client, then the shared media upload.
+        let avatarUrl: string | undefined;
+        if (avatarFile) {
+          const file = await convertHeicFileToJpegIfNeeded(avatarFile);
+          avatarUrl = (await uploadMediaFile(file)).url;
+        }
         const res = await fetch("/api/auth/me", {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            ...(avatarUrl !== undefined ? { avatarUrl } : {}),
             displayName: adultName.trim(),
             familyRole: familyRole || null,
             preferenceSignalIds: selectedPreferenceIds,
@@ -635,6 +652,46 @@ function ParticipantFlow({
 
             {showAdultForm ? (
               <div className="space-y-5 pb-4">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-primary/10"
+                    aria-label="Изменить фото"
+                  >
+                    {avatarPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatarPreview} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-2xl font-semibold text-primary">
+                        {(adultName.trim().charAt(0) || "?").toUpperCase()}
+                      </span>
+                    )}
+                    <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-neutral-200">
+                      <Camera className="h-3.5 w-3.5 text-neutral-700" aria-hidden />
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    {avatarPreview ? "Изменить фото" : "Добавить фото"}
+                  </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    data-testid="adult-avatar-input"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setAvatarFile(file);
+                      setAvatarPreview(URL.createObjectURL(file));
+                    }}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="adult-name">Имя</Label>
                   <Input

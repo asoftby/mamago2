@@ -23,7 +23,8 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionDefinition[] = [
     group: "profile",
     order: 10,
     ownership: "COMMON",
-    surfaceScopes: ["USER", "BUSINESS", "ADMIN"],
+    // USER edits name/photo/interests inline in «Моя семья» on /me.
+    surfaceScopes: ["BUSINESS", "ADMIN"],
     routeKey: "profile",
     routeSegment: "profile",
   },

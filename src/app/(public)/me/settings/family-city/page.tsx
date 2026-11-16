@@ -20,8 +20,8 @@ async function saveFamilyHomeCity(formData: FormData) {
   });
   if (!membership) throw new Error("Домашний город может изменить только владелец семьи.");
   await prisma.family.update({ where: { id: membership.familyId }, data: { homeCityId: city.id } });
-  revalidatePath("/me/settings/profile");
-  redirect("/me/settings/profile");
+  revalidatePath("/me/settings");
+  redirect("/me/settings");
 }
 
 export default async function FamilyHomeCityPage() {
@@ -38,8 +38,8 @@ export default async function FamilyHomeCityPage() {
   });
   return (
     <AccountPage
-      backHref="/me/settings/profile"
-      backLabel="← Профиль"
+      backHref="/me/settings"
+      backLabel="← Настройки"
       title="Город проживания"
       lead="Город, в котором живёт семья. Он не меняется при временном просмотре афиши другого города."
     >
