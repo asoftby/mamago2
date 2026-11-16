@@ -43,7 +43,7 @@ export function SettingsScaffold(props: {
               : "Параметры и безопасность вашего бизнес-аккаунта."
           }
         />
-        <div className={props.maxWidthClassName ?? "max-w-2xl"}>
+        <div className={`mx-auto ${props.maxWidthClassName ?? "max-w-2xl"}`}>
           {props.currentSectionId !== "home" ? (
             <HistoryBackButton
               fallbackHref={homeHref}

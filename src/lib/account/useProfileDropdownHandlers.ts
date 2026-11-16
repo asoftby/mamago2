@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
+import { getCurrentBrowserAppContextWithPath } from "@/lib/routing/appContext";
 import { navigateToSurface } from "@/lib/routing/clientNavigation";
 import type { AccountMenuUser } from "@/lib/account/types";
 
@@ -115,9 +116,14 @@ export function useProfileDropdownHandlers(input: {
   }, [router]);
 
   const onGoToSettings = useCallback(() => {
+    // BusinessHeader forces the menu UI into business mode on business.*, but
+    // AccountMode can still be "personal" when the path lacks /business (subdomain).
+    // Prefer the real host/path surface so Settings stays on business /settings.
+    const onBusinessSurface =
+      mode === "business" || getCurrentBrowserAppContextWithPath() === "business";
     navigateToSurface(router, {
-      targetSurface: mode === "business" ? "business" : "public",
-      targetPath: mode === "business" ? "/settings" : "/me/settings",
+      targetSurface: onBusinessSurface ? "business" : "public",
+      targetPath: onBusinessSurface ? "/settings" : "/me/settings",
     });
   }, [router, mode]);
 
