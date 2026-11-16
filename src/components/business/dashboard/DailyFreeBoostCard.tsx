@@ -14,11 +14,16 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
   const initialCandidate = data.candidates.find(
     (candidate) => `${candidate.publicationType}:${candidate.id}` === initialTarget,
   );
-  const target = initialCandidate
+  // After activation the dashboard button tracks the publication that received
+  // the free Boost. Other publications do not show its countdown.
+  const selectedCandidate = initialCandidate ?? data.candidates.find(
+    (candidate) => candidate.activeFreeBoostUntil,
+  );
+  const target = selectedCandidate
     ? {
-        id: initialCandidate.id,
-        publicationType: initialCandidate.publicationType,
-        title: initialCandidate.title,
+        id: selectedCandidate.id,
+        publicationType: selectedCandidate.publicationType,
+        title: selectedCandidate.title,
       }
     : undefined;
   const nextFreeLabel = data.nextFreeAt
@@ -33,9 +38,9 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
   const eligibleCount = data.candidates.filter(
     (candidate) => candidate.eligible && !candidate.activeBoostUntil,
   ).length;
-  const disabled = target
-    ? !initialCandidate?.eligible || Boolean(initialCandidate.activeBoostUntil)
-    : eligibleCount === 0;
+  const disabled = !data.availableToday || (target
+    ? !selectedCandidate?.eligible || Boolean(selectedCandidate.activeBoostUntil)
+    : eligibleCount === 0);
 
   return (
     <BusinessSurfaceCard className="flex flex-col gap-4 p-5">
@@ -83,10 +88,10 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
       <BoostLauncher
         target={target}
         disabled={disabled}
-        cooldownUntil={data.nextFreeAt}
+        cooldownUntil={selectedCandidate?.activeFreeBoostUntil ?? null}
         className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-semibold text-stone-800 transition hover:bg-stone-100"
       >
-        {target ? "Продвинуть выбранную публикацию" : "Продвинуть публикацию"}
+        Продвигать
       </BoostLauncher>
       {data.candidates.length > 0 && (
         <p className="text-xs text-stone-500">
