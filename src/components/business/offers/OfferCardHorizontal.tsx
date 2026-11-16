@@ -26,7 +26,7 @@ import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
-import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
+import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
 import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
 
 interface Offer {
@@ -227,8 +227,8 @@ export function OfferCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {offer.status === "PUBLISHED" && !offer.archivedAt && !offer.place.archivedAt && isBoostableOfferProductType(offer.kind, offer.productType ?? null) && <Link
-              href={buildBusinessBoostHref("OFFER", offer.id)}
+            {offer.status === "PUBLISHED" && !offer.archivedAt && !offer.place.archivedAt && isBoostableOfferProductType(offer.kind, offer.productType ?? null) && <BoostLauncher
+              target={{ id: offer.id, publicationType: "OFFER", title: offer.title }}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
                 BUSINESS_PUBLICATION_ACTION_PROMOTE,
@@ -236,7 +236,7 @@ export function OfferCardHorizontal({
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
               Продвинуть
-            </Link>}
+            </BoostLauncher>}
 
             {onArchive && offer.status !== "DRAFT" ? (
               <button
