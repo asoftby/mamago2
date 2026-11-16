@@ -122,6 +122,7 @@ type Props = {
   scenarioStatusByDate?: Record<string, "ready" | "changed">;
   experienceCandidates?: ExperienceCheckInCandidate[];
   recentExperiences?: ExperienceCheckInState[];
+  feedbackV1Enabled?: boolean;
   pastEntries?: PastPlanEntry[];
   pastEntriesHasNext?: boolean;
   pastEntriesPage?: number;
@@ -209,6 +210,7 @@ export function PlanPageClient({
   scenarioStatusByDate = {},
   experienceCandidates = [],
   recentExperiences = [],
+  feedbackV1Enabled = false,
   pastEntries = [],
   pastEntriesHasNext = false,
   pastEntriesPage = 0,
@@ -411,6 +413,7 @@ export function PlanPageClient({
             <ExperienceCheckIn
               candidates={experienceCandidates}
               recentExperiences={recentExperiences}
+              feedbackV1Enabled={feedbackV1Enabled}
               onOpenVisits={() => setArchiveOpen(true)}
             />
           </div>

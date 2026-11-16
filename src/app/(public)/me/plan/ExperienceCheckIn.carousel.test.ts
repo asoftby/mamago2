@@ -14,11 +14,15 @@ assert.match(ui, /PlanFeedbackCard/);
 assert.match(ui, /MY_PLAN_V3_TOKENS/);
 assert.match(ui, /onOpenVisits/);
 assert.match(ui, /awaitingFeedback/);
+assert.match(ui, /feedbackV1Enabled/);
+assert.match(ui, /canCorrectAttendance/);
 assert.match(ui, /router\.refresh\(\)/);
 
 assert.match(planFeedback, /mamago:plan-feedback-snooze:/);
 assert.match(planFeedback, /aria-label="Закрыть вопрос о посещении"/);
 assert.match(planFeedback, /Мы не ходили/);
+assert.match(planFeedback, /patchExperienceAttendanceCorrection/);
+assert.match(planFeedback, /canCorrectAttendance !== false/);
 assert.match(planFeedback, /PhoneVerificationModal/);
 assert.match(planFeedback, /PLAN_FACES/);
 

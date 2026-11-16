@@ -67,6 +67,8 @@ assert.doesNotMatch(digest, /experience|ATTENDED|EXPERIENCE_FEEDBACK/i);
 assert.match(ui, /PlanFeedbackCard/);
 assert.match(ui, /MY_PLAN_V3_TOKENS/);
 assert.match(ui, /awaitingFeedback/);
+assert.match(ui, /feedbackV1Enabled/);
+assert.match(ui, /canCorrectAttendance/);
 assert.doesNotMatch(ui, /<dialog/i);
 assert.match(planFeedbackCard, /Как прошло\?/);
 assert.match(planFeedbackCard, /MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH/);

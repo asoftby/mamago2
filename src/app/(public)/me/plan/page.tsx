@@ -109,6 +109,7 @@ export default async function PlanPage({
         plannedStartsAt: candidate.plannedStartsAt?.toISOString() ?? null,
       }))}
       recentExperiences={recentExperiences}
+      feedbackV1Enabled={process.env.FEEDBACK_V1_WRITE_ENABLED === "1"}
       pastEntries={pastEntries.items}
       pastEntriesHasNext={pastEntries.hasNext}
       pastEntriesPage={historyPage}

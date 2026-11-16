@@ -16,6 +16,8 @@ export type PlanExperienceRow = {
   attendance: "ATTENDED" | "NOT_ATTENDED";
   feedbackSentiment: PlanSentiment | null;
   feedbackComment: string | null;
+  /** Own unrated visit may be corrected via PATCH …/attendance. */
+  canCorrectAttendance?: boolean;
 };
 
 export type PlanExperienceFeed = {
@@ -59,6 +61,23 @@ export async function postExperienceAttendance(
     return payload.experience;
   } catch {
     return null;
+  }
+}
+
+/** Correct an already-confirmed but still-unrated visit to NOT_ATTENDED. */
+export async function patchExperienceAttendanceCorrection(
+  experienceId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/plan/experiences/${experienceId}/attendance`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attendance: "NOT_ATTENDED" }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

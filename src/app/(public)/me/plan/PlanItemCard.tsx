@@ -8,6 +8,7 @@ import { CalendarDays, StickyNote } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { formatHHMM } from "@/lib/formatters/date";
 import { planEntryDisplay } from "@/features/my-plan/lib/planEntryDisplay";
 import { removePlanEntry } from "@/features/my-plan/lib/removePlanEntry";
 import { resolvePlanItemCategoryLabel } from "@/features/my-plan/lib/planItemMeta";
@@ -61,10 +62,12 @@ export function PlanItemCard({
   const category = presentation.isCatalog
     ? resolvePlanItemCategoryLabel(item.activity)
     : null;
+  const time = entryDisplay.time;
+  const endTime = formatHHMM(item.endsAt) || null;
   const price = item.activity?.priceLabel ?? null;
   const venueName = presentation.isCatalog ? item.activity?.venueName ?? null : presentation.locationLabel;
   const venueAddress = presentation.isCatalog ? item.activity?.venueAddress ?? null : null;
-  /** Under-title meta: place (точка) · price; time lives in the booking badge when present. */
+  /** Under-title meta: start time (always) · place · price. Booking badge is separate status. */
   const placeLabel = venueName ?? venueAddress ?? null;
   const unavailable = presentation.isCatalog && (
     item.planAvailability === "business_disabled" ||
@@ -77,7 +80,12 @@ export function PlanItemCard({
       ? publicActivityPath(item.activityId, "minsk", item.activity?.slug)
       : null;
 
-  const metaParts = [placeLabel].filter(Boolean) as string[];
+  // Timed events without a booking and manual notes have no booking badge, so
+  // entryDisplay.time must stay in the meta line independently of bookingCaption.
+  const timeLabel = time
+    ? `${time}${endTime ? `–${endTime}` : ""}`
+    : (!presentation.isCatalog ? "Весь день" : null);
+  const metaParts = [timeLabel, placeLabel].filter(Boolean) as string[];
   const hasMeta = metaParts.length > 0 || Boolean(price);
   const bookingConfirmed = item.booking?.status === "CONFIRMED";
 

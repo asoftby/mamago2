@@ -33,8 +33,13 @@ assert.equal(hasPendingPlanFeedback({ ...empty, awaitingFeedback: [historicVisit
 
 const feedbackSource = readFileSync(new URL("./PlanFeedbackCard.tsx", import.meta.url), "utf8");
 const planSource = readFileSync(new URL("../PlanMainContent.tsx", import.meta.url), "utf8");
+const apiSource = readFileSync(new URL("./planExperienceApi.ts", import.meta.url), "utf8");
 assert.match(feedbackSource, /if \(cards\.length === 0\) return null;/,
   "hide the entire carousel, including Все визиты, when no actionable cards remain");
+assert.match(feedbackSource, /patchExperienceAttendanceCorrection/);
+assert.match(feedbackSource, /canCorrectAttendance/);
+assert.match(apiSource, /patchExperienceAttendanceCorrection/);
+assert.match(apiSource, /\/attendance/);
 assert.match(planSource, /if \(hasPendingPlanFeedback\(next\)\) return next;/);
 assert.match(planSource, /return current === null \? current : null;/,
   "do not schedule a state update when history-only feed is already hidden");

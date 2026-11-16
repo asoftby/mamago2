@@ -40,6 +40,7 @@ function toFeedRow(item: ExperienceCheckInState): PlanExperienceRow {
     attendance: item.attendance,
     feedbackSentiment: item.feedbackSentiment,
     feedbackComment: item.feedbackComment ?? null,
+    canCorrectAttendance: item.canCorrectAttendance,
   };
 }
 
@@ -50,15 +51,22 @@ function toFeedRow(item: ExperienceCheckInState): PlanExperienceRow {
 export function ExperienceCheckIn({
   candidates,
   recentExperiences,
+  feedbackV1Enabled = false,
   onOpenVisits,
 }: {
   candidates: ExperienceCheckInCandidate[];
   recentExperiences: ExperienceCheckInState[];
+  /** Mirrors `/api/plan/experiences` so editable Feedback v1 mode works on SSR. */
+  feedbackV1Enabled?: boolean;
   onOpenVisits?: () => void;
 }) {
   const router = useRouter();
   const feed = useMemo((): PlanExperienceFeed => {
-    const awaitingFeedback = recentExperiences
+    // Feedback v1 is personal: do not ask another adult to rate someone else's visit.
+    const awaitingSource = feedbackV1Enabled
+      ? recentExperiences.filter((item) => item.canCorrectAttendance !== false)
+      : recentExperiences;
+    const awaitingFeedback = awaitingSource
       .filter((item) => item.attendance === "ATTENDED" && !item.feedbackSentiment)
       .map(toFeedRow);
     const pending = candidates.filter(
@@ -70,8 +78,9 @@ export function ExperienceCheckIn({
       visits: recentExperiences.map(toFeedRow),
       // Phone gate is enforced by the feedback API (403 → modal); SSR does not ship this flag.
       phoneVerified: true,
+      feedbackV1Enabled,
     };
-  }, [candidates, recentExperiences]);
+  }, [candidates, recentExperiences, feedbackV1Enabled]);
 
   // Keep the Account header wrapper `:empty` when there is nothing to ask,
   // so it does not reserve margin under the subtitle.
