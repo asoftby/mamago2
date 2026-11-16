@@ -28,10 +28,7 @@ import {
   BUSINESS_PUBLICATION_ACTION_PROMOTE,
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
-import {
-  CONTENT_STATUS_META,
-  contentStatusPublicationPillClass,
-} from "@/lib/content-status-meta";
+import { PublicationStatusChip } from "@/components/business/shared/PublicationStatusChip";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
@@ -193,7 +190,6 @@ export function EventCardHorizontal({
     }
   };
 
-  const statusMeta = CONTENT_STATUS_META[activity.status];
   const updatedLine = formatUpdatedAgo(activity.updatedAt, activity.createdAt);
   const createdLine = `Создано: ${format(new Date(activity.createdAt), "d MMMM yyyy", { locale: ru })}`;
 
@@ -210,14 +206,10 @@ export function EventCardHorizontal({
 
   const statusRow = (
     <div className="flex flex-wrap items-center gap-2">
-      <span
-        className={cn(
-          "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium",
-          contentStatusPublicationPillClass(activity.status),
-        )}
-      >
-        {statusMeta.label}
-      </span>
+      <PublicationStatusChip
+        status={activity.status}
+        temporalState={activity.temporalState}
+      />
       {/* Boost never adds a label/ribbon to the publication card.
           Active status and performance are available in the Boost section. */}
     </div>

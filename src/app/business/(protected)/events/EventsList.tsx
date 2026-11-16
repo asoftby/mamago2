@@ -1,5 +1,6 @@
 "use client";
 
+import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import { BusinessContentList } from "@/components/business/shared/BusinessContentList";
 import { EventCardHorizontal } from "@/components/business/events/EventCardHorizontal";
 import { Calendar } from "lucide-react";
@@ -39,6 +40,7 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
+  temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {

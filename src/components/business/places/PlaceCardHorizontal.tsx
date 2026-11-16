@@ -21,7 +21,7 @@ import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { getPlaceSearchAddressMetaLine } from "@/lib/placeLocationString";
 import { calculateUrgency } from "@/lib/improvementRequest/urgency";
-import { CONTENT_STATUS_META } from "@/lib/content-status-meta";
+import { PublicationStatusChip } from "@/components/business/shared/PublicationStatusChip";
 import { cn } from "@/lib/utils";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
@@ -92,7 +92,6 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   const [isArchiving, setIsArchiving] = useState(false);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
 
-  const statusConfig = CONTENT_STATUS_META[place.status];
   
   // Determine effective status (revision takes precedence for display)
   const hasActiveRevision = place.activeRevision && 
@@ -214,31 +213,10 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   const updatedLine = formatUpdatedAgo(place.updatedAt, place.createdAt);
   const createdLine = `Создано: ${format(new Date(place.createdAt), "d MMMM yyyy", { locale: ru })}`;
 
-  const statusRow =
-    !place.archivedAt ? (
+  const statusRow = (
       <>
-        <span
-          className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium ${
-            place.status === "DRAFT"
-              ? "border-stone-200 bg-stone-50 text-stone-600"
-              : place.status === "PENDING"
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-                : place.status === "PENDING_UPDATE"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : place.status === "PUBLISHED"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : place.status === "NEEDS_REVISION"
-                      ? "border-amber-200 bg-amber-50 text-amber-800"
-                      : place.status === "SCHEDULED"
-                        ? "border-blue-200 bg-blue-50 text-blue-900"
-                        : place.status === "ARCHIVED"
-                          ? "border-stone-200 bg-stone-50 text-stone-600"
-                          : "border-red-200 bg-red-50 text-red-700"
-          }`}
-        >
-          {statusConfig.label}
-        </span>
-        {hasActiveImprovementRequest && mostUrgentUrgency ? (
+        <PublicationStatusChip status={place.status} archivedAt={place.archivedAt} />
+        {!place.archivedAt && hasActiveImprovementRequest && mostUrgentUrgency ? (
           <Badge
             variant="outline"
             className={`rounded-full px-3 py-1.5 text-xs ${
@@ -258,7 +236,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           </Badge>
         ) : null}
       </>
-    ) : undefined;
+    );
 
   const revisionFootnote =
     daysSinceRevision !== null ? (

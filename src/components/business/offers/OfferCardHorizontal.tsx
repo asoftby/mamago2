@@ -4,7 +4,7 @@ import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/forma
 import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { useState } from "react";
 import Link from "next/link";
-import { OfferStatusBadge } from "./OfferStatusBadge";
+import { PublicationStatusChip } from "@/components/business/shared/PublicationStatusChip";
 import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Tag, BarChart3, Zap } from "lucide-react";
 import { OfferStatus, OfferKind } from "@prisma/client";
 import { format } from "date-fns";
@@ -42,6 +42,7 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
+  rejectionReason?: string | null;
   archivedAt: Date | null;
   dateFrom: Date | null;
   dateTo: Date | null;
@@ -181,7 +182,13 @@ export function OfferCardHorizontal({
           </BusinessChip>
         }
         subtitle={buildOfferSubtitle(offer)}
-        statusRow={<OfferStatusBadge status={offer.status} />}
+        statusRow={
+          <PublicationStatusChip
+            status={offer.status}
+            archivedAt={offer.archivedAt}
+            reason={offer.status === "REJECTED" ? offer.rejectionReason : null}
+          />
+        }
         updatedLine={updatedLine}
         createdLine={createdLine}
         metrics={cardMetrics}

@@ -7,6 +7,7 @@ import {
   excludeGhostEventDrafts,
   normalizeBusinessEventListView,
 } from "@/lib/business/eventListWhere";
+import { getEventTemporalState } from "@/lib/events/eventTemporalState";
 import { EventsList } from "./EventsList";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
@@ -84,7 +85,7 @@ export default async function EventsPage({
     orderBy: { createdAt: "desc" },
   });
   const now = new Date();
-  const [metricsByEntity, activePromotions, promotionPerformanceByActivity] = await Promise.all([
+  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions] = await Promise.all([
     getPerformanceMetricsByEntity({
       events: activities.map((activity) => ({
         id: activity.id,
@@ -110,15 +111,39 @@ export default async function EventsPage({
       activities.map((activity) => activity.id),
       now,
     ),
+    // Только последний неотозванный сеанс на событие (одна агрегация, строк не больше,
+    // чем событий) — для статуса «Прошло»; полная история сеансов не грузится.
+    activities.length === 0
+      ? Promise.resolve([])
+      : prisma.activitySession.groupBy({
+          by: ["activityId"],
+          where: {
+            activityId: { in: activities.map((activity) => activity.id) },
+            withdrawnAt: null,
+          },
+          _max: { startsAt: true },
+        }),
   ]);
+  const lastSessionStartByActivity = new Map(
+    lastSessions.flatMap((row) =>
+      row._max.startsAt ? [[row.activityId, row._max.startsAt] as const] : [],
+    ),
+  );
 
   const activePromotionIds = new Set(activePromotions.map((promotion) => promotion.publicationId));
 
   const activitiesWithMetrics = activities
     .map((activity) => {
       const promotionPerformance = promotionPerformanceByActivity.get(activity.id) ?? null;
+      const lastSessionStart = lastSessionStartByActivity.get(activity.id);
       return {
         ...activity,
+        temporalState: getEventTemporalState({
+          scheduleMode: activity.scheduleMode,
+          nextOccurrenceAt: activity.nextOccurrenceAt,
+          sessions: lastSessionStart ? [{ startsAt: lastSessionStart }] : [],
+          now,
+        }),
         isPromoted:
           activePromotionIds.has(activity.id) || promotionPerformance?.isPromoted === true,
         promotionPerformance,
