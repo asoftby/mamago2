@@ -51,15 +51,19 @@ export async function getFreeBoostCandidates(params: {
   now?: Date;
 }): Promise<FreeBoostCandidate[]> {
   const now = params.now ?? new Date();
-  // Align owner scope with businessWorkspace and business publication lists.
+  // Do not include publications reassigned to a different Business:
+  // creator rights alone do not authorize spending this Business's free quota.
   const eventOwnerWhere: Prisma.ActivityWhereInput = {
-    OR: [{ businessId: params.businessId }, { ownerUserId: params.userId }],
+    OR: [
+      { businessId: params.businessId },
+      { ownerUserId: params.userId, businessId: null },
+    ],
   };
   const offerOwnerWhere: Prisma.OfferWhereInput = {
     place: {
       OR: [
         { ownerBusinessId: params.businessId },
-        { createdByUserId: params.userId },
+        { createdByUserId: params.userId, ownerBusinessId: null },
       ],
     },
   };
@@ -144,7 +148,7 @@ export async function getFreeBoostCandidates(params: {
             ? "Предложение не опубликовано или находится в архиве"
             : !isBoostableOfferProductType(offer.kind, offer.productType)
               ? "Для этого типа предложения Boost пока недоступен"
-              : offer.place.status !== "PUBLISHED" || offer.place.archivedAt
+              : offer.place?.status !== "PUBLISHED" || offer.place?.archivedAt
                 ? "Связанное место не опубликовано"
                 : "Предложение не отображается в публичном каталоге",
       };
@@ -200,7 +204,7 @@ export async function createDailyFreeBoost(params: {
               { type: "EVENT" },
               { OR: [
                 { businessId: params.businessId },
-                { ownerUserId: params.userId },
+                { ownerUserId: params.userId, businessId: null },
               ] },
             ],
           },
@@ -218,7 +222,7 @@ export async function createDailyFreeBoost(params: {
               getBoostablePublishedOfferWhere(now),
               { place: { OR: [
                 { ownerBusinessId: params.businessId },
-                { createdByUserId: params.userId },
+                { createdByUserId: params.userId, ownerBusinessId: null },
               ] } },
             ],
           },
