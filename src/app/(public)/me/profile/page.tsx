@@ -32,7 +32,6 @@ export default async function FamilyProfilePage() {
 
   return (
     <AccountPage
-      backHref="/me"
       title="Моя семья"
       lead="Используем профиль семьи для более точных рекомендаций и планов."
     >

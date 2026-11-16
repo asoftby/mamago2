@@ -6,14 +6,14 @@ export function SettingsPageLayout(props: {
   title: string;
   children: ReactNode;
   maxWidthClassName?: string;
-  /** Куда ведёт ссылка назад (родительская страница настроек). */
-  backHref?: string;
+  /** Куда ведёт ссылка назад (родительская страница настроек); null — без ссылки. */
+  backHref?: string | null;
   backLabel?: string;
 }) {
   return (
     <AccountPage
       title={props.title}
-      backHref={props.backHref ?? "/me/settings"}
+      backHref={props.backHref === null ? undefined : (props.backHref ?? "/me/settings")}
       backLabel={props.backLabel ?? "← Настройки"}
       className={props.maxWidthClassName ?? "max-w-2xl"}
     >

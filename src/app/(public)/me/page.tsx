@@ -190,7 +190,6 @@ export default async function MePage({ searchParams }: PageProps) {
     <AccountDesign
       userName={firstName}
       greeting={greeting}
-      settingsHref="/me/settings"
       family={family}
       familyBlock={familyBlockProps}
       bookingsHref="/me/bookings"

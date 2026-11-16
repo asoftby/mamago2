@@ -18,6 +18,13 @@ assert.match(onPage, /fixed/);
 assert.match(onPage, /--mp-ac:var\(--primary\)/);
 assert.match(onPage, /Добавим что-нибудь\?/);
 assert.match(onPage, /max-w-\[560px\]/);
+// It rises above the open beta tip: BetaTip publishes the space it occupies at the bottom edge.
+assert.match(onPage, /var\(--beta-tip-clearance-mobile, 0px\)/);
+assert.match(onPage, /var\(--beta-tip-clearance-desktop, 0px\)/);
+const betaTip = readFileSync("src/components/shared/BetaTip.tsx", "utf8");
+assert.match(betaTip, /"--beta-tip-clearance-mobile"/);
+assert.match(betaTip, /"--beta-tip-clearance-desktop"/);
+assert.match(betaTip, /removeProperty\(cssVar\)/);
 
 // Without a handler nothing renders.
 assert.equal(renderToStaticMarkup(createElement(PlanStickyCounter, {})), "");

@@ -103,7 +103,6 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
 
   return (
     <AccountPage
-      backHref="/me"
       title="Мои маршруты"
       lead="Маршруты, которые вы создали — черновики и опубликованные"
       actions={<RoutesHeaderActions totalCount={routes.length} />}

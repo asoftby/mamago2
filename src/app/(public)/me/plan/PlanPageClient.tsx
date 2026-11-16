@@ -25,7 +25,7 @@ import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { PlanNewTaskDialog } from "./PlanNewTaskDialog";
 import { PlanStickyCounter } from "@/features/my-plan/components/PlanStickyCounter";
-import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
+import { addDays, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
   upsertCalendarWeekItem,
@@ -398,16 +398,13 @@ export function PlanPageClient({
     <div className="min-h-screen bg-white">
       <PlanProfileCompletionGate />
 
-      <Container className="pt-10 pb-2">
-        <header>
-          <div className="flex items-center gap-2 font-mono text-[12.5px] font-medium uppercase tracking-[.16em] text-[#C24E22]">
-            <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#C24E22]" />
-            Мой план
-            <span className="text-[var(--text-muted)]">{monthName(selectedDate)}</span>
-          </div>
-          <h1 className="mt-2.5 text-[clamp(36px,4vw,54px)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[var(--text-main)]">
+      {/* Шапка в стиле каркаса кабинета (AccountPage), как на /me/ideas. */}
+      <Container className="pt-8">
+        <header className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">Мой план</h1>
+          <p className="mt-2 max-w-2xl text-neutral-600">
             {weekItems.length > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
-          </h1>
+          </p>
         </header>
       </Container>
 

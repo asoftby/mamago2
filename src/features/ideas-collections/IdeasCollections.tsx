@@ -669,7 +669,7 @@ export function IdeasCollections({
           ? "Нажмите «⋯» на любой идее и выберите эту коллекцию"
           : activeFilter === "none"
             ? "Каждая сохранённая идея уже лежит в какой-нибудь коллекции"
-            : "Нажимайте ♡ на событиях, местах и статьях — они появятся здесь"}
+            : "Нажимайте ♡ на событиях, занятиях, праздниках и статьях и сохраняйте в идеи"}
       </span>
       {activeFilter === "all" ? (
         <Link href={discoveryHref} onClick={(event) => openIdea(event, discoveryHref)}>
@@ -857,14 +857,8 @@ export function IdeasCollections({
   if (layout !== "page") return root;
   return (
     <AccountPage
-      backHref="/me"
       title="Мои идеи и коллекции"
       lead="Сохраняйте понравившиеся активности, собирайте их в коллекции и переносите в план, когда удобно."
-      actions={
-        <Link href="/me/plan" className={styles.planLink}>
-          Мой план →
-        </Link>
-      }
     >
       {root}
     </AccountPage>

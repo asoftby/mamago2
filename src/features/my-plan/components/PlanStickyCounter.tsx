@@ -3,6 +3,10 @@
 import { Plus } from "lucide-react";
 import { MY_PLAN_V3_TOKENS } from "./v3/myPlanV3Tokens";
 
+/** Обычный отступ снизу, но не ниже места, которое занимает открытая beta-плашка. */
+const FLOATING_PADDING_BOTTOM =
+  "max(1.25rem, env(safe-area-inset-bottom, 0px), var(--beta-tip-clearance-mobile, 0px), var(--beta-tip-clearance-desktop, 0px))";
+
 interface PlanStickyCounterProps {
   compact?: boolean;
   onAdd?: () => void;
@@ -20,9 +24,11 @@ export function PlanStickyCounter({ onAdd, floating = false }: PlanStickyCounter
   return (
     <div
       // Вне виджета (страница плана) токены --mp-* не заданы предками — ставим их на самой кнопке.
-      style={floating ? MY_PLAN_V3_TOKENS : undefined}
+      // Плавающая кнопка поднимается над beta-плашкой, пока та открыта (переменные задаёт BetaTip).
+      style={floating ? { ...MY_PLAN_V3_TOKENS, paddingBottom: FLOATING_PADDING_BOTTOM } : undefined}
       className={
-        "pointer-events-none inset-x-0 bottom-0 pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] " +
+        "pointer-events-none inset-x-0 bottom-0 pt-6 " +
+        (floating ? "" : "pb-[max(1.25rem,env(safe-area-inset-bottom))] ") +
         (floating ? "" : "bg-gradient-to-t from-[var(--mp-bg)] from-60% to-transparent ") +
         (floating ? "fixed z-40 px-4 " : "absolute z-10 px-3.5")
       }
