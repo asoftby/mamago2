@@ -25,7 +25,7 @@ test("2 ongoing/always event is active", () => {
 
 test("3 finished event is past", () => {
   const r = resolve({ status: "PUBLISHED", temporalState: temporal([at(-48 * H)]) });
-  assert.equal(r.label, "Прошло");
+  assert.equal(r.label, "Уже прошло");
   assert.equal(r.tone, "muted");
 });
 

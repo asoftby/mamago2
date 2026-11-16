@@ -7,6 +7,7 @@ import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { getPerformanceMetricsByEntity } from "@/server/services/business/businessWorkspace.service";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getFreeBoostDialogState } from "@/server/services/promotion/dailyFreeBoost.service";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -109,7 +110,7 @@ export default async function OffersPage({
     return { ...offer, placeId: offer.place.id, place: offer.place };
   });
 
-  const metricsByEntity = await getPerformanceMetricsByEntity({
+  const [metricsByEntity, freeBoost] = await Promise.all([getPerformanceMetricsByEntity({
     events: [],
     offers: placedOffers.map((offer) => ({
       id: offer.id,
@@ -117,10 +118,15 @@ export default async function OffersPage({
       updatedAt: offer.createdAt,
       status: offer.status,
     })),
-  });
+  }), getFreeBoostDialogState({ businessId: business.id, userId: user.id })]);
+  const boostCandidates = new Map(
+    freeBoost.candidates.filter((candidate) => candidate.publicationType === "OFFER").map((candidate) => [candidate.id, candidate]),
+  );
 
   const offersWithMetrics = placedOffers.map((offer) => ({
     ...offer,
+    boostDisabled: !freeBoost.availableToday || !boostCandidates.get(offer.id)?.eligible || Boolean(boostCandidates.get(offer.id)?.activeBoostUntil),
+    boostNextFreeAt: boostCandidates.get(offer.id)?.activeFreeBoostUntil ?? null,
     metrics: metricsByEntity.get(`OFFER:${offer.id}`) ?? {
       views: 0,
       saves: 0,

@@ -130,15 +130,18 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("candidate list contains only the business's public publications", async () => {
+test("candidate list explains ineligible publications without leaking another Business", async () => {
   const candidates = await getFreeBoostCandidates({ businessId, userId: ownerUserId });
   assert.deepEqual(
     new Set(candidates.map((candidate) => candidate.id)),
-    new Set(offerIds),
+    new Set([...offerIds, packageOfferId]),
   );
   assert.equal(candidates.some((candidate) => candidate.id === foreignOfferId), false);
-  assert.equal(candidates.some((candidate) => candidate.id === packageOfferId), false);
-  assert.ok(candidates.every((candidate) => candidate.activeBoostUntil === null));
+  assert.ok(offerIds.every((id) => candidates.find((candidate) => candidate.id === id)?.eligible));
+  const packageCandidate = candidates.find((candidate) => candidate.id === packageOfferId);
+  assert.equal(packageCandidate?.eligible, false);
+  assert.match(packageCandidate?.reason ?? "", /тип.*Boost/);
+  assert.ok(candidates.every((candidate) => candidate.activeBoostUntil === null && candidate.activeFreeBoostUntil === null));
 });
 
 test("server allows exactly one free boost per Business rolling 24h window", async () => {
@@ -181,6 +184,8 @@ test("server allows exactly one free boost per Business rolling 24h window", asy
   const active = await getFreeBoostCandidates({ businessId, userId: ownerUserId, now });
   const activeCandidate = active.find(candidate => candidate.id === dashboard.boost?.publicationId);
   assert.equal(activeCandidate?.activeBoostUntil, "2026-08-22T09:00:00.000Z");
+  assert.equal(activeCandidate?.activeFreeBoostUntil, "2026-08-22T09:00:00.000Z");
+  assert.ok(active.filter(candidate => candidate.id !== dashboard.boost?.publicationId).every(candidate => candidate.activeFreeBoostUntil === null));
 
   const metricTime = new Date("2026-08-21T09:01:00.000Z");
   await prisma.userEvent.createMany({

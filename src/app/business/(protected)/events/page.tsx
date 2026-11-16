@@ -16,6 +16,7 @@ import { getPerformanceMetricsByEntity } from "@/server/services/business/busine
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { businessPublicationDayRange } from "@/lib/business/publicationAnalyticsRange";
 import { getPromotionPerformanceByActivityIds } from "@/server/services/promotion/boostPerformance.service";
+import { getFreeBoostDialogState } from "@/server/services/promotion/dailyFreeBoost.service";
 
 interface SearchParams {
   view?: "active" | "archived" | "archive";
@@ -85,7 +86,7 @@ export default async function EventsPage({
     orderBy: { createdAt: "desc" },
   });
   const now = new Date();
-  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions] = await Promise.all([
+  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions, upcomingSessions, freeBoost] = await Promise.all([
     getPerformanceMetricsByEntity({
       events: activities.map((activity) => ({
         id: activity.id,
@@ -123,6 +124,20 @@ export default async function EventsPage({
           },
           _max: { startsAt: true },
         }),
+    // Keep the card date aligned with the session-based publication status.
+    // A denormalized nextOccurrenceAt may lag after editing sessions.
+    activities.length === 0
+      ? Promise.resolve([])
+      : prisma.activitySession.groupBy({
+          by: ["activityId"],
+          where: {
+            activityId: { in: activities.map((activity) => activity.id) },
+            withdrawnAt: null,
+            startsAt: { gte: now },
+          },
+          _min: { startsAt: true },
+        }),
+    getFreeBoostDialogState({ businessId: business.id, userId: user.id, now }),
   ]);
   const lastSessionStartByActivity = new Map(
     lastSessions.flatMap((row) =>
@@ -130,14 +145,27 @@ export default async function EventsPage({
     ),
   );
 
+  const nextSessionStartByActivity = new Map(
+    upcomingSessions.flatMap((row) =>
+      row._min.startsAt ? [[row.activityId, row._min.startsAt] as const] : [],
+    ),
+  );
   const activePromotionIds = new Set(activePromotions.map((promotion) => promotion.publicationId));
+  const boostCandidates = new Map(
+    freeBoost.candidates.filter((candidate) => candidate.publicationType === "EVENT").map((candidate) => [candidate.id, candidate]),
+  );
 
   const activitiesWithMetrics = activities
     .map((activity) => {
       const promotionPerformance = promotionPerformanceByActivity.get(activity.id) ?? null;
       const lastSessionStart = lastSessionStartByActivity.get(activity.id);
+      const nextSessionStart = nextSessionStartByActivity.get(activity.id);
+      const boostCandidate = boostCandidates.get(activity.id);
       return {
         ...activity,
+        // The card shows the nearest future session, or the last past session.
+        // Only events without sessions fall back to nextOccurrenceAt.
+        displayOccurrenceAt: nextSessionStart ?? lastSessionStart ?? activity.nextOccurrenceAt,
         temporalState: getEventTemporalState({
           scheduleMode: activity.scheduleMode,
           nextOccurrenceAt: activity.nextOccurrenceAt,
@@ -146,6 +174,8 @@ export default async function EventsPage({
         }),
         isPromoted:
           activePromotionIds.has(activity.id) || promotionPerformance?.isPromoted === true,
+        boostDisabled: !freeBoost.availableToday || !boostCandidate?.eligible || Boolean(boostCandidate.activeBoostUntil),
+        boostNextFreeAt: boostCandidate?.activeFreeBoostUntil ?? null,
         promotionPerformance,
         metrics: {
       ...(metricsByEntity.get(`EVENT:${activity.id}`) ?? {

@@ -10,6 +10,7 @@ import {
   getPublicListingActivityWhere,
 } from "@/server/public/publicContentVisibility";
 import { getBoostablePublishedOfferWhere } from "@/server/services/promotion/boostEligibility";
+import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
 
 export type FreeBoostPublicationType = "EVENT" | "OFFER";
 
@@ -18,6 +19,10 @@ export type FreeBoostCandidate = {
   title: string;
   publicationType: FreeBoostPublicationType;
   activeBoostUntil: string | null;
+  /** Active FREE Boost on this specific publication, not a business-wide quota. */
+  activeFreeBoostUntil: string | null;
+  eligible: boolean;
+  reason: string | null;
 };
 
 export class DailyFreeBoostUnavailableError extends Error {
@@ -37,77 +42,123 @@ function isDailyUniqueConflict(error: unknown): boolean {
   );
 }
 
+/**
+ * Show all publications owned by this Business, not only Boost-eligible ones.
+ * The public discovery predicates remain authoritative for eligibility;
+ * ineligible rows carry a reason instead of silently disappearing.
+ */
 export async function getFreeBoostCandidates(params: {
   businessId: string;
   userId: string;
   now?: Date;
 }): Promise<FreeBoostCandidate[]> {
   const now = params.now ?? new Date();
-  const [events, offers] = await Promise.all([
+  // Do not include publications reassigned to a different Business:
+  // creator rights alone do not authorize spending this Business's free quota.
+  const eventOwnerWhere: Prisma.ActivityWhereInput = {
+    OR: [
+      { businessId: params.businessId },
+      { ownerUserId: params.userId, businessId: null },
+    ],
+  };
+  const offerOwnerWhere: Prisma.OfferWhereInput = {
+    place: {
+      OR: [
+        { ownerBusinessId: params.businessId },
+        { createdByUserId: params.userId, ownerBusinessId: null },
+      ],
+    },
+  };
+  const [events, offers, visibleEvents, visibleOffers] = await Promise.all([
     prisma.activity.findMany({
-      where: {
-        AND: [
-          getPublicListingActivityWhere(now),
-          { type: "EVENT" },
-          {
-            OR: [
-              { businessId: params.businessId },
-              { ownerUserId: params.userId, businessId: null },
-            ],
-          },
-        ],
-      },
+      where: { type: "EVENT", AND: [eventOwnerWhere] },
       select: {
         id: true,
         title: true,
+        status: true,
+        updatedAt: true,
         boosts: {
           where: { startAt: { lte: now }, endAt: { gt: now } },
           orderBy: { endAt: "desc" },
           take: 1,
-          select: { endAt: true },
+          select: { endAt: true, isFreeDaily: true, businessId: true },
         },
       },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.offer.findMany({
-      where: {
-        AND: [
-          getBoostablePublishedOfferWhere(now),
-          {
-            place: {
-              OR: [
-                { ownerBusinessId: params.businessId },
-                { createdByUserId: params.userId, ownerBusinessId: null },
-              ],
-            },
-          },
-        ],
-      },
+      where: offerOwnerWhere,
       select: {
         id: true,
         title: true,
+        status: true,
+        kind: true,
+        productType: true,
+        archivedAt: true,
+        updatedAt: true,
+        place: { select: { status: true, archivedAt: true } },
         boosts: {
           where: { startAt: { lte: now }, endAt: { gt: now } },
           orderBy: { endAt: "desc" },
           take: 1,
-          select: { endAt: true },
+          select: { endAt: true, isFreeDaily: true, businessId: true },
         },
       },
       orderBy: { updatedAt: "desc" },
     }),
+    prisma.activity.findMany({
+      where: {
+        type: "EVENT",
+        AND: [eventOwnerWhere, getPublicListingActivityWhere(now)],
+      },
+      select: { id: true },
+    }),
+    prisma.offer.findMany({
+      where: { AND: [offerOwnerWhere, getBoostablePublishedOfferWhere(now)] },
+      select: { id: true },
+    }),
   ]);
-
+  const visibleEventIds = new Set(visibleEvents.map((row) => row.id));
+  const visibleOfferIds = new Set(visibleOffers.map((row) => row.id));
   return [
-    ...events.map(({ boosts, ...event }) => ({
-      ...event,
-      publicationType: "EVENT" as const,
-      activeBoostUntil: boosts[0]?.endAt.toISOString() ?? null,
-    })),
-    ...offers.map(({ boosts, ...offer }) => ({
-      ...offer,
-      publicationType: "OFFER" as const,
-      activeBoostUntil: boosts[0]?.endAt.toISOString() ?? null,
-    })),
+    ...events.map((event) => {
+      const eligible = visibleEventIds.has(event.id);
+      return {
+        id: event.id,
+        title: event.title,
+        publicationType: "EVENT" as const,
+        activeBoostUntil: event.boosts[0]?.endAt.toISOString() ?? null,
+        activeFreeBoostUntil: event.boosts[0]?.isFreeDaily && event.boosts[0]?.businessId === params.businessId
+          ? event.boosts[0].endAt.toISOString() : null,
+        eligible,
+        reason: eligible
+          ? null
+          : !["PUBLISHED", "PENDING_UPDATE", "SCHEDULED"].includes(event.status)
+            ? "Событие не опубликовано"
+            : "Событие уже прошло, не имеет будущих дат или скрыто из афиши",
+      };
+    }),
+    ...offers.map((offer) => {
+      const eligible = visibleOfferIds.has(offer.id);
+      return {
+        id: offer.id,
+        title: offer.title,
+        publicationType: "OFFER" as const,
+        activeBoostUntil: offer.boosts[0]?.endAt.toISOString() ?? null,
+        activeFreeBoostUntil: offer.boosts[0]?.isFreeDaily && offer.boosts[0]?.businessId === params.businessId
+          ? offer.boosts[0].endAt.toISOString() : null,
+        eligible,
+        reason: eligible
+          ? null
+          : offer.status !== "PUBLISHED" || offer.archivedAt
+            ? "Предложение не опубликовано или находится в архиве"
+            : !isBoostableOfferProductType(offer.kind, offer.productType)
+              ? "Для этого типа предложения Boost пока недоступен"
+              : offer.place?.status !== "PUBLISHED" || offer.place?.archivedAt
+                ? "Связанное место не опубликовано"
+                : "Предложение не отображается в публичном каталоге",
+      };
+    }),
   ];
 }
 
@@ -122,7 +173,8 @@ async function resolveEligibleTarget(params: {
   return candidates.find(
     (candidate) =>
       candidate.id === params.publicationId &&
-      candidate.publicationType === params.publicationType,
+      candidate.publicationType === params.publicationType &&
+      candidate.eligible,
   ) ?? null;
 }
 
@@ -176,7 +228,7 @@ export async function createDailyFreeBoost(params: {
               getBoostablePublishedOfferWhere(now),
               { place: { OR: [
                 { ownerBusinessId: params.businessId },
-                { ownerBusinessId: null, createdByUserId: params.userId },
+                { createdByUserId: params.userId, ownerBusinessId: null },
               ] } },
             ],
           },
@@ -241,6 +293,31 @@ export async function createDailyFreeBoost(params: {
     }
     throw error;
   }
+}
+
+/** Lightweight, fresh snapshot for the inline Boost confirmation dialog. */
+export async function getFreeBoostDialogState(params: {
+  businessId: string;
+  userId: string;
+  now?: Date;
+}) {
+  const now = params.now ?? new Date();
+  const [candidates, latestFreeBoost] = await Promise.all([
+    getFreeBoostCandidates({ ...params, now }),
+    prisma.boost.findFirst({
+      where: { businessId: params.businessId, isFreeDaily: true },
+      orderBy: [{ startAt: "desc" }, { createdAt: "desc" }],
+      select: { startAt: true },
+    }),
+  ]);
+  const nextFreeAt = latestFreeBoost
+    ? new Date(latestFreeBoost.startAt.getTime() + BOOST_DURATION_MS)
+    : null;
+  return {
+    candidates,
+    availableToday: !nextFreeAt || now >= nextFreeAt,
+    nextFreeAt: nextFreeAt && now < nextFreeAt ? nextFreeAt.toISOString() : null,
+  };
 }
 
 export async function getDailyFreeBoostDashboardData(params: {

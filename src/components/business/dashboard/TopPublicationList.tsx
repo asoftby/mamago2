@@ -3,7 +3,7 @@ import { ArrowUpRight, Megaphone } from "lucide-react";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
-import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
+import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
 
 type TopPublicationItem = {
   id: string;
@@ -104,13 +104,17 @@ export function TopPublicationList({
                 Редактировать
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
-              <Link
-                href={buildBusinessBoostHref(item.type === "event" ? "EVENT" : "OFFER", item.id)}
+              <BoostLauncher
+                target={{
+                  id: item.id,
+                  publicationType: item.type === "event" ? "EVENT" : "OFFER",
+                  title: item.title,
+                }}
                 className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-800"
               >
                 Продвинуть
                 <Megaphone className="h-4 w-4" />
-              </Link>
+              </BoostLauncher>
             </div>
           </div>
         ))}

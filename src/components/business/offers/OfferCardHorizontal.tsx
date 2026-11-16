@@ -26,8 +26,7 @@ import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
-import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
-import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
+import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
 
 interface Offer {
   id: string;
@@ -42,6 +41,10 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
+  /** Server-computed Boost eligibility and free quota. */
+  boostDisabled?: boolean;
+  /** Timer only for a successfully activated free Boost on this offer. */
+  boostNextFreeAt?: string | null;
   rejectionReason?: string | null;
   archivedAt: Date | null;
   dateFrom: Date | null;
@@ -227,16 +230,18 @@ export function OfferCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {offer.status === "PUBLISHED" && !offer.archivedAt && !offer.place.archivedAt && isBoostableOfferProductType(offer.kind, offer.productType ?? null) && <Link
-              href={buildBusinessBoostHref("OFFER", offer.id)}
+            {<BoostLauncher
+              target={{ id: offer.id, publicationType: "OFFER", title: offer.title }}
+              disabled={offer.boostDisabled !== false}
+              cooldownUntil={offer.boostNextFreeAt}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
                 BUSINESS_PUBLICATION_ACTION_PROMOTE,
               )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Продвинуть
-            </Link>}
+              Продвигать
+            </BoostLauncher>}
 
             {onArchive && offer.status !== "DRAFT" ? (
               <button

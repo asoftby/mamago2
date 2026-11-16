@@ -40,6 +40,7 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
+  displayOccurrenceAt?: Date | null;
   temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
   promotionPerformance?: ActivityPromotionPerformance | null;
