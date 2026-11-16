@@ -35,7 +35,6 @@ import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPub
 import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
-import { EVENT_PROMOTE_BLOCK_TITLE, getEventPromoteBlockReason } from "@/lib/promotion/canPromoteEvent";
 import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
 
@@ -74,6 +73,8 @@ interface Activity {
   /** Сессионное состояние (getEventTemporalState по неотозванным сеансам); считает страница списка. */
   temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
+  /** Server-computed Boost eligibility and free quota; never infer from card status. */
+  boostDisabled?: boolean;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
     views: number;
@@ -162,7 +163,6 @@ export function EventCardHorizontal({
 
   const canDeleteEvent = canShowEventDeleteAction(activity.status);
   const canArchiveEvent = canShowEventArchiveAction(activity.status);
-  const promoteBlockReason = getEventPromoteBlockReason(activity.status, activity.temporalState);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 
@@ -268,27 +268,14 @@ export function EventCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {!activity.isPromoted ? (
-              promoteBlockReason ? (
-                <button
-                  type="button"
-                  disabled
-                  title={EVENT_PROMOTE_BLOCK_TITLE[promoteBlockReason]}
-                  className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
-                >
-                  <Zap className="h-4 w-4 shrink-0" />
-                  Продвинуть
-                </button>
-              ) : (
-                <BoostLauncher
-                  target={{ id: activity.id, publicationType: "EVENT", title: activity.title }}
-                  className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
-                >
-                  <Zap className="h-4 w-4 shrink-0" />
-                  Продвинуть
-                </BoostLauncher>
-              )
-            ) : null}
+            <BoostLauncher
+              target={{ id: activity.id, publicationType: "EVENT", title: activity.title }}
+              disabled={activity.boostDisabled !== false || activity.isPromoted === true}
+              className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
+            >
+              <Zap className="h-4 w-4 shrink-0" />
+              Продвинуть
+            </BoostLauncher>
 
             {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
               href={buildPromotionLaunchHref({
