@@ -32,3 +32,26 @@ test("Partner story labeling remains separate from Boost", () => {
   assert.match(viewer, /item\.isPromoted/);
   assert.match(modal, /item\.isPromoted/);
 });
+
+test("Unavailable Boost buttons are disabled before opening the dialog", () => {
+  const launcher = read("src/components/business/promotion/BoostLauncher.tsx");
+  assert.match(launcher, /disabled={disabled}/);
+  assert.match(launcher, /if \(disabled\) return/);
+  assert.match(launcher, /disabled={!item\.eligible \|\| Boolean\(item\.activeBoostUntil\)}/);
+
+  const eventsPage = read("src/app/business/(protected)/events/page.tsx");
+  const eventCard = read("src/components/business/events/EventCardHorizontal.tsx");
+  assert.match(eventsPage, /getFreeBoostDialogState/);
+  assert.match(eventsPage, /boostDisabled: !freeBoost\.availableToday/);
+  assert.match(eventCard, /disabled={activity\.boostDisabled !== false/);
+
+  const offersPage = read("src/app/business/(protected)/offers/page.tsx");
+  const offerCard = read("src/components/business/offers/OfferCardHorizontal.tsx");
+  assert.match(offersPage, /getFreeBoostDialogState/);
+  assert.match(offersPage, /boostDisabled: !freeBoost\.availableToday/);
+  assert.match(offerCard, /disabled={offer\.boostDisabled !== false}/);
+
+  const dashboard = read("src/components/business/dashboard/DailyFreeBoostCard.tsx");
+  assert.match(dashboard, /disabled={disabled}/);
+  assert.doesNotMatch(dashboard, /Почему нет публикаций\?|Проверить доступность публикаций/);
+});
