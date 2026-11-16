@@ -75,18 +75,6 @@ export async function renderProfileSettingsPage(surfaceScope: SettingsScope = "U
         avatarUrl={context.viewer.avatarUrl}
         displayName={context.viewer.displayName}
       />
-          </div>
-          {!membership ? (
-            <p className="mt-2 text-xs text-neutral-500">
-              Станет доступен после создания семейного профиля.
-            </p>
-          ) : membership.role !== "OWNER" ? (
-            <p className="mt-2 text-xs text-neutral-500">
-              Изменить город может владелец семьи.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
     </SettingsScaffold>
   );
 }
