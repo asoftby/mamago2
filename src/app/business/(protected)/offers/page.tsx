@@ -125,8 +125,8 @@ export default async function OffersPage({
 
   const offersWithMetrics = placedOffers.map((offer) => ({
     ...offer,
-    boostDisabled: !boostCandidates.get(offer.id)?.eligible || Boolean(boostCandidates.get(offer.id)?.activeBoostUntil),
-    boostNextFreeAt: freeBoost.nextFreeAt?.toISOString() ?? null,
+    boostDisabled: !freeBoost.availableToday || !boostCandidates.get(offer.id)?.eligible || Boolean(boostCandidates.get(offer.id)?.activeBoostUntil),
+    boostNextFreeAt: boostCandidates.get(offer.id)?.activeFreeBoostUntil ?? null,
     metrics: metricsByEntity.get(`OFFER:${offer.id}`) ?? {
       views: 0,
       saves: 0,
