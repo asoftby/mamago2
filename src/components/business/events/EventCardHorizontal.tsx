@@ -39,6 +39,7 @@ import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
 import { EVENT_PROMOTE_BLOCK_TITLE, getEventPromoteBlockReason } from "@/lib/promotion/canPromoteEvent";
+import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
 
 interface Activity {
@@ -73,6 +74,8 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
+  /** Сессионное состояние (getEventTemporalState по неотозванным сеансам); считает страница списка. */
+  temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
@@ -162,7 +165,7 @@ export function EventCardHorizontal({
 
   const canDeleteEvent = canShowEventDeleteAction(activity.status);
   const canArchiveEvent = canShowEventArchiveAction(activity.status);
-  const promoteBlockReason = getEventPromoteBlockReason(activity.status, activity.nextOccurrenceAt);
+  const promoteBlockReason = getEventPromoteBlockReason(activity.status, activity.temporalState);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 

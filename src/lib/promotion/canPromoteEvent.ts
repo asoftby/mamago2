@@ -1,20 +1,23 @@
 import { ContentStatus } from "@prisma/client";
+import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 
 export type EventPromoteBlockReason = "not-published" | "past";
 
 /**
  * Можно ли продвигать событие из списка бизнеса.
- * Нельзя: публикация не активна (не PUBLISHED) или событие уже прошло
- * (есть дата и она раньше «сейчас»; события без даты не считаются прошедшими —
- * как в админском фильтре «прошедшие»).
+ * Нельзя: публикация не активна (не PUBLISHED) или событие уже прошло.
+ *
+ * «Прошло» определяется ТОЛЬКО сессионным состоянием (`getEventTemporalState`
+ * по неотозванным сеансам): закэшированный `nextOccurrenceAt` для событий с
+ * несколькими датами устаревает после первого сеанса и дал бы ложную блокировку.
+ * Если состояние не передано (UNKNOWN/undefined), событие прошедшим не считается.
  */
 export function getEventPromoteBlockReason(
   status: ContentStatus,
-  nextOccurrenceAt: Date | string | null | undefined,
-  now: Date = new Date(),
+  temporalState?: EventTemporalState | null,
 ): EventPromoteBlockReason | null {
   if (status !== ContentStatus.PUBLISHED) return "not-published";
-  if (nextOccurrenceAt && new Date(nextOccurrenceAt).getTime() < now.getTime()) return "past";
+  if (temporalState === "PAST") return "past";
   return null;
 }
 
