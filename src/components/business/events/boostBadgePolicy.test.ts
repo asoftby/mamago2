@@ -79,3 +79,15 @@ test("Boost countdown uses local clock and is precise at minute boundaries", () 
   assert.equal(getBoostRemainingMinutes(deadline, now + 26 * 60 * 60_000), 0);
   assert.equal(getBoostRemainingMinutes("invalid", now), 0);
 });
+
+
+test("Business event date uses the same live sessions as its temporal status", () => {
+  const page = read("src/app/business/(protected)/events/page.tsx");
+  const card = read("src/components/business/events/EventCardHorizontal.tsx");
+  assert.match(page, /upcomingSessions/);
+  assert.match(page, /withdrawnAt: null,[\s\S]*?startsAt: \{ gte: now \}/);
+  assert.match(page, /displayOccurrenceAt: nextSessionStart \?\? lastSessionStart \?\? activity.nextOccurrenceAt/);
+  assert.match(card, /activity.displayOccurrenceAt \?\? activity.nextOccurrenceAt/);
+  const status = read("src/lib/publication/displayStatus.ts");
+  assert.match(status, /input.temporalState === "PAST" \? META.past : META.active/);
+});
