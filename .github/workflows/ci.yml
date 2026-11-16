@@ -369,6 +369,12 @@ jobs:
       - name: Account greeting regressions
         run: pnpm exec tsx src/features/me/lib/accountGreeting.test.ts
 
+      - name: Account inline adult profile regressions
+        run: |
+          pnpm exec tsx src/features/me/components/account/adultProfileInline.contract.test.ts
+          pnpm exec tsx src/features/me/components/account/accountFamilyInline.contract.test.ts
+          pnpm exec tsx --test src/lib/account/resolveAvatarUrlUpdate.test.ts
+
       - name: Event public rendering regressions
         run: |
           pnpm exec tsx src/components/content/RichContentRenderer.test.ts
