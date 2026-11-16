@@ -19,6 +19,8 @@ export type FreeBoostCandidate = {
   title: string;
   publicationType: FreeBoostPublicationType;
   activeBoostUntil: string | null;
+  /** Active FREE Boost on this specific publication, not a business-wide quota. */
+  activeFreeBoostUntil: string | null;
   eligible: boolean;
   reason: string | null;
 };
@@ -79,7 +81,7 @@ export async function getFreeBoostCandidates(params: {
           where: { startAt: { lte: now }, endAt: { gt: now } },
           orderBy: { endAt: "desc" },
           take: 1,
-          select: { endAt: true },
+          select: { endAt: true, isFreeDaily: true, businessId: true },
         },
       },
       orderBy: { updatedAt: "desc" },
@@ -99,7 +101,7 @@ export async function getFreeBoostCandidates(params: {
           where: { startAt: { lte: now }, endAt: { gt: now } },
           orderBy: { endAt: "desc" },
           take: 1,
-          select: { endAt: true },
+          select: { endAt: true, isFreeDaily: true, businessId: true },
         },
       },
       orderBy: { updatedAt: "desc" },
@@ -126,6 +128,8 @@ export async function getFreeBoostCandidates(params: {
         title: event.title,
         publicationType: "EVENT" as const,
         activeBoostUntil: event.boosts[0]?.endAt.toISOString() ?? null,
+        activeFreeBoostUntil: event.boosts[0]?.isFreeDaily && event.boosts[0]?.businessId === params.businessId
+          ? event.boosts[0].endAt.toISOString() : null,
         eligible,
         reason: eligible
           ? null
@@ -141,6 +145,8 @@ export async function getFreeBoostCandidates(params: {
         title: offer.title,
         publicationType: "OFFER" as const,
         activeBoostUntil: offer.boosts[0]?.endAt.toISOString() ?? null,
+        activeFreeBoostUntil: offer.boosts[0]?.isFreeDaily && offer.boosts[0]?.businessId === params.businessId
+          ? offer.boosts[0].endAt.toISOString() : null,
         eligible,
         reason: eligible
           ? null
