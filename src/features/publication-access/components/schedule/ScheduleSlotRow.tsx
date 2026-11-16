@@ -34,7 +34,7 @@ export function ScheduleSlotRow({
 }: ScheduleSlotRowProps) {
   return (
     <div className="rounded-2xl border border-border bg-background px-3 py-3">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_110px_auto] md:items-start">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_minmax(150px,160px)_auto] md:items-start">
         <div className="space-y-1.5">
           <Label className="text-[12px] font-medium text-muted-foreground">
             Начало
@@ -74,9 +74,9 @@ export function ScheduleSlotRow({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
+          <Label className="flex items-center gap-1 whitespace-nowrap text-[12px] font-medium text-muted-foreground">
             <Users className="h-3.5 w-3.5 text-primary" aria-hidden />
-            Вместимость
+            Вместимость (чел.)
           </Label>
           <Input
             type="number"

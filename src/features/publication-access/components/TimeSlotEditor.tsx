@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
-  ChevronDown,
   Info,
   MoreVertical,
   Plus,
@@ -17,9 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import type { PublicationAccessTimeSlot, PublicationEntityType } from "../types";
 import {
   createEmptyScheduleDay,
@@ -34,6 +31,7 @@ import {
 } from "../schedule/suggestions";
 import type { ScheduleDay, ScheduleSlot } from "../schedule/types";
 import { ScheduleSlotRow } from "./schedule/ScheduleSlotRow";
+import { SlotDatePickerField } from "./SlotDatePickerField";
 
 type TimeSlotEditorProps = {
   entityType: PublicationEntityType;
@@ -118,6 +116,9 @@ export function TimeSlotEditor({
   disabled,
   suggestions,
 }: TimeSlotEditorProps) {
+  // DOM ids come from useId(): slot/day ids are random (Date.now/Math.random), so using them
+  // in id/for/aria-* attributes would mismatch between server HTML and hydration.
+  const baseId = useId();
   const suggestedSlots = suggestions?.suggestions ?? NO_SUGGESTIONS;
   const initialDays = useMemo(
     () => normalizeEditorDays(flatSlotsToGroupedDays(value)),
@@ -289,6 +290,10 @@ export function TimeSlotEditor({
         {days.map((day, index) => {
           const dayTouched = touched[day.id];
           const showDateError = Boolean(dayTouched?.date && !day.date);
+          const dateFieldId = `time-slot-date-${baseId}-${index}`;
+          const dateLabelId = `${dateFieldId}-label`;
+          const dateHintId = `${dateFieldId}-hint`;
+          const dateErrorId = `${dateFieldId}-error`;
 
           return (
             <Card
@@ -322,33 +327,35 @@ export function TimeSlotEditor({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-[12px] font-medium text-foreground">Дата</Label>
-                  <div className="relative">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
-                    <Input
-                      type="date"
-                      value={day.date}
-                      onChange={(event) =>
-                        patchDay(day.id, (current) => ({
-                          ...current,
-                          date: event.target.value,
-                        }))
-                      }
-                      onBlur={() => markDateTouched(day.id)}
-                      disabled={disabled}
-                      aria-invalid={showDateError ? "true" : "false"}
-                      className={cn(
-                        "h-11 rounded-xl border-border bg-background pl-10 pr-10 text-[12px] focus-visible:border-primary focus-visible:ring-primary/20 [color-scheme:light]",
-                        !day.date && "text-muted-foreground",
-                      )}
-                    />
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
-                  </div>
-                  <p className="text-[12px] leading-5 text-muted-foreground">
+                  <Label
+                    id={dateLabelId}
+                    htmlFor={dateFieldId}
+                    className="text-[12px] font-medium text-foreground"
+                  >
+                    Дата
+                  </Label>
+                  <SlotDatePickerField
+                    id={dateFieldId}
+                    labelId={dateLabelId}
+                    describedBy={showDateError ? `${dateHintId} ${dateErrorId}` : dateHintId}
+                    value={day.date}
+                    disabled={disabled}
+                    invalid={showDateError}
+                    onChange={(date) =>
+                      patchDay(day.id, (current) => ({
+                        ...current,
+                        date,
+                      }))
+                    }
+                    onTouched={() => markDateTouched(day.id)}
+                  />
+                  <p id={dateHintId} className="text-[12px] leading-5 text-muted-foreground">
                     {getEntityHintLabel(entityType)}
                   </p>
                   {showDateError ? (
-                    <p className="text-[11px] leading-4 text-primary">Выберите дату</p>
+                    <p id={dateErrorId} className="text-[11px] leading-4 text-primary">
+                      Выберите дату
+                    </p>
                   ) : null}
                 </div>
 
