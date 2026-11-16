@@ -99,6 +99,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         {/* Global Header */}
         <AdminHeader
           userEmail={user.email || undefined}
+          userRole={user.role === "ADMIN" ? "ADMIN" : "MODERATOR"}
           userDisplayName={user.displayName}
           hasApprovedBusinessProfile={hasApprovedBusinessProfile}
           moderationCounts={moderationCounts}
@@ -113,6 +114,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {/* Left Sidebar - Hidden on mobile */}
           <div className="hidden lg:block bg-white border-r border-gray-200">
             <AdminSidebar
+              userRole={user.role === "ADMIN" ? "ADMIN" : "MODERATOR"}
               moderationCounts={moderationCounts}
               b2bPendingVerificationCount={b2bPendingVerificationCount}
               importPendingReviewCount={importPendingReviewCount}
