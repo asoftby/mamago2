@@ -34,10 +34,12 @@ export function BoostLauncher({
   target,
   children,
   className,
+  disabled = false,
 }: {
   target?: BoostTarget;
   children: ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -48,6 +50,7 @@ export function BoostLauncher({
   const [pending, startTransition] = useTransition();
 
   function showDialog() {
+    if (disabled) return;
     setOpen(true);
     setLoading(true);
     setData(null);
@@ -111,7 +114,12 @@ export function BoostLauncher({
 
   return (
     <>
-      <button type="button" onClick={showDialog} className={className}>
+      <button
+        type="button"
+        onClick={showDialog}
+        disabled={disabled}
+        className={cn(className, "disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none disabled:hover:bg-stone-200")}
+      >
         {children}
       </button>
 
