@@ -19,6 +19,7 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
+  rejectionReason?: string | null;
   archivedAt: Date | null;
   dateFrom: Date | null;
   dateTo: Date | null;

@@ -28,10 +28,9 @@ import {
   BUSINESS_PUBLICATION_ACTION_PROMOTE,
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
-import {
-  CONTENT_STATUS_META,
-  contentStatusPublicationPillClass,
-} from "@/lib/content-status-meta";
+import { PublicationStatusChip } from "@/components/business/shared/PublicationStatusChip";
+import { isPublicationActive } from "@/lib/publication/displayStatus";
+import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
@@ -72,6 +71,8 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
+  /** Состояние по расписанию, вычисляется на сервере (getEventTemporalState). */
+  temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
@@ -188,7 +189,13 @@ export function EventCardHorizontal({
     }
   };
 
-  const statusMeta = CONTENT_STATUS_META[activity.status];
+  const canPromote =
+    !activity.isPromoted &&
+    activity.status === ContentStatus.PUBLISHED &&
+    isPublicationActive({
+      status: activity.status,
+      temporalState: activity.temporalState,
+    });
   const updatedLine = formatUpdatedAgo(activity.updatedAt, activity.createdAt);
   const createdLine = `Создано: ${format(new Date(activity.createdAt), "d MMMM yyyy", { locale: ru })}`;
 
@@ -205,14 +212,10 @@ export function EventCardHorizontal({
 
   const statusRow = (
     <div className="flex flex-wrap items-center gap-2">
-      <span
-        className={cn(
-          "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium",
-          contentStatusPublicationPillClass(activity.status),
-        )}
-      >
-        {statusMeta.label}
-      </span>
+      <PublicationStatusChip
+        status={activity.status}
+        temporalState={activity.temporalState}
+      />
       {/* Boost never adds a label/ribbon to the publication card.
           Active status and performance are available in the Boost section. */}
     </div>
@@ -271,7 +274,7 @@ export function EventCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {activity.status === ContentStatus.PUBLISHED && !activity.isPromoted ? (
+            {canPromote ? (
               <Link
                 href={buildBusinessBoostHref("EVENT", activity.id)}
                 className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}

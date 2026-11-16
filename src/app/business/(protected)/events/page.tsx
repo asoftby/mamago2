@@ -7,6 +7,7 @@ import {
   excludeGhostEventDrafts,
   normalizeBusinessEventListView,
 } from "@/lib/business/eventListWhere";
+import { getEventTemporalState } from "@/lib/events/eventTemporalState";
 import { EventsList } from "./EventsList";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
@@ -80,6 +81,11 @@ export default async function EventsPage({
       images: {
         orderBy: { sortOrder: "asc" },
       },
+      // Только для вычисления статуса «Прошло» по последнему сеансу.
+      sessions: {
+        where: { withdrawnAt: null },
+        select: { startsAt: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -117,8 +123,15 @@ export default async function EventsPage({
   const activitiesWithMetrics = activities
     .map((activity) => {
       const promotionPerformance = promotionPerformanceByActivity.get(activity.id) ?? null;
+      const { sessions, ...activityFields } = activity;
       return {
-        ...activity,
+        ...activityFields,
+        temporalState: getEventTemporalState({
+          scheduleMode: activity.scheduleMode,
+          nextOccurrenceAt: activity.nextOccurrenceAt,
+          sessions,
+          now,
+        }),
         isPromoted:
           activePromotionIds.has(activity.id) || promotionPerformance?.isPromoted === true,
         promotionPerformance,
