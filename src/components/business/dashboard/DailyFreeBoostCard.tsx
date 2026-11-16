@@ -33,6 +33,9 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
   const eligibleCount = data.candidates.filter(
     (candidate) => candidate.eligible && !candidate.activeBoostUntil,
   ).length;
+  const disabled = !data.availableToday || (target
+    ? !initialCandidate?.eligible || Boolean(initialCandidate.activeBoostUntil)
+    : eligibleCount === 0);
 
   return (
     <BusinessSurfaceCard className="flex flex-col gap-4 p-5">
@@ -79,20 +82,15 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
 
       <BoostLauncher
         target={target}
+        disabled={disabled}
         className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-semibold text-stone-800 transition hover:bg-stone-100"
       >
-        {target
-          ? "Продвинуть выбранную публикацию"
-          : data.candidates.length === 0
-            ? "Почему нет публикаций?"
-            : eligibleCount === 0
-              ? "Проверить доступность публикаций"
-              : "Продвинуть публикацию"}
+        {target ? "Продвинуть выбранную публикацию" : "Продвинуть публикацию"}
       </BoostLauncher>
       {data.candidates.length > 0 && (
         <p className="text-xs text-stone-500">
           Доступно для Boost: {eligibleCount} из {data.candidates.length}.
-          Недоступные публикации показываются с причиной.
+
         </p>
       )}
     </BusinessSurfaceCard>
