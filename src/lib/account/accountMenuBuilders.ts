@@ -197,7 +197,20 @@ export function buildPublicSiteAccountModel(input: {
   return {
     sheetTitle: "Бизнес-аккаунт",
     header,
-    mainItems: [],
+    // Настройки бизнеса (/business/settings) отдельны от личных (/me/settings):
+    // onGoToSettings в режиме business ведёт на поверхность business.
+    mainItems: [
+      {
+        key: "settings",
+        type: "button",
+        label: "Настройки",
+        icon: Settings,
+        activeHref: "/settings",
+        onClick: () => {
+          onGoToSettings();
+        },
+      },
+    ],
     contextItems: isAdminRole(user.role)
       ? [
           {
