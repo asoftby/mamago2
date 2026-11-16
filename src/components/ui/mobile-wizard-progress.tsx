@@ -15,9 +15,11 @@ const VISIBLE_STEPS = 5;
 const FIRST_AUTO_SCROLL_STEP = 4;
 
 /**
- * Mobile-only progress navigation shared across all content wizards.
- * Native horizontal scrolling stays free/inertial (no scroll-snap).
- * The first automatic one-step shift happens on step 4.
+ * Progress navigation shared across all content wizards (mobile and desktop).
+ * On mobile five steps are visible and native horizontal scrolling stays
+ * free/inertial (no scroll-snap); the first automatic one-step shift happens
+ * on step 4. From sm upward the steps share the row width, so all of them fit
+ * on desktop and the same alignment logic only kicks in when they overflow.
  */
 export function MobileWizardProgress({
   steps,
@@ -39,8 +41,8 @@ export function MobileWizardProgress({
     );
 
     const alignSteps = (behavior: ScrollBehavior) => {
-      // The mobile stepper is display:none at the sm breakpoint; wait until
-      // it has real dimensions before applying pixel-based positioning.
+      // Wait until the stepper has real dimensions before applying
+      // pixel-based positioning.
       if (scroller.clientWidth === 0) return;
       const items = scroller.querySelectorAll<HTMLElement>("[data-wizard-step]");
       const first = items[0];
@@ -80,7 +82,7 @@ export function MobileWizardProgress({
   };
 
   return (
-    <div className="relative w-full sm:hidden">
+    <div className="relative w-full">
       <div
         ref={scrollerRef}
         role="tablist"
@@ -107,7 +109,7 @@ export function MobileWizardProgress({
               onClick={() => onStepChange(step.id)}
               className={cn(
                 "relative flex min-w-0 shrink-0 flex-col items-center gap-2 pb-3 pt-1",
-                "w-[calc(20%-6.4px)] select-none",
+                "w-[calc(20%-6.4px)] select-none sm:w-auto sm:min-w-[72px] sm:flex-1",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                 isDisabled ? "cursor-not-allowed" : "cursor-pointer",
               )}
@@ -115,7 +117,7 @@ export function MobileWizardProgress({
               <span
                 aria-hidden="true"
                 className={cn(
-                  "flex h-12 w-12 items-center justify-center rounded-full text-base font-semibold transition-colors",
+                  "flex h-12 w-12 items-center justify-center rounded-full text-base font-semibold transition-colors sm:h-10 sm:w-10 sm:text-sm",
                   isActive
                     ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
                     : isDone
@@ -131,7 +133,7 @@ export function MobileWizardProgress({
               </span>
               <span
                 className={cn(
-                  "block w-full truncate text-center text-[11px] leading-tight",
+                  "block w-full truncate text-center text-[11px] leading-tight sm:text-xs",
                   isActive ? "font-semibold text-foreground" : "text-muted-foreground",
                 )}
               >
