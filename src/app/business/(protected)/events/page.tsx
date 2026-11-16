@@ -81,16 +81,11 @@ export default async function EventsPage({
       images: {
         orderBy: { sortOrder: "asc" },
       },
-      // Только для вычисления статуса «Прошло» по последнему сеансу.
-      sessions: {
-        where: { withdrawnAt: null },
-        select: { startsAt: true },
-      },
     },
     orderBy: { createdAt: "desc" },
   });
   const now = new Date();
-  const [metricsByEntity, activePromotions, promotionPerformanceByActivity] = await Promise.all([
+  const [metricsByEntity, activePromotions, promotionPerformanceByActivity, lastSessions] = await Promise.all([
     getPerformanceMetricsByEntity({
       events: activities.map((activity) => ({
         id: activity.id,
@@ -116,20 +111,37 @@ export default async function EventsPage({
       activities.map((activity) => activity.id),
       now,
     ),
+    // Только последний неотозванный сеанс на событие (одна агрегация, строк не больше,
+    // чем событий) — для статуса «Прошло»; полная история сеансов не грузится.
+    activities.length === 0
+      ? Promise.resolve([])
+      : prisma.activitySession.groupBy({
+          by: ["activityId"],
+          where: {
+            activityId: { in: activities.map((activity) => activity.id) },
+            withdrawnAt: null,
+          },
+          _max: { startsAt: true },
+        }),
   ]);
+  const lastSessionStartByActivity = new Map(
+    lastSessions.flatMap((row) =>
+      row._max.startsAt ? [[row.activityId, row._max.startsAt] as const] : [],
+    ),
+  );
 
   const activePromotionIds = new Set(activePromotions.map((promotion) => promotion.publicationId));
 
   const activitiesWithMetrics = activities
     .map((activity) => {
       const promotionPerformance = promotionPerformanceByActivity.get(activity.id) ?? null;
-      const { sessions, ...activityFields } = activity;
+      const lastSessionStart = lastSessionStartByActivity.get(activity.id);
       return {
-        ...activityFields,
+        ...activity,
         temporalState: getEventTemporalState({
           scheduleMode: activity.scheduleMode,
           nextOccurrenceAt: activity.nextOccurrenceAt,
-          sessions,
+          sessions: lastSessionStart ? [{ startsAt: lastSessionStart }] : [],
           now,
         }),
         isPromoted:
