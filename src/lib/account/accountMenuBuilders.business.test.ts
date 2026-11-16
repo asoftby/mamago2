@@ -40,4 +40,7 @@ assert.equal(settings.label, "Настройки");
 settings.onClick();
 assert.equal(settingsCalls, 1, "row must call onGoToSettings (business surface in business mode)");
 
+// Пополнение баланса: без NEXT_PUBLIC_BILLING_ENABLED=true кнопка неактивна.
+assert.equal((model as { topUpDisabled?: boolean }).topUpDisabled, process.env.NEXT_PUBLIC_BILLING_ENABLED !== "true");
+
 console.log("accountMenuBuilders.business.test: OK");

@@ -74,6 +74,8 @@ export type AccountDropdownContentProps = {
   businessLabel?: string;
   businessBalanceBYN?: number;
   onTopUpBalance?: () => void;
+  /** Пополнение баланса ещё недоступно (биллинг выключен): кнопка неактивна. */
+  topUpDisabled?: boolean;
   ctaBlock?: {
     variant?: "connect" | "pending";
     title: string;
@@ -115,6 +117,7 @@ export function AccountDropdownContent({
   businessLabel = "MamaGo",
   businessBalanceBYN,
   onTopUpBalance,
+  topUpDisabled = false,
   ctaBlock,
   adminPersonalSwitcher,
   onLogout,
@@ -328,14 +331,16 @@ export function AccountDropdownContent({
             <p className="mt-1 text-lg font-semibold text-gray-900">
               {renderCurrencyText(formatPrice(businessBalanceBYN, { hideZero: true }), { iconSize: "sm" })}
             </p>
-            {businessBalanceBYN <= 0 ? (
+            {businessBalanceBYN <= 0 && !topUpDisabled ? (
               <p className="mt-1 text-xs text-gray-500">
                 Пополните, чтобы запускать продвижение
               </p>
             ) : null}
             <button
               type="button"
-              className="mt-2 inline-flex items-center justify-center gap-1 rounded-xl bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-stone-800 active:scale-[0.98]"
+              disabled={topUpDisabled}
+              title={topUpDisabled ? "Пополнение скоро будет доступно" : undefined}
+              className="mt-2 inline-flex items-center justify-center gap-1 rounded-xl bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-stone-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:hover:bg-stone-300 disabled:active:scale-100"
               onClick={() => {
                 onTopUpBalance?.();
                 onNavigate?.();

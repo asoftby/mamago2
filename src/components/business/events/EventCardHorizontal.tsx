@@ -38,6 +38,7 @@ import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPub
 import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
+import { EVENT_PROMOTE_BLOCK_TITLE, getEventPromoteBlockReason } from "@/lib/promotion/canPromoteEvent";
 import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
 
 interface Activity {
@@ -161,6 +162,7 @@ export function EventCardHorizontal({
 
   const canDeleteEvent = canShowEventDeleteAction(activity.status);
   const canArchiveEvent = canShowEventArchiveAction(activity.status);
+  const promoteBlockReason = getEventPromoteBlockReason(activity.status, activity.nextOccurrenceAt);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 
@@ -271,14 +273,26 @@ export function EventCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            {activity.status === ContentStatus.PUBLISHED && !activity.isPromoted ? (
-              <Link
-                href={buildBusinessBoostHref("EVENT", activity.id)}
-                className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
-              >
-                <Zap className="h-4 w-4 shrink-0" />
-                Продвинуть
-              </Link>
+            {!activity.isPromoted ? (
+              promoteBlockReason ? (
+                <button
+                  type="button"
+                  disabled
+                  title={EVENT_PROMOTE_BLOCK_TITLE[promoteBlockReason]}
+                  className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
+                >
+                  <Zap className="h-4 w-4 shrink-0" />
+                  Продвинуть
+                </button>
+              ) : (
+                <Link
+                  href={buildBusinessBoostHref("EVENT", activity.id)}
+                  className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
+                >
+                  <Zap className="h-4 w-4 shrink-0" />
+                  Продвинуть
+                </Link>
+              )
             ) : null}
 
             {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
