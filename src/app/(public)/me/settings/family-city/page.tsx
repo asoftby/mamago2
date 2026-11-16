@@ -21,7 +21,7 @@ async function saveFamilyHomeCity(formData: FormData) {
   if (!membership) throw new Error("Домашний город может изменить только владелец семьи.");
   await prisma.family.update({ where: { id: membership.familyId }, data: { homeCityId: city.id } });
   revalidatePath("/me/settings/profile");
-  redirect("/me/settings/profile#residence-city");
+  redirect("/me/settings/profile");
 }
 
 export default async function FamilyHomeCityPage() {
