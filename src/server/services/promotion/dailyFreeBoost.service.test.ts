@@ -130,14 +130,17 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("candidate list contains only the business's public publications", async () => {
+test("candidate list explains ineligible publications without leaking another Business", async () => {
   const candidates = await getFreeBoostCandidates({ businessId, userId: ownerUserId });
   assert.deepEqual(
     new Set(candidates.map((candidate) => candidate.id)),
-    new Set(offerIds),
+    new Set([...offerIds, packageOfferId]),
   );
   assert.equal(candidates.some((candidate) => candidate.id === foreignOfferId), false);
-  assert.equal(candidates.some((candidate) => candidate.id === packageOfferId), false);
+  assert.ok(offerIds.every((id) => candidates.find((candidate) => candidate.id === id)?.eligible));
+  const packageCandidate = candidates.find((candidate) => candidate.id === packageOfferId);
+  assert.equal(packageCandidate?.eligible, false);
+  assert.match(packageCandidate?.reason ?? "", /тип.*Boost/);
   assert.ok(candidates.every((candidate) => candidate.activeBoostUntil === null));
 });
 
