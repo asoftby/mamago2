@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Zap } from "lucide-react";
+import { Clock3, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -35,11 +35,14 @@ export function BoostLauncher({
   children,
   className,
   disabled = false,
+  cooldownUntil = null,
 }: {
   target?: BoostTarget;
   children: ReactNode;
   className?: string;
   disabled?: boolean;
+  /** Server-provided next free activation; the countdown runs only in the browser. */
+  cooldownUntil?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -48,9 +51,28 @@ export function BoostLauncher({
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!cooldownUntil || disabled) return;
+    const nextAt = Date.parse(cooldownUntil);
+    if (!Number.isFinite(nextAt)) return;
+    const update = () => {
+      setRemainingMinutes(Math.max(0, Math.ceil((nextAt - Date.now()) / 60_000)));
+    };
+    update();
+    // No polling or requests: only local clock arithmetic, recalculated every 15s.
+    const intervalId = setInterval(update, 15_000);
+    return () => clearInterval(intervalId);
+  }, [cooldownUntil, disabled]);
+
+  const coolingDown = !disabled && Boolean(cooldownUntil) && remainingMinutes !== 0;
+  const countdownLabel = remainingMinutes === null
+    ? "24:00"
+    : `${String(Math.floor(remainingMinutes / 60)).padStart(2, "0")}:${String(remainingMinutes % 60).padStart(2, "0")}`;
 
   function showDialog() {
-    if (disabled) return;
+    if (disabled || coolingDown) return;
     setOpen(true);
     setLoading(true);
     setData(null);
@@ -117,10 +139,14 @@ export function BoostLauncher({
       <button
         type="button"
         onClick={showDialog}
-        disabled={disabled}
+        disabled={disabled || coolingDown}
+        aria-label={coolingDown ? `Бесплатный Boost через ${countdownLabel}` : undefined}
+        title={coolingDown ? "Следующее бесплатное поднятие" : undefined}
         className={cn(className, "disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none disabled:hover:bg-stone-200")}
       >
-        {children}
+        {coolingDown ? (
+          <><Clock3 className="h-4 w-4" aria-hidden="true" />{countdownLabel}</>
+        ) : children}
       </button>
 
       <Dialog open={open} onOpenChange={(next) => { if (!pending) setOpen(next); }}>
