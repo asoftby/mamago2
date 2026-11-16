@@ -443,7 +443,8 @@ export function PlanPageClient({
             <IdeasRow count={initialIdeas.length} historyOpen={archiveOpen} onOpenHistory={openHistory} />
           </div>
 
-          <aside className="flex min-w-0 flex-col gap-3.5 lg:sticky lg:top-6">
+          {/* На узкой ширине блоки идут перед списком дня (order-first), на десктопе — правая колонка. */}
+          <aside className="order-first flex min-w-0 flex-col gap-3.5 lg:order-none lg:sticky lg:top-6">
             {/* Explicit post-event check-in; never opened as an automatic modal. */}
             <ExperienceCheckIn
               candidates={experienceCandidates}
