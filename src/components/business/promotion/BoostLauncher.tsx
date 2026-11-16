@@ -55,10 +55,9 @@ export function BoostLauncher({
   const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!cooldownUntil) {
-      setRemainingMinutes(null);
-      return;
-    }
+    // Without an active free Boost nothing is displayed from remainingMinutes
+    // (coolingDown requires cooldownUntil), so no state reset is needed here.
+    if (!cooldownUntil) return;
     const nextAt = Date.parse(cooldownUntil);
     if (!Number.isFinite(nextAt)) return;
     let intervalId: ReturnType<typeof setInterval> | undefined;
