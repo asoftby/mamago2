@@ -34,7 +34,7 @@ import { ru } from "date-fns/locale";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
 import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
-import { buildBusinessBoostHref } from "@/lib/promotion/businessBoostHref";
+import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
 import { EVENT_PROMOTE_BLOCK_TITLE, getEventPromoteBlockReason } from "@/lib/promotion/canPromoteEvent";
 import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
@@ -280,13 +280,13 @@ export function EventCardHorizontal({
                   Продвинуть
                 </button>
               ) : (
-                <Link
-                  href={buildBusinessBoostHref("EVENT", activity.id)}
+                <BoostLauncher
+                  target={{ id: activity.id, publicationType: "EVENT", title: activity.title }}
                   className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
                 >
                   <Zap className="h-4 w-4 shrink-0" />
                   Продвинуть
-                </Link>
+                </BoostLauncher>
               )
             ) : null}
 
