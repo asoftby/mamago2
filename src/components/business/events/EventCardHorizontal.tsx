@@ -29,7 +29,6 @@ import {
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 import { PublicationStatusChip } from "@/components/business/shared/PublicationStatusChip";
-import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
