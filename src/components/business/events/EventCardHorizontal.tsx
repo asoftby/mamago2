@@ -75,6 +75,7 @@ interface Activity {
   isPromoted?: boolean;
   /** Server-computed Boost eligibility and free quota; never infer from card status. */
   boostDisabled?: boolean;
+  boostNextFreeAt?: string | null;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
     views: number;
@@ -271,6 +272,7 @@ export function EventCardHorizontal({
             <BoostLauncher
               target={{ id: activity.id, publicationType: "EVENT", title: activity.title }}
               disabled={activity.boostDisabled !== false || activity.isPromoted === true}
+              cooldownUntil={activity.boostNextFreeAt}
               className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
             >
               <Zap className="h-4 w-4 shrink-0" />
