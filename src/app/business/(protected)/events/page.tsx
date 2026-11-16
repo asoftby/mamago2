@@ -152,7 +152,8 @@ export default async function EventsPage({
         }),
         isPromoted:
           activePromotionIds.has(activity.id) || promotionPerformance?.isPromoted === true,
-        boostDisabled: !freeBoost.availableToday || !boostCandidate?.eligible || Boolean(boostCandidate.activeBoostUntil),
+        boostDisabled: !boostCandidate?.eligible || Boolean(boostCandidate.activeBoostUntil),
+        boostNextFreeAt: freeBoost.nextFreeAt?.toISOString() ?? null,
         promotionPerformance,
         metrics: {
       ...(metricsByEntity.get(`EVENT:${activity.id}`) ?? {
