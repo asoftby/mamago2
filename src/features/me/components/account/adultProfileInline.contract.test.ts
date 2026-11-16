@@ -30,6 +30,12 @@ const childFormStart = modal.indexOf("{showChildForm ? (");
 assert.ok(childFormStart >= 0 && adultFormStart > childFormStart);
 assert.ok(modal.indexOf('type="file"') > adultFormStart, "photo input lives in the adult form only, children have no photo");
 
+// The profile API persists the avatar, but only the user's own upload.
+const meRoute = read("src/app/api/auth/me/route.ts");
+assert.match(meRoute, /resolveAvatarUrlUpdate\(body/);
+assert.match(meRoute, /uploadedById: user\.id, publicUrl: url/);
+assert.match(meRoute, /updateData\.avatarUrl = avatarUpdate\.avatarUrl/);
+
 // /me family card shows the adult photo; children keep the initial.
 const design = read("src/features/me/components/account/AccountDesign.tsx");
 assert.match(design, /m\.kind === "me" && m\.avatarUrl/);

@@ -371,6 +371,7 @@ jobs:
         run: |
           pnpm exec tsx src/features/me/components/account/adultProfileInline.contract.test.ts
           pnpm exec tsx src/features/me/components/account/accountFamilyInline.contract.test.ts
+          pnpm exec tsx --test src/lib/account/resolveAvatarUrlUpdate.test.ts
 
       - name: Event public rendering regressions
         run: |
