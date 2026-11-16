@@ -113,8 +113,13 @@ assert.match(
 );
 assert.match(
   eventWizard,
+  /<MobileEventWizardProgress/,
+  "Event wizard must stay on the shared stepper (mobile and desktop)",
+);
+assert.doesNotMatch(
+  eventWizard,
   /<WizardProgress/,
-  "Event wizard must stay on the shared mobile progress contract",
+  "Event wizard must not render a separate desktop stepper",
 );
 
 assert.match(
@@ -126,8 +131,8 @@ for (const [name, wizard] of [
   ["Place", placeWizard],
   ["Offer", offerWizard],
 ] as const) {
-  assert.match(wizard, /<MobileWizardProgress/, name + " must use the same mobile stepper as Events");
-  assert.match(wizard, /className="hidden sm:block"/, name + " must keep desktop progress separate");
+  assert.match(wizard, /<MobileWizardProgress/, name + " must use the same stepper as Events");
+  assert.doesNotMatch(wizard, /<WizardProgress/, name + " must not render a separate desktop stepper");
 }
 assert.match(sharedMobileProgress, /const VISIBLE_STEPS = 5/, "Show 5 steps on mobile");
 assert.match(sharedMobileProgress, /touch-pan-x gap-2 overflow-x-auto/, "Mobile steps must support horizontal swiping");
