@@ -94,7 +94,7 @@ export function buildPrivateBusinessBookingReminder(
  * Existing in-app records are not rewritten here; migration is separate.
  */
 export function businessBookingDeliveryProjection<T extends {
-  audience: string;
+  audience: string | null;
   type: string;
   title: string;
   body: string;
