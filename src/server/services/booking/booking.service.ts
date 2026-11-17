@@ -322,9 +322,8 @@ async function logBookingCreatedAudit(params: {
       entityType: params.entityType,
       entityId: params.entityId,
       businessId: params.businessId,
-      customerName: params.customerName,
-      customerPhone: params.customerPhone,
-      customerEmail: params.customerEmail ?? null,
+      // BookingRequest is the authoritative encrypted/restricted source for
+      // customer contact. Audit must not duplicate PII into JSON history.
     },
     metadata: params.metadata ?? null,
   });
