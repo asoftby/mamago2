@@ -1636,6 +1636,12 @@ model Business {
   ownerUserId             String                        @unique
   createdAt               DateTime                      @default(now())
   updatedAt               DateTime                      @updatedAt
+  subjectType             BusinessSubjectType @default(UNSPECIFIED)
+  registrationFullName    String?
+  npdCheckStatus          String @default("REVIEW_REQUIRED")
+  npdCheckedAt            DateTime?
+  npdCheckedByUserId      String?
+  npdCheckSource          String?
   legalName               String?
   phone                   String?
   contactPhoneVerifiedAt  DateTime?
@@ -4445,6 +4451,13 @@ enum BusinessVerificationStatus {
 
 /// Автоматическая сверка УНП с ГРП (не путать с BusinessVerificationStatus —
 /// тем ручным admin-approval workflow). PENDING — проверка ещё не выполнялась.
+enum BusinessSubjectType {
+  UNSPECIFIED
+  COMPANY
+  SOLE_PROPRIETOR
+  SELF_EMPLOYED_NPD
+}
+
 enum BusinessUnpVerificationStatus {
   PENDING
   VERIFIED
@@ -7803,6 +7816,7 @@ model WorkActivity {
 model BillingPayerProfile {
   id                 String   @id @default(cuid())
   businessId         String   @unique
+  identityMode       String @default("LEGACY_REVIEW")
   payerType          String
   legalName          String
   unp                String?

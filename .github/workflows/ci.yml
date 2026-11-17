@@ -225,6 +225,7 @@ jobs:
       - name: Business onboarding progress and verified phone trust regressions
         run: |
           pnpm test:business-phone-trust
+          pnpm test:business-identity
           pnpm exec tsx src/lib/business/onboardingProgress.test.ts
         env:
           NODE_OPTIONS: --max-old-space-size=6144

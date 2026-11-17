@@ -15,6 +15,9 @@ function draftKey(userId: string): string {
 }
 
 export interface BusinessOnboardingDraft {
+  subjectType?: string;
+  registrationFullName?: string;
+  publicName?: string;
   unp?: string;
   companyData?: {
     legalName?: string;
@@ -48,8 +51,12 @@ export function loadDraft(userId: string): BusinessOnboardingDraft | null {
     }
 
     // Validate shape
+
     const validated: BusinessOnboardingDraft = {};
 
+    if (["COMPANY", "SOLE_PROPRIETOR", "SELF_EMPLOYED_NPD"].includes(draft.subjectType)) validated.subjectType = draft.subjectType;
+    if (typeof draft.registrationFullName === "string") validated.registrationFullName = draft.registrationFullName;
+    if (typeof draft.publicName === "string") validated.publicName = draft.publicName;
     if (typeof draft.unp === "string") {
       validated.unp = draft.unp;
     }

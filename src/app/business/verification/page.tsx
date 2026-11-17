@@ -260,10 +260,10 @@ export default async function BusinessVerificationPage() {
               <span className="text-sm font-medium text-gray-700">Название:</span>{" "}
               <span className="text-sm text-gray-900">{business.name}</span>
             </div>
-            {business.legalName && (
+            {(business.legalName || business.registrationFullName) && (
               <div>
-                <span className="text-sm font-medium text-gray-700">Юридическое название:</span>{" "}
-                <span className="text-sm text-gray-900">{business.legalName}</span>
+                <span className="text-sm font-medium text-gray-700">Юридическое название / ФИО:</span>{" "}
+                <span className="text-sm text-gray-900">{business.registrationFullName || business.legalName}</span>
               </div>
             )}
             {business.unp && (
@@ -272,7 +272,7 @@ export default async function BusinessVerificationPage() {
                 <span className="text-sm text-gray-900">{business.unp}</span>
               </div>
             )}
-            {business.unp && <UnpVerificationNotice business={business} />}
+            {business.subjectType === "SELF_EMPLOYED_NPD" ? <p>Регистрацию НПД проверяет администратор в сервисе МНС. Результат: {business.npdCheckStatus}. Допустимость деятельности проверяется отдельно.</p> : business.unp && <UnpVerificationNotice business={business} />}
             {business.phone && (
               <div>
                 <span className="text-sm font-medium text-gray-700">Телефон:</span>{" "}

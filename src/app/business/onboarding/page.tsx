@@ -25,6 +25,9 @@ export default async function OnboardingPage() {
   // Normalize Business entity to OnboardingForm initialData shape
   const normalizedInitialData = existingBusiness
     ? {
+        subjectType: existingBusiness.subjectType,
+        registrationFullName: existingBusiness.registrationFullName,
+        publicName: existingBusiness.name,
         unp: existingBusiness.unp ?? undefined,
         legalName: existingBusiness.legalName ?? undefined,
         phone: existingBusiness.phone ?? null,
@@ -98,7 +101,7 @@ export default async function OnboardingPage() {
             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm font-semibold text-stone-900">Первый шаг — подтвердить компанию</p>
               <p className="mt-1 text-sm leading-relaxed text-stone-600">
-                Укажите УНП, юридическое название и контактный номер. После отправки мы покажем статус заявки и познакомим с возможностями mamaGo.
+                Выберите форму деятельности, укажите регистрационные данные, публичное название и контактный номер. После отправки мы покажем статус заявки и познакомим с возможностями mamaGo.
               </p>
             </div>
           )}

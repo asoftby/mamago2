@@ -1,8 +1,8 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { z, ZodError } from "zod";
+import { ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import prisma from "@/lib/prisma";
@@ -42,6 +42,8 @@ import {
 } from "@/lib/phone-verification/businessContactVerification";
 import { resolveBusinessUnpVerification } from "@/server/egr/resolveUnpVerification";
 
+import { registrationSchema } from "@/lib/business/registrationIdentity";
+
 type ActionState =
   | { ok: true }
   | {
@@ -64,11 +66,6 @@ function buildUnpAlreadyExistsError(): ActionState {
   };
 }
 
-const onboardingSchema = z.object({
-  unp: z.string().regex(/^[0-9]{9}$/, "УНП должен содержать 9 цифр"),
-  legalName: z.string().min(2, "Минимум 2 символа").max(200, "Максимум 200 символов"),
-  phone: z.string().min(1, "Укажите номер телефона"),
-});
 
 function buildPhoneVerificationFieldError(): ActionState {
   return {
@@ -105,6 +102,9 @@ export async function createBusinessAction(
 
   // Extract and validate form data
   const payload = {
+    subjectType: String(formData.get("subjectType") ?? ""),
+    registrationFullName: String(formData.get("registrationFullName") ?? ""),
+    publicName: String(formData.get("publicName") ?? ""),
     unp: String(formData.get("unp") ?? ""),
     legalName: String(formData.get("legalName") ?? ""),
     phone: String(formData.get("phone") ?? ""),
@@ -112,7 +112,7 @@ export async function createBusinessAction(
 
   try {
     // Validate
-    const validated = onboardingSchema.parse(payload);
+    const validated = registrationSchema.parse(payload);
     const phoneE164 = normalizeBusinessContactPhone(validated.phone);
 
     // Duplicate УНП guard: Business.ownerUserId is unique (one business per owner), so a
@@ -152,13 +152,15 @@ export async function createBusinessAction(
     // никогда не бросает исключение — недоступность реестра оседает как
     // unpVerificationStatus: "LOOKUP_FAILED" и не блокирует отправку заявки
     // (модератор видит статус и официальное название в админке).
-    const unpVerification = await resolveBusinessUnpVerification(
+    const unpVerification = validated.subjectType === "SELF_EMPLOYED_NPD"
+      ? { status: "PENDING" as const, verifiedAt: null, officialName: null, checkedAt: null }
+      : await resolveBusinessUnpVerification(
       validated.unp,
       validated.legalName,
     );
 
-    // Generate name automatically from legalName or user ID
-    const businessName = validated.legalName || `Business ${user.id}`;
+    // Public display name is independent of registration identity.
+    const businessName = validated.publicName;
     const now = new Date();
     const contactPhoneVerifiedAt =
       existingPhoneStillVerified && existing?.contactPhoneVerifiedAt
@@ -174,7 +176,7 @@ export async function createBusinessAction(
       const currentStatus = getEffectiveVerificationStatus(existing);
 
       // If APPROVED, redirect to dashboard (shouldn't be editing)
-      if (currentStatus === "APPROVED") {
+      if (currentStatus === "APPROVED" && formData.get("requestIdentityChange") !== "true") {
         redirect("/business/dashboard");
       }
 
@@ -185,15 +187,21 @@ export async function createBusinessAction(
 
       // DRAFT or REJECTED: Allow update and resubmit
       const updated = await prisma.business.update({
-        where: { id: existing.id },
+        where: { id: existing.id, updatedAt: existing.updatedAt, verificationStatus: { in: formData.get("requestIdentityChange") === "true" ? ["APPROVED", "DRAFT", "REJECTED", "NEEDS_INFO"] : ["DRAFT", "REJECTED", "NEEDS_INFO"] } },
         data: {
           name: businessName,
           unp: validated.unp,
-          legalName: validated.legalName,
+          subjectType: validated.subjectType,
+          registrationFullName: validated.subjectType === "SELF_EMPLOYED_NPD" ? validated.registrationFullName : null,
+          legalName: validated.subjectType === "SELF_EMPLOYED_NPD" ? null : validated.legalName,
+          npdCheckStatus: "REVIEW_REQUIRED",
+          npdCheckedAt: null, npdCheckedByUserId: null, npdCheckSource: null,
           phone: phoneE164,
           contactPhoneVerifiedAt,
           // CANONICAL: Set verificationStatus to PENDING
           verificationStatus: "PENDING",
+          isVerified: false,
+          approvedAt: null,
           submittedAt: now,
           // Clear moderation fields on resubmit
           reviewedAt: null,
@@ -221,11 +229,17 @@ export async function createBusinessAction(
           ownerUserId: user.id,
           name: businessName,
           unp: validated.unp,
-          legalName: validated.legalName,
+          subjectType: validated.subjectType,
+          registrationFullName: validated.subjectType === "SELF_EMPLOYED_NPD" ? validated.registrationFullName : null,
+          legalName: validated.subjectType === "SELF_EMPLOYED_NPD" ? null : validated.legalName,
+          npdCheckStatus: "REVIEW_REQUIRED",
+          npdCheckedAt: null, npdCheckedByUserId: null, npdCheckSource: null,
           phone: phoneE164,
           contactPhoneVerifiedAt,
           // CANONICAL: Set verificationStatus to PENDING
           verificationStatus: "PENDING",
+          isVerified: false,
+          approvedAt: null,
           submittedAt: now,
           // Legacy: Keep status in sync
           status: "PENDING_VERIFICATION",
@@ -243,6 +257,7 @@ export async function createBusinessAction(
       });
     }
   } catch (e) {
+    unstable_rethrow(e);
     // Handle Zod validation errors
     if (e instanceof ZodError) {
       return {
