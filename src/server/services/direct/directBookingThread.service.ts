@@ -26,6 +26,7 @@ import {
   writeDirectAudit,
 } from "./directAudit";
 import { createDirectMessage } from "./directMessage.service";
+import { canBusinessContactForBooking } from "./directBusinessWritePolicy";
 import {
   evaluateDirectTypePolicy,
   getDirectAvailabilityForPublicationType,
@@ -40,6 +41,7 @@ export type BookingDirectErrorCode =
   | "FORBIDDEN"
   | "GUEST_BOOKING"
   | "POLICY_DISABLED"
+  | "BOOKING_INACTIVE"
   | "PUBLICATION_MISMATCH"
   | "EMPTY_MESSAGE"
   | "NOT_BOOKING_OWNER";
@@ -73,6 +75,7 @@ const bookingSelect = {
   businessId: true,
   userId: true,
   status: true,
+  endsAt: true,
   kind: true,
   publicationType: true,
   offerId: true,
@@ -173,6 +176,11 @@ export async function openBusinessDirectThreadForBooking(input: {
     };
   }
 
+  // A business may inspect an existing thread, but it must not start contact
+  // on a terminal booking or after the known end of the service.
+  if (!canBusinessContactForBooking(booking, new Date())) {
+    throw new BookingDirectError("BOOKING_INACTIVE", "По завершённой или истёкшей заявке нельзя начать переписку");
+  }
   await assertPolicyAllows(booking.publicationType);
   const resolved = await resolveBookingPublication(booking);
 
