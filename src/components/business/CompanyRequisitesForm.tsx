@@ -5,7 +5,6 @@ import { normalizeOtherPayerType } from "@/lib/business/registrationIdentity";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
 type PayerType = "LEGAL_ENTITY" | "SOLE_PROPRIETOR" | "SELF_EMPLOYED";
 type Form = {
@@ -72,12 +71,13 @@ export function CompanyRequisitesForm() {
     } finally { setSaving(false); }
   }
   return (
-    <div className="space-y-6">
-      <BusinessSectionHeader
-        eyebrow="КАБИНЕТ"
-        title="Реквизиты для документов"
-        description="Регистрационные данные берутся из профиля бизнеса. Другого плательщика можно указать отдельно."
-      />
+    <section className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold text-stone-950">Реквизиты для документов</h2>
+        <p className="text-sm text-stone-600">
+          Регистрационные данные берутся из профиля бизнеса. Другого плательщика можно указать отдельно.
+        </p>
+      </div>
       {loading ? <p role="status">Загрузка реквизитов…</p> : (
         <form onSubmit={save} className="max-w-3xl space-y-5 rounded-2xl border border-stone-200 bg-white p-5">
           <label className="block text-sm font-medium">Кто оплачивает услуги mamaGo?
@@ -105,6 +105,6 @@ export function CompanyRequisitesForm() {
           <Button type="submit" disabled={saving || loadFailed || identityMode === "LEGACY_REVIEW"} className="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? "Сохранение…" : "Сохранить реквизиты"}</Button>
         </form>
       )}
-    </div>
+    </section>
   );
 }

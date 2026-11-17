@@ -55,6 +55,13 @@ const STATUS_LABELS: Record<string, string> = {
   REJECTED: "Отклонено",
 };
 
+const NPD_STATUS_LABELS: Record<string, string> = {
+  REVIEW_REQUIRED: "Ожидает проверки",
+  CONFIRMED: "Регистрация подтверждена",
+  NOT_FOUND: "Регистрация не найдена",
+  UNAVAILABLE: "Не удалось проверить",
+};
+
 export function BusinessVerificationSidePanel({
   businessId,
   onClose,
@@ -268,13 +275,13 @@ export function BusinessVerificationSidePanel({
                 <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <dt className="text-sm font-medium text-gray-500">
-                      Юридическое название
+                      {business.subjectType === "SELF_EMPLOYED_NPD" ? "ФИО" : "Юридическое название"}
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900">
                       {business.registrationFullName || business.legalName || "—"}
                       {business.subjectType === "SELF_EMPLOYED_NPD" && <div className="space-y-3">
-                        <p>Проверка НПД: {business.npdCheckStatus}</p>
-                        <p>Дата: {business.npdCheckedAt || "—"}; администратор: {business.npdCheckedByUserId || "—"}</p>
+                        <p>Проверка НПД: {NPD_STATUS_LABELS[business.npdCheckStatus] ?? "Статус уточняется"}</p>
+                        <p>Дата проверки: {business.npdCheckedAt ? formatAdminDateTime(business.npdCheckedAt) : "—"}</p>
                         <a href="https://lkfl.portal.nalog.gov.by/web/guest/check_registration" target="_blank" rel="noopener noreferrer" className="text-primary underline">Проверить НПД</a>
                         <p>Проверка регистрации НПД не подтверждает допустимость конкретной деятельности.</p>
                         {canRecordNpdCheck && business.verificationStatus === "PENDING" && <div className="flex flex-wrap gap-2">{[["CONFIRMED", "Подтверждено"], ["NOT_FOUND", "Не найдено"], ["UNAVAILABLE", "Не удалось проверить"]].map(([result, label]) => <Button variant="outline" key={result} type="button" disabled={actionLoading} onClick={() => void recordNpd(result)} className="rounded-md border border-border p-3 disabled:opacity-50">{label}</Button>)}</div>}
