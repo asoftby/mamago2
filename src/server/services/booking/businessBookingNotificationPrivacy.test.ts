@@ -80,3 +80,19 @@ test("business privacy delivery layer never rewrites customer or non-booking not
     assert.equal(businessBookingDeliveryProjection(notice), notice);
   }
 });
+
+test("Party Outbox BOOKING_CREATED keeps signed-confirmation routing metadata", () => {
+  const partyNotice = {
+    audience: "BUSINESS",
+    type: "BOOKING_CREATED",
+    title: "Новая заявка на праздник",
+    body: "Новая заявка на «Аниматор» — ответьте в разделе «Праздники».",
+    metadata: {
+      source: "PARTY_OUTBOX",
+      outboxId: "outbox-1",
+      templatePayload: { actor: "Семья", customerName: "Семья", offerTitle: "Аниматор" },
+    },
+  };
+  assert.equal(businessBookingDeliveryProjection(partyNotice), partyNotice,
+    "Party keyboard must still see PARTY_OUTBOX and outboxId");
+});
