@@ -101,6 +101,15 @@ export function businessBookingDeliveryProjection<T extends {
   metadata: unknown;
 }>(notice: T): T {
   if (notice.audience !== "BUSINESS") return notice;
+  // Party Outbox already uses the non-identifying actor "Семья" and is
+  // independently authorized. Its source/outboxId metadata is REQUIRED to
+  // build the signed Telegram confirmation keyboard. Do not strip it here.
+  const meta = notice.metadata;
+  if (notice.type === "BOOKING_CREATED" &&
+      meta && typeof meta === "object" && !Array.isArray(meta) &&
+      "source" in meta && meta.source === "PARTY_OUTBOX") {
+    return notice;
+  }
   const safe: Record<string, { title: string; body: string }> = {
     BOOKING_CREATED: {
       title: "Новая заявка",
