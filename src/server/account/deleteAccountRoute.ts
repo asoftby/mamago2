@@ -23,6 +23,15 @@ export async function handleDeleteOwnAccount(): Promise<NextResponse> {
         { status: 409 },
       );
     }
+    if (result.code === "IDENTITY_RETENTION_UNAVAILABLE") {
+      return NextResponse.json(
+        {
+          error: "Удаление аккаунта временно недоступно. Попробуйте позже или напишите в поддержку support@mamago.by.",
+          code: result.code,
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 

@@ -1,0 +1,74 @@
+name: Identity retention and account deletion DB integration
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/workflows/identity-retention-integration.yml"
+      - "src/server/privacy/**"
+      - "src/server/account/**"
+      - "src/app/api/cron/identity-retention-purge/**"
+      - "src/app/api/me/delete/**"
+      - "src/app/api/user/delete/**"
+      - "scripts/privacy/**"
+      - "prisma/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity-retention-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mamago_identity_retention_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mamago_identity_retention_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mamago_identity_retention_test
+      NODE_ENV: test
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.28.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply migrations to disposable PostgreSQL
+        run: pnpm exec prisma migrate deploy
+      - name: Identity envelope unit tests
+        run: pnpm exec tsx src/server/privacy/identityRetention/envelope.test.ts
+      - name: Identity retention, fail-closed deletion and purge cron
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/privacy/identityRetention/identityRetention.integration.test.ts
+      - name: Account deletion regressions (SEC-007, family, inbox)
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: |
+          pnpm exec tsx src/server/account/deleteAccount.integration.test.ts
+          pnpm exec tsx src/server/account/deleteAccount.family.integration.test.ts
+          pnpm exec tsx src/server/account/deleteAccount.inbox.integration.test.ts
+      - name: Disclosure script compiles
+        run: pnpm exec tsup --config tsup.worker.config.ts
