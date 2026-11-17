@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
+import { getBusinessMembership } from "@/server/permissions/business-permissions";
 import prisma from "@/lib/prisma";
 import {
   notifyAdminsBusinessApplicationCreated,
@@ -174,9 +175,19 @@ export async function createBusinessAction(
       // Use getEffectiveVerificationStatus to check current status
       const { getEffectiveVerificationStatus } = await import("@/server/services/businessStatusMap");
       const currentStatus = getEffectiveVerificationStatus(existing);
+      const isIdentityChange = formData.get("requestIdentityChange") === "true";
+
+      // The identity-change flag is untrusted form data. Active OWNER membership
+      // is required; an ownerUserId alone does not grant access after revocation.
+      if (currentStatus === "APPROVED" && isIdentityChange) {
+        const membership = await getBusinessMembership(user.id, existing.id);
+        if (membership?.role !== "OWNER") {
+          return { ok: false, message: "Нет доступа к изменению регистрационных данных" };
+        }
+      }
 
       // If APPROVED, redirect to dashboard (shouldn't be editing)
-      if (currentStatus === "APPROVED" && formData.get("requestIdentityChange") !== "true") {
+      if (currentStatus === "APPROVED" && !isIdentityChange) {
         redirect("/business/dashboard");
       }
 
@@ -187,7 +198,7 @@ export async function createBusinessAction(
 
       // DRAFT or REJECTED: Allow update and resubmit
       const updated = await prisma.business.update({
-        where: { id: existing.id, updatedAt: existing.updatedAt, verificationStatus: { in: formData.get("requestIdentityChange") === "true" ? ["APPROVED", "DRAFT", "REJECTED", "NEEDS_INFO"] : ["DRAFT", "REJECTED", "NEEDS_INFO"] } },
+        where: { id: existing.id, updatedAt: existing.updatedAt, verificationStatus: { in: isIdentityChange ? ["APPROVED", "DRAFT", "REJECTED", "NEEDS_INFO"] : ["DRAFT", "REJECTED", "NEEDS_INFO"] } },
         data: {
           name: businessName,
           unp: validated.unp,

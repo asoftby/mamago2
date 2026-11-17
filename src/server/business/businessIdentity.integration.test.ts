@@ -6,6 +6,7 @@ import { getBusinessPayer, saveBusinessPayer } from "./payerProfile";
 import { recordNpdCheck } from "./npdCheck";
 import { registrationSchema, NPD_SOURCE, normalizeOtherPayerType } from "@/lib/business/registrationIdentity";
 import { approve } from "@/server/services/businessVerification.service";
+import { getBusinessMembership } from "@/server/permissions/business-permissions";
 
 // Only invoked by gate-env.sh against a throwaway PostgreSQL database.
 const prefix = `identity-${Date.now()}`;
@@ -74,6 +75,26 @@ test("manual NPD result is audited, ADMIN-only and separate from moderation", as
     if (result !== "CONFIRMED") await assert.rejects(approve(business.id, admin.id), /НПД/);
   }
   assert.equal(await prisma.businessVerificationLog.count({ where: { businessId: business.id } }), 3);
+});
+
+
+test("registration changes require active OWNER membership, not ownership metadata alone", async () => {
+  const owner = await user();
+  const business = await prisma.business.create({
+    data: { ownerUserId: owner.id, name: "Restricted", verificationStatus: "APPROVED" },
+  });
+  await prisma.businessMember.create({
+    data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true },
+  });
+  assert.equal((await getBusinessMembership(owner.id, business.id))?.role, "OWNER");
+  await prisma.businessMember.update({
+    where: { businessId_userId: { businessId: business.id, userId: owner.id } },
+    data: { isActive: false },
+  });
+  assert.equal(await getBusinessMembership(owner.id, business.id), null);
+  const retained = await prisma.business.findUniqueOrThrow({ where: { id: business.id } });
+  assert.equal(retained.ownerUserId, owner.id);
+  assert.equal(retained.verificationStatus, "APPROVED");
 });
 
 test("additive migration is idempotent on existing data", async () => {
