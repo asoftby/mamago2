@@ -194,7 +194,19 @@ export async function openBusinessDirectThreadForBooking(input: {
   const now = new Date();
   let thread;
   try {
-    thread = await prisma.directThread.create({
+    thread = await prisma.$transaction(async (tx) => {
+      // Serialize with booking status transitions: a completed/cancelled order
+      // cannot win the race between the initial read and first BUSINESS send.
+      await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${booking.id} FOR SHARE`;
+      const current = await tx.bookingRequest.findUnique({
+        where: { id: booking.id },
+        select: { status: true, endsAt: true, businessId: true, userId: true },
+      });
+      if (!current || current.businessId !== booking.businessId ||
+          current.userId !== booking.userId || !canBusinessContactForBooking(current, new Date())) {
+        throw new BookingDirectError("BOOKING_INACTIVE", "Заявка больше не доступна для связи");
+      }
+      return tx.directThread.create({
       data: {
         publicationType: booking.publicationType,
         offerId: booking.offerId,
@@ -216,6 +228,7 @@ export async function openBusinessDirectThreadForBooking(input: {
         },
       },
       include: { messages: { select: { id: true } } },
+      });
     });
   } catch (error) {
     // Concurrent open of the same booking: the UNIQUE index decides the winner.
