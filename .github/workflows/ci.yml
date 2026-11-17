@@ -203,6 +203,9 @@ jobs:
       - name: Direct marketplace business write-policy regressions
         run: pnpm exec tsx src/server/services/direct/directBusinessWritePolicy.test.ts
 
+      - name: Business booking contact minimization regressions
+        run: pnpm exec tsx src/server/services/booking/businessBookingContactProjection.test.ts
+
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=6144 pnpm tsc --noEmit
