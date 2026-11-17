@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BookingStatus, DirectThreadStatus } from "@prisma/client";
+import { BookingKind, BookingStatus, DirectThreadStatus, PartyRequestStage } from "@prisma/client";
 import {
   BUSINESS_ENQUIRY_REPLY_DAYS,
   canBusinessContactForBooking,
@@ -11,6 +11,8 @@ import {
 const now = new Date("2026-11-17T15:00:00.000Z");
 const liveBooking = {
   status: BookingStatus.NEW,
+  kind: BookingKind.STANDARD,
+  partyStage: null,
   userId: "customer-1",
   businessId: "business-1",
   endsAt: null,
@@ -40,7 +42,7 @@ test("all terminal booking statuses deny business contact", () => {
     assert.equal(canBusinessWriteDirect({
       ...bookingThread, booking: { ...liveBooking, status },
     }), false, status);
-    assert.equal(canBusinessContactForBooking({ status, endsAt: null }, now), false, status);
+    assert.equal(canBusinessContactForBooking({ ...liveBooking, status }, now), false, status);
   }
 });
 
@@ -93,4 +95,26 @@ test("unlinked enquiries require recent explicit inbound CUSTOMER message", () =
   assert.equal(canBusinessWriteDirect({
     ...enquiry, latestCustomerMessageAt: new Date(now.getTime() - 3_600_000),
   }), true, "a new inbound message re-opens the response window");
+});
+
+test("party booking with terminal partyStage is not writable despite NEW booking status", () => {
+  for (const partyStage of [
+    PartyRequestStage.DECLINED, PartyRequestStage.EXPIRED,
+    PartyRequestStage.NOT_ACCEPTED, PartyRequestStage.CANCELLED,
+  ]) {
+    assert.equal(canBusinessWriteDirect({
+      ...bookingThread,
+      booking: { ...liveBooking, kind: BookingKind.PARTY, partyStage },
+    }), false, partyStage);
+  }
+  assert.equal(canBusinessWriteDirect({
+    ...bookingThread,
+    booking: { ...liveBooking, kind: BookingKind.PARTY, partyStage: null },
+  }), false);
+  for (const partyStage of [PartyRequestStage.SENT, PartyRequestStage.QUOTED, PartyRequestStage.CONFIRMED]) {
+    assert.equal(canBusinessWriteDirect({
+      ...bookingThread,
+      booking: { ...liveBooking, kind: BookingKind.PARTY, partyStage },
+    }), true, partyStage);
+  }
 });
