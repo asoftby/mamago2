@@ -63,3 +63,25 @@ export function buildPrivateBusinessBookingNotification(context: BusinessBooking
   };
   return { body, templatePayload };
 }
+
+/** One shared, PII-free reminder body for the lazy UI trigger and scheduled job. */
+export function buildPrivateBusinessBookingReminder(
+  staleType: "BOOKING_STALE" | "BOOKING_NEEDS_ATTENTION",
+  staleHours: number,
+): string {
+  const n = Math.max(0, Math.floor(staleHours));
+  const hoursLabel = (hours: number): string =>
+    hours % 10 === 1 && hours % 100 !== 11 ? "час" :
+    [2, 3, 4].includes(hours % 10) && ![12, 13, 14].includes(hours % 100) ? "часа" : "часов";
+  const daysLabel = (days: number): string =>
+    days % 10 === 1 && days % 100 !== 11 ? "день" :
+    [2, 3, 4].includes(days % 10) && ![12, 13, 14].includes(days % 100) ? "дня" : "дней";
+
+  if (staleType === "BOOKING_STALE") {
+    const days = Math.floor(n / 24);
+    const label = n < 48 ? `${n} ${hoursLabel(n)}` : `${days} ${daysLabel(days)}`;
+    return `Новая заявка ждёт ответа уже ${label}`;
+  }
+  const days = Math.floor(n / 24);
+  return `Подтверждённая заявка без активности ${days} ${daysLabel(days)}`;
+}
