@@ -77,6 +77,7 @@ const bookingSelect = {
   status: true,
   endsAt: true,
   kind: true,
+  partyStage: true,
   publicationType: true,
   offerId: true,
   activityId: true,
