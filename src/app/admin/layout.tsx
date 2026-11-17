@@ -113,6 +113,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {/* Left Sidebar - Hidden on mobile */}
           <div className="hidden lg:block bg-white border-r border-gray-200">
             <AdminSidebar
+              role={user.role}
               moderationCounts={moderationCounts}
               b2bPendingVerificationCount={b2bPendingVerificationCount}
               importPendingReviewCount={importPendingReviewCount}

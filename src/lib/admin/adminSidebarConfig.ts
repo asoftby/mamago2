@@ -3,6 +3,7 @@ import type { AdminSidebarNavItem, AdminSidebarGroup } from "./adminSidebarTypes
 import {
   LayoutDashboard,
   Shield,
+  ShieldCheck,
   Users,
   Briefcase,
   CreditCard,
@@ -553,6 +554,20 @@ export const GROUP_SYSTEM: AdminSidebarGroup = {
   ],
 };
 
+export const GROUP_SECURITY: AdminSidebarGroup = {
+  id: "security",
+  label: "Безопасность",
+  icon: ShieldCheck,
+  children: [
+    {
+      id: "government-requests",
+      label: "Запросы госорганов",
+      href: adminPath("/security/government-requests"),
+      matchers: [{ type: "prefix", value: adminPath("/security/government-requests") }],
+    },
+  ],
+};
+
 // === FULL SIDEBAR CONFIGURATION ===
 
 /**
@@ -575,6 +590,7 @@ export const ADMIN_SIDEBAR_CONFIG: readonly (AdminSidebarNavItem | AdminSidebarG
   GROUP_GEOGRAPHY,
   GROUP_SEO,
   GROUP_SYSTEM,
+  GROUP_SECURITY,
   NAV_IMPORT, // Import is now a standalone top-level section
 ];
 
