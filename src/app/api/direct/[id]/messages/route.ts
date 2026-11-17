@@ -11,6 +11,7 @@ import {
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import {
   createDirectMessage,
+  DirectBusinessWriteError,
   DirectMessageError,
 } from "@/server/services/direct/directMessage.service";
 import { DirectSendLimitError } from "@/server/services/direct/directRiskSignal.service";
@@ -74,6 +75,9 @@ export async function POST(
     if (error instanceof DirectSendLimitError) {
       const status = error.kind === "FLOOD_LOCK" ? 429 : 403;
       return NextResponse.json({ error: error.message }, { status });
+    }
+    if (error instanceof DirectBusinessWriteError) {
+      return NextResponse.json({ error: error.message, code: "BUSINESS_CONTACT_WINDOW_CLOSED" }, { status: 403 });
     }
     if (error instanceof DirectMessageError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
