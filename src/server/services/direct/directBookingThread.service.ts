@@ -153,7 +153,8 @@ export async function openBusinessDirectThreadForBooking(input: {
   if (!(await canAccessBusiness(input.actorUserId, booking.businessId))) {
     throw new BookingDirectError("FORBIDDEN", "Forbidden");
   }
-  if (!booking.userId) {
+  const bookingCustomerUserId = booking.userId;
+  if (!bookingCustomerUserId) {
     throw new BookingDirectError("GUEST_BOOKING", "У гостевой заявки нет чата");
   }
   if (booking.kind !== "STANDARD") {
@@ -204,17 +205,17 @@ export async function openBusinessDirectThreadForBooking(input: {
         select: { status: true, kind: true, partyStage: true, endsAt: true, businessId: true, userId: true },
       });
       if (!current || current.businessId !== booking.businessId ||
-          current.userId !== booking.userId || !canBusinessContactForBooking(current, new Date())) {
+          current.userId !== bookingCustomerUserId || !canBusinessContactForBooking(current, new Date())) {
         throw new BookingDirectError("BOOKING_INACTIVE", "Заявка больше не доступна для связи");
       }
       return tx.directThread.create({
-      data: {
+        data: {
         publicationType: booking.publicationType,
         offerId: booking.offerId,
         activityId: booking.activityId,
         placeId: booking.placeId,
         businessId: booking.businessId,
-        customerUserId: booking.userId,
+        customerUserId: bookingCustomerUserId,
         bookingRequestId: booking.id,
         status: DirectThreadStatus.OPEN,
         lastMessageAt: now,
@@ -228,7 +229,7 @@ export async function openBusinessDirectThreadForBooking(input: {
           },
         },
       },
-      include: { messages: { select: { id: true } } },
+        include: { messages: { select: { id: true } } },
       });
     });
   } catch (error) {
@@ -277,7 +278,7 @@ export async function openBusinessDirectThreadForBooking(input: {
       messageId: firstMessageId,
       threadId: thread.id,
       businessId: booking.businessId,
-      customerUserId: booking.userId,
+      customerUserId: bookingCustomerUserId,
       body,
     });
   }
