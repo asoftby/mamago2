@@ -201,7 +201,7 @@ export async function openBusinessDirectThreadForBooking(input: {
       await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${booking.id} FOR SHARE`;
       const current = await tx.bookingRequest.findUnique({
         where: { id: booking.id },
-        select: { status: true, endsAt: true, businessId: true, userId: true },
+        select: { status: true, kind: true, partyStage: true, endsAt: true, businessId: true, userId: true },
       });
       if (!current || current.businessId !== booking.businessId ||
           current.userId !== booking.userId || !canBusinessContactForBooking(current, new Date())) {
