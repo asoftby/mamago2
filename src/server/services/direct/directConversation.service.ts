@@ -389,7 +389,7 @@ export async function getUnifiedConversationDetail(
     include: {
       ...threadIncludeWithCustomer,
       messages: { orderBy: { createdAt: "asc" } },
-      bookingRequest: { select: { status: true, businessId: true, userId: true, endsAt: true } },
+      bookingRequest: { select: { status: true, kind: true, partyStage: true, businessId: true, userId: true, endsAt: true } },
     },
     orderBy: { createdAt: "asc" },
   });
