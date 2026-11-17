@@ -99,7 +99,7 @@ export async function approve(
 ): Promise<void> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { verificationStatus: true, ownerUserId: true },
+    select: { verificationStatus: true, ownerUserId: true, subjectType: true, npdCheckStatus: true, updatedAt: true },
   });
 
   if (!business) throw new Error("Business not found");
@@ -107,13 +107,14 @@ export async function approve(
     throw new Error(`Cannot approve from status: ${business.verificationStatus}`);
   }
 
+  if (business.subjectType === "SELF_EMPLOYED_NPD" && business.npdCheckStatus !== "CONFIRMED") throw new Error("Требуется подтверждение НПД администратором");
   const now = new Date();
   const statusFrom = business.verificationStatus;
   const statusTo: BusinessVerificationStatus = "APPROVED";
 
   await prisma.$transaction([
     prisma.business.update({
-      where: { id: businessId },
+      where: { id: businessId, updatedAt: business.updatedAt, verificationStatus: "PENDING" },
       data: {
         verificationStatus: statusTo,
         reviewedAt: now,

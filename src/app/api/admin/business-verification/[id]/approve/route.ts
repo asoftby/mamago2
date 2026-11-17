@@ -44,7 +44,7 @@ export async function POST(
     console.error("[admin/business-verification/approve] Error:", error);
 
     return NextResponse.json(
-      { ok: false, error: "Внутренняя ошибка сервера" },
+      { ok: false, error: error instanceof Error && error.message === "Требуется подтверждение НПД администратором" ? error.message : "Не удалось одобрить заявку. Обновите данные и повторите." },
       { status: 400 }
     );
   }

@@ -8,7 +8,7 @@ import { extendPrismaWithPlaceGeoCells } from "@/lib/place/placeGeoCellExtension
 // Bump: UserEvent.familyId/planVisibility (Family Core A1, 2026-10-03)
 // GSC query cache (2026-10-22).
 // Wishlist models (2026-10-29).
-const PRISMA_CACHE_VERSION = "v23"; // Manual booking source and idempotency
+const PRISMA_CACHE_VERSION = "v24"; // Business subject identity and payer mode
 
 const globalForPrisma = globalThis as unknown as {
   [key: string]: unknown;

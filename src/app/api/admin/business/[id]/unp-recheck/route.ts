@@ -33,7 +33,7 @@ export async function POST(
     const { id } = await params;
     const business = await prisma.business.findUnique({
       where: { id },
-      select: { id: true, unp: true, legalName: true },
+      select: { id: true, unp: true, legalName: true, subjectType: true },
     });
     if (!business) {
       return NextResponse.json(
@@ -41,6 +41,7 @@ export async function POST(
         { status: 404 },
       );
     }
+    if (business.subjectType === "SELF_EMPLOYED_NPD") return NextResponse.json({ error: "Используйте ручную проверку НПД в сервисе МНС" }, { status: 400 });
     if (!business.unp) {
       return NextResponse.json(
         { ok: false, error: "У бизнеса не указан УНП" },

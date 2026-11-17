@@ -59,7 +59,7 @@ export const BUSINESS_BILLING_HREF = businessRoute("/billing"); // Balance (defa
 export const BUSINESS_BILLING_BALANCE_HREF = businessRoute("/billing");
 export const BUSINESS_BILLING_PLAN_HREF = businessRoute("/billing/plan");
 export const BUSINESS_BILLING_DOCUMENTS_HREF = businessRoute("/billing/documents");
-export const BUSINESS_BILLING_REQUISITES_HREF = businessRoute("/billing/requisites");
+export const BUSINESS_BILLING_REQUISITES_HREF = businessRoute("/settings/company");
 export const BUSINESS_BILLING_HISTORY_HREF = businessRoute("/billing/history");
 // Legacy routes (deprecated, keep for backwards compatibility)
 export const BUSINESS_BILLING_TRANSACTIONS_HREF = businessRoute("/billing/history");

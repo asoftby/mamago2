@@ -85,6 +85,15 @@ export async function getBusinessMembership(
   });
 }
 
+/** Only an active OWNER may request changes to approved registration identity. */
+export async function canChangeApprovedBusinessRegistration(
+  userId: string,
+  businessId: string,
+): Promise<boolean> {
+  const member = await getBusinessMembership(userId, businessId);
+  return member?.role === BusinessMemberRole.OWNER;
+}
+
 /** Owned business metadata only. Do not use this as an authorization check. */
 export async function getOwnedBusinessForUser(userId: string): Promise<Business | null> {
   return prisma.business.findUnique({ where: { ownerUserId: userId } });
