@@ -6,7 +6,6 @@ import {
   Wallet, 
   CreditCard, 
   FileText, 
-  Building2, 
   History 
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -14,7 +13,6 @@ import {
   BUSINESS_BILLING_BALANCE_HREF,
   BUSINESS_BILLING_PLAN_HREF,
   BUSINESS_BILLING_DOCUMENTS_HREF,
-  BUSINESS_BILLING_REQUISITES_HREF,
   BUSINESS_BILLING_HISTORY_HREF,
 } from "@/lib/business/navigation";
 
@@ -45,12 +43,6 @@ const tabs: Tab[] = [
     match: ["/business/billing/documents"],
   },
   {
-    label: "Реквизиты",
-    href: BUSINESS_BILLING_REQUISITES_HREF,
-    icon: Building2,
-    match: ["/business/billing/requisites"],
-  },
-  {
     label: "История",
     href: BUSINESS_BILLING_HISTORY_HREF,
     icon: History,
@@ -62,7 +54,7 @@ export function BillingTabs() {
   const pathname = usePathname();
   const visibleTabs = process.env.NEXT_PUBLIC_BILLING_ENABLED === "true"
     ? tabs
-    : tabs.filter((tab) => tab.href === BUSINESS_BILLING_REQUISITES_HREF);
+    : [];
 
   const isActive = (tab: Tab) => {
     // Exact match for root /business/billing

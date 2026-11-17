@@ -70,6 +70,7 @@ export async function GET(
       ok: true,
       business,
       /** Видимость (operationalStatus) меняет только ADMIN — см. PATCH /api/admin/business/[id]/status */
+      canRecordNpdCheck: user.role === "ADMIN",
       canManageBusinessVisibility: user.role === "ADMIN",
     });
   } catch (error) {

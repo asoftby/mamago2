@@ -66,6 +66,7 @@ function verifiedPhoneFromProps(
 }
 
 export function OnboardingForm({
+  registrationChangeMode = false,
   currentUserId,
   initialData,
   accountPhoneE164 = null,
@@ -75,8 +76,9 @@ export function OnboardingForm({
   initialBusinessContactOtpState,
 }: {
   /** ID текущего авторизованного пользователя — используется для скоупинга localStorage draft */
+  registrationChangeMode?: boolean;
   currentUserId: string;
-  initialData?: { unp?: string; legalName?: string; phone?: string | null; contactPhoneVerifiedAt?: string | null } | null;
+  initialData?: { subjectType?: string; registrationFullName?: string | null; publicName?: string; unp?: string; legalName?: string; phone?: string | null; contactPhoneVerifiedAt?: string | null } | null;
   /** Номер из аккаунта (как правило, подтверждённый при регистрации) — если в заявке ещё нет телефона */
   accountPhoneE164?: string | null;
   accountPhoneVerifiedAt?: string | null;
@@ -85,9 +87,12 @@ export function OnboardingForm({
   /** Серверное состояние escalation OTP (business contact) */
   initialBusinessContactOtpState?: BusinessContactOtpClientState;
 }) {
-  const [state, formAction, isPending] = useActionState(createBusinessAction, null);
+  const [state, formAction] = useActionState(createBusinessAction, null);
   
   // UNP lookup state
+  const [subjectType, setSubjectType] = useState(initialData?.subjectType === "UNSPECIFIED" ? "" : initialData?.subjectType || "");
+  const [fullName, setFullName] = useState(initialData?.registrationFullName || "");
+  const [publicName, setPublicName] = useState(initialData?.publicName || "");
   const [unp, setUnp] = useState(initialData?.unp || "");
   const [legalName, setLegalName] = useState(initialData?.legalName || "");
   const [isLegalNameTouched, setIsLegalNameTouched] = useState(!!initialData?.legalName);
@@ -123,7 +128,9 @@ export function OnboardingForm({
     if (!draft) return;
 
     queueMicrotask(() => {
-      console.log("📋 Loading draft:", draft);
+      if (draft.subjectType) setSubjectType(draft.subjectType);
+      if (draft.registrationFullName) setFullName(draft.registrationFullName);
+      if (draft.publicName) setPublicName(draft.publicName);
 
       if (draft.unp) {
         setUnp(draft.unp);
@@ -151,6 +158,11 @@ export function OnboardingForm({
       ));
     });
   }, [initialData, accountPhoneE164, accountPhoneVerifiedAt, businessContactVerifiedPhoneE164, businessContactPhoneVerifiedAt, currentUserId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => saveDraft(currentUserId, { subjectType, registrationFullName: fullName, publicName, companyData: { legalName }, unp, phoneE164 }), 500);
+    return () => clearTimeout(timer);
+  }, [currentUserId, subjectType, fullName, publicName, legalName, unp, phoneE164]);
 
   // Debounced save helper
   const debouncedSave = (data: Parameters<typeof saveDraft>[1]) => {
@@ -225,8 +237,21 @@ export function OnboardingForm({
 
   return (
     <form action={formAction} className="space-y-6">
+      {registrationChangeMode && <input type="hidden" name="requestIdentityChange" value="true" />}
       <div>
-        <UnpLookupField
+        <label htmlFor="subjectType">Как вы работаете?</label>
+        <select required id="subjectType" name="subjectType" value={subjectType} onChange={e => setSubjectType(e.target.value)} className="block w-full rounded-md border border-border bg-surface p-3 text-base">
+          <option value="" disabled>Выберите форму деятельности</option><option value="COMPANY">Юридическое лицо</option><option value="SOLE_PROPRIETOR">ИП</option><option value="SELF_EMPLOYED_NPD">Самозанятый (НПД)</option>
+        </select>
+      </div>
+      <div><label htmlFor="publicName">Публичное название</label><Input id="publicName" name="publicName" value={publicName} onChange={e => setPublicName(e.target.value)} required minLength={2} maxLength={200} />
+        <p className="text-sm text-muted-foreground">Название для семей. ФИО не публикуется автоматически.</p>
+      </div>
+      <div>
+        {subjectType === "SELF_EMPLOYED_NPD" ? <>
+          <label htmlFor="unp">УНП физического лица</label><Input id="unp" name="unp" value={unp} onChange={e => handleUnpChange(e.target.value)} required pattern="[0-9]{9}" maxLength={9} />
+          <p className="text-sm text-muted-foreground">Регистрацию НПД проверит администратор в официальном сервисе МНС. Допустимость деятельности проверяется отдельно.</p>
+        </> : <UnpLookupField
           id="unp"
           name="unp"
           label="УНП (Учетный номер плательщика)"
@@ -253,7 +278,7 @@ export function OnboardingForm({
               });
             }
           }}
-        />
+        />}
         {showFieldErrors && state.code === "BUSINESS_UNP_ALREADY_EXISTS" && (
           <AccessRequestPanel unp={unp} />
         )}
@@ -264,18 +289,18 @@ export function OnboardingForm({
           htmlFor="legalName"
           className="block text-sm font-medium text-gray-700 mb-2"
         >
-          Юридическое название
+          {subjectType === "SELF_EMPLOYED_NPD" ? "ФИО" : subjectType === "SOLE_PROPRIETOR" ? "ФИО / наименование ИП" : "Юридическое название"}
         </label>
         <Input
           type="text"
           id="legalName"
-          name="legalName"
+          name={subjectType === "SELF_EMPLOYED_NPD" ? "registrationFullName" : "legalName"}
           required
-          value={legalName}
-          onChange={handleLegalNameChange}
+          value={subjectType === "SELF_EMPLOYED_NPD" ? fullName : legalName}
+          onChange={e => subjectType === "SELF_EMPLOYED_NPD" ? setFullName(e.target.value) : handleLegalNameChange(e)}
           minLength={2}
           maxLength={200}
-          placeholder="ООО «Детский центр Радуга»"
+          placeholder={subjectType === "SELF_EMPLOYED_NPD" ? "Фамилия Имя Отчество" : "Наименование по реестру"}
           className="placeholder:text-gray-400"
         />
         {showFieldErrors && state.fieldErrors?.legalName && (
@@ -320,7 +345,8 @@ export function OnboardingForm({
         </p>
       </div>
 
-      <SubmitButton disabled={!isPhoneVerified} />
+      {showFieldErrors && state.fieldErrors && <div role="alert">{Object.entries(state.fieldErrors).filter(([key]) => key !== "phone" && key !== "unp" && key !== "legalName").flatMap(([key, errors]) => (errors || []).map(error => <p key={`${key}-${error}`} className="text-sm text-danger">{error}</p>))}</div>}
+      <SubmitButton disabled={!isPhoneVerified || !subjectType} />
     </form>
   );
 }
