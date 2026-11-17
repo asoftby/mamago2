@@ -46,7 +46,6 @@ const DEDUP_WINDOW_HOURS = 24;
 export interface StaleBooking {
   id: string;
   status: BookingStatus;
-  customerName: string;
   /** Часов с момента создания (для NEW) или с lastActivityAt (для CONFIRMED) */
   staleHours: number;
   staleType: "BOOKING_STALE" | "BOOKING_NEEDS_ATTENTION";
@@ -100,7 +99,6 @@ export async function getStaleBookings(businessId: string): Promise<StaleBooking
     select: {
       id: true,
       status: true,
-      customerName: true,
       createdAt: true,
       lastActivityAt: true,
     },
@@ -117,7 +115,6 @@ export async function getStaleBookings(businessId: string): Promise<StaleBooking
     return {
       id: r.id,
       status: r.status,
-      customerName: r.customerName ?? "",
       staleHours,
       staleType: isNew ? "BOOKING_STALE" : "BOOKING_NEEDS_ATTENTION",
     };
@@ -160,13 +157,13 @@ function buildStaleBody(booking: StaleBooking): string {
       h < 48
         ? `${h} ${pluralHours(h)}`
         : `${Math.floor(h / 24)} ${pluralDays(Math.floor(h / 24))}`;
-    return `Новая заявка от ${booking.customerName} ждёт ответа уже ${label}`;
+    return `Новая заявка ждёт ответа уже ${label}`;
   }
 
   // BOOKING_NEEDS_ATTENTION
   const days = Math.floor(h / 24);
   const label = `${days} ${pluralDays(days)}`;
-  return `Подтверждённая заявка от ${booking.customerName} без активности ${label}`;
+  return `Подтверждённая заявка без активности ${label}`;
 }
 
 function pluralHours(n: number): string {

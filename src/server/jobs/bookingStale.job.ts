@@ -105,7 +105,6 @@ async function wasRecentlyNotified(
 
 function buildStaleBody(
   staleType: "BOOKING_STALE" | "BOOKING_NEEDS_ATTENTION",
-  customerName: string,
   staleHours: number,
 ): string {
   const h = staleHours;
@@ -115,13 +114,13 @@ function buildStaleBody(
       h < 48
         ? `${h} ${pluralHours(h)}`
         : `${Math.floor(h / 24)} ${pluralDays(Math.floor(h / 24))}`;
-    return `Новая заявка от ${customerName} ждёт ответа уже ${label}`;
+    return `Новая заявка ждёт ответа уже ${label}`;
   }
 
   // BOOKING_NEEDS_ATTENTION
   const days = Math.floor(h / 24);
   const label = `${days} ${pluralDays(days)}`;
-  return `Подтверждённая заявка от ${customerName} без активности ${label}`;
+  return `Подтверждённая заявка без активности ${label}`;
 }
 
 function pluralHours(n: number): string {
@@ -179,7 +178,6 @@ export async function runBookingStaleNotificationJob(): Promise<BookingStaleJobR
         status: true,
         businessId: true,
         business: { select: { owner: { select: { id: true } } } },
-        customerName: true,
         createdAt: true,
         lastActivityAt: true,
       },
@@ -215,7 +213,7 @@ export async function runBookingStaleNotificationJob(): Promise<BookingStaleJobR
           ? "BOOKING_STALE"
           : "BOOKING_NEEDS_ATTENTION";
 
-        const body = buildStaleBody(staleType, booking.customerName ?? "", staleHours);
+        const body = buildStaleBody(staleType, staleHours);
         const title =
           staleType === "BOOKING_STALE"
             ? "Заявка ждёт ответа"
