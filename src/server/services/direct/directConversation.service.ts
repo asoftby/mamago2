@@ -121,7 +121,12 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
   // select customer profile/avatar or build an implicit business customer CRM.
   const threads = await prisma.directThread.findMany({
     where: { businessId: { in: businessIds } },
-    include: threadListInclude,
+    include: {
+      ...threadListInclude,
+      bookingRequest: {
+        select: { status: true, kind: true, partyStage: true, endsAt: true, businessId: true, userId: true },
+      },
+    },
     orderBy: { lastMessageAt: "desc" },
   });
 
@@ -139,12 +144,30 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
       })
     : [];
   const unreadByThread = new Map(unreadRows.map((row) => [row.threadId, row._count._all]));
+  const lastCustomerRows = threads.length
+    ? await prisma.directMessage.groupBy({
+        by: ["threadId"],
+        where: { threadId: { in: threads.map((t) => t.id) }, senderType: DirectActorType.CUSTOMER },
+        _max: { createdAt: true },
+      })
+    : [];
+  const lastCustomerByThread = new Map(lastCustomerRows.map((row) => [row.threadId, row._max.createdAt]));
+  const now = new Date();
 
   const items: UnifiedConversationListItem[] = [];
   for (const thread of threads) {
     const { publicationTitle } = await resolveDirectBrand(thread);
     const unreadCount = unreadByThread.get(thread.id) ?? 0;
     const lastMessage = thread.messages[0];
+    const canWrite = canBusinessWriteDirect({
+      threadStatus: thread.status,
+      threadBusinessId: thread.businessId,
+      threadCustomerUserId: thread.customerUserId,
+      bookingRequestId: thread.bookingRequestId,
+      booking: thread.bookingRequest,
+      latestCustomerMessageAt: lastCustomerByThread.get(thread.id) ?? null,
+      now,
+    });
     items.push({
       key: thread.id,
       viewerRole: "BUSINESS",
@@ -159,7 +182,9 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
         lastMessage && !lastMessage.hiddenAt ? lastMessage.body : lastMessage ? "Сообщение скрыто модератором" : null,
       unreadCount,
       occasionCount: 1,
-      tab: deriveConversationTab(thread.status, thread.lastMessageBy),
+      tab: canWrite
+        ? deriveConversationTab(thread.status, thread.lastMessageBy)
+        : thread.status === DirectThreadStatus.ARCHIVED ? "ARCHIVE" : "COMPLETED",
     });
   }
   return items;

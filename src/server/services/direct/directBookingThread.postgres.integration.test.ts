@@ -367,4 +367,9 @@ test("business message inbox is scoped by occasion and never aggregates a custom
   const customerDetail = await getUnifiedConversationDetail(businessId, customer, "CUSTOMER");
   assert.ok(customerDetail?.occasions.some((o) => o.threadId === first.threadId));
   assert.ok(customerDetail?.occasions.some((o) => o.threadId === second.threadId));
+
+  await prisma.bookingRequest.update({ where: { id: secondBooking.id }, data: { status: BookingStatus.COMPLETED } });
+  const businessAfterCompletion = await getBusinessConversationsForUser(owner, businessId);
+  assert.equal(businessAfterCompletion.find((row) => row.latestThreadId === second.threadId)?.tab, "COMPLETED");
+  assert.equal((await getUnifiedConversationDetail(businessId, customer, "BUSINESS", second.threadId))?.canWrite, false);
 });
