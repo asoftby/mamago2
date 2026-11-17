@@ -12,6 +12,7 @@ import {
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 import {
   businessBookingDetailProjection,
   businessBookingDetailRevealsContact,
@@ -41,6 +42,12 @@ export async function GET(
   await attachDirectAvailabilityToBusinessBookings([item]);
   const detail = businessBookingDetailProjection(item);
   if (businessBookingDetailRevealsContact(detail)) {
+    // A selected order is not an export endpoint. Bound large automated reads
+    // by an authenticated staff member to deter collection of customer lists.
+    const limit = await checkRateLimit(`business_contact_detail:${business.id}:${user.id}`, 120, 15 * 60 * 1000);
+    if (!limit.allowed) {
+      return NextResponse.json({ error: "Too many customer detail requests" }, { status: 429 });
+    }
     // Fail closed: never return contact data without a durable disclosure log.
     await logAdminAudit({
       actorId: user.id,
