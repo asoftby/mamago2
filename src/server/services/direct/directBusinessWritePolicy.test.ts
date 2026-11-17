@@ -47,7 +47,7 @@ test("all terminal booking statuses deny business contact", () => {
 test("elapsed explicit end blocks business replies even on stale CONFIRMED status", () => {
   assert.equal(canBusinessWriteDirect({
     ...bookingThread,
-    booking: { ...liveBooking, status: BookingStatus.CONFIRMED, endsAt: new Date(now) },
+    booking: { ...liveBooking, status: BookingStatus.CONFIRMED, endsAt: new Date(now.getTime()) },
   }), false);
   assert.equal(canBusinessWriteDirect({
     ...bookingThread,
