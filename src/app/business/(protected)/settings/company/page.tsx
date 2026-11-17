@@ -131,7 +131,7 @@ export default async function BusinessCompanySettingsPage() {
                 contactPhoneVerifiedAt: business.contactPhoneVerifiedAt?.toISOString(),
               }}
               accountPhoneE164={user.phoneE164}
-              accountPhoneVerifiedAt={user.phoneVerifiedAt?.toISOString()}
+              accountPhoneVerifiedAt={user.phoneVerifiedAt}
               businessContactVerifiedPhoneE164={currentUser?.businessContactVerifiedPhoneE164 ?? null}
               businessContactPhoneVerifiedAt={currentUser?.businessContactPhoneVerifiedAt?.toISOString() ?? null}
             />
