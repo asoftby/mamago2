@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import prisma from "@/lib/prisma";
-import { ActivityType } from "@prisma/client";
-import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
+import { normalizeBusinessEventListView } from "@/lib/business/eventListWhere";
 import { EventsList } from "@/app/business/(protected)/events/EventsList";
 import { AccountPage } from "@/components/account/AccountPage";
 import { getPartnerCabinetBusiness } from "@/server/permissions/business-permissions";
+import { getBusinessEventsList } from "@/server/services/business/businessEventsList.service";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -28,27 +27,14 @@ export default async function MeEventsPage({
   }
 
   const params = await searchParams;
-  const view = params.view || "active";
+  const view = normalizeBusinessEventListView(params.view);
 
-  const activities = await prisma.activity.findMany({
-    where: {
-      businessId: business.id,
-      type: ActivityType.EVENT,
-      ...excludeDeletedEvents(),
-      ...excludeGhostEventDrafts(),
-    },
-    include: {
-      place: {
-        select: {
-          id: true,
-          title: true,
-        },
-      },
-      images: {
-        orderBy: { sortOrder: "asc" },
-      },
-    },
-    orderBy: { createdAt: "desc" },
+  // Тот же серверный источник, что и у бизнес-маршрутов: даты, статус по
+  // расписанию и состояние Boost считаются в одном месте.
+  const activities = await getBusinessEventsList({
+    userId: user.id,
+    businessId: business.id,
+    view,
   });
 
   return (

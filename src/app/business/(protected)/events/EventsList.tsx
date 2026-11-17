@@ -40,9 +40,12 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
-  displayOccurrenceAt?: Date | null;
-  temporalState?: EventTemporalState | null;
+  /** Сервер всегда считает эти поля в getBusinessEventsList (единый источник для обоих маршрутов). */
+  displayOccurrenceAt: Date | null;
+  temporalState: EventTemporalState;
   isPromoted?: boolean;
+  boostDisabled: boolean;
+  boostNextFreeAt: string | null;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
     views: number;

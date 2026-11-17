@@ -44,10 +44,10 @@ test("Unavailable Boost buttons are disabled before opening the dialog", () => {
   assert.match(launcher, /if \(disabled \|\| coolingDown\) return/);
   assert.match(launcher, /disabled={!item\.eligible \|\| Boolean\(item\.activeBoostUntil\)}/);
 
-  const eventsPage = read("src/app/business/(protected)/events/page.tsx");
+  const eventsList = read("src/server/services/business/businessEventsList.service.ts");
   const eventCard = read("src/components/business/events/EventCardHorizontal.tsx");
-  assert.match(eventsPage, /getFreeBoostDialogState/);
-  assert.match(eventsPage, /boostNextFreeAt: boostCandidate\?\.activeFreeBoostUntil/);
+  assert.match(eventsList, /getFreeBoostDialogState/);
+  assert.match(eventsList, /boostNextFreeAt: candidate\?\.activeFreeBoostUntil/);
   assert.match(eventCard, /disabled={activity\.boostDisabled !== false/);
   assert.match(eventCard, /cooldownUntil={activity\.boostNextFreeAt}/);
   assert.match(eventCard, /Продвигать/);
@@ -82,11 +82,12 @@ test("Boost countdown uses local clock and is precise at minute boundaries", () 
 
 
 test("Business event date uses the same live sessions as its temporal status", () => {
-  const page = read("src/app/business/(protected)/events/page.tsx");
+  const loader = read("src/server/services/business/businessEventsList.service.ts");
   const card = read("src/components/business/events/EventCardHorizontal.tsx");
-  assert.match(page, /upcomingSessions/);
-  assert.match(page, /withdrawnAt: null,[\s\S]*?startsAt: \{ gte: now \}/);
-  assert.match(page, /displayOccurrenceAt: nextSessionStart \?\? lastSessionStart \?\? activity.nextOccurrenceAt/);
+  assert.match(loader, /upcomingSessions/);
+  assert.match(loader, /withdrawnAt: null/);
+  assert.match(loader, /startsAt: \{ gte: now \}/);
+  assert.match(loader, /sessions\.nextSessionStart \?\? sessions\.lastSessionStart \?\? nextOccurrenceAt/);
   assert.match(card, /activity.displayOccurrenceAt \?\? activity.nextOccurrenceAt/);
   const status = read("src/lib/publication/displayStatus.ts");
   assert.match(status, /input.temporalState === "PAST" \? META.past : META.active/);
