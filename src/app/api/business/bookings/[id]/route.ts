@@ -11,6 +11,12 @@ import {
 } from "@/server/services/booking/bookingQuery.service";
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
+import { logAdminAudit } from "@/server/services/adminAuditLog.service";
+import {
+  businessBookingDetailProjection,
+  businessBookingDetailRevealsContact,
+  businessBookingListProjection,
+} from "@/server/services/booking/businessBookingContactProjection";
 
 const updateBookingSchema = z.object({
   status: z.enum([
@@ -33,7 +39,19 @@ export async function GET(
   const item = await getBusinessBookingById(id, business.id);
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await attachDirectAvailabilityToBusinessBookings([item]);
-  return NextResponse.json(item, { headers: { "Cache-Control": "private, no-store" } });
+  const detail = businessBookingDetailProjection(item);
+  if (businessBookingDetailRevealsContact(detail)) {
+    // Fail closed: never return contact data without a durable disclosure log.
+    await logAdminAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "BUSINESS_BOOKING_CONTACT_VIEWED",
+      entityType: "BOOKING_REQUEST",
+      entityId: id,
+      metadata: { businessId: business.id, surface: "business_booking_detail" },
+    });
+  }
+  return NextResponse.json(detail, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PATCH(
@@ -66,7 +84,8 @@ export async function PATCH(
     });
 
     await attachDirectAvailabilityToBusinessBookings([updatedBooking]);
-    return NextResponse.json(updatedBooking);
+    // Status-changing responses must not quietly repopulate the bulk list with PII.
+    return NextResponse.json(businessBookingListProjection(updatedBooking));
 
   } catch (error) {
     if (error instanceof BookingOwnershipError) {
