@@ -15,8 +15,8 @@ import {
  * notifyDirectCreated()/notifyDirectMessage() ctaAction links, both the
  * /me/direct/{id} customer links and the legacy /business/direct/{id}
  * business links, which now redirect here — see Phase 3.2). The response is
- * the MERGED conversation for that thread's (business, customer) pair, from
- * whichever side the caller is on — see directConversation.service.ts.
+ * customers see their merged conversation; business sees ONLY the selected
+ * thread, preventing cross-order client history disclosure.
  */
 export async function GET(
   request: Request,
@@ -51,6 +51,7 @@ export async function GET(
     resolved.businessId,
     resolved.customerUserId,
     resolved.viewerRole,
+    resolved.viewerRole === "BUSINESS" ? id : undefined,
   );
   if (!detail) {
     return NextResponse.json({ error: "Direct thread not found" }, { status: 404 });

@@ -17,6 +17,7 @@ import {
   openCustomerDirectThreadForBooking,
 } from "./directBookingThread.service";
 import { createDirectMessage, DirectBusinessWriteError } from "./directMessage.service";
+import { getBusinessConversationsForUser, getUnifiedConversationDetail } from "./directConversation.service";
 import { DirectSendLimitError } from "./directRiskSignal.service";
 import {
   getDirectPlatformSettings,
@@ -333,4 +334,37 @@ test("unlinked old customer enquiry cannot be revived by business without fresh 
   });
   await reply();
   assert.equal(await prisma.directMessage.count({ where: { threadId: thread.id } }), 3);
+});
+
+
+test("business message inbox is scoped by occasion and never aggregates a customer's multiple bookings", async () => {
+  const firstBooking = await newBooking();
+  const secondBooking = await newBooking();
+  const first = await openBusinessDirectThreadForBooking({
+    bookingRequestId: firstBooking.id, actorUserId: owner, message: "Первый заказ",
+  });
+  const second = await openBusinessDirectThreadForBooking({
+    bookingRequestId: secondBooking.id, actorUserId: owner, message: "Второй заказ",
+  });
+
+  const businessRows = await getBusinessConversationsForUser(owner, businessId);
+  const one = businessRows.find((row) => row.latestThreadId === first.threadId);
+  const two = businessRows.find((row) => row.latestThreadId === second.threadId);
+  assert.ok(one && two);
+  assert.notEqual(one.key, two.key);
+  assert.equal(one.occasionCount, 1);
+  assert.equal(two.occasionCount, 1);
+  assert.equal(one.counterpartyLogoUrl, null);
+  assert.match(one.counterpartyName, /^Обращение D-\d+$/);
+
+  const businessDetail = await getUnifiedConversationDetail(businessId, customer, "BUSINESS", first.threadId);
+  assert.deepEqual(businessDetail?.occasions.map((o) => o.threadId), [first.threadId]);
+  assert.deepEqual(businessDetail?.messages.map((m) => m.body), ["Первый заказ"]);
+  assert.equal(businessDetail?.counterpartyLogoUrl, null);
+  assert.equal(await getUnifiedConversationDetail(businessId, customer, "BUSINESS"), null,
+    "Business read without scoped thread must fail closed");
+
+  const customerDetail = await getUnifiedConversationDetail(businessId, customer, "CUSTOMER");
+  assert.ok(customerDetail?.occasions.some((o) => o.threadId === first.threadId));
+  assert.ok(customerDetail?.occasions.some((o) => o.threadId === second.threadId));
 });
