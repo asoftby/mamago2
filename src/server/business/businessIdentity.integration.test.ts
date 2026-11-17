@@ -6,7 +6,7 @@ import { getBusinessPayer, saveBusinessPayer } from "./payerProfile";
 import { recordNpdCheck } from "./npdCheck";
 import { registrationSchema, NPD_SOURCE, normalizeOtherPayerType } from "@/lib/business/registrationIdentity";
 import { approve } from "@/server/services/businessVerification.service";
-import { getBusinessMembership } from "@/server/permissions/business-permissions";
+import { canChangeApprovedBusinessRegistration } from "@/server/permissions/business-permissions";
 
 // Only invoked by gate-env.sh against a throwaway PostgreSQL database.
 const prefix = `identity-${Date.now()}`;
@@ -94,12 +94,15 @@ test("registration changes require active OWNER membership, not ownership metada
   await prisma.businessMember.create({
     data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true },
   });
-  assert.equal((await getBusinessMembership(owner.id, business.id))?.role, "OWNER");
+  assert.equal(await canChangeApprovedBusinessRegistration(owner.id, business.id), true);
   await prisma.businessMember.update({
     where: { businessId_userId: { businessId: business.id, userId: owner.id } },
     data: { isActive: false },
   });
-  assert.equal(await getBusinessMembership(owner.id, business.id), null);
+  assert.equal(await canChangeApprovedBusinessRegistration(owner.id, business.id), false);
+  // The production action calls this exact check before any approved-registration update.
+  const actionSource = readFileSync("src/app/business/onboarding/actions.ts", "utf8");
+  assert.match(actionSource, /canChangeApprovedBusinessRegistration\(user\.id, existing\.id\)/);
   const retained = await prisma.business.findUniqueOrThrow({ where: { id: business.id } });
   assert.equal(retained.ownerUserId, owner.id);
   assert.equal(retained.verificationStatus, "APPROVED");

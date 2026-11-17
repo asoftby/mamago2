@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
-import { getBusinessMembership } from "@/server/permissions/business-permissions";
+import { canChangeApprovedBusinessRegistration } from "@/server/permissions/business-permissions";
 import prisma from "@/lib/prisma";
 import {
   notifyAdminsBusinessApplicationCreated,
@@ -180,8 +180,7 @@ export async function createBusinessAction(
       // The identity-change flag is untrusted form data. Active OWNER membership
       // is required; an ownerUserId alone does not grant access after revocation.
       if (currentStatus === "APPROVED" && isIdentityChange) {
-        const membership = await getBusinessMembership(user.id, existing.id);
-        if (membership?.role !== "OWNER") {
+        if (!(await canChangeApprovedBusinessRegistration(user.id, existing.id))) {
           return { ok: false, message: "Нет доступа к изменению регистрационных данных" };
         }
       }
