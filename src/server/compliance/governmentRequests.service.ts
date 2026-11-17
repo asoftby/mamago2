@@ -65,12 +65,6 @@ export async function getGovernmentRequest(
   return db.$transaction(async (tx) => {
     const found = await tx.governmentDataRequest.findUnique({ where: { id } });
     if (!found) throw new GovernmentRequestNotFoundError("Not found");
-    const history = await tx.adminAuditLog.findMany({
-      where: { entityType: GOVERNMENT_REQUEST_ENTITY, entityId: id },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: { id: true, actorId: true, action: true, reason: true, createdAt: true },
-    });
     await tx.adminAuditLog.create({
       data: {
         actorId: actor.id,
@@ -79,6 +73,12 @@ export async function getGovernmentRequest(
         entityType: GOVERNMENT_REQUEST_ENTITY,
         entityId: id,
       },
+    });
+    const history = await tx.adminAuditLog.findMany({
+      where: { entityType: GOVERNMENT_REQUEST_ENTITY, entityId: id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, actorId: true, action: true, reason: true, createdAt: true },
     });
     return { case: found, history };
   });
