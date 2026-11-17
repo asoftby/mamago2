@@ -280,7 +280,7 @@
     "test:abws-shared-resync-guard": "tsx src/lib/business/syncEventActivitySessions.test.ts && tsx src/lib/event/recurringScheduleMaterialization.test.ts && tsx src/lib/event/eventTimezoneContract.test.ts",
     "test:abws-review-queue-pagination": "tsx src/app/admin/import/review/page.pagination.test.ts",
     "prepare": "husky",
-    "test:business-identity": "tsx --test --test-concurrency=1 src/server/business/businessIdentity.integration.test.ts",
+    "test:business-identity": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 src/server/business/businessIdentity.integration.test.ts",
     "test:business-features": "tsx src/lib/business/businessFeatures.test.ts",
     "test:business-inbox-ui": "tsx src/lib/business/bookingsInbox.test.ts && tsx src/server/services/booking/bookingBucket.contract.test.ts && tsx src/lib/business/bookingsInbox.integrationContract.test.ts && tsx src/components/business/bookings/inbox/PartyConfirmOverlay.contract.test.ts",
     "check:push": "sh scripts/git/gate-env.sh pnpm check:push:steps",
