@@ -48,6 +48,7 @@ export function businessBookingDetailProjection(booking: BusinessBookingItem): B
 
 /** True only when disclosure is possible and must be audited before response. */
 export function businessBookingDetailRevealsContact(booking: BusinessBookingItem): boolean {
-  return ACTIVE_CONTACT_STATUSES.has(booking.status) &&
-    Boolean(booking.customerPhone.trim() || (booking.customerName.trim() && booking.customerName !== "Клиент"));
+  // The active detail may contain free-text comments or child details even if
+  // phone/name are empty. Audit every active detail disclosure, not just phone.
+  return ACTIVE_CONTACT_STATUSES.has(booking.status);
 }
