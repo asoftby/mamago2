@@ -85,3 +85,39 @@ export function buildPrivateBusinessBookingReminder(
   const days = Math.floor(n / 24);
   return `Подтверждённая заявка без активности ${days} ${daysLabel(days)}`;
 }
+
+/**
+ * Defence in depth for retries of legacy BUSINESS notifications that were
+ * persisted before push redaction. Never feed historical PII-filled metadata
+ * to the template engine or fallback Telegram/email renderer.
+ *
+ * Existing in-app records are not rewritten here; migration is separate.
+ */
+export function businessBookingDeliveryProjection<T extends {
+  audience: string;
+  type: string;
+  title: string;
+  body: string;
+  metadata: unknown;
+}>(notice: T): T {
+  if (notice.audience !== "BUSINESS") return notice;
+  const safe: Record<string, { title: string; body: string }> = {
+    BOOKING_CREATED: {
+      title: "Новая заявка",
+      body: "Поступила новая заявка. Откройте её в mamaGo для обработки.",
+    },
+    BOOKING_STALE: {
+      title: "Заявка ждёт ответа",
+      body: "Заявка ожидает ответа. Откройте её в mamaGo.",
+    },
+    BOOKING_NEEDS_ATTENTION: {
+      title: "Требует внимания",
+      body: "Подтверждённая заявка требует внимания. Откройте её в mamaGo.",
+    },
+  };
+  const message = safe[notice.type];
+  if (!message) return notice;
+  // There is deliberately no legacy metadata.templatePayload here:
+  // it may include customerName, childName and other free-form personal data.
+  return { ...notice, title: message.title, body: message.body, metadata: null };
+}
