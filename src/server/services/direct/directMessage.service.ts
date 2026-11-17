@@ -81,9 +81,17 @@ export async function createDirectMessage(input: CreateDirectMessageInput) {
   });
 
   const message = await prisma.$transaction(async (tx) => {
-    // Authorization at the actual write boundary; stale OPEN threads cannot
-    // bypass completed/cancelled/expired bookings via a direct API call.
+    // Lock booking before the thread (consistent order) so a competing
+    // booking status transition cannot race an allowed BUSINESS send.
     if (input.senderType === DirectActorType.BUSINESS) {
+      const routing = await tx.directThread.findUnique({
+        where: { id: input.threadId }, select: { bookingRequestId: true },
+      });
+      if (routing?.bookingRequestId) {
+        await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${routing.bookingRequestId} FOR SHARE`;
+      }
+      await tx.$queryRaw`SELECT "id" FROM "DirectThread" WHERE "id" = ${input.threadId} FOR UPDATE`;
+      // Always re-read after locking; a stale OPEN thread is not authority.
       const live = await tx.directThread.findUnique({
         where: { id: input.threadId },
         select: {
