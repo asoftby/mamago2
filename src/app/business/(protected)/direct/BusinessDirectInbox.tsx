@@ -7,6 +7,7 @@ import type { ConversationTab, UnifiedConversationListItem } from "@/server/serv
 import { StatusBadge } from "@/components/direct/StatusBadge";
 import { UnreadBadge } from "@/components/direct/UnreadBadge";
 import { BUSINESS_DIRECT_HREF } from "@/lib/business/navigation";
+import styles from "@/components/direct/direct.module.css";
 
 type Props = {
   initialConversations: UnifiedConversationListItem[];
@@ -36,7 +37,9 @@ export function BusinessDirectInbox({ initialConversations, initialCounts }: Pro
   }, [initialConversations, query, tab]);
 
   return (
-    <div className="space-y-4">
+    // .businessPage scopes the Direct design tokens (--accent/--ok/--warn) used by
+    // UnreadBadge/StatusBadge; without it they fall back to the global gray theme.
+    <div className={`${styles.businessPage} space-y-4`}>
       <div className="rounded-2xl border border-stone-200 bg-white p-4 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Фильтр переписок">
