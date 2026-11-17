@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/server";
 import { SettingsScaffold } from "@/components/settings/SettingsScaffold";
 import { requireSettingsContext } from "@/lib/settings/resolveSettingsContext";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
@@ -43,6 +44,7 @@ function displayStatus(value: string | null | undefined, labels: Record<string, 
 export default async function BusinessCompanySettingsPage() {
   const context = await requireSettingsContext({ requestedScope: "BUSINESS" });
   const user = context.viewer;
+  const currentUser = await getCurrentUser();
   const business = await getMyBusiness(user.id);
   if (!business) redirect("/business/onboarding");
 
@@ -130,6 +132,8 @@ export default async function BusinessCompanySettingsPage() {
               }}
               accountPhoneE164={user.phoneE164}
               accountPhoneVerifiedAt={user.phoneVerifiedAt?.toISOString()}
+              businessContactVerifiedPhoneE164={currentUser?.businessContactVerifiedPhoneE164 ?? null}
+              businessContactPhoneVerifiedAt={currentUser?.businessContactPhoneVerifiedAt?.toISOString() ?? null}
             />
           </details>
         )}
