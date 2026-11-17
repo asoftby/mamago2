@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildPrivateBusinessBookingNotification } from "./businessBookingNotificationPrivacy";
+import { buildPrivateBusinessBookingNotification, buildPrivateBusinessBookingReminder } from "./businessBookingNotificationPrivacy";
 
 const personal = {
   customerName: "SUPER_SECRET_PARENT",
@@ -40,4 +40,15 @@ test("public booking context remains visible while sensitive caller inputs are i
   });
   assert.deepEqual(first, second, "No customer-identifying data should affect push content");
   assert.match(first.body, /Спектакль/);
+});
+
+test("both stale reminder types contain no identity and preserve the Russian time labels", () => {
+  const matrix = [
+    ["BOOKING_STALE", 24, "Новая заявка ждёт ответа уже 24 часа"],
+    ["BOOKING_STALE", 49, "Новая заявка ждёт ответа уже 2 дня"],
+    ["BOOKING_NEEDS_ATTENTION", 72, "Подтверждённая заявка без активности 3 дня"],
+  ] as const;
+  for (const [type, hours, expected] of matrix) {
+    assert.equal(buildPrivateBusinessBookingReminder(type, hours), expected);
+  }
 });
