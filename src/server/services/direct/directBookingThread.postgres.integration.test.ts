@@ -16,7 +16,7 @@ import {
   openBusinessDirectThreadForBooking,
   openCustomerDirectThreadForBooking,
 } from "./directBookingThread.service";
-import { createDirectMessage } from "./directMessage.service";
+import { createDirectMessage, DirectBusinessWriteError } from "./directMessage.service";
 import { DirectSendLimitError } from "./directRiskSignal.service";
 import {
   getDirectPlatformSettings,
@@ -260,4 +260,77 @@ test("customer side: 'Мои записи' shows the thread link; another user's
   const biz = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Простите" });
   assert.equal(biz.created, false);
   assert.equal(biz.threadId, c.threadId);
+});
+
+test("terminal and elapsed bookings cannot start a business-authored thread", async () => {
+  for (const status of [BookingStatus.EXPIRED, BookingStatus.REJECTED, BookingStatus.COMPLETED]) {
+    const booking = await newBooking({ status });
+    assert.equal(
+      await codeOf(openBusinessDirectThreadForBooking({
+        bookingRequestId: booking.id, actorUserId: owner, message: "Повторное предложение",
+      })),
+      "BOOKING_INACTIVE",
+    );
+    assert.equal(await prisma.directThread.count({ where: { bookingRequestId: booking.id } }), 0);
+  }
+  const elapsed = await newBooking();
+  await prisma.bookingRequest.update({
+    where: { id: elapsed.id },
+    data: { endsAt: new Date(Date.now() - 60_000) },
+  });
+  assert.equal(
+    await codeOf(openBusinessDirectThreadForBooking({
+      bookingRequestId: elapsed.id, actorUserId: owner, message: "Услуга уже прошла",
+    })),
+    "BOOKING_INACTIVE",
+  );
+});
+
+test("stale OPEN booking thread cannot bypass a terminal status via message API service", async () => {
+  const booking = await newBooking();
+  const opened = await openBusinessDirectThreadForBooking({
+    bookingRequestId: booking.id, actorUserId: owner, message: "Подтверждаем детали",
+  });
+  await prisma.bookingRequest.update({
+    where: { id: booking.id }, data: { status: BookingStatus.COMPLETED },
+  });
+  const attempted = () => createDirectMessage({
+    threadId: opened.threadId, senderType: DirectActorType.BUSINESS,
+    senderUserId: owner, body: "Приходите снова без mamaGo",
+  });
+  await assert.rejects(attempted(), DirectBusinessWriteError);
+  assert.equal(await prisma.directMessage.count({ where: { threadId: opened.threadId } }), 1);
+  // Customer is not locked out of their history/possibility to raise a problem.
+  await createDirectMessage({
+    threadId: opened.threadId, senderType: DirectActorType.CUSTOMER,
+    senderUserId: customer, body: "У меня вопрос по завершённому заказу",
+  });
+  await assert.rejects(attempted(), DirectBusinessWriteError);
+});
+
+test("unlinked old customer enquiry cannot be revived by business without fresh inbound", async () => {
+  const old = new Date(Date.now() - 31 * 24 * 60 * 60_000);
+  const thread = await prisma.directThread.create({
+    data: {
+      publicationType: PublicationType.EVENT,
+      activityId, businessId, customerUserId: customer,
+      lastMessageAt: old,
+      lastMessageBy: DirectActorType.CUSTOMER,
+      messages: {
+        create: { senderType: DirectActorType.CUSTOMER, senderUserId: customer,
+          body: "Старый вопрос", createdAt: old },
+      },
+    },
+  });
+  const reply = () => createDirectMessage({
+    threadId: thread.id, senderType: DirectActorType.BUSINESS,
+    senderUserId: owner, body: "Новое предложение",
+  });
+  await assert.rejects(reply(), DirectBusinessWriteError);
+  await createDirectMessage({
+    threadId: thread.id, senderType: DirectActorType.CUSTOMER,
+    senderUserId: customer, body: "Уточняю свой вопрос",
+  });
+  await reply();
+  assert.equal(await prisma.directMessage.count({ where: { threadId: thread.id } }), 3);
 });
