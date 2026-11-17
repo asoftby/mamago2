@@ -36,6 +36,7 @@ test("NPD registration requires FIO and separate public name without legalName",
 test("canonical payer ignores forged Business fields; explicit other payer stays isolated", async () => {
   const owner = await user(); const stranger = await user();
   const business = await prisma.business.create({ data: { ownerUserId: owner.id, name: "Public", legalName: "Official", unp: "123456789", subjectType: "COMPANY", verificationStatus: "APPROVED" } });
+  await prisma.businessMember.create({ data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true } });
   await saveBusinessPayer(owner.id, { identityMode: "BUSINESS", businessId: "forged", subjectType: "SELF_EMPLOYED_NPD", legalName: "Forged", unp: "987654321", bankName: "Bank" });
   const resolved = await getBusinessPayer(owner.id);
   assert.equal(resolved.profile?.legalName, "Official");
@@ -48,11 +49,18 @@ test("canonical payer ignores forged Business fields; explicit other payer stays
   assert.equal((await getBusinessPayer(owner.id)).profile?.legalName, "Other person");
   const unchanged = await prisma.business.findUniqueOrThrow({ where: { id: business.id } });
   assert.equal(unchanged.legalName, "Official"); assert.equal(unchanged.unp, "123456789"); assert.equal(unchanged.verificationStatus, "APPROVED");
+  await prisma.businessMember.update({
+    where: { businessId_userId: { businessId: business.id, userId: owner.id } },
+    data: { isActive: false },
+  });
+  await assert.rejects(getBusinessPayer(owner.id), /OWNER_REQUIRED/);
+  await assert.rejects(saveBusinessPayer(owner.id, { identityMode: "BUSINESS" }), /OWNER_REQUIRED/);
 });
 
 test("legacy discrepancy is never inferred or rewritten on read", async () => {
   const owner = await user();
   const business = await prisma.business.create({ data: { ownerUserId: owner.id, name: "Existing", legalName: "Existing official", verificationStatus: "APPROVED" } });
+  await prisma.businessMember.create({ data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true } });
   assert.equal(business.subjectType, "UNSPECIFIED");
   const profile = await prisma.billingPayerProfile.create({ data: { businessId: business.id, payerType: "LEGAL_ENTITY", legalName: "Different payer", bankAccount: "Preserve" } });
   assert.equal((await getBusinessPayer(owner.id)).identityMode, "LEGACY_REVIEW");
