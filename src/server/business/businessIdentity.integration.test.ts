@@ -6,7 +6,11 @@ import { getBusinessPayer, saveBusinessPayer } from "./payerProfile";
 import { recordNpdCheck } from "./npdCheck";
 import { registrationSchema, NPD_SOURCE, normalizeOtherPayerType } from "@/lib/business/registrationIdentity";
 import { approve } from "@/server/services/businessVerification.service";
-import { canChangeApprovedBusinessRegistration } from "@/server/permissions/business-permissions";
+import { createBusinessAction } from "@/app/business/onboarding/actions";
+import { createSession } from "@/lib/auth/session";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/cookie";
+import { workAsyncStorage } from "next/dist/server/app-render/work-async-storage.external";
+import { workUnitAsyncStorage } from "next/dist/server/app-render/work-unit-async-storage.external";
 
 // Only invoked by gate-env.sh against a throwaway PostgreSQL database.
 const prefix = `identity-${Date.now()}`;
@@ -86,26 +90,92 @@ test("manual NPD result is audited, ADMIN-only and separate from moderation", as
 });
 
 
-test("registration changes require active OWNER membership, not ownership metadata alone", async () => {
+// Run the *real* Next Server Action with a valid DB-backed session and
+// request-scoped cookies. No fake user argument is passed to the action.
+async function submitIdentityChangeAs(ownerId: string, data: FormData) {
+  const token = await createSession(ownerId);
+  const requestCookies = {
+    get(name: string) {
+      return name === SESSION_COOKIE_NAME ? { name, value: token } : undefined;
+    },
+  };
+  // Only the request context is simulated: authentication, ACL and Business
+  // mutations use the production implementations and a real PostgreSQL DB.
+  const workStore = {
+    route: "/business/onboarding",
+    page: "/business/onboarding",
+    incrementalCache: {},
+  };
+  const requestStore = {
+    type: "request",
+    phase: "action",
+    cookies: requestCookies,
+    userspaceMutableCookies: requestCookies,
+  };
+  return workAsyncStorage.run(workStore as never, () =>
+    workUnitAsyncStorage.run(requestStore as never, () =>
+      createBusinessAction(null, data)
+    )
+  );
+}
+
+test("real registration Server Action rejects revoked OWNER and preserves approved data; active OWNER can resubmit", async () => {
   const owner = await user();
+  const phone = "+375291234567";
+  const verifiedAt = new Date("2026-11-17T08:00:00.000Z");
   const business = await prisma.business.create({
-    data: { ownerUserId: owner.id, name: "Restricted", verificationStatus: "APPROVED" },
+    data: {
+      ownerUserId: owner.id,
+      name: "Original public name",
+      unp: "876543219",
+      subjectType: "SELF_EMPLOYED_NPD",
+      registrationFullName: "Иванов Иван Иванович",
+      phone,
+      contactPhoneVerifiedAt: verifiedAt,
+      npdCheckStatus: "CONFIRMED",
+      verificationStatus: "APPROVED",
+      isVerified: true,
+      approvedAt: verifiedAt,
+    },
   });
   await prisma.businessMember.create({
-    data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true },
+    data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: false },
   });
-  assert.equal(await canChangeApprovedBusinessRegistration(owner.id, business.id), true);
+
+  function formData() {
+    const form = new FormData();
+    form.set("requestIdentityChange", "true");
+    form.set("subjectType", "SELF_EMPLOYED_NPD");
+    form.set("unp", business.unp!);
+    form.set("registrationFullName", "Петров Пётр Петрович");
+    form.set("publicName", "Changed public name");
+    form.set("phone", phone); // Already verified in Business; no OTP bypass mock.
+    return form;
+  }
+
+  const before = await prisma.business.findUniqueOrThrow({ where: { id: business.id } });
+  const denied = await submitIdentityChangeAs(owner.id, formData());
+  assert.equal(denied?.ok, false);
+  assert.match(denied?.ok === false ? denied.message : "", /Нет доступа/);
+  const unchanged = await prisma.business.findUniqueOrThrow({ where: { id: business.id } });
+  for (const field of [
+    "name", "unp", "subjectType", "registrationFullName", "verificationStatus",
+    "isVerified", "approvedAt", "npdCheckStatus", "contactPhoneVerifiedAt", "updatedAt",
+  ] as const) assert.deepEqual(unchanged[field], before[field], field);
+
   await prisma.businessMember.update({
     where: { businessId_userId: { businessId: business.id, userId: owner.id } },
-    data: { isActive: false },
+    data: { isActive: true },
   });
-  assert.equal(await canChangeApprovedBusinessRegistration(owner.id, business.id), false);
-  // The production action calls this exact check before any approved-registration update.
-  const actionSource = readFileSync("src/app/business/onboarding/actions.ts", "utf8");
-  assert.match(actionSource, /canChangeApprovedBusinessRegistration\(user\.id, existing\.id\)/);
-  const retained = await prisma.business.findUniqueOrThrow({ where: { id: business.id } });
-  assert.equal(retained.ownerUserId, owner.id);
-  assert.equal(retained.verificationStatus, "APPROVED");
+  await assert.rejects(submitIdentityChangeAs(owner.id, formData()), /NEXT_REDIRECT/);
+  const changed = await prisma.business.findUniqueOrThrow({ where: { id: business.id } });
+  assert.equal(changed.name, "Changed public name");
+  assert.equal(changed.registrationFullName, "Петров Пётр Петрович");
+  assert.equal(changed.unp, before.unp);
+  assert.equal(changed.verificationStatus, "PENDING");
+  assert.equal(changed.isVerified, false);
+  assert.equal(changed.npdCheckStatus, "REVIEW_REQUIRED");
+  assert.equal(changed.approvedAt, null);
 });
 
 test("additive migration is idempotent on existing data", async () => {
