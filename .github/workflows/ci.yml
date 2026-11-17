@@ -222,10 +222,16 @@ jobs:
       - name: Business phone duplicate error regression
         run: pnpm exec tsx src/lib/phone-verification/businessContactVerification.shared.test.ts
 
+      - name: Business identity and payer PostgreSQL regressions
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm test:business-identity
+
       - name: Business onboarding progress and verified phone trust regressions
         run: |
           pnpm test:business-phone-trust
-          pnpm test:business-identity
           pnpm exec tsx src/lib/business/onboardingProgress.test.ts
         env:
           NODE_OPTIONS: --max-old-space-size=6144
