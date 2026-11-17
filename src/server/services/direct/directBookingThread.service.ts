@@ -288,7 +288,7 @@ export async function openBusinessDirectThreadForBooking(input: {
     threadNumber: thread.threadNumber,
     created: true,
     firstMessageId,
-    customerUserId: booking.userId,
+    customerUserId: bookingCustomerUserId,
   };
 }
 
