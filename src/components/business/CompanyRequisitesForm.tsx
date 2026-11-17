@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { normalizeOtherPayerType } from "@/lib/business/registrationIdentity";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,7 @@ export function CompanyRequisitesForm() {
       })
       .then(({ profile, businessIdentity, identityMode }) => {
         if (active) { setIdentityMode(identityMode); setBusinessIdentity(businessIdentity); }
-        if (active && profile) setForm({ ...empty, ...Object.fromEntries(Object.keys(empty).map(key => [key, profile[key] ?? ""])) } as Form);
+        if (active && profile) setForm({ ...empty, ...Object.fromEntries(Object.keys(empty).map(key => [key, profile[key] ?? ""])), payerType: normalizeOtherPayerType(profile.payerType) } as Form);
       })
       .catch(() => { if (active) { setLoadFailed(true); setError("Не удалось загрузить реквизиты. Обновите страницу."); } })
       .finally(() => { if (active) setLoading(false); });

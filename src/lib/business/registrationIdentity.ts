@@ -23,3 +23,8 @@ export function businessPayerIdentity(business: RegistrationIdentity) {
   };
 }
 export const NPD_SOURCE = "https://lkfl.portal.nalog.gov.by/web/guest/check_registration";
+
+/** Legacy/linked business types are not valid editable OTHER payer types. */
+export function normalizeOtherPayerType(value: unknown): "LEGAL_ENTITY" | "SOLE_PROPRIETOR" | "SELF_EMPLOYED" {
+  return value === "SOLE_PROPRIETOR" || value === "SELF_EMPLOYED" ? value : "LEGAL_ENTITY";
+}

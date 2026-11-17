@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import prisma from "@/lib/prisma";
 import { getBusinessPayer, saveBusinessPayer } from "./payerProfile";
 import { recordNpdCheck } from "./npdCheck";
-import { registrationSchema, NPD_SOURCE } from "@/lib/business/registrationIdentity";
+import { registrationSchema, NPD_SOURCE, normalizeOtherPayerType } from "@/lib/business/registrationIdentity";
 import { approve } from "@/server/services/businessVerification.service";
 
 // Only invoked by gate-env.sh against a throwaway PostgreSQL database.
@@ -15,6 +15,11 @@ async function user(role: "USER" | "ADMIN" = "USER") {
   ids.push(row.id); return row;
 }
 test.after(async () => { await prisma.user.deleteMany({ where: { id: { in: ids } } }); await prisma.$disconnect(); });
+
+test("OTHER payer normalizes legacy and linked business types to an editable option", () => {
+  for (const value of ["UNSPECIFIED", "BUSINESS", undefined, null]) assert.equal(normalizeOtherPayerType(value), "LEGAL_ENTITY");
+  for (const value of ["LEGAL_ENTITY", "SOLE_PROPRIETOR", "SELF_EMPLOYED"]) assert.equal(normalizeOtherPayerType(value), value);
+});
 
 test("NPD registration requires FIO and separate public name without legalName", () => {
   const payload = { subjectType: "SELF_EMPLOYED_NPD", unp: "123456789", registrationFullName: "Иванов Иван", publicName: "Мастерская", phone: "+375291234567" };
