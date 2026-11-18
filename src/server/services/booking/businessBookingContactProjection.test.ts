@@ -11,6 +11,7 @@ import {
 const booking = {
   id: "booking-1",
   status: BookingStatus.NEW,
+  createdAt: new Date().toISOString(),
   customerName: "Мария Иванова",
   customerPhone: "+375291234567",
   customerEmail: "test@example.test",
@@ -75,4 +76,12 @@ test("stale CONFIRMED or NEW booking cannot expose contacts after known service 
   const invalid = { ...booking, endsAt: "not-a-date" };
   assert.equal(businessBookingDetailProjection(invalid).customerPhone, "",
     "Invalid known service end fails closed");
+});
+
+test("undated active booking contact visibility expires after 30 days", () => {
+  const old = { ...booking, endsAt: null, createdAt: new Date(Date.now() - 31 * 86_400_000).toISOString() };
+  const recent = { ...booking, endsAt: null, createdAt: new Date(Date.now() - 29 * 86_400_000).toISOString() };
+  assert.equal(businessBookingDetailProjection(old).customerPhone, "");
+  assert.equal(businessBookingDetailRevealsContact(old), false);
+  assert.equal(businessBookingDetailProjection(recent).customerPhone, booking.customerPhone);
 });

@@ -19,9 +19,13 @@ function canRevealBusinessBookingContacts(booking: BusinessBookingItem, now: Dat
   if (!ACTIVE_CONTACT_STATUSES.has(booking.status)) return false;
   if (booking.endsAt) {
     const endTimestamp = new Date(booking.endsAt).getTime();
-    if (!Number.isFinite(endTimestamp) || endTimestamp <= now.getTime()) return false;
+    return Number.isFinite(endTimestamp) && endTimestamp > now.getTime();
   }
-  return true;
+  // Undated enquiries are still operational briefly, but a stale status
+  // cannot authorize harvesting contacts indefinitely.
+  const created = new Date(booking.createdAt).getTime();
+  const elapsed = now.getTime() - created;
+  return Number.isFinite(elapsed) && elapsed >= 0 && elapsed < 30 * 86_400_000;
 }
 
 function removePersonalFields(booking: BusinessBookingItem): BusinessBookingItem {
