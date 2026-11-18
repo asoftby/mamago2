@@ -7836,3 +7836,33 @@ model BillingPayerProfile {
 
   @@index([payerType])
 }
+
+
+/// Case registry only. No decrypted identifiers, phone numbers or disclosure files.
+enum GovernmentDataRequestStatus {
+  RECEIVED
+  IN_REVIEW
+  REJECTED
+  CLOSED
+}
+
+model GovernmentDataRequest {
+  id             String                      @id @default(cuid())
+  authorityName  String
+  incomingNumber String
+  receivedAt     DateTime
+  legalBasis     String
+  requestedScope String
+  /// Internal stable reference only. Not a User FK: deleted-account retention is a separate domain.
+  subjectUserId  String?
+  status         GovernmentDataRequestStatus @default(RECEIVED)
+  resolutionNote String?
+  createdById    String
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([authorityName, incomingNumber])
+  @@index([status, createdAt])
+  @@index([receivedAt])
+  @@index([subjectUserId])
+}

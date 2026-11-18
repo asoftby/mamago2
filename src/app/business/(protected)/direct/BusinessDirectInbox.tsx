@@ -30,7 +30,6 @@ export function BusinessDirectInbox({ initialConversations, initialCounts }: Pro
     return initialConversations.filter((item) =>
       (tab === "ALL" || item.tab === tab) &&
       (!needle ||
-        item.counterpartyName.toLowerCase().includes(needle) ||
         item.latestPublicationTitle.toLowerCase().includes(needle) ||
         String(item.latestThreadNumber).includes(needle.replace(/^d-?/i, ""))),
     );
@@ -59,7 +58,7 @@ export function BusinessDirectInbox({ initialConversations, initialCounts }: Pro
             <span className="sr-only">Найти переписку</span>
             <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={17} />
             <input value={query} onChange={(event) => setQuery(event.target.value)}
-              placeholder="Клиент, публикация, номер"
+              placeholder="Публикация или номер обращения"
               className="h-10 w-full rounded-full border border-stone-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-stone-400" />
           </label>
         </div>
@@ -96,7 +95,7 @@ export function BusinessDirectInbox({ initialConversations, initialCounts }: Pro
             {initialCounts.ALL ? "Переписки не найдены" : "Пока нет сообщений"}
           </h2>
           <p className="mt-2 text-sm text-stone-500">
-            {initialCounts.ALL ? "Измените фильтры или поисковый запрос." : "Здесь появятся обращения клиентов вашей организации."}
+            {initialCounts.ALL ? "Измените фильтры или поисковый запрос." : "Здесь появятся обращения по заявкам вашей организации."}
           </p>
         </div>
       )}

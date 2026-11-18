@@ -200,6 +200,15 @@ jobs:
           pnpm exec tsx src/lib/content-editor/types.test.ts
           pnpm exec tsx src/lib/content-success/resolver.test.ts
 
+      - name: Direct marketplace business write-policy regressions
+        run: pnpm exec tsx src/server/services/direct/directBusinessWritePolicy.test.ts
+
+      - name: Business booking contact minimization regressions
+        run: pnpm exec tsx src/server/services/booking/businessBookingContactProjection.test.ts
+
+      - name: Business booking notification privacy regressions
+        run: pnpm exec tsx src/server/services/booking/businessBookingNotificationPrivacy.test.ts
+
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=6144 pnpm tsc --noEmit
@@ -553,6 +562,14 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/ops/metrics/collectors/partyDelivery.integration.test.ts
+
+      - name: Direct booking-scoped messaging PostgreSQL regressions
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          NODE_OPTIONS: --conditions=react-server
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/services/direct/directBookingThread.postgres.integration.test.ts
 
       - name: Business support PostgreSQL isolation
         env:

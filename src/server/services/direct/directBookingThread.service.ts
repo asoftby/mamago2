@@ -26,6 +26,7 @@ import {
   writeDirectAudit,
 } from "./directAudit";
 import { createDirectMessage } from "./directMessage.service";
+import { canBusinessContactForBooking, directBookingLifecycleSelect } from "./directBusinessWritePolicy";
 import {
   evaluateDirectTypePolicy,
   getDirectAvailabilityForPublicationType,
@@ -40,6 +41,7 @@ export type BookingDirectErrorCode =
   | "FORBIDDEN"
   | "GUEST_BOOKING"
   | "POLICY_DISABLED"
+  | "BOOKING_INACTIVE"
   | "PUBLICATION_MISMATCH"
   | "EMPTY_MESSAGE"
   | "NOT_BOOKING_OWNER";
@@ -70,10 +72,7 @@ export class BookingDirectError extends Error {
 
 const bookingSelect = {
   id: true,
-  businessId: true,
-  userId: true,
-  status: true,
-  kind: true,
+  ...directBookingLifecycleSelect,
   publicationType: true,
   offerId: true,
   activityId: true,
@@ -147,9 +146,10 @@ export async function openBusinessDirectThreadForBooking(input: {
 
   // 404-like for foreign bookings would leak existence; membership is checked first.
   if (!(await canAccessBusiness(input.actorUserId, booking.businessId))) {
-    throw new BookingDirectError("FORBIDDEN", "Forbidden");
+    throw new BookingDirectError("BOOKING_NOT_FOUND", "Booking request not found");
   }
-  if (!booking.userId) {
+  const bookingCustomerUserId = booking.userId;
+  if (!bookingCustomerUserId) {
     throw new BookingDirectError("GUEST_BOOKING", "У гостевой заявки нет чата");
   }
   if (booking.kind !== "STANDARD") {
@@ -173,6 +173,11 @@ export async function openBusinessDirectThreadForBooking(input: {
     };
   }
 
+  // A business may inspect an existing thread, but it must not start contact
+  // on a terminal booking or after the known end of the service.
+  if (!canBusinessContactForBooking(booking, new Date())) {
+    throw new BookingDirectError("BOOKING_INACTIVE", "По завершённой или истёкшей заявке нельзя начать переписку");
+  }
   await assertPolicyAllows(booking.publicationType);
   const resolved = await resolveBookingPublication(booking);
 
@@ -186,14 +191,26 @@ export async function openBusinessDirectThreadForBooking(input: {
   const now = new Date();
   let thread;
   try {
-    thread = await prisma.directThread.create({
-      data: {
+    thread = await prisma.$transaction(async (tx) => {
+      // Serialize with booking status transitions: a completed/cancelled order
+      // cannot win the race between the initial read and first BUSINESS send.
+      await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${booking.id} FOR SHARE`;
+      const current = await tx.bookingRequest.findUnique({
+        where: { id: booking.id },
+        select: directBookingLifecycleSelect,
+      });
+      if (!current || current.businessId !== booking.businessId ||
+          current.userId !== bookingCustomerUserId || !canBusinessContactForBooking(current, new Date())) {
+        throw new BookingDirectError("BOOKING_INACTIVE", "Заявка больше не доступна для связи");
+      }
+      return tx.directThread.create({
+        data: {
         publicationType: booking.publicationType,
         offerId: booking.offerId,
         activityId: booking.activityId,
         placeId: booking.placeId,
         businessId: booking.businessId,
-        customerUserId: booking.userId,
+        customerUserId: bookingCustomerUserId,
         bookingRequestId: booking.id,
         status: DirectThreadStatus.OPEN,
         lastMessageAt: now,
@@ -207,7 +224,8 @@ export async function openBusinessDirectThreadForBooking(input: {
           },
         },
       },
-      include: { messages: { select: { id: true } } },
+        include: { messages: { select: { id: true } } },
+      });
     });
   } catch (error) {
     // Concurrent open of the same booking: the UNIQUE index decides the winner.
@@ -255,7 +273,7 @@ export async function openBusinessDirectThreadForBooking(input: {
       messageId: firstMessageId,
       threadId: thread.id,
       businessId: booking.businessId,
-      customerUserId: booking.userId,
+      customerUserId: bookingCustomerUserId,
       body,
     });
   }
@@ -265,7 +283,7 @@ export async function openBusinessDirectThreadForBooking(input: {
     threadNumber: thread.threadNumber,
     created: true,
     firstMessageId,
-    customerUserId: booking.userId,
+    customerUserId: bookingCustomerUserId,
   };
 }
 
@@ -287,7 +305,7 @@ export async function openCustomerDirectThreadForBooking(input: {
 }): Promise<CustomerBookingThreadResult> {
   const booking = await loadBooking(input.bookingRequestId);
   if (booking.userId !== input.customerUserId) {
-    throw new BookingDirectError("NOT_BOOKING_OWNER", "Forbidden");
+    throw new BookingDirectError("BOOKING_NOT_FOUND", "Booking request not found");
   }
   const body = input.message.trim();
   if (!body) throw new BookingDirectError("EMPTY_MESSAGE", "Введите сообщение");

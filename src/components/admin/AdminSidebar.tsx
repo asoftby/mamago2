@@ -23,6 +23,7 @@ interface AdminSidebarProps {
   importPendingReviewCount?: number;
   reviewsPendingCount?: number;
   buildInfo?: BuildInfo;
+  role?: "ADMIN" | "MODERATOR";
 }
 
 // ─── Active-route helpers ─────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ export function AdminSidebar({
   importPendingReviewCount = 0,
   reviewsPendingCount = 0,
   buildInfo,
+  role,
 }: AdminSidebarProps) {
   const pathname = usePathname();
 
@@ -212,7 +214,7 @@ export function AdminSidebar({
       <nav className="flex flex-col gap-1.5 p-4 flex-1">
         <SidebarPublicSiteEntry onNavigate={onNavigate} />
 
-        {ADMIN_SIDEBAR_CONFIG.map((entry) => {
+        {ADMIN_SIDEBAR_CONFIG.filter((entry) => entry.id !== "security" || role === "ADMIN").map((entry) => {
           if (isGroupEntry(entry)) {
             // AdminSidebarGroup — collapsible with no own href
             const groupHasActive = getTopLevelChildren(entry).some((child) =>

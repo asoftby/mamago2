@@ -30,6 +30,7 @@ export default async function BusinessDirectThreadPage({
     thread.businessId,
     thread.customerUserId,
     "BUSINESS",
+    threadId,
   );
   if (!detail) notFound();
 
@@ -38,7 +39,7 @@ export default async function BusinessDirectThreadPage({
       <BusinessSectionHeader
         eyebrow="КАБИНЕТ"
         title="Сообщения"
-        description="Переписка с клиентами вашей организации"
+        description="Обращения по конкретным заявкам вашей организации"
       />
       <DirectThreadClient initialDetail={detail} businessMode />
     </div>
