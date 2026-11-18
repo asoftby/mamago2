@@ -127,6 +127,17 @@ function mergeStreamFilter(
  * The DB record is preserved — only the feed query excludes it.
  * WELCOME is a legacy onboarding type; it is not part of the active USER settings model.
  */
+/**
+ * Types that exist only to drive external channels (e-mail/Telegram). Their in-app
+ * twin is already in the feed (every Direct message is a DIRECT_NEW_MESSAGE row), so
+ * showing them too would double each entry in the bell and in the unread count.
+ */
+const EXTERNAL_ONLY_NOTIFICATION_TYPES: NotificationType[] = ["DIRECT_CLIENT_WAITING"];
+
+function mergeHideExternalOnlyTypes(base: Prisma.NotificationWhereInput): Prisma.NotificationWhereInput {
+  return { AND: [base, { NOT: { type: { in: EXTERNAL_ONLY_NOTIFICATION_TYPES } } }] };
+}
+
 function mergeHideWelcomeWhenTelegramConnected(
   base: Prisma.NotificationWhereInput,
   telegramConnected?: boolean,
@@ -839,7 +850,9 @@ function buildNotificationBaseWhere(
     where = mergeAccessibleSurfacesFilter(where, options.accessibleSurfaces);
   }
 
-  return mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  return mergeHideExternalOnlyTypes(
+    mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected),
+  );
 }
 
 /**
@@ -1778,6 +1791,33 @@ export async function notifyDirectMessage(params: NotifyDirectMessageParams) {
     ctaAction: params.recipientSurface === "BUSINESS"
       ? `/business/direct/${params.threadId}`
       : `/me/direct/${params.threadId}`,
+  });
+}
+
+export interface NotifyDirectClientWaitingParams {
+  /** Business staff member to ping through e-mail/Telegram (per-user channel preferences apply). */
+  recipientUserId: string;
+  threadId: string;
+  threadNumber: number;
+}
+
+/**
+ * "Client is waiting for a reply" — external channels only (hidden from the bell, see
+ * EXTERNAL_ONLY_NOTIFICATION_TYPES). Deliberately generic: no customer name, no message
+ * text, no publication — the cabinet has the details behind the login.
+ * Throttling (30 min per thread, reset by a business reply) lives in directStaffNotify.
+ */
+export async function notifyDirectClientWaiting(params: NotifyDirectClientWaitingParams) {
+  return createNotification({
+    userId: params.recipientUserId,
+    audience: "BUSINESS",
+    type: "DIRECT_CLIENT_WAITING",
+    title: `Клиент ждёт ответа в ${formatDirectThreadNumber(params.threadNumber)}`,
+    body: "Откройте диалог в кабинете, чтобы ответить.",
+    entityType: "DIRECT_THREAD",
+    entityId: params.threadId,
+    ctaLabel: "Открыть диалог",
+    ctaAction: `/business/direct/${params.threadId}`,
   });
 }
 

@@ -39,6 +39,11 @@ function resolveNavigableCtaLabel(type: string): string {
     case "BOOKING_REQUEST":
     case "BOOKING_CREATED":
       return "Открыть заявку";
+    case "DIRECT_THREAD_CREATED":
+    case "DIRECT_NEW_MESSAGE":
+    case "DIRECT_CLIENT_WAITING":
+    case "DIRECT_COMPLAINT_RESOLVED":
+      return "Открыть диалог";
     case "BOOKING_CONFIRMED":
     case "BOOKING_COMPLETED":
     case "BOOKING_FEEDBACK_REQUEST":

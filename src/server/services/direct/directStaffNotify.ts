@@ -8,9 +8,10 @@
  * forget) and each one goes through the existing per-user dedup in
  * notifyDirect*(), so retries never double-notify.
  */
-import { BusinessMemberRole } from "@prisma/client";
+import { BusinessMemberRole, DirectActorType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
+  notifyDirectClientWaiting,
   notifyDirectCreated,
   notifyDirectMessage,
   type NotifyDirectCreatedParams,
@@ -53,16 +54,61 @@ export async function notifyBusinessStaffDirectCreated(
   logRejected("[direct] notifyDirectCreated (staff) failed:", results);
 }
 
-/** A customer wrote in a Direct thread: tell the whole business team. */
+/** One external (e-mail/Telegram) "client is waiting" ping per thread and recipient per this window… */
+export const DIRECT_WAITING_PING_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * Should this staff member get an external ping for a new customer message?
+ * Yes when they have not been pinged about this thread within the window — or when
+ * the business has replied since the last ping (a reply closes the "waiting" cycle,
+ * so the client's next message is a new one). A new thread already counts as a ping
+ * (DIRECT_THREAD_CREATED), so its first message does not ping twice.
+ */
+export async function shouldPingStaffAboutThread(
+  recipientUserId: string,
+  threadId: string,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const lastPing = await prisma.notification.findFirst({
+    where: {
+      userId: recipientUserId,
+      entityType: "DIRECT_THREAD",
+      entityId: threadId,
+      type: { in: ["DIRECT_CLIENT_WAITING", "DIRECT_THREAD_CREATED"] },
+      createdAt: { gte: new Date(now.getTime() - DIRECT_WAITING_PING_WINDOW_MS) },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  if (!lastPing) return true;
+
+  const repliedSince = await prisma.directMessage.findFirst({
+    where: {
+      threadId,
+      senderType: { in: [DirectActorType.BUSINESS, DirectActorType.ADMIN] },
+      createdAt: { gt: lastPing.createdAt },
+    },
+    select: { id: true },
+  });
+  return Boolean(repliedSince);
+}
+
+/**
+ * A customer wrote in a Direct thread: every team member gets the per-message in-app
+ * notice (bell), and — throttled — an external "client is waiting" ping.
+ */
 export async function notifyBusinessStaffDirectMessage(
   params: Omit<NotifyDirectMessageParams, "recipientUserId" | "recipientSurface"> & { businessId: string },
 ) {
   const { businessId, ...rest } = params;
   const recipients = await getBusinessDirectRecipientUserIds(businessId);
   const results = await Promise.allSettled(
-    recipients.map((recipientUserId) =>
-      notifyDirectMessage({ ...rest, recipientUserId, recipientSurface: "BUSINESS" }),
-    ),
+    recipients.map(async (recipientUserId) => {
+      await notifyDirectMessage({ ...rest, recipientUserId, recipientSurface: "BUSINESS" });
+      if (await shouldPingStaffAboutThread(recipientUserId, rest.threadId)) {
+        await notifyDirectClientWaiting({ recipientUserId, threadId: rest.threadId, threadNumber: rest.threadNumber });
+      }
+    }),
   );
   logRejected("[direct] notifyDirectMessage (staff) failed:", results);
 }

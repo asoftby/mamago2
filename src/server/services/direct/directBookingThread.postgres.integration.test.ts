@@ -24,11 +24,12 @@ import {
   getDirectPlatformSettings,
   updateDirectPlatformSettings,
 } from "./directPlatformSettings.service";
-import { notifyDirectMessage } from "@/server/services/notification.service";
+import { getUnifiedNotificationFeed, getUnreadCount, notifyDirectMessage } from "@/server/services/notification.service";
 import {
   getBusinessDirectRecipientUserIds,
   notifyBusinessStaffDirectCreated,
   notifyBusinessStaffDirectMessage,
+  shouldPingStaffAboutThread,
 } from "./directStaffNotify";
 import { getParentBookings } from "@/server/services/booking/parentBookings.service";
 
@@ -488,4 +489,49 @@ test("customer inbox: unread badges come from one grouped query and sum across a
 
   for (const threadId of threads) await markThreadRead({ threadId, readerType: DirectActorType.CUSTOMER });
   assert.equal(await unreadFor(), baseline, "reading the occasions clears exactly those badges");
+});
+
+test("business pings: one external 'waiting' notice per thread and window, reset by a business reply, hidden from the bell", async () => {
+  const staff = [owner, manager].sort();
+  const booking = await newBooking();
+  const r = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Привет" });
+  const base = { businessId, threadId: r.threadId, threadNumber: r.threadNumber };
+  const waiting = (threadId: string) =>
+    prisma.notification.findMany({ where: { entityType: "DIRECT_THREAD", entityId: threadId, type: "DIRECT_CLIENT_WAITING" } });
+  const ids = [1, 2, 3].map((n) => `m${n}-${sfx}`);
+
+  // 1st customer message: in-app notice + one external ping per team member.
+  await notifyBusinessStaffDirectMessage({ ...base, messageId: ids[0] });
+  assert.deepEqual((await waiting(r.threadId)).map((n) => n.userId).sort(), staff);
+
+  // 2nd one inside the window: the bell gets its row, no second ping.
+  await notifyBusinessStaffDirectMessage({ ...base, messageId: ids[1] });
+  assert.equal((await waiting(r.threadId)).length, 2, "throttled: still one ping per member");
+  assert.equal(await prisma.notification.count({ where: { type: "DIRECT_NEW_MESSAGE", entityId: { in: ids.slice(0, 2) }, userId: { in: staff } } }), 4,
+    "every message still reaches the bell");
+
+  // The business replies: the next customer message opens a new waiting cycle.
+  await createDirectMessage({ threadId: r.threadId, senderType: DirectActorType.BUSINESS, senderUserId: owner, body: "Ответ" });
+  await notifyBusinessStaffDirectMessage({ ...base, messageId: ids[2] });
+  assert.equal((await waiting(r.threadId)).length, 4, "a business reply resets the throttle");
+
+  // Window expiry without a reply also allows a ping; right now it does not.
+  assert.equal(await shouldPingStaffAboutThread(owner, r.threadId), false);
+  assert.equal(await shouldPingStaffAboutThread(owner, r.threadId, new Date(Date.now() + 31 * 60 * 1000)), true);
+
+  // A new thread already counts as a ping: its first message does not ping twice.
+  const second = await openBusinessDirectThreadForBooking({ bookingRequestId: (await newBooking()).id, actorUserId: owner, message: "Новый" });
+  await notifyBusinessStaffDirectCreated({ businessId, threadId: second.threadId, threadNumber: second.threadNumber });
+  await notifyBusinessStaffDirectMessage({ businessId, threadId: second.threadId, threadNumber: second.threadNumber, messageId: `n1-${sfx}` });
+  assert.equal((await waiting(second.threadId)).length, 0);
+
+  // The external-only notice never shows in the bell or in the unread count.
+  const feed = await getUnifiedNotificationFeed(owner, 100, 0, "business");
+  assert.ok(!feed.some((n) => n.type === "DIRECT_CLIENT_WAITING"), "hidden from the business feed");
+  assert.equal(await getUnreadCount(owner, "business"), feed.filter((n) => !n.readAt).length, "and from the unread badge");
+
+  // Local/CI has no e-mail provider or Telegram link: nothing real is sent, every channel is SKIPPED.
+  await waitForDeliveriesToSettle([r.threadId, second.threadId, ...ids, `n1-${sfx}`]);
+  const deliveries = await prisma.notificationDelivery.findMany({ where: { notification: { type: "DIRECT_CLIENT_WAITING", entityId: r.threadId } } });
+  assert.ok(deliveries.length > 0 && deliveries.every((d) => d.status === "SKIPPED"), "no real delivery attempted here");
 });

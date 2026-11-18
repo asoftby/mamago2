@@ -137,6 +137,8 @@ const DEDUP_WINDOWS: Record<NotificationType, number | null> = {
   // Complaint notices are keyed by the complaint id (entityId) — exactly one per complaint and recipient.
   DIRECT_COMPLAINT_OPENED: null,
   DIRECT_COMPLAINT_RESOLVED: null,
+  // Throttled in directStaffNotify (30 min per thread, reset by a business reply), not by this window.
+  DIRECT_CLIENT_WAITING: 0,
 
   // Support notices use the persisted SupportMessage id for exact dedup.
   SUPPORT_BUSINESS_REPLY: null,
