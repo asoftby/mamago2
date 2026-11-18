@@ -24,6 +24,11 @@ import {
   updateDirectPlatformSettings,
 } from "./directPlatformSettings.service";
 import { notifyDirectMessage } from "@/server/services/notification.service";
+import {
+  getBusinessDirectRecipientUserIds,
+  notifyBusinessStaffDirectCreated,
+  notifyBusinessStaffDirectMessage,
+} from "./directStaffNotify";
 import { getParentBookings } from "@/server/services/booking/parentBookings.service";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -213,6 +218,63 @@ test("customer notification: organizer reply text, /me/direct link, no duplicate
   assert.equal(rows.length, 1);
   assert.equal(rows[0].ctaAction, `/me/direct/${r.threadId}`);
   assert.match(rows[0].title, /Организатор написал/);
+});
+
+// Notification delivery rows are written in the background; cleanup must not race them (40P01).
+async function waitForDeliveriesToSettle(entityIds: string[]) {
+  const deadline = Date.now() + 15_000;
+  let previous = "";
+  for (;;) {
+    const notifications = await prisma.notification.findMany({
+      where: { entityId: { in: entityIds } },
+      select: { deliveries: { select: { status: true } } },
+    });
+    const settled = notifications.every(({ deliveries }) => deliveries.length > 0 && deliveries.every(({ status }) => status !== "PENDING"));
+    const snapshot = JSON.stringify(notifications.map(({ deliveries }) => deliveries.length));
+    if (settled && snapshot === previous) return;
+    previous = snapshot;
+    if (Date.now() > deadline) throw new Error("Timed out waiting for notification deliveries");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+test("staff notifications: owner and active managers are told once; inactive members and strangers are not", async () => {
+  const inactive = id("inactive-manager");
+  await prisma.user.create({ data: { id: inactive, email: `${inactive}@example.test` } });
+  users.push(inactive);
+  await prisma.businessMember.create({ data: { businessId, userId: inactive, role: "MANAGER", isActive: false } });
+
+  const expected = [owner, manager].sort();
+  assert.deepEqual((await getBusinessDirectRecipientUserIds(businessId)).sort(), expected);
+
+  const booking = await newBooking();
+  const r = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Привет" });
+  const messageId = r.firstMessageId!;
+
+  const messageParams = { businessId, threadId: r.threadId, threadNumber: r.threadNumber, messageId };
+  await notifyBusinessStaffDirectMessage(messageParams);
+  await notifyBusinessStaffDirectMessage(messageParams); // retry must not double-notify
+  const messageRows = await prisma.notification.findMany({ where: { entityId: messageId, type: "DIRECT_NEW_MESSAGE" } });
+  assert.deepEqual(messageRows.map((n) => n.userId).sort(), expected);
+  assert.ok(messageRows.every((n) => n.audience === "BUSINESS" && n.ctaAction === `/business/direct/${r.threadId}`));
+
+  await notifyBusinessStaffDirectCreated({ businessId, threadId: r.threadId, threadNumber: r.threadNumber });
+  const createdRows = await prisma.notification.findMany({ where: { entityId: r.threadId, type: "DIRECT_THREAD_CREATED" } });
+  assert.deepEqual(createdRows.map((n) => n.userId).sort(), expected);
+
+  // Nobody outside the business team was notified.
+  assert.equal(await prisma.notification.count({ where: { entityId: { in: [messageId, r.threadId] }, userId: { in: [customer, stranger, otherOwner, inactive] } } }), 0);
+  await waitForDeliveriesToSettle([messageId, r.threadId]);
+});
+
+test("staff notifications: an owner without a membership row is still a recipient", async () => {
+  const soloBusiness = await prisma.business.create({ data: { name: "DBT solo " + sfx, ownerUserId: stranger } });
+  try {
+    assert.deepEqual(await getBusinessDirectRecipientUserIds(soloBusiness.id), [stranger]);
+    assert.deepEqual(await getBusinessDirectRecipientUserIds("missing-" + sfx), []);
+  } finally {
+    await prisma.business.delete({ where: { id: soloBusiness.id } });
+  }
 });
 
 test("ACL: only the customer and business members access the thread", async () => {
