@@ -67,7 +67,7 @@ jobs:
           set -euo pipefail
           test "$(git diff --name-only 0a8828f82be5f03d1463414a72be5b62ea30238d..HEAD | LC_ALL=C sort | paste -sd , -)" = ".github/workflows/docker.yml,src/lib/business/eventOrganizer.test.ts,src/lib/business/eventOrganizer.ts"
           pnpm exec tsx src/lib/business/eventOrganizer.test.ts
-          pnpm exec tsc --noEmit
+          NODE_OPTIONS=--max-old-space-size=6144 pnpm exec tsc --noEmit
           pnpm exec eslint src/lib/business/eventOrganizer.ts src/lib/business/eventOrganizer.test.ts
 
       # Обязательно: Настраиваем buildx драйвер для поддержки кэширования
