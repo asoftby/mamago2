@@ -213,7 +213,7 @@ export const GROUP_B2B: AdminSidebarGroup = {
   children: [
     {
       id: "b2b-requests",
-      label: "Заявки",
+      label: "Верификация",
       href: adminPath("/b2b/requests"),
       matchers: [{ type: "prefix", value: adminPath("/b2b/requests") }],
       badgeCountKey: "b2bPendingVerificationCount",
@@ -226,7 +226,7 @@ export const GROUP_B2B: AdminSidebarGroup = {
     },
     {
       id: "b2b-access-requests",
-      label: "Доступы",
+      label: "Запросы доступа",
       href: adminPath("/b2b/access-requests"),
       matchers: [{ type: "prefix", value: adminPath("/b2b/access-requests") }],
     },
