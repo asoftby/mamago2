@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # required to verify exact PROD base diff before publishing
 
       # Hotfix regression and static checks run BEFORE any image publication.
       # This avoids relying on the dev-only pull_request CI branch filter.
