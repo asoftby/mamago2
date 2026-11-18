@@ -712,6 +712,15 @@
 @media (max-width: 390px) {
   .businessThread { padding: 14px; }
 }
+/* phones/tablets: the dialog sits right under the "← Все сообщения" link, no extra top gap */
+@media (max-width: 1023px) {
+  .businessThread {
+    padding-top: 0;
+  }
+  .businessThread .topCard {
+    margin-top: 8px;
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════
    Личные сообщения /me/direct: вид как у «Моя семья» (каркас AccountPage).
