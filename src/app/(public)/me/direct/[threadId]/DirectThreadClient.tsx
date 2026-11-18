@@ -52,6 +52,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const markedReadRef = useRef(false);
   const inbox = useDirectInbox();
+  const threadRef = useRef<HTMLDivElement>(null);
 
   const isBusinessViewer = detail.viewerRole === "BUSINESS";
   const mineSenderTypes: DirectActorType[] = isBusinessViewer
@@ -78,6 +79,15 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
     }
     // Two-column inbox: drop this conversation's unread badge in the list without refetching it.
     inbox?.markThreadsRead(detail.occasions.map((occasion) => occasion.threadId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Two-column desktop: the dialog scrolls inside its own column, so open it at the
+  // newest messages (no-op where the column is not a scroll container, e.g. phones).
+  useEffect(() => {
+    if (!inbox) return;
+    const scroller = threadRef.current?.closest<HTMLElement>("[data-inbox-detail]");
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -174,7 +184,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
 
   const content = (
     <>
-      <div className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : `${styles.threadWrap} ${styles.threadWrapPersonal}`}>
+      <div ref={threadRef} className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : `${styles.threadWrap} ${styles.threadWrapPersonal}`}>
         <ConversationHeader
           counterpartyName={detail.counterpartyName}
           counterpartyLogoUrl={detail.counterpartyLogoUrl}

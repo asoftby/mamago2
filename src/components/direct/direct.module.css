@@ -793,16 +793,31 @@
   }
 }
 @media (min-width: 1024px) {
+  /*
+   * Messenger layout: the workspace is exactly one screen tall (below the site
+   * header) and each column scrolls inside itself, so the list never moves when
+   * the dialog is scrolled — and the page itself does not scroll while chatting.
+   * --inbox-top is the split's real distance from the page top, measured on mount
+   * (DirectInbox); 129px = sticky site header (97) + main padding (32) is the SSR fallback.
+   */
   .inboxSplit {
     display: grid;
     grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-    gap: 24px;
-    align-items: start;
+    gap: 0 24px;
+    align-items: stretch;
+    height: calc(100dvh - var(--inbox-top, 129px) - 24px);
+    min-height: 420px;
   }
   .inboxList {
-    position: sticky;
-    top: 96px;
-    max-height: calc(100dvh - 120px);
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 20px;
+    border-right: 1px solid var(--line-2, #d4cdc6);
+  }
+  .inboxDetail {
+    height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -813,7 +828,8 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
-    min-height: 360px;
+    height: 100%;
+    min-height: 0;
     border: 1px dashed var(--line-2, #d4cdc6);
     border-radius: 20px;
     color: var(--ink-3, #525252);
@@ -822,7 +838,7 @@
   .inboxEmpty p {
     margin: 0;
   }
-  /* the shell owns the page height; inner page wrappers must not force 100vh */
+  /* the shell owns the height; inner page wrappers must not force 100vh */
   .inboxSplit .page {
     min-height: 0;
   }

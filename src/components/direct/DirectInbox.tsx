@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSelectedLayoutSegment } from "next/navigation";
 import type {
   ConversationTab,
@@ -29,6 +29,21 @@ interface Props {
  */
 export function DirectInbox({ variant, initialConversations, initialCounts, children }: Props) {
   const selectedThreadId = useSelectedLayoutSegment();
+  const splitRef = useRef<HTMLDivElement>(null);
+
+  // The desktop workspace is one screen tall below wherever it starts (site header,
+  // cabinet header…): measure that offset instead of hard-coding it per surface.
+  useLayoutEffect(() => {
+    const el = splitRef.current;
+    if (!el) return;
+    const measure = () => {
+      el.style.removeProperty("--inbox-top");
+      el.style.setProperty("--inbox-top", `${Math.round(el.getBoundingClientRect().top + window.scrollY)}px`);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
   const [readThreadIds, setReadThreadIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const markThreadsRead = useCallback((threadIds: string[]) => {
@@ -58,7 +73,7 @@ export function DirectInbox({ variant, initialConversations, initialCounts, chil
 
   return (
     <DirectInboxContext.Provider value={contextValue}>
-      <div className={styles.inboxSplit} data-has-thread={selectedThreadId ? "true" : "false"}>
+      <div ref={splitRef} className={styles.inboxSplit} data-has-thread={selectedThreadId ? "true" : "false"}>
         <aside className={styles.inboxList}>
           {variant === "customer" ? (
             <DirectListClient
@@ -74,7 +89,7 @@ export function DirectInbox({ variant, initialConversations, initialCounts, chil
             />
           )}
         </aside>
-        <section className={styles.inboxDetail}>{children}</section>
+        <section className={styles.inboxDetail} data-inbox-detail>{children}</section>
       </div>
     </DirectInboxContext.Provider>
   );
