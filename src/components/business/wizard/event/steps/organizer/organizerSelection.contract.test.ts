@@ -20,6 +20,10 @@ const picker = readFileSync(
   "src/components/business/wizard/event/steps/organizer/OrganizerSearchSelect.tsx",
   "utf8",
 );
+const organizerStep = readFileSync(
+  "src/components/business/wizard/event/steps/Step8Organizer.tsx",
+  "utf8",
+);
 
 test("organizer search authorizes canonical business membership, not platform BUSINESS_OWNER role", () => {
   assert.match(getRoute, /checkBusinessToolPermission\(user, "content\.create"\)/);
@@ -70,4 +74,11 @@ test("request failures are displayed separately from an empty search result", ()
   assert.match(picker, /role="alert"/);
   assert.match(picker, /searchError \? \(/);
   assert.match(picker, /Организатор не найден/);
+});
+
+
+test("event publisher and organizer roles are distinguished in the wizard", () => {
+  assert.match(organizerStep, /Бизнес, которому принадлежит публикация, и организатор события — разные роли/);
+  assert.match(organizerStep, /Выбрать компанию или существующего организатора/);
+  assert.match(organizerStep, /Моя компания — организатор/);
 });
