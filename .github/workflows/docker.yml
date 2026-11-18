@@ -1,3 +1,5 @@
+# Emergency PROD SMS hotfix. This isolated branch produces only prod-smsfix-N.
+# It never replaces mutable dev images and cannot auto-deploy DEV or PROD.
 name: Docker Build & Push
 
 # Builds the application image exactly once, from `dev` — the canonical
@@ -26,6 +28,7 @@ jobs:
   build-and-push:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/hotfix/prod-1124-sms-by-no-sender-20261118' }}
     runs-on: ubuntu-latest
     # Healthy builds are currently ~12–15 min. Fail closed if buildx genuinely
     # hangs instead of leaving a runner stuck indefinitely.
@@ -52,7 +55,7 @@ jobs:
       - name: Compute build metadata
         id: build_meta
         run: |
-          echo "build_id=dev-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "build_id=prod-smsfix-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata for Docker
         id: meta
@@ -60,8 +63,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=dev-${{ github.run_number }}
-            type=raw,value=dev
+            type=raw,value=prod-smsfix-${{ github.run_number }}
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
