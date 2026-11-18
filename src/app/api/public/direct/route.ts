@@ -7,7 +7,7 @@ import {
   createDirectThread,
   DirectThreadError,
 } from "@/server/services/direct/directThread.service";
-import { notifyDirectCreated, notifyDirectMessage } from "@/server/services/notification.service";
+import { notifyBusinessStaffDirectCreated, notifyBusinessStaffDirectMessage } from "@/server/services/direct/directStaffNotify";
 import {
   BookingDirectError,
   openCustomerDirectThreadForBooking,
@@ -72,19 +72,18 @@ export async function POST(request: NextRequest) {
       });
       const target = await prisma.directThread.findUnique({
         where: { id: result.threadId },
-        select: { business: { select: { ownerUserId: true } } },
+        select: { businessId: true },
       });
       if (target) {
         const notify = result.created
-          ? notifyDirectCreated({
-              ownerUserId: target.business.ownerUserId,
+          ? notifyBusinessStaffDirectCreated({
+              businessId: target.businessId,
               threadId: result.threadId,
               threadNumber: result.threadNumber,
             })
           : result.appendedMessageId
-            ? notifyDirectMessage({
-                recipientUserId: target.business.ownerUserId,
-                recipientSurface: "BUSINESS",
+            ? notifyBusinessStaffDirectMessage({
+                businessId: target.businessId,
                 threadId: result.threadId,
                 threadNumber: result.threadNumber,
                 messageId: result.appendedMessageId,
@@ -110,8 +109,8 @@ export async function POST(request: NextRequest) {
       initialMessage: composeInitialMessage(data),
     });
 
-    notifyDirectCreated({
-      ownerUserId: thread.business.ownerUserId,
+    notifyBusinessStaffDirectCreated({
+      businessId: thread.businessId,
       threadId: thread.id,
       threadNumber: thread.threadNumber,
     }).catch((e) => console.error("[direct] notifyDirectCreated failed:", e));

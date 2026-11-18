@@ -20,6 +20,6 @@ test("fallback request reaches existing authenticated business Direct inbox", ()
   assert.match(modal, /bookingIntent \? "Запись на занятие"/);
   assert.match(modal, /Хочу записаться на занятие/);
   assert.match(route, /createDirectThread/);
-  assert.match(route, /notifyDirectCreated/);
+  assert.match(route, /notifyBusinessStaffDirectCreated/);
   assert.match(modal, /redirectTo: currentPath/);
 });
