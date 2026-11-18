@@ -546,6 +546,8 @@ export interface AdminComplaintListItem {
   status: DirectComplaintStatus;
   resolution: string | null;
   reporterName: string;
+  /** Who filed it: the customer or the business team. */
+  reporterSide: "CUSTOMER" | "BUSINESS";
   businessId: string;
   businessName: string;
   customerUserId: string;
@@ -570,6 +572,8 @@ export async function getAdminComplaints(status?: DirectComplaintStatus): Promis
       },
     },
     orderBy: { createdAt: "desc" },
+    // Bounded list: the admin table is a work queue, not an archive export.
+    take: 200,
   });
 
   return complaints.map((c) => ({
@@ -581,6 +585,7 @@ export async function getAdminComplaints(status?: DirectComplaintStatus): Promis
     status: c.status,
     resolution: c.resolution,
     reporterName: c.reporter.displayName?.trim() || "Пользователь",
+    reporterSide: c.reporterUserId === c.thread.customerUserId ? "CUSTOMER" : "BUSINESS",
     businessId: c.thread.businessId,
     businessName: c.thread.business.name,
     customerUserId: c.thread.customerUserId,
