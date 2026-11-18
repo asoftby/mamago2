@@ -570,6 +570,7 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/services/direct/directBookingThread.postgres.integration.test.ts
+          pnpm exec tsx src/server/services/direct/directComplaint.postgres.integration.test.ts
 
       - name: Business support PostgreSQL isolation
         env:

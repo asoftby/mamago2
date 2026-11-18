@@ -4,6 +4,7 @@ import { adminPath } from "@/lib/routing/surface";
 import { cn } from "@/lib/utils";
 import { getAdminComplaints } from "@/server/services/direct/directAdmin.service";
 import { ThreadNumber } from "@/components/direct/ThreadNumber";
+import { COMPLAINT_STATUS_LABELS, complaintReasonLabel } from "@/server/services/direct/directComplaintLabels";
 import { ComplaintResolveForm } from "./ComplaintResolveForm";
 import { TableContainer } from "@/components/ui/table";
 
@@ -77,7 +78,7 @@ export default async function AdminDirectComplaintsPage({
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-stone-700">
-                  <div>{c.reason}</div>
+                  <div>{complaintReasonLabel(c.reason)}</div>
                   {c.comment && <div className="mt-0.5 text-xs text-stone-500">{c.comment}</div>}
                   {c.resolution && (
                     <div className="mt-1 rounded-lg bg-stone-50 px-2 py-1 text-xs text-stone-600">
@@ -85,12 +86,15 @@ export default async function AdminDirectComplaintsPage({
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-stone-700">{c.reporterName}</td>
+                <td className="px-4 py-3 text-stone-700">
+                  <div>{c.reporterName}</div>
+                  <div className="text-xs text-stone-500">{c.reporterSide === "CUSTOMER" ? "Клиент" : "Бизнес"}</div>
+                </td>
                 <td className="px-4 py-3 text-stone-500">
                   {c.businessName} / {c.customerName}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{c.status}</span>
+                  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{COMPLAINT_STATUS_LABELS[c.status]}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   {c.status === DirectComplaintStatus.PENDING && <ComplaintResolveForm complaintId={c.id} />}
