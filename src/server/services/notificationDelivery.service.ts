@@ -651,12 +651,15 @@ export async function resendNotificationDelivery(
         return false;
       }
 
+      // Manual admin resend must enforce the same privacy boundary as
+      // automatic delivery and retries for legacy persisted notices.
+      const safe = businessBookingDeliveryProjection(delivery.notification);
       const template = buildNotificationEmailTemplate(
-        delivery.notification.type as NotificationType,
-        delivery.notification.title,
-        delivery.notification.body,
-        delivery.notification.entityId,
-        delivery.notification.ctaAction,
+        safe.type as NotificationType,
+        safe.title,
+        safe.body,
+        safe.entityId,
+        safe.ctaAction,
       );
 
       const result = await sendEmail({ to: user.email, ...template });
