@@ -372,6 +372,38 @@
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+  display: flow-root; /* contain the floated time */
+}
+/* Telegram-style time: bottom-right of the bubble, on the last text line when it fits. */
+.bubbleTime {
+  float: right;
+  margin: 8px 0 -6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+  white-space: nowrap;
+  user-select: none;
+}
+.bubbleTime svg {
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: -1px;
+}
+.tickSent {
+  opacity: 0.75;
+}
+.tickRead {
+  opacity: 1;
+}
+/* Centered day label (no outline) shown before the first message of each day. */
+.daySeparator {
+  align-self: center;
+  margin: 2px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-3);
 }
 .bubbleCustomer {
   background: var(--accent);
@@ -410,13 +442,14 @@
   position: sticky;
   bottom: 0;
   margin-top: 22px;
-  padding: 16px;
+  /* Compact pill: 40px controls + 8px frame, text centred against the send icon. */
+  padding: 8px 8px 8px 18px;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 28px;
   display: flex;
-  gap: 10px;
-  align-items: flex-end;
+  gap: 8px;
+  align-items: flex-end; /* multi-line input grows upward, send button stays bottom-right */
 }
 .inputTextarea {
   flex: 1;
@@ -425,20 +458,25 @@
   background: transparent;
   font-family: inherit;
   font-size: 14px;
+  line-height: 24px;
   color: var(--ink);
   outline: none;
-  min-height: 24px;
+  padding: 8px 0; /* 24 + 2*8 = 40px, same height as the send button */
+  min-height: 40px;
   max-height: 140px;
+  field-sizing: content; /* auto-grow where supported; falls back to one scrolling line */
 }
 .sendBtn {
-  height: 44px;
-  padding: 0 20px;
-  border-radius: 99px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
   border: 0;
   background: var(--accent);
   color: #fff;
-  font-weight: 600;
-  font-size: 14px;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s, opacity 0.15s;
@@ -531,7 +569,7 @@
    (occasion/DirectThread) inside one merged per-business conversation.
 ══════════════════════════════════════════════════════════════════ */
 .occasionBlock {
-  margin: 20px 0 14px;
+  margin: 0;
   padding: 14px 16px;
   background: var(--paper);
   border: 1px dashed var(--line-2);
@@ -539,6 +577,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+/* First message after an occasion card: extra air on top of the list gap (12px). */
+.occasionBlock + .bubbleRow {
+  margin-top: 12px;
 }
 .occasionEmoji {
   font-size: 20px;
@@ -567,12 +609,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-3);
-}
-.occasionDate {
-  flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-3);

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ArrowUp } from "lucide-react";
 import { AccountPage } from "@/components/account/AccountPage";
 import { DirectActorType } from "@prisma/client";
 import type { UnifiedConversationDetail } from "@/server/services/direct/directConversation.service";
@@ -60,8 +61,12 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
   const complaintTargetThreadId = detail.replyTargetThreadId ?? anchorThreadId;
   const latestOccasion = detail.occasions[detail.occasions.length - 1];
   const lastMessage = detail.messages[detail.messages.length - 1];
-  const isWaitingOnMe =
-    detail.canWrite && lastMessage && !mineSenderTypes.includes(lastMessage.senderType);
+  const lastIsMine = Boolean(lastMessage && mineSenderTypes.includes(lastMessage.senderType));
+  // Business: the client wrote last, so the reply is owed by the business.
+  // Customer: only the customer's own message is still unanswered — once the
+  // business has replied there is nothing to wait for.
+  const showWaitingBanner =
+    detail.canWrite && Boolean(lastMessage) && (isBusinessViewer ? !lastIsMine : lastIsMine);
 
   // Mark-read once on mount, across every occasion — not on every poll.
   useEffect(() => {
@@ -174,7 +179,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
           latestStatusLabel={latestOccasion ? statusLabel(latestOccasion.status) : undefined}
         />
 
-        {isWaitingOnMe && (
+        {showWaitingBanner && (
           <div className={`${styles.banner} ${styles.bannerWaiting}`}>
             {isBusinessViewer ? "Клиент ждёт ответа." : "Ожидаем ответ."}
           </div>
@@ -232,8 +237,10 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
               className={styles.sendBtn}
               disabled={!body.trim() || sending}
               onClick={() => void sendMessage()}
+              aria-label="Отправить"
+              title="Отправить"
             >
-              Отправить
+              <ArrowUp aria-hidden="true" size={20} strokeWidth={2.4} />
             </button>
           </div>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { Fragment, useMemo, useRef } from "react";
 import type { DirectActorType, DirectThreadStatus } from "@prisma/client";
 import { MessageBubble } from "./MessageBubble";
 import { OccasionCard } from "./OccasionCard";
@@ -22,6 +22,8 @@ export interface MessageListMessage {
   body: string;
   createdAt: Date | string;
   hidden: boolean;
+  /** Set once the counterparty has read it; only provided for the viewer's own messages. */
+  readAt?: Date | string | null;
 }
 
 type FeedItem =
@@ -37,6 +39,19 @@ function buildFeed(occasions: MessageListOccasion[], messages: MessageListMessag
   // (created in the same transaction).
   items.sort((a, b) => a.at - b.at || (a.kind === "occasion" ? -1 : 1));
   return items;
+}
+
+/** Day bucket in the viewer's locale — a dialog can span several days. */
+function dayKey(at: number): string {
+  return new Date(at).toLocaleDateString("ru-RU");
+}
+
+function formatDayLabel(at: number): string {
+  const d = new Date(at);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString("ru-RU", sameYear
+    ? { day: "numeric", month: "long" }
+    : { day: "numeric", month: "long", year: "numeric" });
 }
 
 export interface MessageListProps {
@@ -83,34 +98,51 @@ export function MessageList({ occasions, messages, mineSenderTypes, showOccasion
       )}
 
       <div className={styles.messages}>
-        {feed.map((item) => {
+        {feed.map((item, index) => {
+          // Centered day label before the first item of each day (under an occasion card, above a message).
+          const startsNewDay = index === 0 || dayKey(feed[index - 1].at) !== dayKey(item.at);
+          const separator = startsNewDay ? (
+            <div className={styles.daySeparator}>
+              <span>{formatDayLabel(item.at)}</span>
+            </div>
+          ) : null;
+
           if (item.kind === "occasion") {
             const { occasion } = item;
             return (
-              <OccasionCard
-                key={`occasion-${occasion.threadId}`}
-                ref={(el) => {
-                  occasionRefs.current.set(occasion.threadId, el);
-                }}
-                emoji={occasion.emoji}
-                publicationTitle={occasion.publicationTitle}
-                threadNumber={occasion.threadNumber}
-                status={occasion.status}
-                createdAt={occasion.createdAt}
-              />
+              <Fragment key={`occasion-${occasion.threadId}`}>
+                <OccasionCard
+                  ref={(el) => {
+                    occasionRefs.current.set(occasion.threadId, el);
+                  }}
+                  emoji={occasion.emoji}
+                  publicationTitle={occasion.publicationTitle}
+                  threadNumber={occasion.threadNumber}
+                  status={occasion.status}
+                />
+                {/* The day label goes under the occasion card, right before its first message. */}
+                {separator}
+              </Fragment>
             );
           }
 
           const m = item.message;
           return (
-            <MessageBubble
-              key={m.id}
-              senderType={m.senderType}
-              body={m.body}
-              createdAt={m.createdAt}
-              hidden={m.hidden}
-              isMine={mineSenderTypes.includes(m.senderType)}
-            />
+            <Fragment key={m.id}>
+              {separator}
+              <MessageBubble
+                senderType={m.senderType}
+                body={m.body}
+                createdAt={m.createdAt}
+                hidden={m.hidden}
+                isMine={mineSenderTypes.includes(m.senderType)}
+                deliveryStatus={
+                  mineSenderTypes.includes(m.senderType) && m.senderType !== "SYSTEM"
+                    ? m.readAt ? "read" : "sent"
+                    : undefined
+                }
+              />
+            </Fragment>
           );
         })}
       </div>
