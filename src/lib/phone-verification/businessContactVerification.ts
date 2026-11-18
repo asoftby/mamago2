@@ -194,13 +194,31 @@ export async function sendBusinessContactVerificationCode(params: {
       `[OTP dev] ${phoneE164} [${BUSINESS_CONTACT_VERIFICATION_PURPOSE}] -> ${code}`
     );
   } else {
-    const smsResult = await sendQuickSms({
-      phoneDigits,
-      message: `Ваш код: ${code}`,
-    });
-    console.log(
-      `[OTP sms] sent to ${phoneE164} [${BUSINESS_CONTACT_VERIFICATION_PURPOSE}] -> sms_id=${smsResult.sms_id} status=${smsResult.status}`
-    );
+    try {
+      const smsResult = await sendQuickSms({
+        phoneDigits,
+        message: `Ваш код: ${code}`,
+      });
+      // Provider accepted the message; actual handset delivery is not yet confirmed.
+      console.info("[business-contact-otp] SMS queued", { status: smsResult.status ?? null });
+    } catch (error) {
+      // The code was persisted before the provider call. If dispatch fails,
+      // revoke only THIS code so the recipient can retry immediately without
+      // a phantom 60-second cooldown or a never-delivered valid OTP.
+      try {
+        await prisma.phoneOtp.deleteMany({
+          where: {
+            userId: params.userId,
+            phoneE164,
+            purpose: BUSINESS_CONTACT_VERIFICATION_PURPOSE,
+            codeHash,
+          },
+        });
+      } catch {
+        console.error("[business-contact-otp] failed to revoke undelivered code");
+      }
+      throw error;
+    }
   }
 
   const fresh = await prisma.user.findUnique({
