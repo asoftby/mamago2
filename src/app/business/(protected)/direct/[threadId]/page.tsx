@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import { isDirectAccessError, requireDirectThreadAccess } from "@/lib/auth/directAccess";
 import { getUnifiedConversationDetail } from "@/server/services/direct/directConversation.service";
-import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { DirectThreadClient } from "@/app/(public)/me/direct/[threadId]/DirectThreadClient";
 
 export default async function BusinessDirectThreadPage({
@@ -34,14 +33,6 @@ export default async function BusinessDirectThreadPage({
   );
   if (!detail) notFound();
 
-  return (
-    <div className="space-y-6">
-      <BusinessSectionHeader
-        eyebrow="КАБИНЕТ"
-        title="Сообщения"
-        description="Обращения по конкретным заявкам вашей организации"
-      />
-      <DirectThreadClient initialDetail={detail} businessMode />
-    </div>
-  );
+  // key: remount per dialog in the two-column shell (fresh state, mark-read).
+  return <DirectThreadClient key={threadId} initialDetail={detail} businessMode />;
 }

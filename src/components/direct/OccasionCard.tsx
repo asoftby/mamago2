@@ -16,17 +16,11 @@ function occasionStatusLabel(status: DirectThreadStatus): string {
   }
 }
 
-function formatOccasionDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-}
-
 export interface OccasionCardProps {
   emoji: string;
   publicationTitle: string;
   threadNumber: number;
   status: DirectThreadStatus;
-  createdAt: Date | string;
   highlighted?: boolean;
 }
 
@@ -36,7 +30,7 @@ export interface OccasionCardProps {
  * quick "Поводы" nav can scrollIntoView() a specific occasion.
  */
 export const OccasionCard = forwardRef<HTMLDivElement, OccasionCardProps>(function OccasionCard(
-  { emoji, publicationTitle, threadNumber, status, createdAt, highlighted },
+  { emoji, publicationTitle, threadNumber, status, highlighted },
   ref,
 ) {
   return (
@@ -55,7 +49,6 @@ export const OccasionCard = forwardRef<HTMLDivElement, OccasionCardProps>(functi
           <span>{occasionStatusLabel(status)}</span>
         </div>
       </div>
-      <span className={styles.occasionDate}>{formatOccasionDate(createdAt)}</span>
     </div>
   );
 });
