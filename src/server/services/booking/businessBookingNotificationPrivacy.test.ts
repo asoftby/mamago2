@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { buildPrivateBusinessBookingNotification, buildPrivateBusinessBookingReminder, businessBookingDeliveryProjection } from "./businessBookingNotificationPrivacy";
 
@@ -95,4 +96,12 @@ test("Party Outbox BOOKING_CREATED keeps signed-confirmation routing metadata", 
   };
   assert.equal(businessBookingDeliveryProjection(partyNotice), partyNotice,
     "Party keyboard must still see PARTY_OUTBOX and outboxId");
+});
+
+test("manual email resend enforces the same legacy notice projection as automatic delivery", () => {
+  const source = readFileSync("src/server/services/notificationDelivery.service.ts", "utf8");
+  const resend = source.slice(source.indexOf("export async function resendNotificationDelivery("));
+  assert.ok(resend.length > 1000);
+  assert.match(resend, /const safe = businessBookingDeliveryProjection\(delivery\.notification\)/);
+  assert.match(resend, /buildNotificationEmailTemplate\(\s*safe\.type as NotificationType,\s*safe\.title,\s*safe\.body,/);
 });
