@@ -792,7 +792,10 @@
 .inboxEmpty {
   display: none;
 }
-.recCardActive {
+/* `.page .recCard` (two classes) would win over a lone `.recCardActive`; match its specificity. */
+.recCardActive,
+.page .recCardActive,
+.page .recCardActive:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
