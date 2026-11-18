@@ -11,10 +11,12 @@ import {
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import {
   createDirectMessage,
+  DirectBusinessWriteError,
   DirectMessageError,
 } from "@/server/services/direct/directMessage.service";
 import { DirectSendLimitError } from "@/server/services/direct/directRiskSignal.service";
 import { notifyDirectMessage } from "@/server/services/notification.service";
+import { notifyBusinessStaffDirectMessage } from "@/server/services/direct/directStaffNotify";
 import prisma from "@/lib/prisma";
 
 const sendMessageSchema = z.object({
@@ -75,6 +77,9 @@ export async function POST(
       const status = error.kind === "FLOOD_LOCK" ? 429 : 403;
       return NextResponse.json({ error: error.message }, { status });
     }
+    if (error instanceof DirectBusinessWriteError) {
+      return NextResponse.json({ error: error.message, code: "BUSINESS_CONTACT_WINDOW_CLOSED" }, { status: 403 });
+    }
     if (error instanceof DirectMessageError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
@@ -92,18 +97,25 @@ async function notifyOtherSide(params: {
   try {
     const thread = await prisma.directThread.findUnique({
       where: { id: params.threadId },
-      select: { threadNumber: true, customerUserId: true, business: { select: { ownerUserId: true } } },
+      select: { threadNumber: true, customerUserId: true, businessId: true },
     });
     if (!thread) return;
 
-    // The customer is always the recipient unless they themselves sent it.
-    const recipientUserId =
-      params.senderType === "CUSTOMER" ? thread.business.ownerUserId : thread.customerUserId;
-    const recipientSurface = params.senderType === "CUSTOMER" ? "BUSINESS" : "USER";
+    if (params.senderType === "CUSTOMER") {
+      // Every active owner/manager can answer in the business inbox, so all of them are told.
+      await notifyBusinessStaffDirectMessage({
+        businessId: thread.businessId,
+        threadId: params.threadId,
+        threadNumber: thread.threadNumber,
+        messageId: params.messageId,
+      });
+      return;
+    }
 
+    // Business/admin wrote: the customer is the recipient.
     await notifyDirectMessage({
-      recipientUserId,
-      recipientSurface,
+      recipientUserId: thread.customerUserId,
+      recipientSurface: "USER",
       threadId: params.threadId,
       threadNumber: thread.threadNumber,
       messageId: params.messageId,

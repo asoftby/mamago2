@@ -4,6 +4,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { resolveBookingServiceEnd } from "@/lib/booking/effectiveServiceEnd";
 import { allocationTransition } from "./allocationTransition";
 import { assertActiveBookingHold, BookingHoldExpiredError } from "./bookingHold";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
@@ -37,6 +38,8 @@ export interface BusinessBookingItem {
   status: BookingStatus;
   publicationType: string;
   createdAt: string;
+  /** Effective service end (explicit, session or Minsk date), for contact access. */
+  endsAt: string | null;
 
   // Normalized display (computed, not stored)
   display: BookingDisplay;
@@ -150,6 +153,9 @@ const BOOKING_SELECT = {
   source: true,
   publicationType: true,
   createdAt: true,
+  endsAt: true,
+  startsAt: true,
+  offerSession: { select: { startAt: true, endAt: true } },
   lastActivityAt: true,
   firstResponseAt: true,
   completedAt: true,
@@ -227,6 +233,9 @@ function mapBooking(raw: {
   status: BookingStatus;
   publicationType: string;
   createdAt: Date;
+  endsAt: Date | null;
+  startsAt: Date | null;
+  offerSession: { startAt: Date | null; endAt: Date | null } | null;
   lastActivityAt: Date;
   offerId: string | null;
   activityId: string | null;
@@ -318,6 +327,7 @@ function mapBooking(raw: {
     source: raw.source,
     publicationType: raw.publicationType,
     createdAt: raw.createdAt.toISOString(),
+    endsAt: resolveBookingServiceEnd(raw)?.toISOString() ?? null,
     display,
 
     offerId: raw.offerId,

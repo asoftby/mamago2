@@ -4737,6 +4737,10 @@ enum NotificationType {
   DIRECT_THREAD_CREATED
   /// Новое сообщение в Direct-треде
   DIRECT_NEW_MESSAGE
+  /// Новая жалоба на Direct-диалог (получают админы и модераторы)
+  DIRECT_COMPLAINT_OPENED
+  /// Жалоба рассмотрена (получает заявитель; без внутренней заметки модератора)
+  DIRECT_COMPLAINT_RESOLVED
   SUPPORT_BUSINESS_REPLY
   SUPPORT_STAFF_MESSAGE
   IMPORT_CHANNELS_DIGEST
@@ -7856,4 +7860,34 @@ model BillingPayerProfile {
   business           Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([payerType])
+}
+
+
+/// Case registry only. No decrypted identifiers, phone numbers or disclosure files.
+enum GovernmentDataRequestStatus {
+  RECEIVED
+  IN_REVIEW
+  REJECTED
+  CLOSED
+}
+
+model GovernmentDataRequest {
+  id             String                      @id @default(cuid())
+  authorityName  String
+  incomingNumber String
+  receivedAt     DateTime
+  legalBasis     String
+  requestedScope String
+  /// Internal stable reference only. Not a User FK: deleted-account retention is a separate domain.
+  subjectUserId  String?
+  status         GovernmentDataRequestStatus @default(RECEIVED)
+  resolutionNote String?
+  createdById    String
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([authorityName, incomingNumber])
+  @@index([status, createdAt])
+  @@index([receivedAt])
+  @@index([subjectUserId])
 }

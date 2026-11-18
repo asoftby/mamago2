@@ -63,5 +63,6 @@ export default async function DirectThreadPage({
   );
   if (!detail) notFound();
 
-  return <DirectThreadClient initialDetail={detail} />;
+  // key: moving between dialogs in the two-column shell must remount the client (fresh state, mark-read).
+  return <DirectThreadClient key={threadId} initialDetail={detail} />;
 }

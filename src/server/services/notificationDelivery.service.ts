@@ -46,6 +46,7 @@ import { buildPartyConfirmationTelegramKeyboard } from "@/server/birthday/partyT
 import { TelegramChannel, type TelegramParseMode, type TelegramReplyMarkup } from "@/server/services/telegram/TelegramChannel";
 import { renderNotificationTelegramMessage } from "@/server/services/telegram/TelegramTemplateRenderer";
 import { isOneTimeNotificationType } from "./notificationDedup.service";
+import { businessBookingDeliveryProjection } from "./booking/businessBookingNotificationPrivacy";
 import {
   buildLegacyTemplatePayload,
   renderNotification as renderNotificationTemplate,
@@ -63,11 +64,12 @@ async function buildTelegramMessageForNotification(notification: Notification): 
   replyMarkup?: TelegramReplyMarkup;
   parseMode?: TelegramParseMode;
 }> {
-  const fallback = renderNotificationTelegramMessage(notification);
+  const safe = businessBookingDeliveryProjection(notification);
+  const fallback = renderNotificationTelegramMessage(safe);
   const templated = await renderNotificationTemplate(
-    notification.type,
+    safe.type,
     "TELEGRAM",
-    buildLegacyTemplatePayload(notification),
+    buildLegacyTemplatePayload(safe),
   );
 
   if (!templated) return fallback;
@@ -222,19 +224,20 @@ async function handleEmail(
     return;
   }
 
-  // Build and send: шаблонный рендер (override → дефолт), null → текущий текст
+  // The delivery boundary also redacts previously stored PII-filled notices.
+  const safe = businessBookingDeliveryProjection(notification);
   const templated = await renderNotificationTemplate(
-    notification.type,
+    safe.type,
     "EMAIL",
-    buildLegacyTemplatePayload(notification),
+    buildLegacyTemplatePayload(safe),
   );
 
   const template = buildNotificationEmailTemplate(
-    notification.type as NotificationType,
-    templated?.subject ?? notification.title,
-    templated ? toPlainText(templated.body, 4000) : notification.body,
-    notification.entityId,
-    notification.ctaAction,
+    safe.type as NotificationType,
+    templated?.subject ?? safe.title,
+    templated ? toPlainText(templated.body, 4000) : safe.body,
+    safe.entityId,
+    safe.ctaAction,
     templated?.body ?? null,
   );
 
@@ -520,18 +523,19 @@ export async function retryFailedDelivery(
         return false;
       }
 
+      const safe = businessBookingDeliveryProjection(delivery.notification);
       const templated = await renderNotificationTemplate(
-        delivery.notification.type,
+        safe.type,
         "EMAIL",
-        buildLegacyTemplatePayload(delivery.notification),
+        buildLegacyTemplatePayload(safe),
       );
 
       const template = buildNotificationEmailTemplate(
-        delivery.notification.type as NotificationType,
-        templated?.subject ?? delivery.notification.title,
-        templated ? toPlainText(templated.body, 4000) : delivery.notification.body,
-        delivery.notification.entityId,
-        delivery.notification.ctaAction,
+        safe.type as NotificationType,
+        templated?.subject ?? safe.title,
+        templated ? toPlainText(templated.body, 4000) : safe.body,
+        safe.entityId,
+        safe.ctaAction,
         templated?.body ?? null,
       );
 
@@ -647,12 +651,15 @@ export async function resendNotificationDelivery(
         return false;
       }
 
+      // Manual admin resend must enforce the same privacy boundary as
+      // automatic delivery and retries for legacy persisted notices.
+      const safe = businessBookingDeliveryProjection(delivery.notification);
       const template = buildNotificationEmailTemplate(
-        delivery.notification.type as NotificationType,
-        delivery.notification.title,
-        delivery.notification.body,
-        delivery.notification.entityId,
-        delivery.notification.ctaAction,
+        safe.type as NotificationType,
+        safe.title,
+        safe.body,
+        safe.entityId,
+        safe.ctaAction,
       );
 
       const result = await sendEmail({ to: user.email, ...template });

@@ -16,13 +16,20 @@ import {
   openBusinessDirectThreadForBooking,
   openCustomerDirectThreadForBooking,
 } from "./directBookingThread.service";
-import { createDirectMessage } from "./directMessage.service";
+import { createDirectMessage, DirectBusinessWriteError } from "./directMessage.service";
+import { markThreadRead } from "./directThread.service";
+import { getBusinessConversationsForUser, getCustomerConversationsForUser, getUnifiedConversationDetail } from "./directConversation.service";
 import { DirectSendLimitError } from "./directRiskSignal.service";
 import {
   getDirectPlatformSettings,
   updateDirectPlatformSettings,
 } from "./directPlatformSettings.service";
 import { notifyDirectMessage } from "@/server/services/notification.service";
+import {
+  getBusinessDirectRecipientUserIds,
+  notifyBusinessStaffDirectCreated,
+  notifyBusinessStaffDirectMessage,
+} from "./directStaffNotify";
 import { getParentBookings } from "@/server/services/booking/parentBookings.service";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -150,7 +157,7 @@ test("guest request, foreign business, customer and empty text are rejected with
   assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: guest.id, actorUserId: owner, message: "hi" })), "GUEST_BOOKING");
   const booking = await newBooking();
   for (const actor of [otherOwner, customer, stranger]) {
-    assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: actor, message: "hi" })), "FORBIDDEN");
+    assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: actor, message: "hi" })), "BOOKING_NOT_FOUND");
   }
   assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "   " })), "EMPTY_MESSAGE");
   assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: "nope", actorUserId: owner, message: "hi" })), "BOOKING_NOT_FOUND");
@@ -214,6 +221,63 @@ test("customer notification: organizer reply text, /me/direct link, no duplicate
   assert.match(rows[0].title, /Организатор написал/);
 });
 
+// Notification delivery rows are written in the background; cleanup must not race them (40P01).
+async function waitForDeliveriesToSettle(entityIds: string[]) {
+  const deadline = Date.now() + 15_000;
+  let previous = "";
+  for (;;) {
+    const notifications = await prisma.notification.findMany({
+      where: { entityId: { in: entityIds } },
+      select: { deliveries: { select: { status: true } } },
+    });
+    const settled = notifications.every(({ deliveries }) => deliveries.length > 0 && deliveries.every(({ status }) => status !== "PENDING"));
+    const snapshot = JSON.stringify(notifications.map(({ deliveries }) => deliveries.length));
+    if (settled && snapshot === previous) return;
+    previous = snapshot;
+    if (Date.now() > deadline) throw new Error("Timed out waiting for notification deliveries");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+test("staff notifications: owner and active managers are told once; inactive members and strangers are not", async () => {
+  const inactive = id("inactive-manager");
+  await prisma.user.create({ data: { id: inactive, email: `${inactive}@example.test` } });
+  users.push(inactive);
+  await prisma.businessMember.create({ data: { businessId, userId: inactive, role: "MANAGER", isActive: false } });
+
+  const expected = [owner, manager].sort();
+  assert.deepEqual((await getBusinessDirectRecipientUserIds(businessId)).sort(), expected);
+
+  const booking = await newBooking();
+  const r = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Привет" });
+  const messageId = r.firstMessageId!;
+
+  const messageParams = { businessId, threadId: r.threadId, threadNumber: r.threadNumber, messageId };
+  await notifyBusinessStaffDirectMessage(messageParams);
+  await notifyBusinessStaffDirectMessage(messageParams); // retry must not double-notify
+  const messageRows = await prisma.notification.findMany({ where: { entityId: messageId, type: "DIRECT_NEW_MESSAGE" } });
+  assert.deepEqual(messageRows.map((n) => n.userId).sort(), expected);
+  assert.ok(messageRows.every((n) => n.audience === "BUSINESS" && n.ctaAction === `/business/direct/${r.threadId}`));
+
+  await notifyBusinessStaffDirectCreated({ businessId, threadId: r.threadId, threadNumber: r.threadNumber });
+  const createdRows = await prisma.notification.findMany({ where: { entityId: r.threadId, type: "DIRECT_THREAD_CREATED" } });
+  assert.deepEqual(createdRows.map((n) => n.userId).sort(), expected);
+
+  // Nobody outside the business team was notified.
+  assert.equal(await prisma.notification.count({ where: { entityId: { in: [messageId, r.threadId] }, userId: { in: [customer, stranger, otherOwner, inactive] } } }), 0);
+  await waitForDeliveriesToSettle([messageId, r.threadId]);
+});
+
+test("staff notifications: an owner without a membership row is still a recipient", async () => {
+  const soloBusiness = await prisma.business.create({ data: { name: "DBT solo " + sfx, ownerUserId: stranger } });
+  try {
+    assert.deepEqual(await getBusinessDirectRecipientUserIds(soloBusiness.id), [stranger]);
+    assert.deepEqual(await getBusinessDirectRecipientUserIds("missing-" + sfx), []);
+  } finally {
+    await prisma.business.delete({ where: { id: soloBusiness.id } });
+  }
+});
+
 test("ACL: only the customer and business members access the thread", async () => {
   const booking = await newBooking();
   const r = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Привет" });
@@ -239,7 +303,7 @@ test("customer side: 'Мои записи' shows the thread link; another user's
   assert.equal(find(before)?.directAvailable, true);
 
   // Customer writes to the organizer about the expired request.
-  assert.equal(await codeOf(openCustomerDirectThreadForBooking({ bookingRequestId: booking.id, customerUserId: stranger, message: "hi" })), "NOT_BOOKING_OWNER");
+  assert.equal(await codeOf(openCustomerDirectThreadForBooking({ bookingRequestId: booking.id, customerUserId: stranger, message: "hi" })), "BOOKING_NOT_FOUND");
   const c = await openCustomerDirectThreadForBooking({ bookingRequestId: booking.id, customerUserId: customer, message: "Вы не ответили" });
   assert.equal(c.created, true);
   const t = await prisma.directThread.findUniqueOrThrow({ where: { id: c.threadId } });
@@ -260,4 +324,168 @@ test("customer side: 'Мои записи' shows the thread link; another user's
   const biz = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Простите" });
   assert.equal(biz.created, false);
   assert.equal(biz.threadId, c.threadId);
+});
+
+test("past dated booking closes despite stale CONFIRMED status and null endsAt", async () => {
+  const booking = await newBooking({ status: BookingStatus.CONFIRMED });
+  await prisma.bookingRequest.update({
+    where: { id: booking.id },
+    data: { requestedDate: new Date(Date.now() - 3 * 86_400_000) },
+  });
+  assert.equal(await codeOf(openBusinessDirectThreadForBooking({
+    bookingRequestId: booking.id, actorUserId: owner, message: "Обратитесь напрямую",
+  })), "BOOKING_INACTIVE");
+  assert.equal(await prisma.directThread.count({ where: { bookingRequestId: booking.id } }), 0);
+});
+
+test("terminal and elapsed bookings cannot start a business-authored thread", async () => {
+  for (const status of [BookingStatus.EXPIRED, BookingStatus.REJECTED, BookingStatus.COMPLETED]) {
+    const booking = await newBooking({ status });
+    assert.equal(
+      await codeOf(openBusinessDirectThreadForBooking({
+        bookingRequestId: booking.id, actorUserId: owner, message: "Повторное предложение",
+      })),
+      "BOOKING_INACTIVE",
+    );
+    assert.equal(await prisma.directThread.count({ where: { bookingRequestId: booking.id } }), 0);
+  }
+  const elapsed = await newBooking();
+  await prisma.bookingRequest.update({
+    where: { id: elapsed.id },
+    data: { endsAt: new Date(Date.now() - 60_000) },
+  });
+  assert.equal(
+    await codeOf(openBusinessDirectThreadForBooking({
+      bookingRequestId: elapsed.id, actorUserId: owner, message: "Услуга уже прошла",
+    })),
+    "BOOKING_INACTIVE",
+  );
+});
+
+test("stale OPEN booking thread cannot bypass a terminal status via message API service", async () => {
+  const booking = await newBooking();
+  const opened = await openBusinessDirectThreadForBooking({
+    bookingRequestId: booking.id, actorUserId: owner, message: "Подтверждаем детали",
+  });
+  await prisma.bookingRequest.update({
+    where: { id: booking.id }, data: { status: BookingStatus.COMPLETED },
+  });
+  const attempted = () => createDirectMessage({
+    threadId: opened.threadId, senderType: DirectActorType.BUSINESS,
+    senderUserId: owner, body: "Приходите снова без mamaGo",
+  });
+  await assert.rejects(attempted(), DirectBusinessWriteError);
+  assert.equal(await prisma.directMessage.count({ where: { threadId: opened.threadId } }), 1);
+  // Customer is not locked out of their history/possibility to raise a problem.
+  await createDirectMessage({
+    threadId: opened.threadId, senderType: DirectActorType.CUSTOMER,
+    senderUserId: customer, body: "У меня вопрос по завершённому заказу",
+  });
+  await assert.rejects(attempted(), DirectBusinessWriteError);
+});
+
+test("unlinked old customer enquiry cannot be revived by business without fresh inbound", async () => {
+  const old = new Date(Date.now() - 31 * 24 * 60 * 60_000);
+  const thread = await prisma.directThread.create({
+    data: {
+      publicationType: PublicationType.EVENT,
+      activityId, businessId, customerUserId: customer,
+      lastMessageAt: old,
+      lastMessageBy: DirectActorType.CUSTOMER,
+      messages: {
+        create: { senderType: DirectActorType.CUSTOMER, senderUserId: customer,
+          body: "Старый вопрос", createdAt: old },
+      },
+    },
+  });
+  const reply = () => createDirectMessage({
+    threadId: thread.id, senderType: DirectActorType.BUSINESS,
+    senderUserId: owner, body: "Новое предложение",
+  });
+  await assert.rejects(reply(), DirectBusinessWriteError);
+  await createDirectMessage({
+    threadId: thread.id, senderType: DirectActorType.CUSTOMER,
+    senderUserId: customer, body: "Уточняю свой вопрос",
+  });
+  await reply();
+  assert.equal(await prisma.directMessage.count({ where: { threadId: thread.id } }), 3);
+});
+
+
+test("business message inbox is scoped by occasion and never aggregates a customer's multiple bookings", async () => {
+  const firstBooking = await newBooking();
+  const secondBooking = await newBooking();
+  const first = await openBusinessDirectThreadForBooking({
+    bookingRequestId: firstBooking.id, actorUserId: owner, message: "Первый заказ",
+  });
+  const second = await openBusinessDirectThreadForBooking({
+    bookingRequestId: secondBooking.id, actorUserId: owner, message: "Второй заказ",
+  });
+
+  const businessRows = await getBusinessConversationsForUser(owner, businessId);
+  const one = businessRows.find((row) => row.latestThreadId === first.threadId);
+  const two = businessRows.find((row) => row.latestThreadId === second.threadId);
+  assert.ok(one && two);
+  assert.notEqual(one.key, two.key);
+  assert.equal(one.occasionCount, 1);
+  assert.equal(two.occasionCount, 1);
+  assert.equal(one.counterpartyLogoUrl, null);
+  assert.match(one.counterpartyName, /^Обращение D-\d+$/);
+
+  const businessDetail = await getUnifiedConversationDetail(businessId, customer, "BUSINESS", first.threadId);
+  assert.deepEqual(businessDetail?.occasions.map((o) => o.threadId), [first.threadId]);
+  assert.deepEqual(businessDetail?.messages.map((m) => m.body), ["Первый заказ"]);
+  assert.equal(businessDetail?.counterpartyLogoUrl, null);
+  assert.equal(businessDetail?.customerUserId, null, "Business cannot correlate separate orders using a permanent customer ID");
+  assert.equal(await getUnifiedConversationDetail(businessId, customer, "BUSINESS"), null,
+    "Business read without scoped thread must fail closed");
+
+  const customerDetail = await getUnifiedConversationDetail(businessId, customer, "CUSTOMER");
+  assert.equal(customerDetail?.customerUserId, customer, "Customer view retains its own identity");
+  assert.ok(customerDetail?.occasions.some((o) => o.threadId === first.threadId));
+  assert.ok(customerDetail?.occasions.some((o) => o.threadId === second.threadId));
+
+  await prisma.bookingRequest.update({ where: { id: secondBooking.id }, data: { status: BookingStatus.COMPLETED } });
+  const businessAfterCompletion = await getBusinessConversationsForUser(owner, businessId);
+  assert.equal(businessAfterCompletion.find((row) => row.latestThreadId === second.threadId)?.tab, "COMPLETED");
+  assert.equal((await getUnifiedConversationDetail(businessId, customer, "BUSINESS", second.threadId))?.canWrite, false);
+});
+
+test("read receipts: only CUSTOMER/BUSINESS messages carry one; ADMIN messages never confirm the customer read", async () => {
+  const booking = await newBooking();
+  const r = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Привет" });
+  await createDirectMessage({ threadId: r.threadId, senderType: DirectActorType.ADMIN, senderUserId: owner, body: "Сообщение поддержки" });
+
+  // The business opens the dialog: markThreadRead also marks the ADMIN message read (for either reader).
+  await markThreadRead({ threadId: r.threadId, readerType: DirectActorType.BUSINESS });
+  const before = await getUnifiedConversationDetail(businessId, customer, "BUSINESS", r.threadId);
+  const byBody = (detail: typeof before, body: string) => detail?.messages.find((m) => m.body === body);
+  assert.equal(byBody(before, "Привет")?.readAt, null, "customer has not read the business message yet");
+  assert.equal(byBody(before, "Сообщение поддержки")?.readAt, null, "ADMIN message must not show a read receipt");
+
+  // The customer opens the dialog: the business message is now read; the ADMIN one still carries nothing.
+  await markThreadRead({ threadId: r.threadId, readerType: DirectActorType.CUSTOMER });
+  const after = await getUnifiedConversationDetail(businessId, customer, "BUSINESS", r.threadId);
+  assert.ok(byBody(after, "Привет")?.readAt instanceof Date);
+  assert.equal(byBody(after, "Сообщение поддержки")?.readAt, null);
+});
+
+test("customer inbox: unread badges come from one grouped query and sum across an organization's occasions", async () => {
+  const unreadFor = async () =>
+    (await getCustomerConversationsForUser(customer)).find((item) => item.key === businessId)?.unreadCount ?? 0;
+  const baseline = await unreadFor();
+
+  const threads: string[] = [];
+  for (let i = 0; i < 2; i++) {
+    const booking = await newBooking();
+    const opened = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: `Новое ${i}` });
+    threads.push(opened.threadId);
+  }
+  assert.equal(await unreadFor(), baseline + 2, "one unread business message per new occasion, summed under the organization");
+
+  const item = (await getCustomerConversationsForUser(customer)).find((row) => row.key === businessId);
+  assert.ok(threads.every((id) => item?.threadIds.includes(id)), "list item exposes every thread of the conversation");
+
+  for (const threadId of threads) await markThreadRead({ threadId, readerType: DirectActorType.CUSTOMER });
+  assert.equal(await unreadFor(), baseline, "reading the occasions clears exactly those badges");
 });

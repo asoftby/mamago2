@@ -17,7 +17,6 @@ import {
   CircleX,
   Clock3,
   Inbox,
-  MessageCircle,
   Phone,
   X,
 } from "lucide-react";
@@ -428,6 +427,8 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [selectedBookingDetail, setSelectedBookingDetail] = useState<BusinessBookingItem | null>(null);
+  const [detailRefreshRevision, setDetailRefreshRevision] = useState(0);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -538,6 +539,30 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
     void fetchBookings();
   }, [fetchBookings, revision]);
 
+  // The bulk API deliberately excludes contacts and child names. Fetch just
+  // the one selected order after a deliberate click; the detail API audits
+  // any active customer-contact disclosure before returning it.
+  useEffect(() => {
+    setSelectedBookingDetail(null);
+    if (!selectedBookingId) return;
+    const controller = new AbortController();
+    void fetch(`/api/business/bookings/${encodeURIComponent(selectedBookingId)}`, {
+      credentials: "include",
+      cache: "no-store",
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<BusinessBookingItem>;
+    }).then((item) => {
+      if (!controller.signal.aborted) setSelectedBookingDetail(item);
+    }).catch((error: unknown) => {
+      if (controller.signal.aborted) return;
+      console.error("[BookingsPageClient] booking detail", error);
+      toast.error("Не удалось открыть подробности заявки");
+    });
+    return () => controller.abort();
+  }, [selectedBookingId, detailRefreshRevision]);
+
   const handleStatusChange = useCallback(
     async (id: string, status: BookingStatus) => {
       setItems((prev) => prev.map((booking) => (booking.id === id ? { ...booking, status } : booking)));
@@ -557,6 +582,8 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
 
         const updated = (await res.json()) as BusinessBookingItem;
         setItems((prev) => prev.map((booking) => (booking.id === id ? updated : booking)));
+        setSelectedBookingDetail(null);
+        setDetailRefreshRevision((version) => version + 1);
         toast.success("Статус обновлён");
 
         void fetchBookings();
@@ -610,8 +637,10 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [selectedBookingId, visibleItems]);
 
   const selectedBooking = useMemo(
-    () => visibleItems.find((item) => item.id === selectedBookingId) ?? null,
-    [selectedBookingId, visibleItems],
+    () => selectedBookingDetail?.id === selectedBookingId
+      ? selectedBookingDetail
+      : (visibleItems.find((item) => item.id === selectedBookingId) ?? null),
+    [selectedBookingId, selectedBookingDetail, visibleItems],
   );
 
   const selectedIndex = selectedBooking
@@ -1216,7 +1245,7 @@ function BookingCalendarDayPanel({
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-stone-500">
-                      {booking.customerName} · {booking.customerPhone}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
+                      {booking.customerName}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", STATUS_META[booking.status].chipClass)}>
@@ -1378,7 +1407,7 @@ function BookingListItem({
             {booking.display.title}
           </div>
           <div className="mt-2 text-base text-stone-500">
-            {booking.customerName} · {booking.customerPhone}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
+            {booking.customerName}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
           </div>
           {participant ? <div className="mt-1 text-sm text-stone-400">{participant}</div> : null}
           {booking.participantChildren.length > 0 ? (
@@ -1502,7 +1531,6 @@ export function BookingDetailsDrawer({
   const canComplete = isConfirmed;
   const history = buildHistoryEntries(booking);
   const showNav = isDesktop && total > 1;
-  const chatHref = booking.customerEmail ? `mailto:${booking.customerEmail}` : null;
   const initial = (booking.customerName.trim().charAt(0) || "?").toUpperCase();
 
   const handleAction = async (status: BookingStatus) => {
@@ -1652,29 +1680,25 @@ export function BookingDetailsDrawer({
                 <div className="truncate text-[17px] font-semibold text-stone-950">
                   {booking.customerName}
                 </div>
-                <div className="mt-1 whitespace-nowrap font-mono text-[15px] text-stone-700">{booking.customerPhone}</div>
+                <div className="mt-1 text-[15px] text-stone-700">
+                  {booking.customerPhone || "Контакт скрыт"}
+                </div>
                 {booking.source === "MANUAL" ? (
                   <div className="mt-0.5 text-xs text-stone-500">Добавлено вручную</div>
                 ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <a
-                  href={`tel:${booking.customerPhone}`}
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 text-stone-800 transition hover:bg-stone-50"
-                  aria-label="Позвонить клиенту"
-                >
-                  <Phone className="h-5 w-5" />
-                </a>
+                {booking.customerPhone ? (
+                  <a
+                    href={`tel:${booking.customerPhone}`}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 text-stone-800 transition hover:bg-stone-50"
+                    aria-label="Позвонить по действующей заявке"
+                  >
+                    <Phone className="h-5 w-5" />
+                  </a>
+                ) : null}
                 {booking.hasCustomerAccount ? (
                   <BookingChatButton booking={booking} iconOnly onCompose={() => setChat({ bookingId: booking.id, open: true })} />
-                ) : chatHref ? (
-                  <a
-                    href={chatHref}
-                    className="flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 text-stone-800 transition hover:bg-stone-50"
-                    aria-label="Написать клиенту"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                  </a>
                 ) : null}
               </div>
             </div>

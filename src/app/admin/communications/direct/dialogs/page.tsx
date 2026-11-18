@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/direct/StatusBadge";
 import { UnreadBadge } from "@/components/direct/UnreadBadge";
 import { DialogSearchForm } from "./DialogSearchForm";
 import { TableContainer } from "@/components/ui/table";
+import directStyles from "@/components/direct/direct.module.css";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,7 +36,9 @@ export default async function AdminDirectDialogsPage({
   const dialogs = await getAdminDialogs(filter, search);
 
   return (
-    <div className="space-y-4">
+    // Scope Direct design tokens so the shared StatusBadge/UnreadBadge are not
+    // rendered with the admin theme's near-white --accent (invisible pills).
+    <div className={`${directStyles.businessPage} space-y-4`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {FILTERS.map((f) => (

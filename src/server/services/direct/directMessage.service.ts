@@ -16,6 +16,7 @@ import {
   DirectMessageHiddenReason,
   DirectThreadStatus,
 } from "@prisma/client";
+import { canBusinessWriteDirect, directBookingLifecycleSelect } from "./directBusinessWritePolicy";
 import {
   DIRECT_AUDIT_ENTITY,
   DirectAuditAction,
@@ -31,6 +32,14 @@ export class DirectMessageError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "DirectMessageError";
+  }
+}
+
+/** BUSINESS send is forbidden once its booking/enquiry is no longer actionable. */
+export class DirectBusinessWriteError extends DirectMessageError {
+  constructor() {
+    super("Переписка по этой заявке или обращению завершена. Новая запись оформляется через mamaGo.");
+    this.name = "DirectBusinessWriteError";
   }
 }
 
@@ -72,6 +81,49 @@ export async function createDirectMessage(input: CreateDirectMessageInput) {
   });
 
   const message = await prisma.$transaction(async (tx) => {
+    // Lock booking before the thread (consistent order) so a competing
+    // booking status transition cannot race an allowed BUSINESS send.
+    if (input.senderType === DirectActorType.BUSINESS) {
+      const routing = await tx.directThread.findUnique({
+        where: { id: input.threadId }, select: { bookingRequestId: true },
+      });
+      if (routing?.bookingRequestId) {
+        await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${routing.bookingRequestId} FOR SHARE`;
+      }
+      await tx.$queryRaw`SELECT "id" FROM "DirectThread" WHERE "id" = ${input.threadId} FOR UPDATE`;
+      // Always re-read after locking; a stale OPEN thread is not authority.
+      const live = await tx.directThread.findUnique({
+        where: { id: input.threadId },
+        select: {
+          status: true,
+          businessId: true,
+          customerUserId: true,
+          bookingRequestId: true,
+          bookingRequest: {
+            select: directBookingLifecycleSelect,
+          },
+        },
+      });
+      const latestCustomer = live && !live.bookingRequestId
+        ? await tx.directMessage.findFirst({
+            where: { threadId: input.threadId, senderType: DirectActorType.CUSTOMER },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+          })
+        : null;
+      if (!live || !canBusinessWriteDirect({
+        threadStatus: live.status,
+        threadBusinessId: live.businessId,
+        threadCustomerUserId: live.customerUserId,
+        bookingRequestId: live.bookingRequestId,
+        booking: live.bookingRequest,
+        latestCustomerMessageAt: latestCustomer?.createdAt ?? null,
+        now: new Date(),
+      })) {
+        throw new DirectBusinessWriteError();
+      }
+    }
+
     const created = await tx.directMessage.create({
       data: {
         threadId: input.threadId,
