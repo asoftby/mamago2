@@ -37,6 +37,8 @@ export interface BusinessBookingItem {
   status: BookingStatus;
   publicationType: string;
   createdAt: string;
+  /** Known end of service; used to expire business-facing personal data access. */
+  endsAt: string | null;
 
   // Normalized display (computed, not stored)
   display: BookingDisplay;
@@ -150,6 +152,7 @@ const BOOKING_SELECT = {
   source: true,
   publicationType: true,
   createdAt: true,
+  endsAt: true,
   lastActivityAt: true,
   firstResponseAt: true,
   completedAt: true,
@@ -227,6 +230,7 @@ function mapBooking(raw: {
   status: BookingStatus;
   publicationType: string;
   createdAt: Date;
+  endsAt: Date | null;
   lastActivityAt: Date;
   offerId: string | null;
   activityId: string | null;
@@ -318,6 +322,7 @@ function mapBooking(raw: {
     source: raw.source,
     publicationType: raw.publicationType,
     createdAt: raw.createdAt.toISOString(),
+    endsAt: raw.endsAt?.toISOString() ?? null,
     display,
 
     offerId: raw.offerId,
