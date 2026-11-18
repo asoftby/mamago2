@@ -7,8 +7,9 @@ import { checkBusinessToolPermission } from "@/server/permissions/business-permi
 export const runtime = "nodejs";
 
 /**
- * Materialize a verified business as an Organizer only after an explicit
- * selection by a user who can create business content. Searching is read-only.
+ * Resolve a verified Business into a persistent Organizer, only when explicitly
+ * selected. Lock the Business row so concurrent clicks cannot create duplicates,
+ * including for SELF_EMPLOYED_NPD businesses without UNP.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,41 +27,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Некорректный идентификатор бизнеса" }, { status: 400 });
     }
 
-    const business = await prisma.business.findFirst({
-      where: {
-        id: businessId,
-        verificationStatus: "APPROVED",
-        operationalStatus: "ACTIVE",
-      },
-      select: { id: true, name: true, unp: true, phone: true },
-    });
-    if (!business) {
-      return NextResponse.json({ ok: false, error: "Подтверждённый организатор недоступен" }, { status: 404 });
-    }
+    const resolve = () => prisma.$transaction(async (tx) => {
+      // Serialization is essential because Organizer.linkedBusinessId is not unique.
+      await tx.$queryRaw`SELECT id FROM "Business" WHERE id = ${businessId} FOR UPDATE`;
 
-    const existingWhere: Prisma.OrganizerWhereInput = {
-      OR: [
-        { linkedBusinessId: business.id },
-        ...(business.unp ? [{ unp: business.unp }] : []),
-      ],
-    };
-
-    let organizer = await prisma.organizer.findFirst({
-      where: existingWhere,
-      orderBy: { createdAt: "asc" },
-    });
-    if (organizer?.linkedBusinessId && organizer.linkedBusinessId !== business.id) {
-      return NextResponse.json({ ok: false, error: "Организатор связан с другой компанией" }, { status: 409 });
-    }
-
-    if (organizer && !organizer.linkedBusinessId) {
-      organizer = await prisma.organizer.update({
-        where: { id: organizer.id },
-        data: { linkedBusinessId: business.id },
+      // Recheck eligibility under the lock; a rejected/disabled business cannot be selected.
+      const business = await tx.business.findFirst({
+        where: {
+          id: businessId,
+          verificationStatus: "APPROVED",
+          operationalStatus: "ACTIVE",
+        },
+        select: { id: true, name: true, unp: true, phone: true },
       });
-    } else if (!organizer) {
-      try {
-        organizer = await prisma.organizer.create({
+      if (!business) {
+        return { ok: false as const, status: 404 as const, error: "Подтверждённый организатор недоступен" };
+      }
+
+      // A Business-linked organizer takes precedence over any legacy unlinked row.
+      let organizer = await tx.organizer.findFirst({
+        where: { linkedBusinessId: business.id },
+        orderBy: { createdAt: "asc" },
+      });
+      if (!organizer && business.unp) {
+        organizer = await tx.organizer.findUnique({ where: { unp: business.unp } });
+      }
+      if (organizer?.linkedBusinessId && organizer.linkedBusinessId !== business.id) {
+        return { ok: false as const, status: 409 as const, error: "Организатор связан с другой компанией" };
+      }
+
+      if (organizer && !organizer.linkedBusinessId) {
+        organizer = await tx.organizer.update({
+          where: { id: organizer.id },
+          data: { linkedBusinessId: business.id },
+        });
+      } else if (!organizer) {
+        organizer = await tx.organizer.create({
           data: {
             name: business.name,
             unp: business.unp,
@@ -69,24 +71,28 @@ export async function POST(request: NextRequest) {
             createdFrom: "MANUAL",
           },
         });
-      } catch (error) {
-        // Another request may have created the row with this unique UNP.
-        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002" || !business.unp) {
-          throw error;
-        }
-        organizer = await prisma.organizer.findFirst({ where: { unp: business.unp } });
-        if (!organizer || (organizer.linkedBusinessId && organizer.linkedBusinessId !== business.id)) {
-          return NextResponse.json({ ok: false, error: "Конфликт привязки организатора" }, { status: 409 });
-        }
-        if (!organizer.linkedBusinessId) {
-          organizer = await prisma.organizer.update({
-            where: { id: organizer.id },
-            data: { linkedBusinessId: business.id },
-          });
-        }
       }
+
+      return { ok: true as const, organizer };
+    });
+
+    let result: Awaited<ReturnType<typeof resolve>>;
+    try {
+      result = await resolve();
+    } catch (error) {
+      // An unrelated writer may have inserted a row with the same unique UNP
+      // concurrently. Retry in a fresh transaction, after the failed one rolled back.
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        throw error;
+      }
+      result = await resolve();
     }
 
+    if (!result.ok) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
+    }
+
+    const organizer = result.organizer;
     return NextResponse.json({
       ok: true,
       organizer: {
