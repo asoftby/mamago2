@@ -203,23 +203,14 @@ export async function sendBusinessContactVerificationCode(params: {
       // Provider accepted the message; actual handset delivery is not yet confirmed.
       console.info("[business-contact-otp] SMS queued", { status: smsResult.status ?? null });
     } catch (error) {
-      // On an explicit provider refusal, remove only this undelivered OTP so
-      // the recipient can retry immediately. A transport timeout is ambiguous:
-      // the provider may have accepted it; keep the code so a late SMS works.
-      if (!(error instanceof SmsByDeliveryError) || error.reason !== "NETWORK_ERROR") {
-        try {
-          await prisma.phoneOtp.deleteMany({
-            where: {
-              userId: params.userId,
-              phoneE164,
-              purpose: BUSINESS_CONTACT_VERIFICATION_PURPOSE,
-              codeHash,
-            },
-          });
-        } catch {
-          console.error("[business-contact-otp] failed to revoke rejected code");
-        }
-      }
+      // Do not erase the OTP/cooldown on provider errors. HTTP 5xx, malformed
+      // responses and timeouts are ambiguous: the provider may still deliver
+      // the code. Even an explicit refusal must not refund the send budget
+      // (otherwise a caller can hammer the provider during an outage).
+      // The existing 60-second cooldown and 10-minute expiry remain enforced.
+      console.warn("[business-contact-otp] SMS not confirmed", {
+        reason: error instanceof SmsByDeliveryError ? error.reason : "UNKNOWN",
+      });
       throw error;
     }
   }
