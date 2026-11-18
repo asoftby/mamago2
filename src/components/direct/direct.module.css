@@ -715,7 +715,7 @@
 /* phones/tablets: the dialog sits right under the "← Все сообщения" link, no extra top gap */
 @media (max-width: 1023px) {
   .businessThread {
-    padding-top: 0;
+    padding: 0 0 20px; /* full width: edges line up with the page content */
   }
   /* same visual gap under "← Все сообщения" as between the description and that link (29px) */
   .businessThread .topCard {
