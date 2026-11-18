@@ -57,3 +57,22 @@ test("historical bookings are permanently redacted in business detail", () => {
     assert.equal(businessBookingDetailRevealsContact(historical), false, status);
   }
 });
+
+test("stale CONFIRMED or NEW booking cannot expose contacts after known service end", () => {
+  const expiredAt = new Date(Date.now() - 60_000).toISOString();
+  for (const status of [BookingStatus.NEW, BookingStatus.CONFIRMED]) {
+    const stale = { ...booking, status, endsAt: expiredAt };
+    const projected = businessBookingDetailProjection(stale);
+    assert.equal(projected.customerPhone, "", status);
+    assert.equal(projected.customerName, "Клиент", status);
+    assert.equal(projected.childName, null, status);
+    assert.equal(businessBookingDetailRevealsContact(stale), false, status);
+  }
+  const future = { ...booking, status: BookingStatus.CONFIRMED,
+    endsAt: new Date(Date.now() + 86_400_000).toISOString() };
+  assert.equal(businessBookingDetailProjection(future).customerPhone, booking.customerPhone);
+  assert.equal(businessBookingDetailRevealsContact(future), true);
+  const invalid = { ...booking, endsAt: "not-a-date" };
+  assert.equal(businessBookingDetailProjection(invalid).customerPhone, "",
+    "Invalid known service end fails closed");
+});
