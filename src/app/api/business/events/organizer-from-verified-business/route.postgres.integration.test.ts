@@ -16,6 +16,10 @@ const loader = NodeModule as unknown as { _load: (request: string, ...args: unkn
 const originalLoad = loader._load;
 loader._load = function (request, ...args) {
   if (request === "server-only") return {};
+  // API handlers must not load the Next.js client router in Node integration tests.
+  if (request === "next/navigation") {
+    return { redirect: (url: string): never => { throw new Error(`Unexpected redirect in API test: ${url}`); } };
+  }
   if (request === "next/headers") {
     return { cookies: async () => ({ get: () => sessionToken ? { value: sessionToken } : undefined }) };
   }
