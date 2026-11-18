@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { normalizePhoneToE164 } from "@/lib/phone/phoneNormalize";
 import { genCode4, hashCode, safeEq } from "@/lib/otp/otp";
 import { sendQuickSms } from "@/lib/sms/smsBy";
+import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
 import {
   type BusinessContactOtpClientState,
   BUSINESS_CONTACT_VERIFICATION_CODE_LENGTH,
@@ -202,20 +203,22 @@ export async function sendBusinessContactVerificationCode(params: {
       // Provider accepted the message; actual handset delivery is not yet confirmed.
       console.info("[business-contact-otp] SMS queued", { status: smsResult.status ?? null });
     } catch (error) {
-      // The code was persisted before the provider call. If dispatch fails,
-      // revoke only THIS code so the recipient can retry immediately without
-      // a phantom 60-second cooldown or a never-delivered valid OTP.
-      try {
-        await prisma.phoneOtp.deleteMany({
-          where: {
-            userId: params.userId,
-            phoneE164,
-            purpose: BUSINESS_CONTACT_VERIFICATION_PURPOSE,
-            codeHash,
-          },
-        });
-      } catch {
-        console.error("[business-contact-otp] failed to revoke undelivered code");
+      // On an explicit provider refusal, remove only this undelivered OTP so
+      // the recipient can retry immediately. A transport timeout is ambiguous:
+      // the provider may have accepted it; keep the code so a late SMS works.
+      if (!(error instanceof SmsByDeliveryError) || error.reason !== "NETWORK_ERROR") {
+        try {
+          await prisma.phoneOtp.deleteMany({
+            where: {
+              userId: params.userId,
+              phoneE164,
+              purpose: BUSINESS_CONTACT_VERIFICATION_PURPOSE,
+              codeHash,
+            },
+          });
+        } catch {
+          console.error("[business-contact-otp] failed to revoke rejected code");
+        }
       }
       throw error;
     }
