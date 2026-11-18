@@ -151,7 +151,7 @@ test("guest request, foreign business, customer and empty text are rejected with
   assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: guest.id, actorUserId: owner, message: "hi" })), "GUEST_BOOKING");
   const booking = await newBooking();
   for (const actor of [otherOwner, customer, stranger]) {
-    assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: actor, message: "hi" })), "FORBIDDEN");
+    assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: actor, message: "hi" })), "BOOKING_NOT_FOUND");
   }
   assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "   " })), "EMPTY_MESSAGE");
   assert.equal(await codeOf(openBusinessDirectThreadForBooking({ bookingRequestId: "nope", actorUserId: owner, message: "hi" })), "BOOKING_NOT_FOUND");
@@ -240,7 +240,7 @@ test("customer side: 'Мои записи' shows the thread link; another user's
   assert.equal(find(before)?.directAvailable, true);
 
   // Customer writes to the organizer about the expired request.
-  assert.equal(await codeOf(openCustomerDirectThreadForBooking({ bookingRequestId: booking.id, customerUserId: stranger, message: "hi" })), "NOT_BOOKING_OWNER");
+  assert.equal(await codeOf(openCustomerDirectThreadForBooking({ bookingRequestId: booking.id, customerUserId: stranger, message: "hi" })), "BOOKING_NOT_FOUND");
   const c = await openCustomerDirectThreadForBooking({ bookingRequestId: booking.id, customerUserId: customer, message: "Вы не ответили" });
   assert.equal(c.created, true);
   const t = await prisma.directThread.findUniqueOrThrow({ where: { id: c.threadId } });
@@ -261,6 +261,18 @@ test("customer side: 'Мои записи' shows the thread link; another user's
   const biz = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Простите" });
   assert.equal(biz.created, false);
   assert.equal(biz.threadId, c.threadId);
+});
+
+test("past dated booking closes despite stale CONFIRMED status and null endsAt", async () => {
+  const booking = await newBooking({ status: BookingStatus.CONFIRMED });
+  await prisma.bookingRequest.update({
+    where: { id: booking.id },
+    data: { requestedDate: new Date(Date.now() - 3 * 86_400_000) },
+  });
+  assert.equal(await codeOf(openBusinessDirectThreadForBooking({
+    bookingRequestId: booking.id, actorUserId: owner, message: "Обратитесь напрямую",
+  })), "BOOKING_INACTIVE");
+  assert.equal(await prisma.directThread.count({ where: { bookingRequestId: booking.id } }), 0);
 });
 
 test("terminal and elapsed bookings cannot start a business-authored thread", async () => {
@@ -361,10 +373,12 @@ test("business message inbox is scoped by occasion and never aggregates a custom
   assert.deepEqual(businessDetail?.occasions.map((o) => o.threadId), [first.threadId]);
   assert.deepEqual(businessDetail?.messages.map((m) => m.body), ["Первый заказ"]);
   assert.equal(businessDetail?.counterpartyLogoUrl, null);
+  assert.equal(businessDetail?.customerUserId, null, "Business cannot correlate separate orders using a permanent customer ID");
   assert.equal(await getUnifiedConversationDetail(businessId, customer, "BUSINESS"), null,
     "Business read without scoped thread must fail closed");
 
   const customerDetail = await getUnifiedConversationDetail(businessId, customer, "CUSTOMER");
+  assert.equal(customerDetail?.customerUserId, customer, "Customer view retains its own identity");
   assert.ok(customerDetail?.occasions.some((o) => o.threadId === first.threadId));
   assert.ok(customerDetail?.occasions.some((o) => o.threadId === second.threadId));
 

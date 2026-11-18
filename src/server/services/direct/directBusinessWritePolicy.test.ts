@@ -13,6 +13,7 @@ const liveBooking = {
   status: BookingStatus.NEW,
   kind: BookingKind.STANDARD,
   partyStage: null,
+  createdAt: new Date("2026-11-17T14:00:00Z"),
   userId: "customer-1",
   businessId: "business-1",
   endsAt: null,
@@ -117,4 +118,30 @@ test("party booking with terminal partyStage is not writable despite NEW booking
       booking: { ...liveBooking, kind: BookingKind.PARTY, partyStage },
     }), true, partyStage);
   }
+});
+
+test("dated bookings close after the effective Minsk service day even when endsAt is null", () => {
+  for (const status of [BookingStatus.NEW, BookingStatus.CONFIRMED]) {
+    assert.equal(canBusinessContactForBooking({
+      ...liveBooking, status, requestedDate: new Date("2026-11-16T00:00:00Z"),
+    }, now), false);
+    assert.equal(canBusinessContactForBooking({
+      ...liveBooking, status, requestedDate: new Date("2026-11-18T00:00:00Z"),
+    }, now), true);
+  }
+  assert.equal(canBusinessContactForBooking({
+    ...liveBooking, offerSession: {
+      startAt: new Date("2026-11-14T14:00:00Z"),
+      endAt: new Date("2026-11-14T15:00:00Z"),
+    },
+  }, now), false);
+});
+
+test("undated bookings have a bounded initial contact window, never infinite", () => {
+  assert.equal(canBusinessContactForBooking({
+    ...liveBooking, createdAt: new Date(now.getTime() - 31 * 86_400_000),
+  }, now), false);
+  assert.equal(canBusinessContactForBooking({
+    ...liveBooking, createdAt: new Date(now.getTime() - 29 * 86_400_000),
+  }, now), true);
 });

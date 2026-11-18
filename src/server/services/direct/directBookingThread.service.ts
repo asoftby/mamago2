@@ -26,7 +26,7 @@ import {
   writeDirectAudit,
 } from "./directAudit";
 import { createDirectMessage } from "./directMessage.service";
-import { canBusinessContactForBooking } from "./directBusinessWritePolicy";
+import { canBusinessContactForBooking, directBookingLifecycleSelect } from "./directBusinessWritePolicy";
 import {
   evaluateDirectTypePolicy,
   getDirectAvailabilityForPublicationType,
@@ -72,12 +72,7 @@ export class BookingDirectError extends Error {
 
 const bookingSelect = {
   id: true,
-  businessId: true,
-  userId: true,
-  status: true,
-  endsAt: true,
-  kind: true,
-  partyStage: true,
+  ...directBookingLifecycleSelect,
   publicationType: true,
   offerId: true,
   activityId: true,
@@ -151,7 +146,7 @@ export async function openBusinessDirectThreadForBooking(input: {
 
   // 404-like for foreign bookings would leak existence; membership is checked first.
   if (!(await canAccessBusiness(input.actorUserId, booking.businessId))) {
-    throw new BookingDirectError("FORBIDDEN", "Forbidden");
+    throw new BookingDirectError("BOOKING_NOT_FOUND", "Booking request not found");
   }
   const bookingCustomerUserId = booking.userId;
   if (!bookingCustomerUserId) {
@@ -202,7 +197,7 @@ export async function openBusinessDirectThreadForBooking(input: {
       await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${booking.id} FOR SHARE`;
       const current = await tx.bookingRequest.findUnique({
         where: { id: booking.id },
-        select: { status: true, kind: true, partyStage: true, endsAt: true, businessId: true, userId: true },
+        select: directBookingLifecycleSelect,
       });
       if (!current || current.businessId !== booking.businessId ||
           current.userId !== bookingCustomerUserId || !canBusinessContactForBooking(current, new Date())) {
@@ -310,7 +305,7 @@ export async function openCustomerDirectThreadForBooking(input: {
 }): Promise<CustomerBookingThreadResult> {
   const booking = await loadBooking(input.bookingRequestId);
   if (booking.userId !== input.customerUserId) {
-    throw new BookingDirectError("NOT_BOOKING_OWNER", "Forbidden");
+    throw new BookingDirectError("BOOKING_NOT_FOUND", "Booking request not found");
   }
   const body = input.message.trim();
   if (!body) throw new BookingDirectError("EMPTY_MESSAGE", "Введите сообщение");
