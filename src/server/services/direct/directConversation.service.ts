@@ -60,7 +60,7 @@
 
 import "server-only";
 import prisma from "@/lib/prisma";
-import { canBusinessWriteDirect } from "./directBusinessWritePolicy";
+import { canBusinessWriteDirect, directBookingLifecycleSelect } from "./directBusinessWritePolicy";
 import { DirectActorType, DirectThreadStatus, type Prisma } from "@prisma/client";
 import { getBusinessIdsUserCanAccess } from "@/lib/auth/activityAccess";
 import {
@@ -389,7 +389,7 @@ export async function getUnifiedConversationDetail(
     include: {
       ...threadIncludeWithCustomer,
       messages: { orderBy: { createdAt: "asc" } },
-      bookingRequest: { select: { status: true, kind: true, partyStage: true, businessId: true, userId: true, endsAt: true } },
+      bookingRequest: { select: directBookingLifecycleSelect },
     },
     orderBy: { createdAt: "asc" },
   });
