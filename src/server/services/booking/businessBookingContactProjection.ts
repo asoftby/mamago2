@@ -13,6 +13,17 @@ const ACTIVE_CONTACT_STATUSES = new Set<BookingStatus>([
   BookingStatus.CONFIRMED,
 ]);
 
+/** Terminal bookings and elapsed services must not disclose contact details,
+ * even if their database status has not yet transitioned from CONFIRMED. */
+function canRevealBusinessBookingContacts(booking: BusinessBookingItem, now: Date = new Date()): boolean {
+  if (!ACTIVE_CONTACT_STATUSES.has(booking.status)) return false;
+  if (booking.endsAt) {
+    const endTimestamp = new Date(booking.endsAt).getTime();
+    if (!Number.isFinite(endTimestamp) || endTimestamp <= now.getTime()) return false;
+  }
+  return true;
+}
+
 function removePersonalFields(booking: BusinessBookingItem): BusinessBookingItem {
   return {
     ...booking,
@@ -42,7 +53,7 @@ export function businessBookingListProjection(booking: BusinessBookingItem): Bus
  * Even the single-order archive uses a minimal pseudonymous record.
  */
 export function businessBookingDetailProjection(booking: BusinessBookingItem): BusinessBookingItem {
-  if (!ACTIVE_CONTACT_STATUSES.has(booking.status)) return removePersonalFields(booking);
+  if (!canRevealBusinessBookingContacts(booking)) return removePersonalFields(booking);
   return { ...booking, customerEmail: null };
 }
 
@@ -50,5 +61,5 @@ export function businessBookingDetailProjection(booking: BusinessBookingItem): B
 export function businessBookingDetailRevealsContact(booking: BusinessBookingItem): boolean {
   // The active detail may contain free-text comments or child details even if
   // phone/name are empty. Audit every active detail disclosure, not just phone.
-  return ACTIVE_CONTACT_STATUSES.has(booking.status);
+  return canRevealBusinessBookingContacts(booking);
 }
