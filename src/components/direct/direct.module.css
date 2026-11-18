@@ -706,7 +706,7 @@
   padding: 20px;
   border: 1px solid #e7e5e4;
   border-radius: 18px;
-  background: #fff;
+  background: transparent;
 }
 
 @media (max-width: 390px) {
