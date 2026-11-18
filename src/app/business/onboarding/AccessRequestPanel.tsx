@@ -27,7 +27,7 @@ const ROLE_LABELS: Record<RequesterRole, string> = {
  * already typed in.
  */
 export function AccessRequestPanel({ unp }: { unp: string }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -69,8 +69,7 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
 
   const canSubmit = name.trim().length >= 2 && (phone.trim() || email.trim());
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!canSubmit || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -159,7 +158,27 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 space-y-3 rounded-md border border-gray-200 p-4">
+    <div
+      role="group"
+      aria-label="Запрос доступа к существующей компании"
+      className="mt-3 space-y-3 rounded-md border border-gray-200 p-4"
+      onKeyDown={(event) => {
+        // The access-request controls live inside the parent onboarding form.
+        // Prevent Enter in our own inputs from submitting the onboarding form.
+        if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+          event.preventDefault();
+          event.stopPropagation();
+          void handleSubmit();
+        }
+      }}
+    >
+      <p className="text-sm font-medium text-gray-900">
+        Эта компания уже зарегистрирована. Запрос доступа ещё не отправлен.
+      </p>
+      <p className="text-sm text-gray-600">
+        Заполните данные представителя и нажмите «Отправить заявку».
+        После сохранения вы получите номер заявки.
+      </p>
       {statusCheckFailed && (
         <p className="text-sm text-amber-800" role="status">
           Не удалось проверить ранее отправленные заявки. Это не препятствует повторной отправке.
@@ -243,13 +262,13 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
       {result && !result.ok && <p className="text-sm text-red-600">{result.message}</p>}
 
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={!canSubmit || isSubmitting}>
+        <Button type="button" size="sm" onClick={() => void handleSubmit()} disabled={!canSubmit || isSubmitting}>
           {isSubmitting ? "Отправка..." : "Отправить заявку"}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
           Отмена
         </Button>
       </div>
-    </form>
+    </div>
   );
 }
