@@ -11,6 +11,7 @@
 import { BusinessMemberRole, DirectActorType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
+  DIRECT_WAITING_PING_WINDOW_MS,
   notifyDirectClientWaiting,
   notifyDirectCreated,
   notifyDirectMessage,
@@ -55,7 +56,7 @@ export async function notifyBusinessStaffDirectCreated(
 }
 
 /** One external (e-mail/Telegram) "client is waiting" ping per thread and recipient per this window… */
-export const DIRECT_WAITING_PING_WINDOW_MS = 30 * 60 * 1000;
+export { DIRECT_WAITING_PING_WINDOW_MS } from "@/server/services/notification.service";
 
 /**
  * Should this staff member get an external ping for a new customer message?
@@ -105,9 +106,9 @@ export async function notifyBusinessStaffDirectMessage(
   const results = await Promise.allSettled(
     recipients.map(async (recipientUserId) => {
       await notifyDirectMessage({ ...rest, recipientUserId, recipientSurface: "BUSINESS" });
-      if (await shouldPingStaffAboutThread(recipientUserId, rest.threadId)) {
-        await notifyDirectClientWaiting({ recipientUserId, threadId: rest.threadId, threadNumber: rest.threadNumber });
-      }
+      // The PostgreSQL claim and notice insert are atomic across workers.
+      // Do not pre-check the deadline here: a separate read races concurrent messages.
+      await notifyDirectClientWaiting({ recipientUserId, threadId: rest.threadId, threadNumber: rest.threadNumber });
     }),
   );
   logRejected("[direct] notifyDirectMessage (staff) failed:", results);

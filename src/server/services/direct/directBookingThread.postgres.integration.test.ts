@@ -535,3 +535,26 @@ test("business pings: one external 'waiting' notice per thread and window, reset
   const deliveries = await prisma.notificationDelivery.findMany({ where: { notification: { type: "DIRECT_CLIENT_WAITING", entityId: r.threadId } } });
   assert.ok(deliveries.length > 0 && deliveries.every((d) => d.status === "SKIPPED"), "no real delivery attempted here");
 });
+
+test("business waiting pings are atomic under overlapping customer messages", async () => {
+  const booking = await newBooking();
+  const thread = await openBusinessDirectThreadForBooking({
+    bookingRequestId: booking.id, actorUserId: owner, message: "Конкурентные сообщения",
+  });
+  const messages = Array.from({ length: 8 }, (_, i) => `concurrent-${sfx}-${i}`);
+  await Promise.all(messages.map((messageId) => notifyBusinessStaffDirectMessage({
+    businessId, threadId: thread.threadId, threadNumber: thread.threadNumber, messageId,
+  })));
+
+  const waiting = await prisma.notification.findMany({
+    where: { type: "DIRECT_CLIENT_WAITING", entityType: "DIRECT_THREAD", entityId: thread.threadId },
+    select: { userId: true },
+  });
+  assert.deepEqual(waiting.map((n) => n.userId).sort(), [owner, manager].sort(),
+    "one durable waiting notification for each staff member, regardless of overlap");
+
+  const bellCount = await prisma.notification.count({
+    where: { type: "DIRECT_NEW_MESSAGE", entityId: { in: messages }, userId: { in: [owner, manager] } },
+  });
+  assert.equal(bellCount, messages.length * 2, "every customer message still reaches the business bell");
+});
