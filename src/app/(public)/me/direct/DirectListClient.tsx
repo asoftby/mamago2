@@ -82,7 +82,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
     >
     <div className={styles.page}>
       {total > 0 ? (
-        <section style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+        <section style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div className={styles.filters}>
             {TABS.map((t) => (
               <button
@@ -104,7 +104,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Номер, организация, имя..."
               style={{
-                height: 38, width: "100%", paddingLeft: 38, paddingRight: 14, borderRadius: 99,
+                height: 42, width: "100%", paddingLeft: 38, paddingRight: 14, borderRadius: 99,
                 border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit",
               }}
             />
