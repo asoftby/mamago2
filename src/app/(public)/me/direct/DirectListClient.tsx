@@ -97,7 +97,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
             ))}
           </div>
 
-          <div style={{ position: "relative", width: 260, maxWidth: "100%" }}>
+          <div className={styles.searchBox}>
             <Search size={15} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ink-3)" }} />
             <input
               value={search}

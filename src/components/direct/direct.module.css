@@ -56,13 +56,35 @@
   color: var(--ink-3);
 }
 
+/* One scrollable row of chips (never wraps onto a second line). */
 .filters {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.filters::-webkit-scrollbar {
+  display: none;
+}
+/* Inbox search: 260px next to the chips on wide screens, full width on phones. */
+.searchBox {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+}
+@media (max-width: 767px) {
+  .searchBox {
+    width: 100%;
+  }
 }
 .pill {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
