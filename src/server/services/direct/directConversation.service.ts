@@ -1,61 +1,8 @@
 /**
- * Unified "Мои сообщения" conversation view (Phase 3.2) — one card per
- * counterparty, aggregating multiple existing DirectThread rows, shown
- * identically whether the viewer is acting as a customer or as a business
- * representative.
- *
- * A "conversation" is fully identified by the pair (businessId,
- * customerUserId) — that pair is what groups DirectThread rows together,
- * regardless of who's looking at it:
- *   - Viewing as CUSTOMER: counterparty = the Business (brand/logo).
- *   - Viewing as BUSINESS: counterparty = that Customer (display name/avatar).
- * A user who owns/represents a Business sees BOTH kinds of cards merged
- * into the same list, sorted by lastMessageAt — no separate business inbox.
- *
- * ARCHITECTURAL NOTE / TODO(business-thread-migration):
- * ------------------------------------------------------------------------
- * DirectThread is still exactly what Phase 1 built: one row per
- * (customerUserId, businessId, publication). This file does NOT change
- * that — it is a pure presentation-layer aggregation on top of it, so a
- * customer sees ONE chat per business instead of one card per publication,
- * without any schema migration, without touching createDirectThread(),
- * createDirectMessage(), markThreadRead(), notifications, or audit.
- *
- * Each existing DirectThread becomes an "occasion" (повод обращения) inside
- * the merged conversation — exactly what the current threadNumber (D-10253,
- * D-10458, ...) already represents, just rendered as a header block instead
- * of a separate list card.
- *
- * If this stops being enough (e.g. we need occasions to be independently
- * assignable to different business staff, or a business needs to reply to
- * one occasion without it affecting others' unread state), the real fix is
- * a schema migration along these lines — NOT implemented now:
- *
- *   Business
- *     └─ Conversation   (1 per businessId + customerUserId — new table)
- *          └─ Request   (today's DirectThread, demoted to a child of
- *                         Conversation; keeps publicationType/offerId/
- *                         activityId/placeId, threadNumber, status)
- *               └─ Message  (today's DirectMessage, FK moves from
- *                             threadId → conversationId, keeps a
- *                             requestId to still render occasion headers)
- *
- *   Migration sketch (for a dedicated future phase, NOT this one):
- *     1. Add Conversation table + Conversation.id on DirectThread (nullable
- *        FK, backfillable) instead of dropping/renaming anything.
- *     2. Backfill: group existing DirectThread rows by
- *        (customerUserId, businessId), create one Conversation per group,
- *        set DirectThread.conversationId.
- *     3. Move DirectMessage.threadId reads to join through conversationId
- *        where the UI needs the merged feed; keep threadId for the
- *        "which occasion" tag (no data loss, additive column).
- *     4. Only after both reads and writes are migrated and verified,
- *        consider whether DirectThread should be renamed to
- *        "DirectRequest" — a rename, not a rebuild.
- *   Estimated complexity: MEDIUM (additive migration, backfill script,
- *   no destructive schema changes) — see the Phase 3/3.1/3.2 reports for
- *   the full write-up.
- * ------------------------------------------------------------------------
+ * Customer view groups a family's messages by Business for convenience.
+ * Business view is deliberately scoped to individual DirectThread (occasion)
+ * and must never aggregate multiple bookings into a customer dossier.
+ * No schema or underlying Direct/Booking source of truth is duplicated.
  */
 
 import "server-only";
@@ -73,7 +20,7 @@ export type ConversationTab = "ALL" | "ACTIVE" | "WAITING" | "COMPLETED" | "ARCH
 export type ConversationViewerRole = "CUSTOMER" | "BUSINESS";
 
 export interface UnifiedConversationListItem {
-  /** Stable card key: businessId (CUSTOMER view) or `${businessId}:${customerUserId}` (BUSINESS view). */
+  /** Customer view uses businessId; business view uses a single DirectThread id. */
   key: string;
   viewerRole: ConversationViewerRole;
   counterpartyName: string;
@@ -163,49 +110,86 @@ async function getCustomerSideItems(userId: string): Promise<UnifiedConversation
   return items;
 }
 
-/** Business-side groups: every business this user represents, grouped by which customer messaged them. */
+/** Business-side list: each individual occasion in an authorized Business, never grouped by customer. */
 async function getBusinessSideItems(userId: string, selectedBusinessId?: string): Promise<UnifiedConversationListItem[]> {
   const permittedBusinessIds = await getBusinessIdsUserCanAccess(userId);
   if (selectedBusinessId && !permittedBusinessIds.includes(selectedBusinessId)) return [];
   const businessIds = selectedBusinessId ? [selectedBusinessId] : permittedBusinessIds;
   if (businessIds.length === 0) return [];
 
+  // One row per occasion/booking: do not group by customerUserId, and do not
+  // select customer profile/avatar or build an implicit business customer CRM.
   const threads = await prisma.directThread.findMany({
     where: { businessId: { in: businessIds } },
-    include: threadIncludeWithCustomer,
+    // Only the title is needed for the business request list. Do not fetch
+    // customer profiles, place images, logo metadata or MediaAsset fallbacks.
+    include: {
+      offer: { select: { title: true } },
+      activity: { select: { title: true } },
+      place: { select: { title: true } },
+      messages: threadListInclude.messages,
+      bookingRequest: {
+        select: directBookingLifecycleSelect,
+      },
+    },
     orderBy: { lastMessageAt: "desc" },
   });
 
-  const byCustomer = new Map<string, ThreadWithCustomerRelations[]>();
-  for (const t of threads) {
-    const groupKey = `${t.businessId}:${t.customerUserId}`;
-    const group = byCustomer.get(groupKey);
-    if (group) group.push(t);
-    else byCustomer.set(groupKey, [t]);
-  }
+  // One grouped query for unread counts across the full inbox; per-thread
+  // queries would become N+1 as soon as one customer has multiple requests.
+  const unreadRows = threads.length
+    ? await prisma.directMessage.groupBy({
+        by: ["threadId"],
+        where: {
+          threadId: { in: threads.map((thread) => thread.id) },
+          senderType: { notIn: [DirectActorType.BUSINESS, DirectActorType.ADMIN] },
+          readAt: null,
+        },
+        _count: { _all: true },
+      })
+    : [];
+  const unreadByThread = new Map(unreadRows.map((row) => [row.threadId, row._count._all]));
+  const lastCustomerRows = threads.length
+    ? await prisma.directMessage.groupBy({
+        by: ["threadId"],
+        where: { threadId: { in: threads.map((t) => t.id) }, senderType: DirectActorType.CUSTOMER },
+        _max: { createdAt: true },
+      })
+    : [];
+  const lastCustomerByThread = new Map(lastCustomerRows.map((row) => [row.threadId, row._max.createdAt]));
+  const now = new Date();
 
   const items: UnifiedConversationListItem[] = [];
-  for (const [key, group] of byCustomer) {
-    const latest = group[0];
-    const { publicationTitle } = await resolveDirectBrand(latest);
-    const unreadCount = await unreadCountFor(group.map((g) => g.id), [DirectActorType.BUSINESS, DirectActorType.ADMIN]);
-    const lastMessage = latest.messages[0];
-
+  for (const thread of threads) {
+    const publicationTitle = thread.place?.title ?? thread.offer?.title ?? thread.activity?.title ?? "Публикация недоступна";
+    const unreadCount = unreadByThread.get(thread.id) ?? 0;
+    const lastMessage = thread.messages[0];
+    const canWrite = canBusinessWriteDirect({
+      threadStatus: thread.status,
+      threadBusinessId: thread.businessId,
+      threadCustomerUserId: thread.customerUserId,
+      bookingRequestId: thread.bookingRequestId,
+      booking: thread.bookingRequest,
+      latestCustomerMessageAt: lastCustomerByThread.get(thread.id) ?? null,
+      now,
+    });
     items.push({
-      key,
+      key: thread.id,
       viewerRole: "BUSINESS",
-      counterpartyName: latest.customer.displayName?.trim() || "Пользователь",
-      counterpartyLogoUrl: latest.customer.avatarUrl ?? null,
-      latestThreadId: latest.id,
-      latestThreadNumber: latest.threadNumber,
+      counterpartyName: `Обращение D-${thread.threadNumber}`,
+      counterpartyLogoUrl: null,
+      latestThreadId: thread.id,
+      latestThreadNumber: thread.threadNumber,
       latestPublicationTitle: publicationTitle,
-      lastMessageAt: latest.lastMessageAt,
-      lastMessageBy: latest.lastMessageBy,
+      lastMessageAt: thread.lastMessageAt,
+      lastMessageBy: thread.lastMessageBy,
       lastMessagePreview:
         lastMessage && !lastMessage.hiddenAt ? lastMessage.body : lastMessage ? "Сообщение скрыто модератором" : null,
       unreadCount,
-      occasionCount: group.length,
-      tab: deriveConversationTab(latest.status, latest.lastMessageBy),
+      occasionCount: 1,
+      tab: canWrite
+        ? deriveConversationTab(thread.status, thread.lastMessageBy)
+        : thread.status === DirectThreadStatus.ARCHIVED ? "ARCHIVE" : "COMPLETED",
     });
   }
   return items;
@@ -235,9 +219,7 @@ export function countConversationsByTab(
   return counts;
 }
 
-/** Only client conversations for the selected, authorized business cabinet.
- * Never query or combine this user's personal customer conversations here.
- */
+/** Business inbox: individual owned requests, never a unified per-customer dossier. */
 export async function getBusinessConversationsForUser(
   userId: string,
   businessId: string,
@@ -333,7 +315,8 @@ export interface ConversationMessage {
 
 export interface UnifiedConversationDetail {
   businessId: string;
-  customerUserId: string;
+  /** BUSINESS responses must not disclose a stable cross-booking customer identifier. */
+  customerUserId: string | null;
   viewerRole: ConversationViewerRole;
   counterpartyName: string;
   counterpartyLogoUrl: string | null;
@@ -374,18 +357,21 @@ export async function resolveViewerRoleForThread(
 }
 
 /**
- * Merged, multi-occasion view for one (business, customer) pair — the same
- * data regardless of which side is asking; only counterpartyName/logoUrl
- * and viewerRole flip. Does NOT perform authorization — callers must resolve
- * (and confirm) the viewer role via resolveViewerRoleForThread() first.
+ * Customer sees a unified (business, customer) conversation. Business must
+ * supply an authorized scopedThreadId and sees only that single occasion.
+ * Caller must authorize the selected DirectThread before calling this method.
  */
 export async function getUnifiedConversationDetail(
   businessId: string,
   customerUserId: string,
   viewerRole: ConversationViewerRole,
+  scopedThreadId?: string,
 ): Promise<UnifiedConversationDetail | null> {
+  if (viewerRole === "BUSINESS" && !scopedThreadId) return null;
   const threads = await prisma.directThread.findMany({
-    where: { businessId, customerUserId },
+    where: viewerRole === "BUSINESS"
+      ? { id: scopedThreadId, businessId, customerUserId }
+      : { businessId, customerUserId },
     include: {
       ...threadIncludeWithCustomer,
       messages: { orderBy: { createdAt: "asc" } },
@@ -403,8 +389,9 @@ export async function getUnifiedConversationDetail(
     counterpartyName = brand.name;
     counterpartyLogoUrl = brand.logoUrl;
   } else {
-    counterpartyName = first.customer.displayName?.trim() || "Пользователь";
-    counterpartyLogoUrl = first.customer.avatarUrl ?? null;
+    // Business sees the specific request, not a persistent identifiable profile.
+    counterpartyName = `Обращение D-${first.threadNumber}`;
+    counterpartyLogoUrl = null;
   }
 
   const occasions: ConversationOccasion[] = [];
@@ -457,7 +444,7 @@ export async function getUnifiedConversationDetail(
 
   return {
     businessId,
-    customerUserId,
+    customerUserId: viewerRole === "BUSINESS" ? null : customerUserId,
     viewerRole,
     counterpartyName,
     counterpartyLogoUrl,

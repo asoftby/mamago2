@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
-  getUnifiedConversationCountsForUser,
-  getUnifiedConversationsForUser,
+  countConversationsByTab,
+  getCustomerConversationsForUser,
   type ConversationTab,
 } from "@/server/services/direct/directConversation.service";
 
 const VALID_TABS: ConversationTab[] = ["ALL", "ACTIVE", "WAITING", "COMPLETED", "ARCHIVE"];
 
-/**
- * The single "Мои сообщения" list for everyone (Phase 3.2) — one card per
- * counterparty, merging conversations where this user is the customer with
- * conversations where they represent a Business, sorted by lastMessageAt.
- * No separate business inbox endpoint anymore — see
- * directConversation.service.ts for the aggregation.
- */
+/** Personal inbox API: no business-role messages mixed into /me data. */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
@@ -25,10 +19,17 @@ export async function GET(request: NextRequest) {
   const tab = VALID_TABS.includes(tabParam as ConversationTab) ? (tabParam as ConversationTab) : "ALL";
   const search = request.nextUrl.searchParams.get("q") ?? undefined;
 
-  const [conversations, counts] = await Promise.all([
-    getUnifiedConversationsForUser(user.id, tab, search),
-    getUnifiedConversationCountsForUser(user.id),
-  ]);
+  const all = await getCustomerConversationsForUser(user.id);
+  const counts = countConversationsByTab(all);
+  const needle = search?.trim().toLowerCase();
+  const conversations = all.filter((item) =>
+    (tab === "ALL" || item.tab === tab) &&
+    (!needle || item.counterpartyName.toLowerCase().includes(needle) ||
+      item.latestPublicationTitle.toLowerCase().includes(needle) ||
+      String(item.latestThreadNumber) === needle.replace(/^d-?/i, "")),
+  );
 
-  return NextResponse.json({ conversations, counts });
+  return NextResponse.json({ conversations, counts }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
