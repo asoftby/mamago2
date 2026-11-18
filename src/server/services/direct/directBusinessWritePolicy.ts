@@ -6,19 +6,19 @@
  * Customer and explicitly authorized staff messages have different policies.
  */
 import { BookingKind, BookingStatus, DirectThreadStatus, PartyRequestStage } from "@prisma/client";
+import { resolveBookingServiceEnd, type BookingServiceEndSource } from "@/lib/booking/effectiveServiceEnd";
 
 /** Mirrors the planned 30-day inactive Direct archive horizon until its cron exists. */
 export const BUSINESS_ENQUIRY_REPLY_DAYS = 30;
 const ENQUIRY_WINDOW_MS = BUSINESS_ENQUIRY_REPLY_DAYS * 24 * 60 * 60 * 1000;
 
-export type DirectBookingWriteContext = {
+export type DirectBookingWriteContext = BookingServiceEndSource & {
   status: BookingStatus;
   kind: BookingKind;
   partyStage: PartyRequestStage | null;
   businessId: string;
   userId: string | null;
-  /** A known service end blocks further commercial messages even before status cleanup. */
-  endsAt: Date | null;
+  createdAt: Date;
 };
 
 export type BusinessDirectWriteContext = {
@@ -36,7 +36,7 @@ export type BusinessDirectWriteContext = {
  * business. A NEW or CONFIRMED booking is actionable; terminal states are not.
  */
 export function canBusinessContactForBooking(
-  booking: Pick<DirectBookingWriteContext, "status" | "kind" | "partyStage" | "endsAt">,
+  booking: Pick<DirectBookingWriteContext, "status" | "kind" | "partyStage" | "createdAt"> & BookingServiceEndSource,
   now: Date,
 ): boolean {
   if (booking.status !== BookingStatus.NEW && booking.status !== BookingStatus.CONFIRMED) {
@@ -48,8 +48,15 @@ export function canBusinessContactForBooking(
     PartyRequestStage.AWAITING_RECONFIRM,
     PartyRequestStage.CONFIRMED,
   ].some((stage) => stage === booking.partyStage)) return false;
-  if (booking.endsAt && booking.endsAt.getTime() <= now.getTime()) return false;
-  return true;
+  const effectiveEnd = resolveBookingServiceEnd(booking);
+  if (effectiveEnd) {
+    const end = effectiveEnd.getTime();
+    return Number.isFinite(end) && end > now.getTime();
+  }
+  // Undated requests may be negotiated, but never grant perpetual customer
+  // contact access on an unchanged NEW/CONFIRMED status.
+  const elapsed = now.getTime() - booking.createdAt.getTime();
+  return Number.isFinite(elapsed) && elapsed >= 0 && elapsed < ENQUIRY_WINDOW_MS;
 }
 
 export function canBusinessWriteDirect(context: BusinessDirectWriteContext): boolean {
