@@ -82,7 +82,7 @@ export default async function AdminSystemNotificationsPage({
   // and get the manual Resend action below.
   const reconciledCount = await reconcileStalePendingDeliveries();
 
-  const [notifications, deliveries, failedDeliveries, pendingCount] = await Promise.all([
+  const [notifications, deliveries, failedDeliveries, pendingCount, lastSmsFailure] = await Promise.all([
     prisma.notification.findMany({
       where: notificationWhere,
       orderBy: { createdAt: "desc" },
@@ -126,7 +126,29 @@ export default async function AdminSystemNotificationsPage({
     prisma.notificationDelivery.count({
       where: { status: "PENDING", channel: { in: ["EMAIL", "TELEGRAM"] } },
     }),
+    prisma.notification.findFirst({
+      where: { type: "SYSTEM", audience: "ADMIN", title: "Сбой отправки SMS" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, metadata: true },
+    }),
   ]);
+
+  const smsFailureMetadata =
+    lastSmsFailure?.metadata && typeof lastSmsFailure.metadata === "object" &&
+    !Array.isArray(lastSmsFailure.metadata)
+      ? lastSmsFailure.metadata as Record<string, unknown>
+      : null;
+  const smsFailureReason = typeof smsFailureMetadata?.reason === "string"
+    ? smsFailureMetadata.reason
+    : "неизвестно";
+  const smsProviderMode =
+    process.env.NODE_ENV === "development" && process.env.FORCE_SMS !== "true"
+      ? "SIMULATED — SMS не отправляются"
+      : "LIVE — отправка включена";
+  const smsTokenSet = Boolean(
+    process.env.SMS_BY_TOKEN &&
+      !["YOUR_TOKEN_HERE", "your_sms_by_token_here"].includes(process.env.SMS_BY_TOKEN),
+  );
 
   const emailHealth = emailService.getHealth();
   const telegramConfig = getTelegramConfig();
@@ -160,6 +182,18 @@ export default async function AdminSystemNotificationsPage({
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
+        <HealthCard
+          title="SMS — регистрация"
+          lines={[
+            `Режим: ${smsProviderMode}`,
+            `SMS_BY_TOKEN: ${smsTokenSet ? "SET" : "MISSING"}`,
+            `Последний сбой: ${lastSmsFailure
+              ? `${lastSmsFailure.createdAt.toLocaleString("ru-RU")} (${smsFailureReason})`
+              : "не зарегистрирован"}`,
+            "HTTP 200 сам по себе не означает отправку: нужен ответ провайдера с ID и статусом принятия.",
+            "Статус принятия в очередь не гарантирует доставку на телефон.",
+          ]}
+        />
         <HealthCard
           title="Email"
           lines={[
