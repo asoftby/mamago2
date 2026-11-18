@@ -186,8 +186,10 @@ async function main() {
     const digest = flag("expected-digest");
     const count = flag("expected-count");
     const confirm = flag("confirm");
+    const preventionConfirmed = flag("prevention-deployed");
 
     if (confirm !== "DELETE_TECHNICAL_DRAFT_BUSINESSES" ||
+        preventionConfirmed !== "YES" || snapshot.technicalDrafts < 1 ||
         !actorId || !backupRef || backupRef.length < 8 ||
         !reason || reason.length < 20 ||
         digest !== snapshot.digest ||
@@ -254,13 +256,14 @@ async function main() {
       where: { id: { in: snapshot.rows.map((row) => row.businessId) } },
     });
     console.log(JSON.stringify({
-      result: "APPLIED",
+      result: remaining === 0 ? "APPLIED" : "POSTCHECK_FAILED",
       deletedBusinesses: snapshot.rows.length,
       remainingBusinessRows: remaining,
       technicalUserAccountsDeleted: 0,
       organizerRowsDeleted: 0,
       backupReference: backupRef,
     }, null, 2));
+    if (remaining !== 0) throw new Error("POSTCHECK_FAILED: business rows remain");
   } finally {
     await db.$disconnect();
   }
