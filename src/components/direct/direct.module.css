@@ -374,6 +374,12 @@
   word-break: break-word;
   display: flow-root; /* contain the floated time */
 }
+/* On phones the composer is forced to 16px (globals.css, iOS zoom guard) — match the bubbles to it. */
+@media (max-width: 767px) {
+  .bubble {
+    font-size: 16px;
+  }
+}
 /* Telegram-style time: bottom-right of the bubble, on the last text line when it fits. */
 .bubbleTime {
   float: right;
