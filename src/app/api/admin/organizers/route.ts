@@ -89,6 +89,7 @@ export async function GET(request: NextRequest) {
             createdFrom: true,
             linkedBusinessId: true,
           },
+          orderBy: { createdAt: "asc" },
         })
       : [];
 
@@ -106,11 +107,13 @@ export async function GET(request: NextRequest) {
 
     const merged = [
       ...businesses.map((business) => {
-        const existing = existingForBusinesses.find(
-          (organizer) =>
-            organizer.linkedBusinessId === business.id ||
-            (business.unp && organizer.unp === business.unp && !organizer.linkedBusinessId),
-        );
+        // Prefer the already-linked Organizer over an unlinked row with the same UNP.
+        // This matches the selection endpoint and avoids showing a different name after selection.
+        const existing =
+          existingForBusinesses.find((organizer) => organizer.linkedBusinessId === business.id) ??
+          existingForBusinesses.find(
+            (organizer) => business.unp && organizer.unp === business.unp && !organizer.linkedBusinessId,
+          );
         return existing
           ? serialize(existing, true)
           : {
