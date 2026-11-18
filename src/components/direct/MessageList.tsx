@@ -136,8 +136,10 @@ export function MessageList({ occasions, messages, mineSenderTypes, showOccasion
                 createdAt={m.createdAt}
                 hidden={m.hidden}
                 isMine={mineSenderTypes.includes(m.senderType)}
+                // Ticks only for messages whose read state is per-recipient: CUSTOMER/BUSINESS.
+                // ADMIN (staff) messages are marked read for both sides, so they get none.
                 deliveryStatus={
-                  mineSenderTypes.includes(m.senderType) && m.senderType !== "SYSTEM"
+                  mineSenderTypes.includes(m.senderType) && (m.senderType === "CUSTOMER" || m.senderType === "BUSINESS")
                     ? m.readAt ? "read" : "sent"
                     : undefined
                 }

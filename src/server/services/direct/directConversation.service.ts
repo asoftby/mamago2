@@ -304,9 +304,14 @@ export interface ConversationOccasion {
   emoji: string;
 }
 
-function isViewerOwnMessage(viewerRole: ConversationViewerRole, senderType: DirectActorType): boolean {
+/**
+ * Whose read receipt this viewer may see. ADMIN (mamaGo staff) messages are
+ * deliberately excluded: markThreadRead marks them read for BOTH sides, so their
+ * readAt cannot prove the customer read them.
+ */
+function hasViewerReadReceipt(viewerRole: ConversationViewerRole, senderType: DirectActorType): boolean {
   return viewerRole === "BUSINESS"
-    ? senderType === DirectActorType.BUSINESS || senderType === DirectActorType.ADMIN
+    ? senderType === DirectActorType.BUSINESS
     : senderType === DirectActorType.CUSTOMER;
 }
 
@@ -318,8 +323,8 @@ export interface ConversationMessage {
   createdAt: Date;
   hidden: boolean;
   /**
-   * Read receipt for the VIEWER'S OWN messages only (null for the other side's
-   * and SYSTEM messages) — the counterparty's read state is never disclosed
+   * Read receipt for the VIEWER'S OWN CUSTOMER/BUSINESS messages only (null for the
+   * other side's, SYSTEM and ADMIN messages) — the counterparty's read state is never disclosed
    * beyond what the sender needs to see.
    */
   readAt: Date | null;
@@ -430,7 +435,7 @@ export async function getUnifiedConversationDetail(
         body: m.hiddenAt ? "Сообщение скрыто модератором" : m.body,
         createdAt: m.createdAt,
         hidden: Boolean(m.hiddenAt),
-        readAt: isViewerOwnMessage(viewerRole, m.senderType) ? m.readAt : null,
+        readAt: hasViewerReadReceipt(viewerRole, m.senderType) ? m.readAt : null,
       });
     }
   }
