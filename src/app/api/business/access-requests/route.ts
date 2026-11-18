@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       {
         ok: true,
         alreadyPending: true,
+        requestId: result.request.id,
         message: "Заявка уже отправлена и ожидает проверки.",
       },
       { status: 200 },
