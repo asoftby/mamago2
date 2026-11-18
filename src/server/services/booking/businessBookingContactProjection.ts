@@ -56,9 +56,29 @@ export function businessBookingListProjection(booking: BusinessBookingItem): Bus
  * Email is not needed for Direct and is not exposed through this endpoint.
  * Even the single-order archive uses a minimal pseudonymous record.
  */
+export interface BusinessBookingDetailDisclosure {
+  detail: BusinessBookingItem;
+  revealsContact: boolean;
+}
+
+/**
+ * Atomic response policy: both the projected fields and the mandatory
+ * disclosure audit/rate-limit gate consume this same decision. Do not
+ * recalculate visibility after building a potentially sensitive response.
+ */
+export function projectBusinessBookingDetailWithDisclosure(
+  booking: BusinessBookingItem,
+  now: Date = new Date(),
+): BusinessBookingDetailDisclosure {
+  const revealsContact = canRevealBusinessBookingContacts(booking, now);
+  return {
+    detail: revealsContact ? { ...booking, customerEmail: null } : removePersonalFields(booking),
+    revealsContact,
+  };
+}
+
 export function businessBookingDetailProjection(booking: BusinessBookingItem): BusinessBookingItem {
-  if (!canRevealBusinessBookingContacts(booking)) return removePersonalFields(booking);
-  return { ...booking, customerEmail: null };
+  return projectBusinessBookingDetailWithDisclosure(booking).detail;
 }
 
 /** True only when disclosure is possible and must be audited before response. */
