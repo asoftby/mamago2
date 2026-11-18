@@ -17,6 +17,7 @@ import {
   openCustomerDirectThreadForBooking,
 } from "./directBookingThread.service";
 import { createDirectMessage, DirectBusinessWriteError } from "./directMessage.service";
+import { markThreadRead } from "./directThread.service";
 import { getBusinessConversationsForUser, getUnifiedConversationDetail } from "./directConversation.service";
 import { DirectSendLimitError } from "./directRiskSignal.service";
 import {
@@ -386,4 +387,23 @@ test("business message inbox is scoped by occasion and never aggregates a custom
   const businessAfterCompletion = await getBusinessConversationsForUser(owner, businessId);
   assert.equal(businessAfterCompletion.find((row) => row.latestThreadId === second.threadId)?.tab, "COMPLETED");
   assert.equal((await getUnifiedConversationDetail(businessId, customer, "BUSINESS", second.threadId))?.canWrite, false);
+});
+
+test("read receipts: only CUSTOMER/BUSINESS messages carry one; ADMIN messages never confirm the customer read", async () => {
+  const booking = await newBooking();
+  const r = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Привет" });
+  await createDirectMessage({ threadId: r.threadId, senderType: DirectActorType.ADMIN, senderUserId: owner, body: "Сообщение поддержки" });
+
+  // The business opens the dialog: markThreadRead also marks the ADMIN message read (for either reader).
+  await markThreadRead({ threadId: r.threadId, readerType: DirectActorType.BUSINESS });
+  const before = await getUnifiedConversationDetail(businessId, customer, "BUSINESS", r.threadId);
+  const byBody = (detail: typeof before, body: string) => detail?.messages.find((m) => m.body === body);
+  assert.equal(byBody(before, "Привет")?.readAt, null, "customer has not read the business message yet");
+  assert.equal(byBody(before, "Сообщение поддержки")?.readAt, null, "ADMIN message must not show a read receipt");
+
+  // The customer opens the dialog: the business message is now read; the ADMIN one still carries nothing.
+  await markThreadRead({ threadId: r.threadId, readerType: DirectActorType.CUSTOMER });
+  const after = await getUnifiedConversationDetail(businessId, customer, "BUSINESS", r.threadId);
+  assert.ok(byBody(after, "Привет")?.readAt instanceof Date);
+  assert.equal(byBody(after, "Сообщение поддержки")?.readAt, null);
 });
