@@ -19,7 +19,32 @@ async function user(role: "USER" | "ADMIN" = "USER") {
   const row = await prisma.user.create({ data: { email: `${prefix}-${ids.length}@example.invalid`, role } });
   ids.push(row.id); return row;
 }
-test.after(async () => { await prisma.user.deleteMany({ where: { id: { in: ids } } }); await prisma.$disconnect(); });
+// businessVerification.service fires notifications without awaiting them, and
+// createNotification in turn dispatches IN_APP/EMAIL/TELEGRAM delivery rows in
+// the background. Deleting users while those writes are in flight deadlocks
+// (40P01) on the Notification/NotificationDelivery FK cascade, so every test
+// that triggers them waits for the chain to finish before cleanup runs.
+const DELIVERY_CHANNELS = 3; // IN_APP, EMAIL, TELEGRAM — one row each per notification.
+async function waitFor(label: string, done: () => Promise<boolean>, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await done())) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+async function notificationsSettled(userIds: string[]) {
+  const notifications = await prisma.notification.findMany({
+    where: { userId: { in: userIds } },
+    select: { deliveries: { select: { status: true } } },
+  });
+  return notifications.every(({ deliveries }) =>
+    deliveries.length === DELIVERY_CHANNELS && deliveries.every(({ status }) => status !== "PENDING"));
+}
+test.after(async () => {
+  await waitFor("notification deliveries to settle", () => notificationsSettled(ids));
+  await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  await prisma.$disconnect();
+});
 
 test("OTHER payer normalizes legacy and linked business types to an editable option", () => {
   for (const value of ["UNSPECIFIED", "BUSINESS", undefined, null]) assert.equal(normalizeOtherPayerType(value), "LEGAL_ENTITY");
@@ -176,6 +201,18 @@ test("real registration Server Action rejects revoked OWNER and preserves approv
   assert.equal(changed.isVerified, false);
   assert.equal(changed.npdCheckStatus, "REVIEW_REQUIRED");
   assert.equal(changed.approvedAt, null);
+
+  // Resubmission notifies the owner and every admin in the background; wait
+  // until those notifications exist so cleanup can drain their deliveries.
+  const admins = await prisma.user.findMany({ where: { id: { in: ids }, role: "ADMIN" }, select: { id: true } });
+  await waitFor("verification notifications", async () => {
+    const [submitted, adminNotices] = await Promise.all([
+      prisma.notification.count({ where: { userId: owner.id, type: "BUSINESS_VERIFICATION_SUBMITTED", entityId: business.id } }),
+      prisma.notification.count({ where: { userId: { in: admins.map((a) => a.id) }, type: "BUSINESS_APPLICATION_CREATED", entityId: business.id } }),
+    ]);
+    return submitted === 1 && adminNotices === admins.length;
+  });
+  await waitFor("notification deliveries to settle", () => notificationsSettled(ids));
 });
 
 test("additive migration is idempotent on existing data", async () => {

@@ -60,6 +60,7 @@
 
 import "server-only";
 import prisma from "@/lib/prisma";
+import { canBusinessWriteDirect, directBookingLifecycleSelect } from "./directBusinessWritePolicy";
 import { DirectActorType, DirectThreadStatus, type Prisma } from "@prisma/client";
 import { getBusinessIdsUserCanAccess } from "@/lib/auth/activityAccess";
 import {
@@ -388,6 +389,7 @@ export async function getUnifiedConversationDetail(
     include: {
       ...threadIncludeWithCustomer,
       messages: { orderBy: { createdAt: "asc" } },
+      bookingRequest: { select: directBookingLifecycleSelect },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -438,8 +440,18 @@ export async function getUnifiedConversationDetail(
   // Reply target: most recently created occasion that's still OPEN. An
   // older occasion can be OPEN while a newer one got BLOCKED/ARCHIVED —
   // in that case the older one is still a valid place to keep talking.
+  const now = new Date();
   const writable = threads
     .filter((t) => t.status === DirectThreadStatus.OPEN)
+    .filter((t) => viewerRole !== "BUSINESS" || canBusinessWriteDirect({
+      threadStatus: t.status,
+      threadBusinessId: t.businessId,
+      threadCustomerUserId: t.customerUserId,
+      bookingRequestId: t.bookingRequestId,
+      booking: t.bookingRequest,
+      latestCustomerMessageAt: t.messages.filter((m) => m.senderType === DirectActorType.CUSTOMER).at(-1)?.createdAt ?? null,
+      now,
+    }))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const replyTargetThreadId = writable[0]?.id ?? null;
 
