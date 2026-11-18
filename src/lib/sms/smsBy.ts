@@ -1,8 +1,8 @@
 /**
  * SMS.BY sendQuickSms client (app.sms.by API v1)
  *
- * Correct request format: POST form-encoded with alphaname_id.
- * JSON body does NOT work — returns "ошибка в буквенном имени".
+ * Correct request format: POST form-encoded with token, phone and message.
+ * The approved default sender is configured in the SMS.BY account; never pass alphaname_id.
  */
 
 interface SendQuickSmsParams {
@@ -45,7 +45,6 @@ export async function sendQuickSms({
     token,
     phone: phoneDigits,
     message,
-    alphaname_id: "4720",
   });
 
   console.log(`[smsBy] sending to ${phoneDigits.slice(0, 6)}... via ${url}`);
