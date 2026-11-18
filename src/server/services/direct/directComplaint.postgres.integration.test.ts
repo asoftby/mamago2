@@ -10,6 +10,7 @@ import { BookingStatus, DirectComplaintStatus, PublicationType } from "@prisma/c
 import prisma from "@/lib/prisma";
 import { openBusinessDirectThreadForBooking } from "./directBookingThread.service";
 import { createComplaint, DirectComplaintError, resolveComplaint } from "./directComplaint.service";
+import { getUnifiedNotificationFeed, getUnreadCount, notifyDirectMessage } from "@/server/services/notification.service";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl || !["localhost", "127.0.0.1"].includes(new URL(databaseUrl).hostname)) {
@@ -162,4 +163,27 @@ test("resolving an unknown complaint is NOT_FOUND, not a server error", async ()
     (e: unknown) => e instanceof DirectComplaintError && e.code === "NOT_FOUND",
   );
   assert.equal(await prisma.notification.count({ where: { userId: bystander } }), 0);
+});
+
+test("the business bell actually shows Direct notices (feed + unread count), but only BUSINESS-audience ones", async () => {
+  // Regression: Direct types are not in NOTIFICATION_REGISTRY, so stream=business used to drop them.
+  const complaint = await fileComplaint({ threadId, reporterUserId: owner, reason: "SPAM" });
+  await resolveComplaint({
+    complaintId: complaint.id, reviewedByUserId: moderator, actorRole: "MODERATOR",
+    status: DirectComplaintStatus.REVIEWED, resolution: "ok",
+  });
+  await waitFor("business complaint outcome", async () => (await notificationsFor("DIRECT_COMPLAINT_RESOLVED", complaint.id)).length >= 1);
+
+  // A personal (USER-audience) Direct notice of the same account must NOT leak into the cabinet feed.
+  const personalMessageId = "dcp-personal-" + sfx;
+  await notifyDirectMessage({
+    recipientUserId: owner, recipientSurface: "USER", threadId, threadNumber, messageId: personalMessageId,
+  });
+  await waitFor("personal notice", async () => (await prisma.notification.count({ where: { entityId: personalMessageId } })) >= 1);
+
+  const feed = await getUnifiedNotificationFeed(owner, 50, 0, "business");
+  assert.ok(feed.some((n) => n.entityId === complaint.id && n.type === "DIRECT_COMPLAINT_RESOLVED"), "complaint outcome is in the business feed");
+  assert.ok(!feed.some((n) => n.entityId === personalMessageId), "personal Direct notice stays out of the business feed");
+  assert.ok((await getUnreadCount(owner, "business")) >= 1, "unread badge counts the Direct notice");
+  assert.ok(feed.every((n) => n.audience === "BUSINESS" || n.type !== "DIRECT_NEW_MESSAGE"));
 });

@@ -92,12 +92,33 @@ export function getAccessibleSurfacesForUser(user: {
   return surfaces;
 }
 
+/**
+ * Direct (messages) notices are not in NOTIFICATION_REGISTRY, so the registry-derived
+ * NOTIFICATION_TYPES_BUSINESS never contained them and the business bell silently
+ * dropped them (rows existed, the feed and unread count were empty). They belong to
+ * the business feed when — and only when — they are addressed to the BUSINESS audience,
+ * so a personal (USER) Direct notice of a business owner never leaks into the cabinet.
+ */
+const DIRECT_BUSINESS_FEED_TYPES: NotificationType[] = [
+  "DIRECT_THREAD_CREATED",
+  "DIRECT_NEW_MESSAGE",
+  "DIRECT_COMPLAINT_RESOLVED",
+];
+
 function mergeStreamFilter(
   base: Prisma.NotificationWhereInput,
   stream?: NotificationStreamFilter,
 ): Prisma.NotificationWhereInput {
   if (stream === "user") return { ...base, type: { in: NOTIFICATION_TYPES_USER } };
-  if (stream === "business") return { ...base, type: { in: NOTIFICATION_TYPES_BUSINESS } };
+  if (stream === "business") {
+    return {
+      ...base,
+      OR: [
+        { type: { in: NOTIFICATION_TYPES_BUSINESS } },
+        { type: { in: DIRECT_BUSINESS_FEED_TYPES }, audience: "BUSINESS" },
+      ],
+    };
+  }
   return base;
 }
 
