@@ -9,6 +9,7 @@ import {
   sendBusinessContactVerificationCode,
 } from "@/lib/phone-verification/businessContactVerification";
 import { isBusinessContactOtpEscalationError } from "@/lib/phone-verification/businessContactOtpErrors";
+import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
 
 export const runtime = "nodejs";
 
@@ -64,6 +65,18 @@ export async function POST(request: NextRequest) {
             otpState,
           },
           { status }
+        );
+      }
+
+      if (error instanceof SmsByDeliveryError) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: error.message,
+            code: "SMS_DELIVERY_FAILED",
+            otpState,
+          },
+          { status: 503 },
         );
       }
 
