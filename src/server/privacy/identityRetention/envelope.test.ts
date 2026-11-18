@@ -129,3 +129,26 @@ test("operator selector matches phone by digits (any format), business phone, em
   assert.ok(!matchesIdentitySelector(payload, { email: "other@example.test" }));
   assert.ok(!matchesIdentitySelector(payload, {}));
 });
+
+test("server refuses RSA private PEM in the public-key environment variable", () => {
+  const unencrypted = keyPair(3072);
+  assert.throws(
+    () => loadPublicKey(unencrypted.privateKey),
+    (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "INVALID",
+  );
+  assert.throws(
+    () => loadPublicKey(Buffer.from(unencrypted.privateKey).toString("base64")),
+    (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "INVALID",
+  );
+});
+
+test("envelope v1 rejects truncated GCM tags instead of downgrading authentication", () => {
+  const sealed = sealIdentityPayload(buildIdentityPayload(user, endedAt), loadPublicKey(main.publicKey));
+  const parsed = JSON.parse(sealed.envelope);
+  const tag = Buffer.from(parsed.tag, "base64");
+  parsed.tag = tag.subarray(0, 4).toString("base64");
+  assert.throws(
+    () => openIdentityEnvelope(JSON.stringify(parsed), user.id, loadPrivateKey(main.privateKey, "test-passphrase")),
+    (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "MALFORMED_ENVELOPE",
+  );
+});
