@@ -42,29 +42,27 @@ export function BusinessDirectInbox({ initialConversations, initialCounts, selec
     // UnreadBadge/StatusBadge; without it they fall back to the global gray theme.
     <div className={`${styles.businessPage} space-y-4`}>
       <div className="rounded-2xl border border-stone-200 bg-white p-4 md:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Фильтр переписок">
-            {tabs.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setTab(value)}
-                aria-pressed={tab === value}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${tab === value ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`}
-              >
-                {label} <span className="ml-1 tabular-nums">{initialCounts[value]}</span>
-              </button>
-            ))}
-          </div>
-          <label className="relative block w-full sm:w-64">
-            <span className="sr-only">Найти переписку</span>
-            <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={17} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)}
-              placeholder="Публикация или номер обращения"
-              className="h-10 w-full rounded-full border border-stone-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-stone-400" />
-          </label>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Фильтр переписок">
+          {tabs.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTab(value)}
+              aria-pressed={tab === value}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${tab === value ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`}
+            >
+              {label} <span className="ml-1 tabular-nums">{initialCounts[value]}</span>
+            </button>
+          ))}
         </div>
       </div>
+      <label className="relative block w-full">
+        <span className="sr-only">Найти переписку</span>
+        <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={17} />
+        <input value={query} onChange={(event) => setQuery(event.target.value)}
+          placeholder="Публикация или номер обращения"
+          className="h-10 w-full rounded-full border border-stone-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-stone-400" />
+      </label>
       {visible.length ? (
         <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
           <div className="divide-y divide-stone-100">
