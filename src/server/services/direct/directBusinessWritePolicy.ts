@@ -5,8 +5,30 @@
  *
  * Customer and explicitly authorized staff messages have different policies.
  */
-import { BookingKind, BookingStatus, DirectThreadStatus, PartyRequestStage } from "@prisma/client";
+import { BookingKind, BookingStatus, DirectThreadStatus, PartyRequestStage, type Prisma } from "@prisma/client";
 import { resolveBookingServiceEnd, type BookingServiceEndSource } from "@/lib/booking/effectiveServiceEnd";
+
+/**
+ * All business Direct entrypoints must select the same effective service dates.
+ * A stale CONFIRMED booking often has endsAt=null even after a dated visit.
+ */
+export const directBookingLifecycleSelect = {
+  status: true,
+  kind: true,
+  partyStage: true,
+  businessId: true,
+  userId: true,
+  createdAt: true,
+  endsAt: true,
+  startsAt: true,
+  requestedDate: true,
+  campShiftDateTo: true,
+  session: { select: { startsAt: true } },
+  offerSession: { select: { startAt: true, endAt: true } },
+  partyOrderItem: {
+    select: { partyOrder: { select: { eventDate: true, timeTo: true } } },
+  },
+} as const satisfies Prisma.BookingRequestSelect;
 
 /** Mirrors the planned 30-day inactive Direct archive horizon until its cron exists. */
 export const BUSINESS_ENQUIRY_REPLY_DAYS = 30;
