@@ -22,16 +22,20 @@ export function OrganizerSearchSelect({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ExistingOrganizer[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       setIsSearching(false);
+      setSearchError(null);
       return;
     }
 
     let isActive = true;
     setIsSearching(true);
+    setSearchError(null);
 
     const timer = setTimeout(async () => {
       try {
@@ -55,6 +59,11 @@ export function OrganizerSearchSelect({
         console.error("[OrganizerSearchSelect] Search error:", e);
         if (isActive) {
           setSearchResults([]);
+          setSearchError(
+            e instanceof Error && e.message.includes("403")
+              ? "Нет доступа к поиску организаторов. Проверьте права в бизнес-кабинете."
+              : "Не удалось выполнить поиск. Попробуйте ещё раз.",
+          );
         }
       } finally {
         if (isActive) {
@@ -68,6 +77,39 @@ export function OrganizerSearchSelect({
       clearTimeout(timer);
     };
   }, [searchQuery]);
+
+  async function handleChoose(organizer: ExistingOrganizer) {
+    if (!isEditable || isResolving) return;
+    if (!organizer.id.startsWith("business:")) {
+      onSelect(organizer);
+      return;
+    }
+
+    const businessId = organizer.id.slice("business:".length);
+    setIsResolving(true);
+    setSearchError(null);
+    try {
+      const response = await fetch("/api/business/events/organizer-from-verified-business", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId }),
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        organizer?: ExistingOrganizer;
+        error?: string;
+      };
+      if (!response.ok || !json.ok || !json.organizer) {
+        throw new Error(json.error || "Не удалось выбрать организатора");
+      }
+      onSelect(json.organizer);
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : "Не удалось выбрать организатора");
+    } finally {
+      setIsResolving(false);
+    }
+  }
 
   if (selectedOrganizer) {
     return (
@@ -128,9 +170,13 @@ export function OrganizerSearchSelect({
 
         {searchQuery && (
           <div className="space-y-2">
-            {isSearching ? (
+            {searchError ? (
+              <div role="alert" className="text-center py-4 text-red-700 text-sm">
+                {searchError}
+              </div>
+            ) : isSearching || isResolving ? (
               <div className="text-center py-4 text-gray-500 text-sm">
-                Поиск...
+                {isResolving ? "Выбираем организатора..." : "Поиск..."}
               </div>
             ) : searchResults.length > 0 ? (
               <div className="space-y-2">
@@ -139,8 +185,8 @@ export function OrganizerSearchSelect({
                   <button
                     key={organizer.id}
                     type="button"
-                    onClick={() => onSelect(organizer)}
-                    disabled={!isEditable}
+                    onClick={() => void handleChoose(organizer)}
+                    disabled={!isEditable || isResolving}
                     className="w-full p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-white text-left transition-colors"
                   >
                     <div className="flex items-start gap-3">
