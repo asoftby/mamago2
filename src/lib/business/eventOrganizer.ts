@@ -1,7 +1,5 @@
 import type { Organizer, OrganizerCreatedFrom, PrismaClient } from "@prisma/client";
-import { DISABLED_PASSWORD_HASH } from "@/lib/auth/crypto";
 import { normalizePhoneToE164 } from "@/lib/phone/e164";
-import { resolveCompanyByUnp } from "@/server/company/resolveByUnp";
 
 export type OrganizerFormMode = "existing" | "import" | "manual";
 
@@ -69,72 +67,6 @@ function normalizeUnp(value: string | null | undefined): string | null {
   return /^\d{9}$/.test(cleaned) ? cleaned : null;
 }
 
-async function ensureServiceBusinessOwnerForUnp(
-  prisma: PrismaClient,
-  unp: string,
-  legalName: string,
-) {
-  const email = `organizer-unp-${unp}@mamago.local`;
-  const existing = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  return prisma.user.create({
-    data: {
-      email,
-      passwordHash: DISABLED_PASSWORD_HASH,
-      role: "USER",
-      status: "ACTIVE",
-      emailVerifiedAt: new Date(),
-      displayName: legalName,
-    },
-    select: { id: true },
-  });
-}
-
-async function ensureLinkedBusinessForOrganizer(params: {
-  prisma: PrismaClient;
-  unp: string;
-  legalName: string;
-  phone: string | null;
-  website: string | null;
-}) {
-  const existing = await params.prisma.business.findFirst({
-    where: { unp: params.unp },
-    select: { id: true },
-  });
-
-  if (existing) {
-    return existing.id;
-  }
-
-  const owner = await ensureServiceBusinessOwnerForUnp(
-    params.prisma,
-    params.unp,
-    params.legalName,
-  );
-
-  const created = await params.prisma.business.create({
-    data: {
-      ownerUserId: owner.id,
-      name: params.legalName,
-      legalName: params.legalName,
-      unp: params.unp,
-      phone: params.phone,
-      verificationStatus: "DRAFT",
-      status: "DRAFT",
-    },
-    select: { id: true },
-  });
-
-  return created.id;
-}
-
 export async function resolveEventOrganizer(
   prisma: PrismaClient,
   input: EventOrganizerInput,
@@ -167,18 +99,12 @@ export async function resolveEventOrganizer(
         select: { id: true },
       })
     : null;
-  const unpLookup = unp ? await resolveCompanyByUnp(unp) : { legalName: null, source: null };
-  const linkedBusinessId = existingBusinessByUnp?.id
-    ? existingBusinessByUnp.id
-    : unp && unpLookup.legalName
-      ? await ensureLinkedBusinessForOrganizer({
-          prisma,
-          unp,
-          legalName: unpLookup.legalName,
-          phone,
-          website,
-        })
-      : null;
+  // An organizer is a catalog identity, not proof of a registered business.
+  // Do not create a placeholder Business + technical User just because an
+  // organizer supplied an УНП; that would reserve the unique УНП and prevent
+  // the legitimate company from registering its own account.
+  // Keep linking to an already-existing Business when one is present.
+  const linkedBusinessId = existingBusinessByUnp?.id ?? null;
 
   const exactNameWhere = { equals: name, mode: "insensitive" as const };
 
