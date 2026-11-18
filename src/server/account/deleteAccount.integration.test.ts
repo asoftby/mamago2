@@ -5,6 +5,9 @@ import { hashPassword } from "@/lib/auth/crypto";
 import { createSession, validateSession } from "@/lib/auth/session";
 import { verifyLoginPassword } from "@/lib/auth/credentials";
 import { deleteAccount } from "./deleteAccount.service";
+import { installTestIdentityRetentionKey } from "@/server/privacy/identityRetention/testKey";
+
+installTestIdentityRetentionKey();
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL must point at a disposable SEC-007 test database");

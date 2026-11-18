@@ -11,6 +11,9 @@ import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { deleteAccount } from "./deleteAccount.service";
+import { installTestIdentityRetentionKey } from "@/server/privacy/identityRetention/testKey";
+
+installTestIdentityRetentionKey();
 
 const db = new PrismaClient();
 const userId = `delinbox-${randomUUID().slice(0, 8)}`;

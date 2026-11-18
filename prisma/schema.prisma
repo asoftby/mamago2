@@ -306,6 +306,27 @@ model ActivationDeliveryAudit {
   @@index([requestedAt])
 }
 
+/// Данные предварительной идентификации удалённого аккаунта (постановление
+/// Совмина РБ № 850): хранятся год после расторжения пользовательского
+/// соглашения и удаляются cron-задачей `identity-retention-purge`.
+/// `envelope` — гибридный шифротекст (AES-256-GCM + RSA-OAEP-256 публичным
+/// ключом IDENTITY_RETENTION_PUBLIC_KEY). Приватного ключа на сервере нет:
+/// расшифровка только по запросу уполномоченного органа через
+/// `identity-retention-disclose` с записью в AdminAuditLog.
+/// Без FK на User: запись должна пережить любые будущие изменения tombstone.
+model IdentityRetentionRecord {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  keyId            String
+  envelope         String
+  accountCreatedAt DateTime
+  agreementEndedAt DateTime
+  purgeAfter       DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([purgeAfter])
+}
+
 model PhoneOtp {
   id         String   @id @default(cuid())
   userId     String
@@ -4720,6 +4741,8 @@ enum NotificationType {
   DIRECT_COMPLAINT_OPENED
   /// Жалоба рассмотрена (получает заявитель; без внутренней заметки модератора)
   DIRECT_COMPLAINT_RESOLVED
+  /// Клиент ждёт ответа в Direct-треде (только бизнесу; внешние каналы, не показывается в колокольчике)
+  DIRECT_CLIENT_WAITING
   SUPPORT_BUSINESS_REPLY
   SUPPORT_STAFF_MESSAGE
   IMPORT_CHANNELS_DIGEST
