@@ -6,6 +6,7 @@ import {
   businessBookingListProjection,
   businessBookingDetailProjection,
   businessBookingDetailRevealsContact,
+  projectBusinessBookingDetailWithDisclosure,
 } from "./businessBookingContactProjection";
 
 const booking = {
@@ -84,4 +85,29 @@ test("undated active booking contact visibility expires after 30 days", () => {
   assert.equal(businessBookingDetailProjection(old).customerPhone, "");
   assert.equal(businessBookingDetailRevealsContact(old), false);
   assert.equal(businessBookingDetailProjection(recent).customerPhone, booking.customerPhone);
+});
+
+test("contact projection and disclosure audit gate share the same expiry snapshot", () => {
+  const expiresAt = Date.now() + 60_000;
+  const timed = { ...booking, endsAt: new Date(expiresAt).toISOString() };
+  const before = projectBusinessBookingDetailWithDisclosure(timed, new Date(expiresAt - 1));
+  assert.equal(before.revealsContact, true);
+  assert.equal(before.detail.customerPhone, booking.customerPhone);
+
+  // Even if the service expires immediately after projection, its audit gate
+  // stays true; the response must never carry contacts with a false gate.
+  const after = projectBusinessBookingDetailWithDisclosure(timed, new Date(expiresAt));
+  assert.equal(after.revealsContact, false);
+  assert.equal(after.detail.customerPhone, "");
+  assert.equal(after.detail.customerName, "Клиент");
+
+  const createdAt = "2026-01-01T00:00:00.000Z";
+  const cutoff = new Date(createdAt).getTime() + 30 * 86_400_000;
+  const undated = { ...booking, endsAt: null, createdAt };
+  const justBefore = projectBusinessBookingDetailWithDisclosure(undated, new Date(cutoff - 1));
+  const atCutoff = projectBusinessBookingDetailWithDisclosure(undated, new Date(cutoff));
+  assert.equal(justBefore.revealsContact, true);
+  assert.equal(justBefore.detail.customerPhone, booking.customerPhone);
+  assert.equal(atCutoff.revealsContact, false);
+  assert.equal(atCutoff.detail.customerPhone, "");
 });

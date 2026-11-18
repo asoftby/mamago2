@@ -14,8 +14,7 @@ import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import {
-  businessBookingDetailProjection,
-  businessBookingDetailRevealsContact,
+  projectBusinessBookingDetailWithDisclosure,
   businessBookingListProjection,
 } from "@/server/services/booking/businessBookingContactProjection";
 
@@ -40,8 +39,10 @@ export async function GET(
   const item = await getBusinessBookingById(id, business.id);
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await attachDirectAvailabilityToBusinessBookings([item]);
-  const detail = businessBookingDetailProjection(item);
-  if (businessBookingDetailRevealsContact(detail)) {
+  // The projection and mandatory audit/rate-limit decision share one
+  // immutable policy result, including at service-end expiry boundaries.
+  const { detail, revealsContact } = projectBusinessBookingDetailWithDisclosure(item);
+  if (revealsContact) {
     // A selected order is not an export endpoint. Bound large automated reads
     // by an authenticated staff member to deter collection of customer lists.
     const limit = await checkRateLimit(`business_contact_detail:${business.id}:${user.id}`, 120, 15 * 60 * 1000);
