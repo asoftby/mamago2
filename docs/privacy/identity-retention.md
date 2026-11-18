@@ -69,14 +69,14 @@ base64 -w0 mamago-identity-retention-public.pem   # значение для env
 4. Установить `DATABASE_URL` локально с ограниченными правами и ввести пароль ключа без его записи в shell history или аргументы процесса. Пример команды **на операторской машине**:
 
    ```bash
-   read -rs "IDENTITY_RETENTION_PRIVATE_KEY_PASSPHRASE?Пароль закрытого ключа: "
+   read -r -s -p "Пароль закрытого ключа: " IDENTITY_RETENTION_PRIVATE_KEY_PASSPHRASE
+   printf '\n'
    export IDENTITY_RETENTION_PRIVATE_KEY_PASSPHRASE
-   printf '\\n'
-   node dist/ops/identity-retention-disclose.js \\
-     --request-ref="Запрос № … от …" \\
-     --operator="Ответственный сотрудник" \\
-     --private-key-file="./mamago-identity-retention-private.pem" \\
-     --phone="+375XXXXXXXXX" \\
+   node dist/ops/identity-retention-disclose.js \
+     --request-ref="Запрос № … от …" \
+     --operator="Ответственный сотрудник" \
+     --private-key-file="./mamago-identity-retention-private.pem" \
+     --phone="+375XXXXXXXXX" \
      --confirm-host="имя_хоста_бд"
    unset IDENTITY_RETENTION_PRIVATE_KEY_PASSPHRASE
    ```
