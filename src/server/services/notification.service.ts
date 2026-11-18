@@ -21,6 +21,7 @@ import {
 } from "@/server/notifications/notification-lifecycle";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
+  DirectActorType,
   Prisma,
   type Notification as NotificationModel,
   type NotificationActionMode,
@@ -127,6 +128,17 @@ function mergeStreamFilter(
  * The DB record is preserved — only the feed query excludes it.
  * WELCOME is a legacy onboarding type; it is not part of the active USER settings model.
  */
+/**
+ * Types that exist only to drive external channels (e-mail/Telegram). Their in-app
+ * twin is already in the feed (every Direct message is a DIRECT_NEW_MESSAGE row), so
+ * showing them too would double each entry in the bell and in the unread count.
+ */
+const EXTERNAL_ONLY_NOTIFICATION_TYPES: NotificationType[] = ["DIRECT_CLIENT_WAITING"];
+
+function mergeHideExternalOnlyTypes(base: Prisma.NotificationWhereInput): Prisma.NotificationWhereInput {
+  return { AND: [base, { NOT: { type: { in: EXTERNAL_ONLY_NOTIFICATION_TYPES } } }] };
+}
+
 function mergeHideWelcomeWhenTelegramConnected(
   base: Prisma.NotificationWhereInput,
   telegramConnected?: boolean,
@@ -839,7 +851,9 @@ function buildNotificationBaseWhere(
     where = mergeAccessibleSurfacesFilter(where, options.accessibleSurfaces);
   }
 
-  return mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  return mergeHideExternalOnlyTypes(
+    mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected),
+  );
 }
 
 /**
@@ -1779,6 +1793,101 @@ export async function notifyDirectMessage(params: NotifyDirectMessageParams) {
       ? `/business/direct/${params.threadId}`
       : `/me/direct/${params.threadId}`,
   });
+}
+
+export interface NotifyDirectClientWaitingParams {
+  /** Business staff member to ping through e-mail/Telegram (per-user channel preferences apply). */
+  recipientUserId: string;
+  threadId: string;
+  threadNumber: number;
+}
+
+/**
+ * One external Direct ping per recipient/thread/waiting cycle, even with
+ * overlapping HTTP requests or multiple Next.js workers.
+ *
+ * A PostgreSQL transaction-scoped advisory lock serializes claims for this
+ * exact pair. The notice is inserted in the same transaction before the
+ * lock is released, so the next claimant sees it. Delivery is dispatched
+ * only AFTER commit, never under the DB lock.
+ */
+export const DIRECT_WAITING_PING_WINDOW_MS = 30 * 60 * 1000;
+
+export async function notifyDirectClientWaiting(params: NotifyDirectClientWaitingParams) {
+  const title = `Клиент ждёт ответа в ${formatDirectThreadNumber(params.threadNumber)}`;
+  const body = "Откройте диалог в кабинете, чтобы ответить.";
+  const href = `/business/direct/${params.threadId}`;
+  const action = resolveNotificationActionDefaults({
+    type: "DIRECT_CLIENT_WAITING",
+    title,
+    body,
+    actionUrl: href,
+  });
+  const lockKey = `direct-waiting:${params.recipientUserId}:${params.threadId}`;
+
+  const notification = await prisma.$transaction(async (tx) => {
+    // SELECT returns text (not PostgreSQL void) for safe Prisma decoding.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text AS lock_token`;
+    const now = new Date();
+    const lastPing = await tx.notification.findFirst({
+      where: {
+        userId: params.recipientUserId,
+        entityType: "DIRECT_THREAD",
+        entityId: params.threadId,
+        type: { in: ["DIRECT_THREAD_CREATED", "DIRECT_CLIENT_WAITING"] },
+        createdAt: { gte: new Date(now.getTime() - DIRECT_WAITING_PING_WINDOW_MS) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+
+    if (lastPing) {
+      const reply = await tx.directMessage.findFirst({
+        where: {
+          threadId: params.threadId,
+          senderType: { in: [DirectActorType.BUSINESS, DirectActorType.ADMIN] },
+          createdAt: { gt: lastPing.createdAt },
+        },
+        select: { id: true },
+      });
+      if (!reply) return null;
+    }
+
+    // Prisma's @default(now()) would use transaction-start time, potentially
+    // older than a reply committed while this transaction waited for the lock.
+    // Stamp the claim only after the lock and latest-reply check.
+    const claimedAt = new Date();
+    return tx.notification.create({
+      data: {
+        createdAt: claimedAt,
+        userId: params.recipientUserId,
+        audience: "BUSINESS",
+        type: "DIRECT_CLIENT_WAITING",
+        title,
+        body,
+        entityType: "DIRECT_THREAD",
+        entityId: params.threadId,
+        ctaLabel: "Открыть диалог",
+        ctaAction: href,
+        actionMode: action.actionMode,
+        actionUrl: action.actionUrl,
+        modalTitle: action.modalTitle,
+        modalBody: action.modalBody,
+      },
+    });
+  }, { timeout: 15_000 });
+
+  if (!notification) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: params.recipientUserId },
+    select: { id: true, email: true, role: true },
+  });
+  if (user) {
+    void dispatchDelivery(notification, user).catch((e) =>
+      console.error("[notification] Direct waiting delivery failed:", e),
+    );
+  }
+  return notification;
 }
 
 export interface NotifyDirectComplaintOpenedParams {
