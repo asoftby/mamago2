@@ -851,4 +851,11 @@
     padding-left: 0;
     padding-right: 0;
   }
+  /* business: the dialog header card starts on the same line as the filters card on the left */
+  .inboxDetail .businessThread {
+    padding-top: 0;
+  }
+  .inboxDetail .businessThread .topCard {
+    margin-top: 0;
+  }
 }
