@@ -31,6 +31,19 @@ export interface SmsByResponse {
   message?: unknown;
 }
 
+/** The provider default sender is used; never include alphaname_id. */
+export function buildSmsByRequestBody(params: {
+  token: string;
+  phoneDigits: string;
+  message: string;
+}): URLSearchParams {
+  return new URLSearchParams({
+    token: params.token,
+    phone: params.phoneDigits,
+    message: params.message,
+  });
+}
+
 const ACCEPTED_STATUSES = new Set([
   "NEW", "QUEUED", "ACCEPTED", "SENT", "DELIVERED", "SUCCESS", "OK",
 ]);
