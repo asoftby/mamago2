@@ -72,17 +72,10 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
   const total = initialCounts.ALL;
 
   return (
-    <AccountPage
-      title="Мои сообщения"
-      lead={
-        total > 0
-          ? `Одна переписка на каждую организацию. Всего ${total}: ${initialCounts.ACTIVE} активны, ${initialCounts.WAITING} ждут ответа.`
-          : "Одна переписка на каждую организацию — все ваши заявки и вопросы к ней в одном месте."
-      }
-    >
+    <AccountPage title="Мои сообщения">
     <div className={styles.page}>
       {total > 0 ? (
-        <section style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+        <section style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div className={styles.filters}>
             {TABS.map((t) => (
               <button
@@ -97,14 +90,14 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
             ))}
           </div>
 
-          <div style={{ position: "relative", width: 260, maxWidth: "100%" }}>
+          <div className={styles.searchBox}>
             <Search size={15} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ink-3)" }} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Номер, организация, имя..."
               style={{
-                height: 38, width: "100%", paddingLeft: 38, paddingRight: 14, borderRadius: 99,
+                height: 42, width: "100%", paddingLeft: 38, paddingRight: 14, borderRadius: 99,
                 border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit",
               }}
             />

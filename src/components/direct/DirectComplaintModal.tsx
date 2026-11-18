@@ -51,8 +51,19 @@ export function DirectComplaintModal({ open, onOpenChange, threadId }: Props) {
   }
 
   return (
-    <ResponsiveOverlay open={open} onOpenChange={handleClose} a11yTitle="Пожаловаться" variant="chromeless">
-      <div style={{ background: "#F6F2EA", borderRadius: 24, padding: "24px 24px 22px", maxWidth: 420 }}>
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={handleClose}
+      a11yTitle="Пожаловаться"
+      variant="chromeless"
+      // The overlay shell is the card: size it to this short form instead of the
+      // default tall sheet / 960px dialog, so no second card floats inside it.
+      sheetContentClassName="!h-auto max-h-[92dvh] !bg-[#F6F2EA]"
+      dialogContentClassName="!w-[min(92vw,420px)] !max-w-[420px] !bg-[#F6F2EA]"
+    >
+      <div
+        className="overflow-y-auto px-6 pt-6 pb-[max(22px,env(safe-area-inset-bottom))]"
+      >
         {phase === "sent" ? (
           <div style={{ textAlign: "center", padding: "16px 0" }}>
             <div style={{ width: 56, height: 56, borderRadius: 99, background: "rgba(31,138,91,.12)", color: "#1F8A5B", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 16px" }}>✓</div>
