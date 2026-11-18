@@ -717,8 +717,9 @@
   .businessThread {
     padding-top: 0;
   }
+  /* same visual gap under "← Все сообщения" as between the description and that link (29px) */
   .businessThread .topCard {
-    margin-top: 8px;
+    margin-top: 27px; /* collapses with space-y-4's 16px on the wrapper, so 27px lands on 29px visually */
   }
 }
 
