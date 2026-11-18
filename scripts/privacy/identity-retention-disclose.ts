@@ -83,7 +83,7 @@ async function main(): Promise<number> {
   const db = new PrismaClient();
   try {
     const candidates = await db.identityRetentionRecord.findMany({
-      where: userId ? { userId } : {},
+      where: { ...(userId ? { userId } : {}), purgeAfter: { gt: new Date() } },
       select: { id: true, userId: true, keyId: true, envelope: true, purgeAfter: true },
       orderBy: { agreementEndedAt: "desc" },
     });
@@ -91,6 +91,9 @@ async function main(): Promise<number> {
     const found: Array<{ recordId: string; purgeAfter: string; identity: IdentityRetentionPayload }> = [];
     let otherKey = 0;
     for (const record of candidates) {
+      // Purge is best effort; never disclose an already expired row even if
+      // the scheduled purge job has been delayed.
+      if (record.purgeAfter.getTime() <= Date.now()) continue;
       if (record.keyId !== privateKey.keyId) {
         otherKey += 1;
         continue;
@@ -102,13 +105,14 @@ async function main(): Promise<number> {
     }
 
     if (otherKey > 0) console.error(`WARN: ${otherKey} record(s) sealed with another key were skipped`);
-    if (found.length === 0) {
+    const currentlyRetained = found.filter((item) => Date.parse(item.purgeAfter) > Date.now());
+    if (currentlyRetained.length === 0) {
       console.error("NOT FOUND");
       return 1;
     }
 
     await db.adminAuditLog.createMany({
-      data: found.map((item) => ({
+      data: currentlyRetained.map((item) => ({
         actorId: null,
         actorRole: "OPERATOR_CLI",
         action: "IDENTITY_RETENTION_DISCLOSED",
@@ -119,7 +123,13 @@ async function main(): Promise<number> {
       })),
     });
 
-    process.stdout.write(`${JSON.stringify({ requestRef, records: found }, null, 2)}\n`);
+    // Recheck at output time; no disclosure after the one-year deadline.
+    const toDisclose = currentlyRetained.filter((item) => Date.parse(item.purgeAfter) > Date.now());
+    if (toDisclose.length === 0) {
+      console.error("NOT FOUND");
+      return 1;
+    }
+    process.stdout.write(`${JSON.stringify({ requestRef, records: toDisclose }, null, 2)}\n`);
     return 0;
   } finally {
     await db.$disconnect();

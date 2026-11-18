@@ -10,6 +10,7 @@ import {
 } from "@/lib/phone-verification/businessContactVerification";
 import { isBusinessContactOtpEscalationError } from "@/lib/phone-verification/businessContactOtpErrors";
 import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { ok: false, error: "Неверный purpose" },
         { status: 400 }
+      );
+    }
+
+    // Independent caller budget survives OTP rollover and provider failures:
+    // multiple numbers or repeated definite rejections cannot bypass it.
+    const budget = await checkRateLimit(`business-contact-sms:user:${user.id}`, 12, 60 * 60 * 1000);
+    if (!budget.allowed) {
+      return NextResponse.json(
+        { ok: false, code: "SMS_RATE_LIMITED", error: "Слишком много запросов SMS. Попробуйте позже." },
+        { status: 429 },
       );
     }
 
@@ -69,11 +80,15 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof SmsByDeliveryError) {
+        const deliveryUnknown = ["NETWORK_ERROR", "INVALID_RESPONSE", "HTTP_ERROR"].includes(error.reason);
         return NextResponse.json(
           {
             ok: false,
-            error: error.message,
-            code: "SMS_DELIVERY_FAILED",
+            error: deliveryUnknown
+              ? "Не удалось подтвердить отправку SMS. Код ещё может прийти — введите его, если получите."
+              : error.message,
+            code: deliveryUnknown ? "SMS_DELIVERY_UNKNOWN" : "SMS_DELIVERY_FAILED",
+            resendAfterSec: 60,
             otpState,
           },
           { status: 503 },

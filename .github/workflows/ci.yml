@@ -572,6 +572,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/services/direct/directBookingThread.postgres.integration.test.ts
           pnpm exec tsx src/server/services/direct/directComplaint.postgres.integration.test.ts
+          pnpm exec tsx src/app/api/business/events/organizer-from-verified-business/route.postgres.integration.test.ts
 
       - name: Business support PostgreSQL isolation
         env:

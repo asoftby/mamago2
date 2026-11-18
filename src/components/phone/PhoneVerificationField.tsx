@@ -246,6 +246,15 @@ export function PhoneVerificationField({
 
       if (!response.ok) {
         const message = errorToText(data) || `Ошибка: ${response.status}`;
+        if (data?.code === "SMS_DELIVERY_UNKNOWN") {
+          // The provider might have queued the SMS before a timeout/5xx.
+          // Keep the OTP entry usable; retrying immediately invalidates it.
+          setCooldown(typeof data.resendAfterSec === "number" ? data.resendAfterSec : 60);
+          setShowCodeInput(true);
+          setStatus("code_sent");
+          setError(message);
+          return;
+        }
         setStatus("error");
         setError(message);
         return;

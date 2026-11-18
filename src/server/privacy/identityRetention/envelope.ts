@@ -74,9 +74,15 @@ export type IdentityRetentionPublicKey = { key: KeyObject; keyId: string };
 
 export function loadPublicKey(pem: string | undefined | null): IdentityRetentionPublicKey {
   if (!pem || !pem.trim()) throw new IdentityRetentionKeyError("MISSING");
+  const normalized = normalizePem(pem);
+  // Node's createPublicKey() also accepts PRIVATE KEY PEM and silently derives
+  // a public key. Never allow decryption material in a server-only setting.
+  if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/i.test(normalized)) {
+    throw new IdentityRetentionKeyError("INVALID");
+  }
   let key: KeyObject;
   try {
-    key = createPublicKey(normalizePem(pem));
+    key = createPublicKey(normalized);
   } catch {
     throw new IdentityRetentionKeyError("INVALID");
   }
@@ -165,9 +171,13 @@ export function openIdentityEnvelope(
     Buffer.from(envelope.ek, "base64"),
   );
   try {
-    const decipher = createDecipheriv("aes-256-gcm", dataKey, Buffer.from(envelope.iv, "base64"));
+    const tag = Buffer.from(envelope.tag, "base64");
+    if (tag.length !== 16) throw new IdentityRetentionKeyError("MALFORMED_ENVELOPE");
+    const decipher = createDecipheriv("aes-256-gcm", dataKey, Buffer.from(envelope.iv, "base64"), {
+      authTagLength: 16,
+    });
     decipher.setAAD(aadFor(userId));
-    decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
+    decipher.setAuthTag(tag);
     const plain = Buffer.concat([decipher.update(Buffer.from(envelope.ct, "base64")), decipher.final()]);
     return JSON.parse(plain.toString("utf8")) as IdentityRetentionPayload;
   } finally {

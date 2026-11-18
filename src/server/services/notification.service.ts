@@ -1853,8 +1853,13 @@ export async function notifyDirectClientWaiting(params: NotifyDirectClientWaitin
       if (!reply) return null;
     }
 
+    // Prisma's @default(now()) would use transaction-start time, potentially
+    // older than a reply committed while this transaction waited for the lock.
+    // Stamp the claim only after the lock and latest-reply check.
+    const claimedAt = new Date();
     return tx.notification.create({
       data: {
+        createdAt: claimedAt,
         userId: params.recipientUserId,
         audience: "BUSINESS",
         type: "DIRECT_CLIENT_WAITING",

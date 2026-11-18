@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, Users } from "lucide-react";
@@ -24,6 +24,16 @@ export function OrganizerSearchSelect({
   const [isSearching, setIsSearching] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  // A delayed Business selection must never override a newer manual choice.
+  const selectionGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      selectionGenerationRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -86,6 +96,7 @@ export function OrganizerSearchSelect({
     }
 
     const businessId = organizer.id.slice("business:".length);
+    const selectionGeneration = ++selectionGenerationRef.current;
     setIsResolving(true);
     setSearchError(null);
     try {
@@ -103,11 +114,17 @@ export function OrganizerSearchSelect({
       if (!response.ok || !json.ok || !json.organizer) {
         throw new Error(json.error || "Не удалось выбрать организатора");
       }
-      onSelect(json.organizer);
+      if (mountedRef.current && selectionGenerationRef.current === selectionGeneration) {
+        onSelect(json.organizer);
+      }
     } catch (error) {
-      setSearchError(error instanceof Error ? error.message : "Не удалось выбрать организатора");
+      if (mountedRef.current && selectionGenerationRef.current === selectionGeneration) {
+        setSearchError(error instanceof Error ? error.message : "Не удалось выбрать организатора");
+      }
     } finally {
-      setIsResolving(false);
+      if (mountedRef.current && selectionGenerationRef.current === selectionGeneration) {
+        setIsResolving(false);
+      }
     }
   }
 
