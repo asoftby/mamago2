@@ -147,7 +147,7 @@
 .brandAvatar {
   width: 52px;
   height: 52px;
-  border-radius: 14px;
+  border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent-deep);
   display: flex;
@@ -321,7 +321,7 @@
   .brandAvatar {
     width: 44px;
     height: 44px;
-    border-radius: 12px;
+    border-radius: 50%;
   }
 }
 
