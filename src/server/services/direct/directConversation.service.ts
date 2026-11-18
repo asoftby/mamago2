@@ -121,8 +121,13 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
   // select customer profile/avatar or build an implicit business customer CRM.
   const threads = await prisma.directThread.findMany({
     where: { businessId: { in: businessIds } },
+    // Only the title is needed for the business request list. Do not fetch
+    // customer profiles, place images, logo metadata or MediaAsset fallbacks.
     include: {
-      ...threadListInclude,
+      offer: { select: { title: true } },
+      activity: { select: { title: true } },
+      place: { select: { title: true } },
+      messages: threadListInclude.messages,
       bookingRequest: {
         select: { status: true, kind: true, partyStage: true, endsAt: true, businessId: true, userId: true },
       },
@@ -156,7 +161,7 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
 
   const items: UnifiedConversationListItem[] = [];
   for (const thread of threads) {
-    const { publicationTitle } = await resolveDirectBrand(thread);
+    const publicationTitle = thread.place?.title ?? thread.offer?.title ?? thread.activity?.title ?? "Публикация недоступна";
     const unreadCount = unreadByThread.get(thread.id) ?? 0;
     const lastMessage = thread.messages[0];
     const canWrite = canBusinessWriteDirect({
@@ -310,7 +315,8 @@ export interface ConversationMessage {
 
 export interface UnifiedConversationDetail {
   businessId: string;
-  customerUserId: string;
+  /** BUSINESS responses must not disclose a stable cross-booking customer identifier. */
+  customerUserId: string | null;
   viewerRole: ConversationViewerRole;
   counterpartyName: string;
   counterpartyLogoUrl: string | null;
@@ -438,7 +444,7 @@ export async function getUnifiedConversationDetail(
 
   return {
     businessId,
-    customerUserId,
+    customerUserId: viewerRole === "BUSINESS" ? null : customerUserId,
     viewerRole,
     counterpartyName,
     counterpartyLogoUrl,
