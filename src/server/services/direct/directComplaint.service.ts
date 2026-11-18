@@ -10,9 +10,15 @@ import {
   writeDirectAudit,
 } from "./directAudit";
 import { recordDirectRiskSignal } from "./directRiskSignal.service";
+import {
+  notifyDirectComplaintOpened,
+  notifyDirectComplaintResolved,
+} from "@/server/services/notification.service";
+
+export type DirectComplaintErrorCode = "NOT_FOUND" | "ALREADY_RESOLVED" | "INVALID";
 
 export class DirectComplaintError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly code: DirectComplaintErrorCode = "INVALID") {
     super(message);
     this.name = "DirectComplaintError";
   }
@@ -28,10 +34,10 @@ export interface CreateComplaintInput {
 export async function createComplaint(input: CreateComplaintInput) {
   const thread = await prisma.directThread.findUnique({
     where: { id: input.threadId },
-    select: { id: true, businessId: true, customerUserId: true },
+    select: { id: true, businessId: true, customerUserId: true, threadNumber: true },
   });
   if (!thread) {
-    throw new DirectComplaintError("Direct thread not found");
+    throw new DirectComplaintError("Direct thread not found", "NOT_FOUND");
   }
 
   const reason = input.reason.trim();
@@ -67,6 +73,14 @@ export async function createComplaint(input: CreateComplaintInput) {
     metadata: { complaintId: complaint.id, reason },
   });
 
+  // Moderators learn about it without polling the admin page. Fire-and-forget:
+  // a notification failure must never fail (or slow) the user's complaint.
+  void notifyDirectComplaintOpened({
+    complaintId: complaint.id,
+    threadNumber: thread.threadNumber,
+    reason,
+  }).catch((error) => console.error("[direct] complaint-opened notify failed:", error));
+
   return complaint;
 }
 
@@ -90,8 +104,22 @@ export async function resolveComplaint(params: {
     throw new DirectComplaintError("resolution cannot be empty");
   }
 
-  const updated = await prisma.directComplaint.update({
+  const existing = await prisma.directComplaint.findUnique({
     where: { id: params.complaintId },
+    select: {
+      reporterUserId: true,
+      threadId: true,
+      thread: { select: { threadNumber: true, customerUserId: true } },
+    },
+  });
+  if (!existing) {
+    throw new DirectComplaintError("Complaint not found", "NOT_FOUND");
+  }
+
+  // Atomic PENDING → decided transition: two moderators (or a double click)
+  // cannot both resolve it, so the reporter is notified exactly once.
+  const { count } = await prisma.directComplaint.updateMany({
+    where: { id: params.complaintId, status: DirectComplaintStatus.PENDING },
     data: {
       status: params.status,
       resolution,
@@ -99,6 +127,10 @@ export async function resolveComplaint(params: {
       reviewedByUserId: params.reviewedByUserId,
     },
   });
+  if (count === 0) {
+    throw new DirectComplaintError("Complaint is already resolved", "ALREADY_RESOLVED");
+  }
+  const updated = await prisma.directComplaint.findUniqueOrThrow({ where: { id: params.complaintId } });
 
   await writeDirectAudit({
     action: DirectAuditAction.COMPLAINT_RESOLVED,
@@ -110,6 +142,17 @@ export async function resolveComplaint(params: {
     after: { status: params.status },
     metadata: { threadId: updated.threadId },
   });
+
+  // The reporter hears the outcome in their own cabinet (customer or business).
+  // Canned text only — the internal resolution note stays admin-only.
+  void notifyDirectComplaintResolved({
+    complaintId: updated.id,
+    reporterUserId: existing.reporterUserId,
+    reporterSurface: existing.reporterUserId === existing.thread.customerUserId ? "USER" : "BUSINESS",
+    threadId: existing.threadId,
+    threadNumber: existing.thread.threadNumber,
+    outcome: params.status,
+  }).catch((error) => console.error("[direct] complaint-resolved notify failed:", error));
 
   return updated;
 }

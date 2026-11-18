@@ -40,6 +40,8 @@ import { dispatchDelivery } from "./notificationDelivery.service";
 import { validateNotificationRegistry } from "@/lib/notifications/notificationRegistry";
 import { checkNotificationDedup } from "./notificationDedup.service";
 import { formatDirectThreadNumber } from "@/lib/direct/threadNumber";
+import { adminPath } from "@/lib/routing/surface";
+import { complaintReasonLabel } from "@/server/services/direct/directComplaintLabels";
 import {
   resolveNotificationAction,
   resolveNotificationActionDefaults,
@@ -90,12 +92,33 @@ export function getAccessibleSurfacesForUser(user: {
   return surfaces;
 }
 
+/**
+ * Direct (messages) notices are not in NOTIFICATION_REGISTRY, so the registry-derived
+ * NOTIFICATION_TYPES_BUSINESS never contained them and the business bell silently
+ * dropped them (rows existed, the feed and unread count were empty). They belong to
+ * the business feed when — and only when — they are addressed to the BUSINESS audience,
+ * so a personal (USER) Direct notice of a business owner never leaks into the cabinet.
+ */
+const DIRECT_BUSINESS_FEED_TYPES: NotificationType[] = [
+  "DIRECT_THREAD_CREATED",
+  "DIRECT_NEW_MESSAGE",
+  "DIRECT_COMPLAINT_RESOLVED",
+];
+
 function mergeStreamFilter(
   base: Prisma.NotificationWhereInput,
   stream?: NotificationStreamFilter,
 ): Prisma.NotificationWhereInput {
   if (stream === "user") return { ...base, type: { in: NOTIFICATION_TYPES_USER } };
-  if (stream === "business") return { ...base, type: { in: NOTIFICATION_TYPES_BUSINESS } };
+  if (stream === "business") {
+    return {
+      ...base,
+      OR: [
+        { type: { in: NOTIFICATION_TYPES_BUSINESS } },
+        { type: { in: DIRECT_BUSINESS_FEED_TYPES }, audience: "BUSINESS" },
+      ],
+    };
+  }
   return base;
 }
 
@@ -1753,6 +1776,106 @@ export async function notifyDirectMessage(params: NotifyDirectMessageParams) {
     ctaLabel: "Открыть диалог",
     // Keep the notification in the recipient's surface.
     ctaAction: params.recipientSurface === "BUSINESS"
+      ? `/business/direct/${params.threadId}`
+      : `/me/direct/${params.threadId}`,
+  });
+}
+
+export interface NotifyDirectComplaintOpenedParams {
+  complaintId: string;
+  threadNumber: number;
+  reason: string;
+}
+
+/**
+ * New Direct complaint → every ADMIN and MODERATOR (both can review complaints).
+ * `entityId` is the complaint id (exact dedup per complaint and recipient);
+ * the CTA is explicit, so the DIRECT_THREAD entity type is only a grouping hint.
+ */
+export async function notifyDirectComplaintOpened(params: NotifyDirectComplaintOpenedParams) {
+  const staff = await prisma.user.findMany({
+    where: { role: { in: ["ADMIN", "MODERATOR"] } },
+    select: { id: true },
+  });
+
+  const created = [];
+  for (const user of staff) {
+    const dedup = await checkNotificationDedup(
+      user.id,
+      "DIRECT_COMPLAINT_OPENED",
+      "DIRECT_THREAD",
+      params.complaintId,
+    );
+    if (dedup.isDuplicate) continue;
+    created.push(
+      await createNotification({
+        userId: user.id,
+        audience: "ADMIN",
+        type: "DIRECT_COMPLAINT_OPENED",
+        title: `Новая жалоба на диалог ${formatDirectThreadNumber(params.threadNumber)}`,
+        body: `Причина: ${complaintReasonLabel(params.reason)}. Жалоба ожидает рассмотрения.`,
+        entityType: "DIRECT_THREAD",
+        entityId: params.complaintId,
+        ctaLabel: "Открыть жалобы",
+        ctaAction: adminPath("/communications/direct/complaints?status=PENDING"),
+      }),
+    );
+  }
+  return created;
+}
+
+export interface NotifyDirectComplaintResolvedParams {
+  complaintId: string;
+  reporterUserId: string;
+  /** Which cabinet the reporter used: the customer's or the business team's. */
+  reporterSurface: "USER" | "BUSINESS";
+  threadId: string;
+  threadNumber: number;
+  outcome: "REVIEWED" | "DISMISSED" | "ACTION_TAKEN";
+}
+
+const COMPLAINT_OUTCOME_COPY: Record<
+  NotifyDirectComplaintResolvedParams["outcome"],
+  { title: string; body: (thread: string) => string }
+> = {
+  REVIEWED: {
+    title: "Жалоба рассмотрена",
+    body: (thread) => `Модератор изучил диалог ${thread}. Спасибо, что помогаете делать mamaGo безопаснее.`,
+  },
+  ACTION_TAKEN: {
+    title: "По вашей жалобе приняты меры",
+    body: (thread) => `Модератор проверил диалог ${thread} и принял меры. Спасибо за обращение.`,
+  },
+  DISMISSED: {
+    title: "Жалоба рассмотрена",
+    body: (thread) => `Модератор проверил диалог ${thread} и не нашёл нарушений.`,
+  },
+};
+
+/**
+ * Complaint decision → the reporter. Canned text only: the moderator's internal
+ * resolution note is admin-only and is never copied into the notification.
+ */
+export async function notifyDirectComplaintResolved(params: NotifyDirectComplaintResolvedParams) {
+  const dedup = await checkNotificationDedup(
+    params.reporterUserId,
+    "DIRECT_COMPLAINT_RESOLVED",
+    "DIRECT_THREAD",
+    params.complaintId,
+  );
+  if (dedup.isDuplicate) return null;
+
+  const copy = COMPLAINT_OUTCOME_COPY[params.outcome];
+  return createNotification({
+    userId: params.reporterUserId,
+    audience: params.reporterSurface,
+    type: "DIRECT_COMPLAINT_RESOLVED",
+    title: copy.title,
+    body: copy.body(formatDirectThreadNumber(params.threadNumber)),
+    entityType: "DIRECT_THREAD",
+    entityId: params.complaintId,
+    ctaLabel: "Открыть диалог",
+    ctaAction: params.reporterSurface === "BUSINESS"
       ? `/business/direct/${params.threadId}`
       : `/me/direct/${params.threadId}`,
   });

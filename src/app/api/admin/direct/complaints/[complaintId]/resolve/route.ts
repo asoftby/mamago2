@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DirectComplaintStatus } from "@prisma/client";
 import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
-import { resolveComplaint } from "@/server/services/direct/directComplaint.service";
+import { DirectComplaintError, resolveComplaint } from "@/server/services/direct/directComplaint.service";
 
 const bodySchema = z.object({
   status: z.enum([
@@ -37,6 +37,10 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation error", details: error.issues }, { status: 400 });
+    }
+    if (error instanceof DirectComplaintError) {
+      const status = error.code === "NOT_FOUND" ? 404 : error.code === "ALREADY_RESOLVED" ? 409 : 400;
+      return NextResponse.json({ error: error.message }, { status });
     }
     console.error("[admin/direct] resolve complaint error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AccountPage } from "@/components/account/AccountPage";
+import { ArrowUp } from "lucide-react";
 import { DirectActorType } from "@prisma/client";
 import type { UnifiedConversationDetail } from "@/server/services/direct/directConversation.service";
 import { ConversationHeader } from "@/components/direct/ConversationHeader";
 import { MessageList } from "@/components/direct/MessageList";
+import { useDirectInbox } from "@/components/direct/DirectInboxContext";
 import { DirectComplaintModal } from "@/components/direct/DirectComplaintModal";
 import { toast } from "@/lib/toast";
 import styles from "@/components/direct/direct.module.css";
@@ -50,6 +51,8 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
   const [rating, setRating] = useState(0);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const markedReadRef = useRef(false);
+  const inbox = useDirectInbox();
+  const threadRef = useRef<HTMLDivElement>(null);
 
   const isBusinessViewer = detail.viewerRole === "BUSINESS";
   const mineSenderTypes: DirectActorType[] = isBusinessViewer
@@ -60,8 +63,12 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
   const complaintTargetThreadId = detail.replyTargetThreadId ?? anchorThreadId;
   const latestOccasion = detail.occasions[detail.occasions.length - 1];
   const lastMessage = detail.messages[detail.messages.length - 1];
-  const isWaitingOnMe =
-    detail.canWrite && lastMessage && !mineSenderTypes.includes(lastMessage.senderType);
+  const lastIsMine = Boolean(lastMessage && mineSenderTypes.includes(lastMessage.senderType));
+  // Business: the client wrote last, so the reply is owed by the business.
+  // Customer: only the customer's own message is still unanswered — once the
+  // business has replied there is nothing to wait for.
+  const showWaitingBanner =
+    detail.canWrite && Boolean(lastMessage) && (isBusinessViewer ? !lastIsMine : lastIsMine);
 
   // Mark-read once on mount, across every occasion — not on every poll.
   useEffect(() => {
@@ -70,6 +77,17 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
     for (const occasion of detail.occasions) {
       fetch(`/api/direct/${occasion.threadId}/read${businessMode ? "?as=business" : ""}`, { method: "POST", credentials: "include" }).catch(() => {});
     }
+    // Two-column inbox: drop this conversation's unread badge in the list without refetching it.
+    inbox?.markThreadsRead(detail.occasions.map((occasion) => occasion.threadId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Two-column desktop: the dialog scrolls inside its own column, so open it at the
+  // newest messages (no-op where the column is not a scroll container, e.g. phones).
+  useEffect(() => {
+    if (!inbox) return;
+    const scroller = threadRef.current?.closest<HTMLElement>("[data-inbox-detail]");
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -166,7 +184,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
 
   const content = (
     <>
-      <div className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : `${styles.threadWrap} ${styles.threadWrapPersonal}`}>
+      <div ref={threadRef} className={businessMode ? `${styles.threadWrap} ${styles.businessThread}` : `${styles.threadWrap} ${styles.threadWrapPersonal}`}>
         <ConversationHeader
           counterpartyName={detail.counterpartyName}
           counterpartyLogoUrl={detail.counterpartyLogoUrl}
@@ -174,7 +192,7 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
           latestStatusLabel={latestOccasion ? statusLabel(latestOccasion.status) : undefined}
         />
 
-        {isWaitingOnMe && (
+        {showWaitingBanner && (
           <div className={`${styles.banner} ${styles.bannerWaiting}`}>
             {isBusinessViewer ? "Клиент ждёт ответа." : "Ожидаем ответ."}
           </div>
@@ -232,8 +250,10 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
               className={styles.sendBtn}
               disabled={!body.trim() || sending}
               onClick={() => void sendMessage()}
+              aria-label="Отправить"
+              title="Отправить"
             >
-              Отправить
+              <ArrowUp aria-hidden="true" size={20} strokeWidth={2.4} />
             </button>
           </div>
         )}
@@ -301,15 +321,20 @@ export function DirectThreadClient({ initialDetail, businessMode = false }: Prop
 
   if (!businessMode) {
     return (
-      <AccountPage backHref="/me/direct" backLabel="← Мои сообщения" title="Переписка">
+      <>
+        {/* Back link + title only on phones: on desktop the list column is always visible. */}
+        <Link href="/me/direct" className="inline-flex min-h-11 items-center text-sm text-neutral-600 hover:text-neutral-900 lg:hidden">
+          ← Мои сообщения
+        </Link>
+        <h1 className="mb-6 mt-3 text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl lg:hidden">Переписка</h1>
         <div className={styles.page}>{content}</div>
-      </AccountPage>
+      </>
     );
   }
 
   return (
     <div className={`${styles.businessPage} space-y-4`}>
-      <div className="text-sm text-stone-500">
+      <div className="text-sm text-stone-500 lg:hidden">
         <Link href="/business/direct">← Все сообщения</Link>
       </div>
       {content}
