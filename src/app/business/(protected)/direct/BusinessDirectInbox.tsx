@@ -12,6 +12,8 @@ import styles from "@/components/direct/direct.module.css";
 type Props = {
   initialConversations: UnifiedConversationListItem[];
   initialCounts: Record<ConversationTab, number>;
+  /** Open dialog (two-column shell) — its row is highlighted. */
+  selectedThreadId?: string | null;
 };
 
 const tabs: { value: ConversationTab; label: string }[] = [
@@ -22,7 +24,7 @@ const tabs: { value: ConversationTab; label: string }[] = [
   { value: "ARCHIVE", label: "Архив" },
 ];
 
-export function BusinessDirectInbox({ initialConversations, initialCounts }: Props) {
+export function BusinessDirectInbox({ initialConversations, initialCounts, selectedThreadId = null }: Props) {
   const [tab, setTab] = useState<ConversationTab>("ALL");
   const [query, setQuery] = useState("");
   const visible = useMemo(() => {
@@ -68,7 +70,8 @@ export function BusinessDirectInbox({ initialConversations, initialCounts }: Pro
           <div className="divide-y divide-stone-100">
             {visible.map((item) => (
               <Link key={item.key} href={`${BUSINESS_DIRECT_HREF}/${item.latestThreadId}`}
-                className="flex flex-wrap items-center gap-3 p-4 transition hover:bg-stone-50 md:flex-nowrap md:p-5">
+                aria-current={selectedThreadId && item.threadIds.includes(selectedThreadId) ? "page" : undefined}
+                className={`flex flex-wrap items-center gap-3 p-4 transition hover:bg-stone-50 md:flex-nowrap md:p-5 ${selectedThreadId && item.threadIds.includes(selectedThreadId) ? "bg-stone-100" : ""}`}>
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-100 text-lg font-semibold text-stone-600">
                   {item.counterpartyLogoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element

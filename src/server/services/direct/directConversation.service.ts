@@ -27,6 +27,8 @@ export interface UnifiedConversationListItem {
   counterpartyLogoUrl: string | null;
   /** Most recently active occasion — list card links to /me/direct/{latestThreadId}. */
   latestThreadId: string;
+  /** Every DirectThread in this conversation (selected-row match, local unread reset). */
+  threadIds: string[];
   /** Searchable fields from the most recent occasion (see the `q` param on GET /api/direct). */
   latestThreadNumber: number;
   latestPublicationTitle: string;
@@ -96,6 +98,7 @@ async function getCustomerSideItems(userId: string): Promise<UnifiedConversation
       counterpartyName: brand.name,
       counterpartyLogoUrl: brand.logoUrl,
       latestThreadId: latest.id,
+      threadIds: group.map((g) => g.id),
       latestThreadNumber: latest.threadNumber,
       latestPublicationTitle: publicationTitle,
       lastMessageAt: latest.lastMessageAt,
@@ -179,6 +182,7 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
       counterpartyName: `Обращение D-${thread.threadNumber}`,
       counterpartyLogoUrl: null,
       latestThreadId: thread.id,
+      threadIds: [thread.id],
       latestThreadNumber: thread.threadNumber,
       latestPublicationTitle: publicationTitle,
       lastMessageAt: thread.lastMessageAt,

@@ -771,3 +771,68 @@
 .page .pillSolid .count {
   color: rgba(255, 255, 255, 0.7);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Two-column inbox shell (DirectInbox): list left, dialog right (≥1024px).
+   On phones the route decides: list OR dialog, like before.
+══════════════════════════════════════════════════════════════════ */
+.inboxSplit {
+  display: block;
+}
+.inboxEmpty {
+  display: none;
+}
+.recCardActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+@media (max-width: 1023px) {
+  .inboxSplit[data-has-thread="true"] .inboxList,
+  .inboxSplit[data-has-thread="false"] .inboxDetail {
+    display: none;
+  }
+}
+@media (min-width: 1024px) {
+  .inboxSplit {
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .inboxList {
+    position: sticky;
+    top: 96px;
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .inboxEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 360px;
+    border: 1px dashed var(--line-2, #d4cdc6);
+    border-radius: 20px;
+    color: var(--ink-3, #525252);
+    font-size: 15px;
+  }
+  .inboxEmpty p {
+    margin: 0;
+  }
+  /* the shell owns the page height; inner page wrappers must not force 100vh */
+  .inboxSplit .page {
+    min-height: 0;
+  }
+  .inboxList .searchBox {
+    width: 100%;
+  }
+  .inboxDetail .threadWrap {
+    margin: 0;
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
