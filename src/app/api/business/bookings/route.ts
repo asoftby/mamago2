@@ -4,6 +4,7 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { BookingStatus } from "@prisma/client";
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { getBusinessBookings } from "@/server/services/booking/bookingQuery.service";
+import { businessBookingListProjection } from "@/server/services/booking/businessBookingContactProjection";
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,7 +39,10 @@ export async function GET(request: NextRequest) {
     });
 
     await attachDirectAvailabilityToBusinessBookings(result.items);
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      items: result.items.map(businessBookingListProjection),
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("[GET /api/business/bookings]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

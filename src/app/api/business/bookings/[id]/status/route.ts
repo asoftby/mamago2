@@ -21,6 +21,7 @@ import {
   BookingOwnershipError,
 } from "@/server/services/booking/bookingQuery.service";
 import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
+import { businessBookingListProjection } from "@/server/services/booking/businessBookingContactProjection";
 
 const bodySchema = z.object({
   status: z.enum([
@@ -67,7 +68,7 @@ export async function PATCH(
       },
     });
     await attachDirectAvailabilityToBusinessBookings([updated]);
-    return NextResponse.json(updated);
+    return NextResponse.json(businessBookingListProjection(updated));
   } catch (err) {
     if (err instanceof BookingOwnershipError) {
       return NextResponse.json({ error: err.message }, { status: 403 });
