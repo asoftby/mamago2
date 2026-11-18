@@ -18,7 +18,7 @@ import {
 } from "./directBookingThread.service";
 import { createDirectMessage, DirectBusinessWriteError } from "./directMessage.service";
 import { markThreadRead } from "./directThread.service";
-import { getBusinessConversationsForUser, getUnifiedConversationDetail } from "./directConversation.service";
+import { getBusinessConversationsForUser, getCustomerConversationsForUser, getUnifiedConversationDetail } from "./directConversation.service";
 import { DirectSendLimitError } from "./directRiskSignal.service";
 import {
   getDirectPlatformSettings,
@@ -406,4 +406,24 @@ test("read receipts: only CUSTOMER/BUSINESS messages carry one; ADMIN messages n
   const after = await getUnifiedConversationDetail(businessId, customer, "BUSINESS", r.threadId);
   assert.ok(byBody(after, "Привет")?.readAt instanceof Date);
   assert.equal(byBody(after, "Сообщение поддержки")?.readAt, null);
+});
+
+test("customer inbox: unread badges come from one grouped query and sum across an organization's occasions", async () => {
+  const unreadFor = async () =>
+    (await getCustomerConversationsForUser(customer)).find((item) => item.key === businessId)?.unreadCount ?? 0;
+  const baseline = await unreadFor();
+
+  const threads: string[] = [];
+  for (let i = 0; i < 2; i++) {
+    const booking = await newBooking();
+    const opened = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: `Новое ${i}` });
+    threads.push(opened.threadId);
+  }
+  assert.equal(await unreadFor(), baseline + 2, "one unread business message per new occasion, summed under the organization");
+
+  const item = (await getCustomerConversationsForUser(customer)).find((row) => row.key === businessId);
+  assert.ok(threads.every((id) => item?.threadIds.includes(id)), "list item exposes every thread of the conversation");
+
+  for (const threadId of threads) await markThreadRead({ threadId, readerType: DirectActorType.CUSTOMER });
+  assert.equal(await unreadFor(), baseline, "reading the occasions clears exactly those badges");
 });

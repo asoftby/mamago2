@@ -704,13 +704,23 @@
   max-width: none;
   margin: 0;
   padding: 20px;
-  border: 1px solid #e7e5e4;
+  border: 0;
   border-radius: 18px;
-  background: #fff;
+  background: transparent;
 }
 
 @media (max-width: 390px) {
   .businessThread { padding: 14px; }
+}
+/* phones/tablets: the dialog sits right under the "← Все сообщения" link, no extra top gap */
+@media (max-width: 1023px) {
+  .businessThread {
+    padding: 0 0 20px; /* full width: edges line up with the page content */
+  }
+  /* same visual gap under "← Все сообщения" as between the description and that link (29px) */
+  .businessThread .topCard {
+    margin-top: 27px; /* collapses with space-y-4's 16px on the wrapper, so 27px lands on 29px visually */
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -770,4 +780,95 @@
 }
 .page .pillSolid .count {
   color: rgba(255, 255, 255, 0.7);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Two-column inbox shell (DirectInbox): list left, dialog right (≥1024px).
+   On phones the route decides: list OR dialog, like before.
+══════════════════════════════════════════════════════════════════ */
+.inboxSplit {
+  display: block;
+}
+.inboxEmpty {
+  display: none;
+}
+/* `.page .recCard` (two classes) would win over a lone `.recCardActive`; match its specificity. */
+.recCardActive,
+.page .recCardActive,
+.page .recCardActive:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+@media (max-width: 1023px) {
+  .inboxSplit[data-has-thread="true"] .inboxList,
+  .inboxSplit[data-has-thread="false"] .inboxDetail {
+    display: none;
+  }
+}
+@media (min-width: 1024px) {
+  /*
+   * Messenger layout: the workspace is exactly one screen tall (below the site
+   * header) and each column scrolls inside itself, so the list never moves when
+   * the dialog is scrolled — and the page itself does not scroll while chatting.
+   * --inbox-top is the split's real distance from the page top, measured on mount
+   * (DirectInbox); 129px = sticky site header (97) + main padding (32) is the SSR fallback.
+   */
+  .inboxSplit {
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: 0 24px;
+    align-items: stretch;
+    height: calc(100dvh - var(--inbox-top, 129px) - 24px);
+    min-height: 420px;
+  }
+  .inboxList {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 20px;
+    border-right: 1px solid var(--line-2, #d4cdc6);
+  }
+  .inboxDetail {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .inboxEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 100%;
+    min-height: 0;
+    border: 1px dashed var(--line-2, #d4cdc6);
+    border-radius: 20px;
+    color: var(--ink-3, #525252);
+    font-size: 15px;
+  }
+  .inboxEmpty p {
+    margin: 0;
+  }
+  /* the shell owns the height; inner page wrappers must not force 100vh */
+  .inboxSplit .page {
+    min-height: 0;
+  }
+  .inboxList .searchBox {
+    width: 100%;
+  }
+  .inboxDetail .threadWrap {
+    margin: 0;
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  /* business: the dialog header card starts on the same line as the filters card on the left */
+  .inboxDetail .businessThread {
+    padding-top: 0;
+  }
+  .inboxDetail .businessThread .topCard {
+    margin-top: 0;
+  }
 }

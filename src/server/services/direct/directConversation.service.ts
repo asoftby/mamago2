@@ -27,6 +27,8 @@ export interface UnifiedConversationListItem {
   counterpartyLogoUrl: string | null;
   /** Most recently active occasion — list card links to /me/direct/{latestThreadId}. */
   latestThreadId: string;
+  /** Every DirectThread in this conversation (selected-row match, local unread reset). */
+  threadIds: string[];
   /** Searchable fields from the most recent occasion (see the `q` param on GET /api/direct). */
   latestThreadNumber: number;
   latestPublicationTitle: string;
@@ -59,12 +61,10 @@ type ThreadWithCustomerRelations = Prisma.DirectThreadGetPayload<{
   include: typeof threadIncludeWithCustomer;
 }>;
 
-async function unreadCountFor(threadIds: string[], excludeSenderTypes: DirectActorType[]): Promise<number> {
-  if (threadIds.length === 0) return 0;
-  return prisma.directMessage.count({
-    where: { threadId: { in: threadIds }, senderType: { notIn: excludeSenderTypes }, readAt: null },
-  });
-}
+/** Upper bound on the threads read for one customer's inbox (a work-queue list, not an archive). */
+const CUSTOMER_INBOX_THREAD_LIMIT = 200;
+/** Brand/logo lookups run in small parallel batches: faster than serial, never a pool-saturating burst. */
+const BRAND_RESOLVE_CONCURRENCY = 8;
 
 /** Customer-side groups: this user's own threads, grouped by the business they messaged. */
 async function getCustomerSideItems(userId: string): Promise<UnifiedConversationListItem[]> {
@@ -72,7 +72,9 @@ async function getCustomerSideItems(userId: string): Promise<UnifiedConversation
     where: { customerUserId: userId },
     include: threadListInclude,
     orderBy: { lastMessageAt: "desc" },
+    take: CUSTOMER_INBOX_THREAD_LIMIT,
   });
+  if (threads.length === 0) return [];
 
   const byBusiness = new Map<string, ThreadWithDisplayRelations[]>();
   for (const t of threads) {
@@ -81,30 +83,47 @@ async function getCustomerSideItems(userId: string): Promise<UnifiedConversation
     else byBusiness.set(t.businessId, [t]);
   }
 
-  const items: UnifiedConversationListItem[] = [];
-  for (const [businessId, group] of byBusiness) {
-    // `threads` was queried ordered by lastMessageAt desc, and we push into
-    // each group in that same order, so group[0] is the most recent one.
-    const latest = group[0];
-    const { brand, publicationTitle } = await resolveDirectBrand(latest);
-    const unreadCount = await unreadCountFor(group.map((g) => g.id), [DirectActorType.CUSTOMER]);
-    const lastMessage = latest.messages[0];
+  // One grouped query for the unread badges of the whole inbox
+  // (was one count query per organization, awaited serially).
+  const unreadRows = await prisma.directMessage.groupBy({
+    by: ["threadId"],
+    where: {
+      threadId: { in: threads.map((t) => t.id) },
+      senderType: { notIn: [DirectActorType.CUSTOMER] },
+      readAt: null,
+    },
+    _count: { _all: true },
+  });
+  const unreadByThread = new Map(unreadRows.map((row) => [row.threadId, row._count._all]));
 
-    items.push({
-      key: businessId,
-      viewerRole: "CUSTOMER",
-      counterpartyName: brand.name,
-      counterpartyLogoUrl: brand.logoUrl,
-      latestThreadId: latest.id,
-      latestThreadNumber: latest.threadNumber,
-      latestPublicationTitle: publicationTitle,
-      lastMessageAt: latest.lastMessageAt,
-      lastMessageBy: latest.lastMessageBy,
-      lastMessagePreview:
-        lastMessage && !lastMessage.hiddenAt ? lastMessage.body : lastMessage ? "Сообщение скрыто модератором" : null,
-      unreadCount,
-      occasionCount: group.length,
-      tab: deriveConversationTab(latest.status, latest.lastMessageBy),
+  // `threads` is ordered by lastMessageAt desc and pushed into each group in that
+  // order, so group[0] is the most recent occasion of that business.
+  const groups = [...byBusiness.entries()];
+  const items: UnifiedConversationListItem[] = [];
+  for (let i = 0; i < groups.length; i += BRAND_RESOLVE_CONCURRENCY) {
+    const batch = groups.slice(i, i + BRAND_RESOLVE_CONCURRENCY);
+    const resolved = await Promise.all(batch.map(([, group]) => resolveDirectBrand(group[0])));
+    batch.forEach(([businessId, group], index) => {
+      const latest = group[0];
+      const { brand, publicationTitle } = resolved[index];
+      const lastMessage = latest.messages[0];
+      items.push({
+        key: businessId,
+        viewerRole: "CUSTOMER",
+        counterpartyName: brand.name,
+        counterpartyLogoUrl: brand.logoUrl,
+        latestThreadId: latest.id,
+        threadIds: group.map((g) => g.id),
+        latestThreadNumber: latest.threadNumber,
+        latestPublicationTitle: publicationTitle,
+        lastMessageAt: latest.lastMessageAt,
+        lastMessageBy: latest.lastMessageBy,
+        lastMessagePreview:
+          lastMessage && !lastMessage.hiddenAt ? lastMessage.body : lastMessage ? "Сообщение скрыто модератором" : null,
+        unreadCount: group.reduce((sum, g) => sum + (unreadByThread.get(g.id) ?? 0), 0),
+        occasionCount: group.length,
+        tab: deriveConversationTab(latest.status, latest.lastMessageBy),
+      });
     });
   }
   return items;
@@ -179,6 +198,7 @@ async function getBusinessSideItems(userId: string, selectedBusinessId?: string)
       counterpartyName: `Обращение D-${thread.threadNumber}`,
       counterpartyLogoUrl: null,
       latestThreadId: thread.id,
+      threadIds: [thread.id],
       latestThreadNumber: thread.threadNumber,
       latestPublicationTitle: publicationTitle,
       lastMessageAt: thread.lastMessageAt,

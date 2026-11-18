@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AccountPage } from "@/components/account/AccountPage";
 import { MessageSquare, Search } from "lucide-react";
 import type {
   ConversationTab,
@@ -15,6 +14,8 @@ import styles from "@/components/direct/direct.module.css";
 interface Props {
   initialConversations: UnifiedConversationListItem[];
   initialCounts: Record<ConversationTab, number>;
+  /** Open dialog (two-column shell) — its row is highlighted. */
+  selectedThreadId?: string | null;
 }
 
 const TABS: { value: ConversationTab; label: string }[] = [
@@ -51,7 +52,7 @@ function pluralOccasions(n: number): string {
   return "обращений";
 }
 
-export function DirectListClient({ initialConversations, initialCounts }: Props) {
+export function DirectListClient({ initialConversations, initialCounts, selectedThreadId = null }: Props) {
   const [tab, setTab] = useState<ConversationTab>("ALL");
   const [search, setSearch] = useState("");
 
@@ -72,7 +73,8 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
   const total = initialCounts.ALL;
 
   return (
-    <AccountPage title="Мои сообщения">
+    <>
+    <h1 className="mb-6 text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">Мои сообщения</h1>
     <div className={styles.page}>
       {total > 0 ? (
         <section style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -109,7 +111,12 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
         {visible.length > 0 ? (
           <div className={styles.recList}>
             {visible.map((item) => (
-              <Link key={item.key} href={`/me/direct/${item.latestThreadId}`} className={styles.recCard}>
+              <Link
+                key={item.key}
+                href={`/me/direct/${item.latestThreadId}`}
+                className={`${styles.recCard} ${selectedThreadId && item.threadIds.includes(selectedThreadId) ? styles.recCardActive : ""}`.trim()}
+                aria-current={selectedThreadId && item.threadIds.includes(selectedThreadId) ? "page" : undefined}
+              >
                 <div className={styles.recMain}>
                   <div className={styles.brandAvatar}>
                     {item.counterpartyLogoUrl ? (
@@ -145,7 +152,7 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
         )}
       </section>
     </div>
-    </AccountPage>
+    </>
   );
 }
 
