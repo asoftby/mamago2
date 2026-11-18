@@ -11,6 +11,15 @@ name: Docker Build & Push
 # `prod-*` tag actually gets created.
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Build hotfix or promote published immutable image
+        required: true
+        type: choice
+        default: build
+        options:
+          - build
+          - promote
   push:
     branches:
       - dev
@@ -27,7 +36,7 @@ concurrency:
 
 jobs:
   build-and-push:
-    if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/hotfix/prod-1124-organizer-unp-20261119' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'build' && github.ref == 'refs/heads/hotfix/prod-1124-organizer-unp-20261119' }}
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     runs-on: ubuntu-latest
@@ -116,6 +125,55 @@ jobs:
             GIT_COMMIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Registry-only, source/destination hard-pinned. No image rebuild, host SSH or deploy.
+  promote-organizer-hotfix:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'promote' && github.ref == 'refs/heads/hotfix/prod-1124-organizer-unp-20261119' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: prod-orgfix-1316-to-prod-91316
+      cancel-in-progress: false
+    env:
+      SRC: ghcr.io/asoftby/mamago2:prod-orgfix-1316
+      DST: ghcr.io/asoftby/mamago2:prod-91316
+      EXPECTED_DIGEST: sha256:b027b3095812eaec1e3e032d458d740ef13d7144fb65c02b11f6bd128d07bec4
+      EXPECTED_SOURCE_SHA: 411822da706b716d6611d14533a4fa5159d204b6
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Log in to GHCR with repo-scoped Actions token
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify pinned source, refuse conflicting target, promote, verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_digest=$(docker buildx imagetools inspect "$SRC" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          test "$source_digest" = "$EXPECTED_DIGEST" || { echo 'ABORT: source digest mismatch'; exit 1; }
+          echo "Source SHA (original build #1316): $EXPECTED_SOURCE_SHA"
+          echo "Source digest: $source_digest"
+          if docker buildx imagetools inspect "$DST" --format '{{json .Manifest.Digest}}' > /tmp/dest-digest 2> /tmp/dest-error; then
+            existing=$(tr -d '"' < /tmp/dest-digest)
+            test "$existing" = "$EXPECTED_DIGEST" || { echo 'ABORT: target tag already has different digest'; exit 1; }
+            echo 'Destination already points to expected digest; no mutation needed'
+          else
+            if ! grep -Eiq 'manifest unknown|not found|404' /tmp/dest-error; then
+              echo 'ABORT: target registry lookup failed for unexpected reason'
+              cat /tmp/dest-error
+              exit 1
+            fi
+            docker buildx imagetools create --tag "$DST" "$SRC"
+          fi
+          target_digest=$(docker buildx imagetools inspect "$DST" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          test "$target_digest" = "$EXPECTED_DIGEST" || { echo 'ABORT: post-promotion digest mismatch'; exit 1; }
+          echo "PROMOTION_OK tag=$DST digest=$target_digest source_build_sha=$EXPECTED_SOURCE_SHA"
 
   # Opt-in only. Keep disabled until host Compose, SSH host keys, encrypted
   # backup recovery and DEV rehearsal pass. Never deploys PROD.
