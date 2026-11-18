@@ -63,9 +63,9 @@ async function main() {
     const outsider = await user();
     const admin = await user("ADMIN");
     const primary = await business(owner.id, "Organizer primary " + marker);
-    const pending = await business(owner.id, "Pending " + marker, "PENDING");
-    const disabled = await business(owner.id, "Disabled " + marker, "APPROVED", "DISABLED");
-    const noUnp = await business(owner.id, "Verified without UNP " + marker);
+    const pending = await business((await user()).id, "Pending " + marker, "PENDING");
+    const disabled = await business((await user()).id, "Disabled " + marker, "APPROVED", "DISABLED");
+    const noUnp = await business((await user()).id, "Verified without UNP " + marker);
     await db.businessMember.createMany({ data: [
       { userId: owner.id, businessId: primary.id, role: "OWNER", isActive: true },
       { userId: manager.id, businessId: primary.id, role: "MANAGER", isActive: true },
@@ -116,7 +116,7 @@ async function main() {
     // Existing Organizer with the same UNP is adopted, not duplicated.
     sessionToken = await createSession(owner.id);
     const legalUnp = String(100000000 + Math.floor(Math.random() * 800000000));
-    const withUnp = await business(owner.id, "Verified linked " + marker, "APPROVED", "ACTIVE", legalUnp);
+    const withUnp = await business((await user()).id, "Verified linked " + marker, "APPROVED", "ACTIVE", legalUnp);
     const legacy = await db.organizer.create({ data: { name: "Legacy " + marker, unp: legalUnp, createdFrom: "MANUAL" } });
     const adopted = await POST(body(withUnp.id));
     assert.equal(adopted.status, 200);
