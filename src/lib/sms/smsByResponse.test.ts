@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { parseSmsByResponse, SmsByDeliveryError } from "./smsByResponse";
+import { buildSmsByRequestBody, parseSmsByResponse, SmsByDeliveryError } from "./smsByResponse";
 
 test("sms.by NEW with message id is accepted", () => {
   const result = parseSmsByResponse(200, JSON.stringify({ sms_id: "12345", status: "NEW" }));
@@ -45,4 +45,15 @@ test("invalid provider response is not treated as sent", () => {
     (error: unknown) =>
       error instanceof SmsByDeliveryError && error.reason === "INVALID_RESPONSE",
   );
+});
+
+test("sms.by request has exactly the three fields of the working integration", () => {
+  const body = buildSmsByRequestBody({
+    token: "test-secret",
+    phoneDigits: "375291234567",
+    message: "Код: 1234",
+  });
+  assert.deepEqual([...body.keys()], ["token", "phone", "message"]);
+  assert.equal(body.has("alphaname_id"), false);
+  assert.equal(body.has("sender"), false);
 });
