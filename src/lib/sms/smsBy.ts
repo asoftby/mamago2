@@ -3,7 +3,7 @@
  * phone and message (form-encoded), with the provider's default sender.
  * Do not reintroduce alphaname_id: it caused sender-name rejection.
  */
-import { parseSmsByResponse, SmsByDeliveryError } from "./smsByResponse";
+import { buildSmsByRequestBody, parseSmsByResponse, SmsByDeliveryError } from "./smsByResponse";
 import type { SmsByResponse } from "./smsByResponse";
 import { reportSmsByFailure } from "@/server/ops/reportSmsByFailure";
 
@@ -35,7 +35,7 @@ export async function sendQuickSms({
 
     const baseUrl = process.env.SMS_BY_BASE_URL ?? "https://app.sms.by";
     const url = `${baseUrl.replace(/\/$/, "")}/api/v1/sendQuickSms`;
-    const body = new URLSearchParams({ token, phone: phoneDigits, message });
+    const body = buildSmsByRequestBody({ token, phoneDigits, message });
 
     const res = await fetch(url, {
       method: "POST",
