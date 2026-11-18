@@ -1394,12 +1394,7 @@ export async function notifyUserPlanReminder(params: {
 
 // ── BOOKING ───────────────────────────────────────────────────────────────────
 
-import {
-  buildBookingActorLabel,
-  buildBookingNotificationBody,
-  type BookingNotificationBodyInput,
-} from "./booking/booking.formatters";
-import { resolveBookingSourceType } from "./booking/booking.types";
+import { buildPrivateBusinessBookingNotification } from "./booking/businessBookingNotificationPrivacy";
 import { renderNotification as renderNotificationTemplate } from "@/server/notifications/template-render.service";
 
 export interface NotifyBookingCreatedParams {
@@ -1440,44 +1435,9 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     return null;
   }
 
-  const sourceType = resolveBookingSourceType({
-    campShiftId: params.campShiftId ?? null,
-    offerId: params.offerId ?? null,
-    activityId: params.activityId ?? null,
-    placeId: params.placeId ?? null,
-  });
-
-  const bodyInput: BookingNotificationBodyInput = {
-    sourceType,
-    offerTitle: params.offerTitle ?? null,
-    activityTitle: params.activityTitle ?? null,
-    placeTitle: params.placeTitle ?? null,
-    campShiftTitle: params.campShiftTitle ?? null,
-    campShiftDateFrom: params.campShiftDateFrom ?? null,
-    campShiftDateTo: params.campShiftDateTo ?? null,
-    customerName: params.customerName,
-    childName: params.childName ?? null,
-    childAge: params.childAge ?? null,
-  };
-
-  const body = buildBookingNotificationBody(bodyInput);
-
-  // Богатый payload сценария BOOKING_CREATED (см. NOTIFICATION_SCENARIO_REGISTRY).
-  // Сохраняется в metadata, чтобы dispatchDelivery отрендерил email/telegram
-  // теми же переменными.
-  const templatePayload: Record<string, string> = {
-    bookingSummary: body,
-    actor: buildBookingActorLabel(bodyInput),
-    customerName: params.customerName,
-    ...(params.childName ? { childName: params.childName } : {}),
-    ...(params.childAge != null ? { childAge: String(params.childAge) } : {}),
-    ...(params.offerTitle ? { offerTitle: params.offerTitle } : {}),
-    ...(params.activityTitle ? { activityTitle: params.activityTitle } : {}),
-    ...(params.placeTitle ? { placeTitle: params.placeTitle } : {}),
-    ...(params.campShiftTitle ? { campShiftTitle: params.campShiftTitle } : {}),
-    ...(params.campShiftDateFrom ? { campShiftDateFrom: params.campShiftDateFrom } : {}),
-    ...(params.campShiftDateTo ? { campShiftDateTo: params.campShiftDateTo } : {}),
-  };
+  // Shared by in-app, email and Telegram: never persist or send customer
+  // names, children's names or ages outside the authorized order detail.
+  const { body, templatePayload } = buildPrivateBusinessBookingNotification(params);
 
   const rendered = await renderNotificationTemplate("BOOKING_CREATED", "IN_APP", templatePayload);
 

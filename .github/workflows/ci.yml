@@ -206,6 +206,9 @@ jobs:
       - name: Business booking contact minimization regressions
         run: pnpm exec tsx src/server/services/booking/businessBookingContactProjection.test.ts
 
+      - name: Business booking notification privacy regressions
+        run: pnpm exec tsx src/server/services/booking/businessBookingNotificationPrivacy.test.ts
+
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=6144 pnpm tsc --noEmit

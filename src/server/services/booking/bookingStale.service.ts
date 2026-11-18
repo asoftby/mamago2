@@ -29,6 +29,7 @@
 import prisma from "@/lib/prisma";
 import { BookingStatus } from "@prisma/client";
 import { createNotification } from "@/server/services/notification.service";
+import { buildPrivateBusinessBookingReminder } from "@/server/services/booking/businessBookingNotificationPrivacy";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,6 @@ const DEDUP_WINDOW_HOURS = 24;
 export interface StaleBooking {
   id: string;
   status: BookingStatus;
-  customerName: string;
   /** Часов с момента создания (для NEW) или с lastActivityAt (для CONFIRMED) */
   staleHours: number;
   staleType: "BOOKING_STALE" | "BOOKING_NEEDS_ATTENTION";
@@ -100,7 +100,6 @@ export async function getStaleBookings(businessId: string): Promise<StaleBooking
     select: {
       id: true,
       status: true,
-      customerName: true,
       createdAt: true,
       lastActivityAt: true,
     },
@@ -117,7 +116,6 @@ export async function getStaleBookings(businessId: string): Promise<StaleBooking
     return {
       id: r.id,
       status: r.status,
-      customerName: r.customerName ?? "",
       staleHours,
       staleType: isNew ? "BOOKING_STALE" : "BOOKING_NEEDS_ATTENTION",
     };
@@ -150,37 +148,6 @@ async function wasRecentlyNotified(
   return existing !== null;
 }
 
-// ─── Notification body builder ────────────────────────────────────────────────
-
-function buildStaleBody(booking: StaleBooking): string {
-  const h = booking.staleHours;
-
-  if (booking.staleType === "BOOKING_STALE") {
-    const label =
-      h < 48
-        ? `${h} ${pluralHours(h)}`
-        : `${Math.floor(h / 24)} ${pluralDays(Math.floor(h / 24))}`;
-    return `Новая заявка от ${booking.customerName} ждёт ответа уже ${label}`;
-  }
-
-  // BOOKING_NEEDS_ATTENTION
-  const days = Math.floor(h / 24);
-  const label = `${days} ${pluralDays(days)}`;
-  return `Подтверждённая заявка от ${booking.customerName} без активности ${label}`;
-}
-
-function pluralHours(n: number): string {
-  if (n % 10 === 1 && n % 100 !== 11) return "час";
-  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return "часа";
-  return "часов";
-}
-
-function pluralDays(n: number): string {
-  if (n % 10 === 1 && n % 100 !== 11) return "день";
-  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return "дня";
-  return "дней";
-}
-
 // ─── Main: check and notify ───────────────────────────────────────────────────
 
 /**
@@ -205,7 +172,7 @@ export async function checkAndNotifyStaleBookings(
       continue;
     }
 
-    const body = buildStaleBody(booking);
+    const body = buildPrivateBusinessBookingReminder(booking.staleType, booking.staleHours);
     const title =
       booking.staleType === "BOOKING_STALE"
         ? "Заявка ждёт ответа"
