@@ -18,7 +18,7 @@ export async function sendQuickSms({
   phoneDigits,
   message,
 }: SendQuickSmsParams): Promise<SmsByResponse> {
-  if (!/^\\d{7,15}$/.test(phoneDigits)) {
+  if (!/^\d{7,15}$/.test(phoneDigits)) {
     throw new Error("Неверный формат телефона");
   }
   if (!message?.trim()) {
@@ -34,7 +34,7 @@ export async function sendQuickSms({
     }
 
     const baseUrl = process.env.SMS_BY_BASE_URL ?? "https://app.sms.by";
-    const url = `${baseUrl.replace(/\\/$/, "")}/api/v1/sendQuickSms`;
+    const url = `${baseUrl.replace(/\/$/, "")}/api/v1/sendQuickSms`;
     const body = new URLSearchParams({ token, phone: phoneDigits, message });
 
     const res = await fetch(url, {
