@@ -1,4 +1,5 @@
 import { readPackageChangeScope } from "@/lib/birthday/packageChangeScope";
+import { resolveBookingServiceEnd } from "@/lib/booking/effectiveServiceEnd";
 import "server-only";
 import { childrenOutsideEventAge, eventAgeRuleFromActivity, formatParticipantsSummary, parseStoredChildren } from "@/lib/booking/bookingParticipants";
 import prisma from "@/lib/prisma";
@@ -20,12 +21,6 @@ export interface BusinessInboxOptions {
   limit?: number;
   now?: Date;
   requestId?: string;
-}
-
-/** Дата без времени считается до конца дня по Минску (не закрываем посещение утром). */
-function minskEndOfDay(date: Date | null): Date | null {
-  if (!date) return null;
-  return new Date(date.toISOString().slice(0, 10) + "T23:59:59.999+03:00");
 }
 
 const INBOX_SELECT = {
@@ -52,18 +47,6 @@ const INBOX_SELECT = {
 
 type InboxRow = Prisma.BookingRequestGetPayload<{ select: typeof INBOX_SELECT }>;
 
-function serviceEnd(row: InboxRow): Date | null {
-  const party = row.partyOrderItem?.partyOrder;
-  const partyEnd = party?.eventDate && party.timeTo
-    ? new Date(party.eventDate.toISOString().slice(0, 10) + "T" + party.timeTo + ":00+03:00")
-    : null;
-  return row.endsAt ?? partyEnd ??
-    row.offerSession?.endAt ??
-    minskEndOfDay(row.campShiftDateTo ?? row.requestedDate ??
-      row.partyOrderItem?.partyOrder.eventDate ?? row.session?.startsAt ??
-      row.offerSession?.startAt ?? row.startsAt);
-}
-
 /** Состав группы для карточки списка: без имён детей, только числа и возраст. */
 function participantsForInbox(row: InboxRow) {
   if (row.kind !== "STANDARD" || row.childrenCount < 1) return { participantsSummary: null, participantsAgeMismatch: false };
@@ -85,7 +68,7 @@ function effectiveResponseDueAt(row: InboxRow): Date | null {
 }
 
 function mapDecision(row: InboxRow, now: Date) {
-  const date = serviceEnd(row);
+  const date = resolveBookingServiceEnd(row);
   const decision = bookingBucket({
     kind: row.kind, status: row.status, partyStage: row.partyStage,
     createdAt: row.createdAt, firstResponseAt: row.firstResponseAt,

@@ -16,7 +16,7 @@ import {
   DirectMessageHiddenReason,
   DirectThreadStatus,
 } from "@prisma/client";
-import { canBusinessWriteDirect } from "./directBusinessWritePolicy";
+import { canBusinessWriteDirect, directBookingLifecycleSelect } from "./directBusinessWritePolicy";
 import {
   DIRECT_AUDIT_ENTITY,
   DirectAuditAction,
@@ -100,7 +100,7 @@ export async function createDirectMessage(input: CreateDirectMessageInput) {
           customerUserId: true,
           bookingRequestId: true,
           bookingRequest: {
-            select: { status: true, kind: true, partyStage: true, businessId: true, userId: true, endsAt: true },
+            select: directBookingLifecycleSelect,
           },
         },
       });
