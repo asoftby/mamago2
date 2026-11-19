@@ -102,7 +102,39 @@ async function main() {
     assert.equal(await prisma.phoneOtp.count({ where: {
       userId: user.id, phoneE164: { in: [phoneAt(12), phoneAt(13)] },
     } }), 0, "denied requests do not create or replace OTPs");
+
+    // Simulate a statement-level PostgreSQL failure of the budget counter
+    // while User/PhoneOtp remain readable. Paid sends MUST fail closed.
+    await prisma.rateLimitEntry.deleteMany({ where: { key: quotaKey } });
+    await prisma.$executeRawUnsafe(`
+      CREATE FUNCTION ci_sms_budget_fail_check() RETURNS TRIGGER AS $
+      BEGIN
+        IF NEW."key" LIKE 'business-contact-sms:user:%' THEN
+          RAISE EXCEPTION 'synthetic SMS quota statement failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $ LANGUAGE plpgsql
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TRIGGER ci_sms_budget_fail_check
+        BEFORE INSERT OR UPDATE ON "RateLimitEntry"
+        FOR EACH ROW EXECUTE FUNCTION ci_sms_budget_fail_check()
+    `);
+    for (const [endpoint, denied] of [
+      ["settings", await fromSettings(14)],
+      ["onboarding", await fromStart(15)],
+    ] as const) {
+      assert.equal(denied.status, 429, endpoint + " must fail closed when quota DB write fails");
+      assert.equal((await denied.json() as { code?: string }).code, "SMS_RATE_LIMITED");
+    }
+    assert.equal(smsCalls, 12, "quota statement failures never invoke the SMS provider");
+    assert.equal(await prisma.phoneOtp.count({ where: {
+      userId: user.id, phoneE164: { in: [phoneAt(14), phoneAt(15)] },
+    } }), 0, "failed budget check cannot persist a new OTP");
   } finally {
+    await prisma.$executeRawUnsafe('DROP TRIGGER IF EXISTS ci_sms_budget_fail_check ON "RateLimitEntry"');
+    await prisma.$executeRawUnsafe('DROP FUNCTION IF EXISTS ci_sms_budget_fail_check()');
     if (userId) {
       await prisma.phoneOtp.deleteMany({ where: { userId } });
       await prisma.rateLimitEntry.deleteMany({ where: { key: "business-contact-sms:user:" + userId } });

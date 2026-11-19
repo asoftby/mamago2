@@ -5,7 +5,7 @@ import { normalizePhoneToE164 } from "@/lib/phone/phoneNormalize";
 import { genCode4, hashCode, safeEq } from "@/lib/otp/otp";
 import { sendQuickSms } from "@/lib/sms/smsBy";
 import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
-import { checkRateLimit } from "@/lib/security/rateLimit";
+import { checkActivationRateLimit } from "@/server/auth/activationRateLimit";
 import {
   type BusinessContactOtpClientState,
   BUSINESS_CONTACT_VERIFICATION_CODE_LENGTH,
@@ -126,11 +126,13 @@ export async function sendBusinessContactVerificationCode(params: {
   // Both onboarding and account-settings routes call this service; enforcing
   // the limit in just one HTTP handler permits cross-route quota bypass.
   // Charge attempts even when provider delivery later fails or numbers change.
-  const budget = await checkRateLimit(
-    `business-contact-sms:user:${params.userId}`,
-    SMS_SENDS_PER_HOUR,
-    SMS_SEND_WINDOW_MS,
-  );
+  // Paid SMS must fail CLOSED on a limiter/DB statement failure. The generic
+  // checkRateLimit is intentionally fail-open for login, and is unsafe here.
+  const budget = await checkActivationRateLimit({
+    key: `business-contact-sms:user:${params.userId}`,
+    limit: SMS_SENDS_PER_HOUR,
+    windowMs: SMS_SEND_WINDOW_MS,
+  });
   if (!budget.allowed) throw new BusinessContactSmsRateLimitError();
 
   // A verified contact must not be associated with another user's account.
