@@ -247,6 +247,10 @@ export async function deleteAccount(
         emailVerificationExpires: null,
         phoneE164: null,
         phoneVerifiedAt: null,
+        // Verified business contact is also identifying information. It is
+        // retained only in the sealed archive, never in the User tombstone.
+        businessContactVerifiedPhoneE164: null,
+        businessContactPhoneVerifiedAt: null,
         emailVerifiedAt: null,
         lastVerificationEmailSentAt: null,
         lastLoginAt: null,
