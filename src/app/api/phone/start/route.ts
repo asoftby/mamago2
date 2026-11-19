@@ -8,7 +8,8 @@ import {
   loadBusinessContactOtpClientState,
   sendBusinessContactVerificationCode,
 } from "@/lib/phone-verification/businessContactVerification";
-import { isBusinessContactOtpEscalationError } from "@/lib/phone-verification/businessContactOtpErrors";
+import { isBusinessContactOtpEscalationError, isBusinessContactSmsRateLimitError } from "@/lib/phone-verification/businessContactOtpErrors";
+import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,13 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       const otpState = await loadBusinessContactOtpClientState(user.id);
 
+      if (isBusinessContactSmsRateLimitError(error)) {
+        return NextResponse.json(
+          { ok: false, code: error.code, error: error.message, otpState },
+          { status: 429 },
+        );
+      }
+
       if (isBusinessContactOtpEscalationError(error)) {
         const status = error.code === "OTP_SUPPORT" ? 403 : 429;
         return NextResponse.json(
@@ -64,6 +72,22 @@ export async function POST(request: NextRequest) {
             otpState,
           },
           { status }
+        );
+      }
+
+      if (error instanceof SmsByDeliveryError) {
+        const deliveryUnknown = ["NETWORK_ERROR", "INVALID_RESPONSE", "HTTP_ERROR"].includes(error.reason);
+        return NextResponse.json(
+          {
+            ok: false,
+            error: deliveryUnknown
+              ? "Не удалось подтвердить отправку SMS. Код ещё может прийти — введите его, если получите."
+              : error.message,
+            code: deliveryUnknown ? "SMS_DELIVERY_UNKNOWN" : "SMS_DELIVERY_FAILED",
+            resendAfterSec: 60,
+            otpState,
+          },
+          { status: 503 },
         );
       }
 

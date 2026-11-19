@@ -489,6 +489,19 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm test:business-identity
 
+      - name: Business contact SMS shared-budget PostgreSQL integration
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          NODE_OPTIONS: --conditions=react-server
+          SMS_BY_TOKEN: synthetic_ci_sms_token
+          SMS_BY_BASE_URL: https://sms-budget.invalid
+          FORCE_SMS: "true"
+          OTP_SECRET: synthetic_ci_otp_secret_no_real_data_20261119
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/lib/phone-verification/phoneOtpSendOutcome.test.ts
+          pnpm test:business-phone-sms-budget-integration
+
       - name: Business Mini App signed authentication and live membership PostgreSQL
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
