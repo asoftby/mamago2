@@ -6110,7 +6110,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ---
 
-## [BACKLOG-239] `pnpm audit --prod` на `dev`: 4 открытых advisory (2 low, 2 moderate) в транзитивных зависимостях
+## [BACKLOG-239] `pnpm audit --prod` на `dev`: 4 открытых advisory (2 low, 2 moderate): 3 в транзитивных зависимостях, 1 в прямой
 
 - Status: OPEN
 - Priority: P2
@@ -6122,10 +6122,10 @@ distributor_company_id=550) и хотели бы уточнить несколь
   - `glob` 13.0.6 (moderate, `GHSA-3g3m-2fjr-6pw4`, исправлено в `>=14.0.2`) — путь `@sentry/nextjs > @sentry/bundler-plugins > glob`;
   - `minimatch` 10.2.3 (moderate, `GHSA-g3hv-75wg-m249`, исправлено в `>=11.0.1`) — путь `@sentry/nextjs > @sentry/bundler-plugins > glob > minimatch`;
   - `fast-xml-parser` 5.11.0 (low, `GHSA-474x-hrwr-fgx4`, исправлено в `>=5.12.0`) — прямая зависимость.
-  CI-job `audit` на `dev` при этом зелёный (порог, судя по всему, выше `moderate`). GitHub Dependabot показывает 20 открытых уязвимостей (5 critical, 3 high, 8 moderate, 4 low) на default-ветке `main`; сопоставление с `dev` не проводилось.
+  Проверки зависимостей в CI нет: job `audit` в PR-проверках — это тест эвристик дизайн-системы (`.github/workflows/design-system-inventory.yml`), а не `pnpm audit`, поэтому зелёный CI ничего не говорит об этих advisory. При будущем `dev` → `main` учесть, что в `pnpm-lock.yaml` `main` разрешён `@tiptap/*` 3.32.0, а в `dev` 3.31.3 (диапазон `^3.31.3` допускает обновление). GitHub Dependabot показывает 20 открытых уязвимостей (5 critical, 3 high, 8 moderate, 4 low) на default-ветке `main`; сопоставление с `dev` не проводилось.
 - Current state: не чинилось. `fast-xml-parser` — прямая зависимость (путь `.>fast-xml-parser`), остальные три транзитивные; выбор между обновлением `@sentry/nextjs`, `@react-email/render` и `pnpm.overrides` не сделан, совместимость патч-версий не проверялась.
 - Dependencies: нет. При обновлении `@sentry/nextjs` учесть, что это затрагивает сборку (source maps, bundler plugin).
-- Acceptance criteria: `pnpm audit --prod --audit-level=low` на `dev` без находок либо оставшиеся находки зафиксированы здесь с обоснованием (нет патча / недостижимый путь); `pnpm build` и CI зелёные; после обновления `main` перепроверить список Dependabot и закрыть/обновить запись.
+- Acceptance criteria: решено, нужен ли `pnpm audit` как проверка в CI (сейчас её нет); `pnpm audit --prod --audit-level=low` на `dev` без находок либо оставшиеся находки зафиксированы здесь с обоснованием (нет патча / недостижимый путь); `pnpm build` и CI зелёные; после обновления `main` перепроверить список Dependabot и закрыть/обновить запись.
 - Source: сверка `main` и `dev`, `pnpm audit` 2026-11-16; PR сверки `main` — [asoftby/mamago2#1276](https://github.com/asoftby/mamago2/pull/1276).
 
 ## [BACKLOG-240] Direct: масштабируемость и точность админ-реестра «Коммуникации → Прямые сообщения → Диалоги»
