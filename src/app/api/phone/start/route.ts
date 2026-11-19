@@ -8,9 +8,8 @@ import {
   loadBusinessContactOtpClientState,
   sendBusinessContactVerificationCode,
 } from "@/lib/phone-verification/businessContactVerification";
-import { isBusinessContactOtpEscalationError } from "@/lib/phone-verification/businessContactOtpErrors";
+import { isBusinessContactOtpEscalationError, isBusinessContactSmsRateLimitError } from "@/lib/phone-verification/businessContactOtpErrors";
 import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
-import { checkRateLimit } from "@/lib/security/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -39,16 +38,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Independent caller budget survives OTP rollover and provider failures:
-    // multiple numbers or repeated definite rejections cannot bypass it.
-    const budget = await checkRateLimit(`business-contact-sms:user:${user.id}`, 12, 60 * 60 * 1000);
-    if (!budget.allowed) {
-      return NextResponse.json(
-        { ok: false, code: "SMS_RATE_LIMITED", error: "Слишком много запросов SMS. Попробуйте позже." },
-        { status: 429 },
-      );
-    }
-
     try {
       const result = await sendBusinessContactVerificationCode({
         userId: user.id,
@@ -63,6 +52,13 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       const otpState = await loadBusinessContactOtpClientState(user.id);
+
+      if (isBusinessContactSmsRateLimitError(error)) {
+        return NextResponse.json(
+          { ok: false, code: error.code, error: error.message, otpState },
+          { status: 429 },
+        );
+      }
 
       if (isBusinessContactOtpEscalationError(error)) {
         const status = error.code === "OTP_SUPPORT" ? 403 : 429;
