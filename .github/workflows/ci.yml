@@ -497,6 +497,7 @@ jobs:
           SMS_BY_TOKEN: synthetic_ci_sms_token
           SMS_BY_BASE_URL: https://sms-budget.invalid
           FORCE_SMS: "true"
+          OTP_SECRET: synthetic_ci_otp_secret_no_real_data_20261119
         run: |
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/lib/phone-verification/phoneOtpSendOutcome.test.ts

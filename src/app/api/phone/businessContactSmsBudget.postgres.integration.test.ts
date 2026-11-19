@@ -107,14 +107,14 @@ async function main() {
     // while User/PhoneOtp remain readable. Paid sends MUST fail closed.
     await prisma.rateLimitEntry.deleteMany({ where: { key: quotaKey } });
     await prisma.$executeRawUnsafe(`
-      CREATE FUNCTION ci_sms_budget_fail_check() RETURNS TRIGGER AS $
+      CREATE FUNCTION ci_sms_budget_fail_check() RETURNS TRIGGER AS $sms_budget$
       BEGIN
         IF NEW."key" LIKE 'business-contact-sms:user:%' THEN
           RAISE EXCEPTION 'synthetic SMS quota statement failure';
         END IF;
         RETURN NEW;
       END;
-      $ LANGUAGE plpgsql
+      $sms_budget$ LANGUAGE plpgsql
     `);
     await prisma.$executeRawUnsafe(`
       CREATE TRIGGER ci_sms_budget_fail_check
