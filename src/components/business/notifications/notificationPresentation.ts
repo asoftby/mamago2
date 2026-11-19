@@ -5,6 +5,11 @@ export function getNotificationIcon(type: string): string {
     case "BOOKING_CREATED":
     case "BOOKING_REQUEST":
       return "📋";
+    case "DIRECT_THREAD_CREATED":
+    case "DIRECT_NEW_MESSAGE":
+    case "DIRECT_CLIENT_WAITING":
+    case "DIRECT_COMPLAINT_RESOLVED":
+      return "💬";
     case "PLACE_APPROVED":
     case "CONTENT_PUBLISHED":
       return "✅";
@@ -31,6 +36,11 @@ export function getNotificationTypeLabel(type: string): string {
     case "BOOKING_CREATED":
     case "BOOKING_REQUEST":
       return "Заявки";
+    case "DIRECT_THREAD_CREATED":
+    case "DIRECT_NEW_MESSAGE":
+    case "DIRECT_CLIENT_WAITING":
+    case "DIRECT_COMPLAINT_RESOLVED":
+      return "Диалоги";
     case "PLACE_APPROVED":
     case "PLACE_NEEDS_CHANGES":
     case "PLACE_IMPROVEMENT_REQUESTED":
