@@ -594,5 +594,7 @@ test("created and waiting external Direct pings share one claim across concurren
       where: { type: "DIRECT_NEW_MESSAGE", entityId: messageId, userId: { in: staff } },
     });
     assert.equal(bellCount, 2, `new message reaches each business bell for ${ordering}`);
+    // Let async delivery rows settle before the shared PostgreSQL fixture teardown.
+    await waitForDeliveriesToSettle([thread.threadId, messageId]);
   }
 });
