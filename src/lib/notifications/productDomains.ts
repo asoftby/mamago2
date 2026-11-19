@@ -78,6 +78,12 @@ function resolveExplicitProductDomain(
     case "BOOKING_STALE":
     case "BOOKING_NEEDS_ATTENTION":
       return notification.audience === "USER" ? "BOOKINGS" : "BUSINESS";
+    case "DIRECT_THREAD_CREATED":
+    case "DIRECT_NEW_MESSAGE":
+    case "DIRECT_CLIENT_WAITING":
+    case "DIRECT_COMPLAINT_RESOLVED":
+      // Business-cabinet Direct notices; personal (USER) ones keep the generic fallback.
+      return notification.audience === "BUSINESS" ? "BUSINESS" : null;
     case "PLACE_APPROVED":
     case "PLACE_NEEDS_CHANGES":
     case "PLACE_REJECTED":

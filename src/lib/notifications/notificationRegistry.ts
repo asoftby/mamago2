@@ -602,6 +602,45 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
   },
 
   // ── Booking ──
+  // ── Direct (messages): business-only types. DIRECT_NEW_MESSAGE stays unregistered on purpose:
+  //    it is also sent to parents, and registering it would switch on e-mail/Telegram for them. ──
+  DIRECT_THREAD_CREATED: {
+    type: "DIRECT_THREAD_CREATED",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "bookings",
+    label: "Новое обращение",
+    description: "Клиент открыл новый диалог по вашей публикации",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "DIRECT_THREAD",
+    ctaLabel: "Открыть диалог",
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/business/direct/${n.entityId}` : "/business/direct"),
+    telegram: {
+      enabledByDefault: true,
+    },
+    importance: "HIGH",
+    category: "BOOKING",
+  },
+
+  DIRECT_CLIENT_WAITING: {
+    type: "DIRECT_CLIENT_WAITING",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "bookings",
+    label: "Клиент ждёт ответа",
+    description: "Клиент написал в диалог и ждёт ответа (не чаще раза в 30 минут на диалог)",
+    // External channels only: every message is already in the bell as DIRECT_NEW_MESSAGE.
+    defaultChannels: { inApp: false, email: false, telegram: true },
+    entityType: "DIRECT_THREAD",
+    ctaLabel: "Открыть диалог",
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/business/direct/${n.entityId}` : "/business/direct"),
+    telegram: {
+      enabledByDefault: true,
+    },
+    importance: "NORMAL",
+    category: "BOOKING",
+  },
+
   BOOKING_CREATED: {
     type: "BOOKING_CREATED",
     audience: "BUSINESS",
