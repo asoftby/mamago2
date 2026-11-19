@@ -1,3 +1,4 @@
+import { toDirectSendMessageDto } from "@/server/services/direct/directMessageDto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DirectActorType } from "@prisma/client";
@@ -68,7 +69,7 @@ export async function POST(
 
     void notifyOtherSide({ threadId: thread.id, senderType, senderUserId: currentUser.id, messageId: message.id });
 
-    return NextResponse.json({ id: message.id, threadId: message.threadId, senderType: message.senderType, body: message.body, createdAt: message.createdAt, readAt: message.readAt, hiddenAt: message.hiddenAt }, { status: 201 });
+    return NextResponse.json(toDirectSendMessageDto(message), { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation error", details: error.issues }, { status: 400 });
