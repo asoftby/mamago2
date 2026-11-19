@@ -5,6 +5,7 @@ import { normalizePhoneToE164 } from "@/lib/phone/phoneNormalize";
 import { genCode4, hashCode, safeEq } from "@/lib/otp/otp";
 import { sendQuickSms } from "@/lib/sms/smsBy";
 import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 import {
   type BusinessContactOtpClientState,
   BUSINESS_CONTACT_VERIFICATION_CODE_LENGTH,
@@ -14,6 +15,7 @@ import {
 } from "./businessContactVerification.shared";
 import {
   BusinessContactOtpEscalationError,
+  BusinessContactSmsRateLimitError,
 } from "./businessContactOtpErrors";
 import {
   buildBusinessContactOtpClientState,
@@ -27,6 +29,8 @@ import {
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_SEC = 60;
+const SMS_SENDS_PER_HOUR = 12;
+const SMS_SEND_WINDOW_MS = 60 * 60 * 1000;
 
 const USER_OTP_ESCALATION_SELECT = {
   businessContactOtpFailedAttempts: true,
@@ -117,6 +121,17 @@ export async function sendBusinessContactVerificationCode(params: {
   }
 
   assertCanSendBusinessContactOtp(escalationUser, now);
+
+  // Consume the *shared* per-user budget before OTP writes/provider calls.
+  // Both onboarding and account-settings routes call this service; enforcing
+  // the limit in just one HTTP handler permits cross-route quota bypass.
+  // Charge attempts even when provider delivery later fails or numbers change.
+  const budget = await checkRateLimit(
+    `business-contact-sms:user:${params.userId}`,
+    SMS_SENDS_PER_HOUR,
+    SMS_SEND_WINDOW_MS,
+  );
+  if (!budget.allowed) throw new BusinessContactSmsRateLimitError();
 
   // A verified contact must not be associated with another user's account.
   const otherOwner = await prisma.user.findFirst({
