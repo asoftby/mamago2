@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { adminPath } from "@/lib/routing/surface";
 import { X } from "lucide-react";
 import { BusinessVisibilityControl } from "@/components/admin/business/BusinessVisibilityControl";
 import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
@@ -47,6 +49,22 @@ type BusinessDetail = {
   }>;
 };
 
+type AccessRequestSummary = {
+  id: string;
+  status: string;
+  name: string;
+  requesterRole: string;
+  createdAt: string;
+  requesterUser: { email: string };
+};
+
+const ACCESS_REQUEST_STATUS_LABELS: Record<string, string> = {
+  PENDING: "На проверке",
+  APPROVED: "Одобрено",
+  REJECTED: "Отклонено",
+  NEEDS_INFO: "Нужны данные",
+};
+
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Черновик",
   PENDING: "На проверке",
@@ -72,6 +90,8 @@ export function BusinessVerificationSidePanel({
   onActionComplete: (newStatus: string) => void;
 }) {
   const [business, setBusiness] = useState<BusinessDetail | null>(null);
+  const [accessRequests, setAccessRequests] = useState<AccessRequestSummary[]>([]);
+  const [canReviewAccessRequests, setCanReviewAccessRequests] = useState(false);
   const [canManageBusinessVisibility, setCanManageBusinessVisibility] =
     useState(false);
   const [canRecordNpdCheck, setCanRecordNpdCheck] = useState(false);
@@ -87,6 +107,8 @@ export function BusinessVerificationSidePanel({
   const fetchBusiness = async () => {
     setLoading(true);
     setError("");
+    setAccessRequests([]);
+    setCanReviewAccessRequests(false);
 
     try {
       const res = await fetch(`/api/admin/business-verification/${businessId}`);
@@ -97,6 +119,8 @@ export function BusinessVerificationSidePanel({
       }
 
       setBusiness(data.business);
+      setAccessRequests(data.accessRequests ?? []);
+      setCanReviewAccessRequests(data.canReviewAccessRequests === true);
       setCanRecordNpdCheck(data.canRecordNpdCheck === true);
       setCanManageBusinessVisibility(data.canManageBusinessVisibility === true);
     } catch (err) {
@@ -347,6 +371,53 @@ export function BusinessVerificationSidePanel({
                   </div>
                 </dl>
               </div>
+
+              {/* Access requests are distinct from registration verification. */}
+              {canReviewAccessRequests && (
+                <section className="rounded-lg border border-gray-200 bg-white p-4" aria-labelledby="business-access-requests-title">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 id="business-access-requests-title" className="text-lg font-semibold">
+                      Запросы доступа к бизнесу
+                    </h4>
+                    <Link
+                      href={adminPath("/b2b/access-requests")}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      Все запросы
+                    </Link>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Это отдельная проверка полномочий заявителя, не связанная со статусом верификации бизнеса.
+                  </p>
+                  {accessRequests.length === 0 ? (
+                    <p className="mt-3 text-sm text-gray-500">
+                      Запросов доступа для этой компании не найдено.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-3">
+                      {accessRequests.map((accessRequest) => (
+                        <div key={accessRequest.id} className="rounded-md border border-gray-200 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-medium text-gray-900">{accessRequest.name}</div>
+                            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                              {ACCESS_REQUEST_STATUS_LABELS[accessRequest.status] ?? accessRequest.status}
+                            </span>
+                          </div>
+                          <p className="mt-1 break-all text-xs text-gray-600">
+                            {accessRequest.requesterUser.email} · {accessRequest.requesterRole} · {formatAdminDateTime(accessRequest.createdAt)}
+                          </p>
+                          <Link
+                            href={adminPath(`/b2b/access-requests/${accessRequest.id}`)}
+                            className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
+                          >
+                            {accessRequest.status === "PENDING" ? "Рассмотреть запрос" : "Открыть запрос"}
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* Review Note */}
               {business.reviewNote && (
