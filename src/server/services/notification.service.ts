@@ -1716,34 +1716,53 @@ export interface NotifyDirectCreatedParams {
   publicationTitle?: string | null;
 }
 
+/** Both external Direct pings use one transaction-scoped PostgreSQL claim. */
+type DirectBusinessPingType = "DIRECT_THREAD_CREATED" | "DIRECT_CLIENT_WAITING";
+async function claimDirectBusinessPing(input: { recipientUserId: string; threadId: string; type: DirectBusinessPingType; title: string; body: string }) {
+  const href = `/business/direct/${input.threadId}`;
+  const action = resolveNotificationActionDefaults({ type: input.type, title: input.title, body: input.body, actionUrl: href });
+  const lockKey = `direct-waiting:${input.recipientUserId}:${input.threadId}`;
+  const notification = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text AS lock_token`;
+    const now = new Date();
+    const where = { userId: input.recipientUserId, entityType: "DIRECT_THREAD" as const, entityId: input.threadId,
+      type: { in: ["DIRECT_THREAD_CREATED", "DIRECT_CLIENT_WAITING"] as NotificationType[] } };
+    if (input.type === "DIRECT_THREAD_CREATED") {
+      // Late creation events must not duplicate a waiting ping that won the race.
+      const existing = await tx.notification.findFirst({ where, select: { id: true } });
+      if (existing) return null;
+    } else {
+      const lastPing = await tx.notification.findFirst({
+        where: { ...where, createdAt: { gte: new Date(now.getTime() - DIRECT_WAITING_PING_WINDOW_MS) } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { createdAt: true },
+      });
+      if (lastPing) {
+        const reply = await tx.directMessage.findFirst({ where: {
+          threadId: input.threadId, senderType: { in: [DirectActorType.BUSINESS, DirectActorType.ADMIN] },
+          createdAt: { gt: lastPing.createdAt },
+        }, select: { id: true } });
+        if (!reply) return null;
+      }
+    }
+    // Prisma default now() would use transaction-start time, before lock acquisition.
+    return tx.notification.create({ data: { createdAt: new Date(), userId: input.recipientUserId, audience: "BUSINESS",
+      type: input.type, title: input.title, body: input.body, entityType: "DIRECT_THREAD", entityId: input.threadId,
+      ctaLabel: "Открыть диалог", ctaAction: href, actionMode: action.actionMode, actionUrl: action.actionUrl,
+      modalTitle: action.modalTitle, modalBody: action.modalBody,
+    } });
+  }, { timeout: 15_000 });
+  if (!notification) return null;
+  // Delivery only after commit: never send under the database lock.
+  const user = await prisma.user.findUnique({ where: { id: input.recipientUserId }, select: { id: true, email: true, role: true } });
+  if (user) void dispatchDelivery(notification, user).catch((e) => console.error("[notification] Direct ping delivery failed:", e));
+  return notification;
+}
+
 /** Уведомление бизнесу: пользователь открыл новый Direct-тред по его публикации. */
 export async function notifyDirectCreated(params: NotifyDirectCreatedParams) {
-  const dedup = await checkNotificationDedup(
-    params.ownerUserId,
-    "DIRECT_THREAD_CREATED",
-    "DIRECT_THREAD",
-    params.threadId,
-  );
-  if (dedup.isDuplicate) {
-    console.warn("[notification] DIRECT_THREAD_CREATED deduplicated:", params.threadId);
-    return null;
-  }
-
-  const title = params.publicationTitle
-    ? `Новое обращение: «${params.publicationTitle}»`
-    : "Новое обращение";
-
-  return createNotification({
-    userId: params.ownerUserId,
-    audience: "BUSINESS",
-    type: "DIRECT_THREAD_CREATED",
-    title,
+  return claimDirectBusinessPing({ recipientUserId: params.ownerUserId, threadId: params.threadId, type: "DIRECT_THREAD_CREATED",
+    title: params.publicationTitle ? `Новое обращение: «${params.publicationTitle}»` : "Новое обращение",
     body: `Открыт диалог ${formatDirectThreadNumber(params.threadNumber)}. Ответьте, чтобы продолжить общение.`,
-    entityType: "DIRECT_THREAD",
-    entityId: params.threadId,
-    ctaLabel: "Открыть диалог",
-    // Business notifications must open inside the business cabinet.
-    ctaAction: `/business/direct/${params.threadId}`,
   });
 }
 
@@ -1814,80 +1833,10 @@ export interface NotifyDirectClientWaitingParams {
 export const DIRECT_WAITING_PING_WINDOW_MS = 30 * 60 * 1000;
 
 export async function notifyDirectClientWaiting(params: NotifyDirectClientWaitingParams) {
-  const title = `Клиент ждёт ответа в ${formatDirectThreadNumber(params.threadNumber)}`;
-  const body = "Откройте диалог в кабинете, чтобы ответить.";
-  const href = `/business/direct/${params.threadId}`;
-  const action = resolveNotificationActionDefaults({
-    type: "DIRECT_CLIENT_WAITING",
-    title,
-    body,
-    actionUrl: href,
+  return claimDirectBusinessPing({ recipientUserId: params.recipientUserId, threadId: params.threadId,
+    type: "DIRECT_CLIENT_WAITING", title: `Клиент ждёт ответа в ${formatDirectThreadNumber(params.threadNumber)}`,
+    body: "Откройте диалог в кабинете, чтобы ответить.",
   });
-  const lockKey = `direct-waiting:${params.recipientUserId}:${params.threadId}`;
-
-  const notification = await prisma.$transaction(async (tx) => {
-    // SELECT returns text (not PostgreSQL void) for safe Prisma decoding.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text AS lock_token`;
-    const now = new Date();
-    const lastPing = await tx.notification.findFirst({
-      where: {
-        userId: params.recipientUserId,
-        entityType: "DIRECT_THREAD",
-        entityId: params.threadId,
-        type: { in: ["DIRECT_THREAD_CREATED", "DIRECT_CLIENT_WAITING"] },
-        createdAt: { gte: new Date(now.getTime() - DIRECT_WAITING_PING_WINDOW_MS) },
-      },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
-    });
-
-    if (lastPing) {
-      const reply = await tx.directMessage.findFirst({
-        where: {
-          threadId: params.threadId,
-          senderType: { in: [DirectActorType.BUSINESS, DirectActorType.ADMIN] },
-          createdAt: { gt: lastPing.createdAt },
-        },
-        select: { id: true },
-      });
-      if (!reply) return null;
-    }
-
-    // Prisma's @default(now()) would use transaction-start time, potentially
-    // older than a reply committed while this transaction waited for the lock.
-    // Stamp the claim only after the lock and latest-reply check.
-    const claimedAt = new Date();
-    return tx.notification.create({
-      data: {
-        createdAt: claimedAt,
-        userId: params.recipientUserId,
-        audience: "BUSINESS",
-        type: "DIRECT_CLIENT_WAITING",
-        title,
-        body,
-        entityType: "DIRECT_THREAD",
-        entityId: params.threadId,
-        ctaLabel: "Открыть диалог",
-        ctaAction: href,
-        actionMode: action.actionMode,
-        actionUrl: action.actionUrl,
-        modalTitle: action.modalTitle,
-        modalBody: action.modalBody,
-      },
-    });
-  }, { timeout: 15_000 });
-
-  if (!notification) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: params.recipientUserId },
-    select: { id: true, email: true, role: true },
-  });
-  if (user) {
-    void dispatchDelivery(notification, user).catch((e) =>
-      console.error("[notification] Direct waiting delivery failed:", e),
-    );
-  }
-  return notification;
 }
 
 export interface NotifyDirectComplaintOpenedParams {
