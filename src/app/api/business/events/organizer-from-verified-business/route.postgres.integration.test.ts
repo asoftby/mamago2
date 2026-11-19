@@ -118,12 +118,23 @@ async function main() {
     const legalUnp = String(100000000 + Math.floor(Math.random() * 800000000));
     const withUnp = await business((await user()).id, "Verified linked " + marker, "APPROVED", "ACTIVE", legalUnp);
     const legacy = await db.organizer.create({ data: { name: "Legacy " + marker, unp: legalUnp, createdFrom: "MANUAL" } });
+    const before = await GET(search(marker));
+    assert.equal(before.status, 200);
+    const beforeRows = (await before.json() as { organizers: Array<{ id: string; name: string }> }).organizers;
+    assert.equal(beforeRows.find((item) => item.name === withUnp.name)?.id, `business:${withUnp.id}`,
+      "verified company with unlinked legacy UNP must resolve through POST");
+    assert.ok(!beforeRows.some((item) => item.id === legacy.id),
+      "unlinked legacy ID cannot bypass Business adoption via direct selection");
     const adopted = await POST(body(withUnp.id));
     assert.equal(adopted.status, 200);
     assert.equal(((await adopted.json()) as { organizer: { id: string } }).organizer.id, legacy.id);
     const row = await db.organizer.findUniqueOrThrow({ where: { id: legacy.id } });
     assert.equal(row.linkedBusinessId, withUnp.id);
     assert.equal(await db.organizer.count({ where: { unp: legalUnp } }), 1);
+    const after = await GET(search(marker));
+    const afterRows = (await after.json() as { organizers: Array<{ id: string; name: string }> }).organizers;
+    assert.equal(afterRows.find((item) => item.name === row.name)?.id, legacy.id,
+      "after adoption the verified company returns its persistent Organizer ID");
     console.log("Verified organizer API auth, eligibility, no-UNP concurrency and dedup: PASS");
   } finally {
     sessionToken = null;
