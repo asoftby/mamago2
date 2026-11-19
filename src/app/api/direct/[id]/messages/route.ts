@@ -68,7 +68,7 @@ export async function POST(
 
     void notifyOtherSide({ threadId: thread.id, senderType, senderUserId: currentUser.id, messageId: message.id });
 
-    return NextResponse.json(message, { status: 201 });
+    return NextResponse.json({ id: message.id, threadId: message.threadId, senderType: message.senderType, body: message.body, createdAt: message.createdAt, readAt: message.readAt, hiddenAt: message.hiddenAt }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation error", details: error.issues }, { status: 400 });
