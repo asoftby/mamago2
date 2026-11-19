@@ -38,7 +38,7 @@ export async function POST(
       body,
       sentByUserId: auth.id,
     });
-    return NextResponse.json(message);
+    return NextResponse.json({ id: message.id, threadId: message.threadId, senderType: message.senderType, body: message.body, createdAt: message.createdAt, readAt: message.readAt, hiddenAt: message.hiddenAt });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation error", details: error.issues }, { status: 400 });
