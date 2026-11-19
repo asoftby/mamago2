@@ -64,10 +64,23 @@ async function mkUser(label: string) {
 
 test("deletion seals identification data before wiping it; only the private key opens it", async () => {
   const user = await mkUser("sealed");
+  const businessPhoneE164 = user.phoneE164!.replace("+37529", "+37533");
+  const businessPhoneVerifiedAt = new Date("2026-01-07T00:00:00.000Z");
+  await db.user.update({
+    where: { id: user.id },
+    data: {
+      businessContactVerifiedPhoneE164: businessPhoneE164,
+      businessContactPhoneVerifiedAt: businessPhoneVerifiedAt,
+    },
+  });
   assert.deepEqual(await deleteAccount(user.id, db), { ok: true });
 
   const tombstone = await db.user.findUniqueOrThrow({ where: { id: user.id } });
   assert.equal(tombstone.phoneE164, null);
+  assert.equal(tombstone.businessContactVerifiedPhoneE164, null,
+    "verified business phone must not survive in plaintext tombstone");
+  assert.equal(tombstone.businessContactPhoneVerifiedAt, null,
+    "verified business phone timestamp must be erased on account deletion");
   assert.equal(tombstone.telegramId, null);
   assert.notEqual(tombstone.email, user.email);
   assert.ok(tombstone.deletedAt);
@@ -80,6 +93,8 @@ test("deletion seals identification data before wiping it; only the private key 
   expectedPurge.setUTCFullYear(expectedPurge.getUTCFullYear() + 1);
   assert.equal(record.purgeAfter.getTime(), expectedPurge.getTime());
   assert.ok(!record.envelope.includes(user.phoneE164!.slice(1)), "phone never stored in plaintext");
+  assert.ok(!record.envelope.includes(businessPhoneE164.slice(1)),
+    "business phone never stored in plaintext archive");
   assert.ok(!record.envelope.includes(user.email), "email never stored in plaintext");
 
   const identity = openIdentityEnvelope(record.envelope, user.id, key.privateKey);
@@ -87,6 +102,8 @@ test("deletion seals identification data before wiping it; only the private key 
   assert.equal(identity.email, user.email);
   assert.equal(identity.phoneE164, user.phoneE164);
   assert.equal(identity.phoneVerifiedAt, "2026-01-05T00:00:00.000Z");
+  assert.equal(identity.businessContactPhoneE164, businessPhoneE164);
+  assert.equal(identity.businessContactPhoneVerifiedAt, businessPhoneVerifiedAt.toISOString());
   assert.equal(identity.displayName, user.displayName);
   assert.equal(identity.telegramId, user.telegramId);
   assert.equal(identity.telegramUsername, user.telegramUsername);
