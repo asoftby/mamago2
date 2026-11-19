@@ -3,10 +3,27 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { BusinessMemberRole, FamilyRole, PlanVisibility, Role, UserStatus, type Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  buildIdentityPayload,
+  IDENTITY_SOURCE_SELECT,
+  IdentityRetentionKeyError,
+  identityRetentionPurgeAfter,
+  loadPublicKeyFromEnv,
+  sealIdentityPayload,
+  type IdentityRetentionPublicKey,
+} from "@/server/privacy/identityRetention/envelope";
 
 export type DeleteAccountResult =
   | { ok: true }
-  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "BUSINESS_OWNER_TRANSFER_REQUIRED" | "LAST_ADMIN" };
+  | {
+      ok: false;
+      code: "ACCOUNT_NOT_FOUND" | "BUSINESS_OWNER_TRANSFER_REQUIRED" | "LAST_ADMIN" | "IDENTITY_RETENTION_UNAVAILABLE";
+    };
+
+export type DeleteAccountOptions = {
+  /** Test seam; production reads IDENTITY_RETENTION_PUBLIC_KEY from the environment. */
+  identityRetentionPublicKey?: IdentityRetentionPublicKey;
+};
 
 function tombstoneEmail(userId: string): string {
   const digest = createHash("sha256").update(`mamago-deleted-user:${userId}`).digest("hex");
@@ -86,15 +103,31 @@ async function detachFromFamily(
  * Canonical account-deletion policy. Required User foreign keys on shared and
  * business records make hard deletion destructive, so a non-identifying,
  * non-authenticatable tombstone is retained while private data is erased.
+ *
+ * Постановление Совмина РБ № 850: identification data (email, phone, name,
+ * Telegram) must be kept for one year after the user agreement ends. Before the
+ * live columns are wiped, they are sealed with the public retention key into
+ * IdentityRetentionRecord in the same transaction. Without a usable key the
+ * deletion is refused up front (fail closed) — nothing is written.
  */
 export async function deleteAccount(
   userId: string,
   client: PrismaClient = prisma,
+  options: DeleteAccountOptions = {},
 ): Promise<DeleteAccountResult> {
+  let retentionKey: IdentityRetentionPublicKey;
+  try {
+    retentionKey = options.identityRetentionPublicKey ?? loadPublicKeyFromEnv();
+  } catch (error) {
+    const code = error instanceof IdentityRetentionKeyError ? error.code : "UNKNOWN";
+    console.error(`[deleteAccount] identity retention key unavailable code=${code}`);
+    return { ok: false, code: "IDENTITY_RETENTION_UNAVAILABLE" };
+  }
+
   return client.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { id: userId },
-      select: { role: true, deletedAt: true },
+      select: { ...IDENTITY_SOURCE_SELECT, role: true, deletedAt: true },
     });
     if (!user || user.deletedAt) return { ok: false, code: "ACCOUNT_NOT_FOUND" };
 
@@ -118,6 +151,18 @@ export async function deleteAccount(
 
     const deletedAt = new Date();
     const anonymousEmail = tombstoneEmail(userId);
+
+    const sealed = sealIdentityPayload(buildIdentityPayload(user, deletedAt), retentionKey);
+    await tx.identityRetentionRecord.create({
+      data: {
+        userId,
+        keyId: sealed.keyId,
+        envelope: sealed.envelope,
+        accountCreatedAt: user.createdAt,
+        agreementEndedAt: deletedAt,
+        purgeAfter: identityRetentionPurgeAfter(deletedAt),
+      },
+    });
 
     await tx.userEvent.updateMany({
       where: { userId },
@@ -202,6 +247,10 @@ export async function deleteAccount(
         emailVerificationExpires: null,
         phoneE164: null,
         phoneVerifiedAt: null,
+        // Verified business contact is also identifying information. It is
+        // retained only in the sealed archive, never in the User tombstone.
+        businessContactVerifiedPhoneE164: null,
+        businessContactPhoneVerifiedAt: null,
         emailVerifiedAt: null,
         lastVerificationEmailSentAt: null,
         lastLoginAt: null,

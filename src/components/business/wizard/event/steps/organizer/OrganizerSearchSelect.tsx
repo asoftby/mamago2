@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, Users } from "lucide-react";
@@ -22,16 +22,30 @@ export function OrganizerSearchSelect({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ExistingOrganizer[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  // A delayed Business selection must never override a newer manual choice.
+  const selectionGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      selectionGenerationRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       setIsSearching(false);
+      setSearchError(null);
       return;
     }
 
     let isActive = true;
     setIsSearching(true);
+    setSearchError(null);
 
     const timer = setTimeout(async () => {
       try {
@@ -55,6 +69,11 @@ export function OrganizerSearchSelect({
         console.error("[OrganizerSearchSelect] Search error:", e);
         if (isActive) {
           setSearchResults([]);
+          setSearchError(
+            e instanceof Error && e.message.includes("403")
+              ? "Нет доступа к поиску организаторов. Проверьте права в бизнес-кабинете."
+              : "Не удалось выполнить поиск. Попробуйте ещё раз.",
+          );
         }
       } finally {
         if (isActive) {
@@ -68,6 +87,46 @@ export function OrganizerSearchSelect({
       clearTimeout(timer);
     };
   }, [searchQuery]);
+
+  async function handleChoose(organizer: ExistingOrganizer) {
+    if (!isEditable || isResolving) return;
+    if (!organizer.id.startsWith("business:")) {
+      onSelect(organizer);
+      return;
+    }
+
+    const businessId = organizer.id.slice("business:".length);
+    const selectionGeneration = ++selectionGenerationRef.current;
+    setIsResolving(true);
+    setSearchError(null);
+    try {
+      const response = await fetch("/api/business/events/organizer-from-verified-business", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId }),
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        organizer?: ExistingOrganizer;
+        error?: string;
+      };
+      if (!response.ok || !json.ok || !json.organizer) {
+        throw new Error(json.error || "Не удалось выбрать организатора");
+      }
+      if (mountedRef.current && selectionGenerationRef.current === selectionGeneration) {
+        onSelect(json.organizer);
+      }
+    } catch (error) {
+      if (mountedRef.current && selectionGenerationRef.current === selectionGeneration) {
+        setSearchError(error instanceof Error ? error.message : "Не удалось выбрать организатора");
+      }
+    } finally {
+      if (mountedRef.current && selectionGenerationRef.current === selectionGeneration) {
+        setIsResolving(false);
+      }
+    }
+  }
 
   if (selectedOrganizer) {
     return (
@@ -128,9 +187,13 @@ export function OrganizerSearchSelect({
 
         {searchQuery && (
           <div className="space-y-2">
-            {isSearching ? (
+            {searchError ? (
+              <div role="alert" className="text-center py-4 text-red-700 text-sm">
+                {searchError}
+              </div>
+            ) : isSearching || isResolving ? (
               <div className="text-center py-4 text-gray-500 text-sm">
-                Поиск...
+                {isResolving ? "Выбираем организатора..." : "Поиск..."}
               </div>
             ) : searchResults.length > 0 ? (
               <div className="space-y-2">
@@ -139,8 +202,8 @@ export function OrganizerSearchSelect({
                   <button
                     key={organizer.id}
                     type="button"
-                    onClick={() => onSelect(organizer)}
-                    disabled={!isEditable}
+                    onClick={() => void handleChoose(organizer)}
+                    disabled={!isEditable || isResolving}
                     className="w-full p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-white text-left transition-colors"
                   >
                     <div className="flex items-start gap-3">

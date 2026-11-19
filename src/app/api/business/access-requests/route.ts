@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
+import prisma from "@/lib/prisma";
 import {
   businessAccessRequestSchema,
   createBusinessAccessRequest,
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
       {
         ok: true,
         alreadyPending: true,
+        requestId: result.request.id,
         message: "Заявка уже отправлена и ожидает проверки.",
       },
       { status: 200 },
@@ -77,4 +79,35 @@ export async function POST(request: NextRequest) {
     },
     { status: 201 },
   );
+}
+
+/**
+ * GET /api/business/access-requests?unp=... — authenticated requester checks
+ * their own latest access request. Never looks up or reveals other owners,
+ * business records, or other applicants by the supplied УНП.
+ */
+export async function GET(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { ok: false, code: "UNAUTHORIZED", message: "Требуется авторизация" },
+      { status: 401 },
+    );
+  }
+
+  const unp = request.nextUrl.searchParams.get("unp") ?? "";
+  if (!/^[0-9]{9}$/.test(unp)) {
+    return NextResponse.json(
+      { ok: false, code: "INVALID_UNP", message: "Проверьте УНП" },
+      { status: 400 },
+    );
+  }
+
+  const existing = await prisma.businessAccessRequest.findFirst({
+    where: { requesterUserId: user.id, unp },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, status: true, createdAt: true },
+  });
+
+  return NextResponse.json({ ok: true, request: existing });
 }

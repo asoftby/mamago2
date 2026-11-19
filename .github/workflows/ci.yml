@@ -188,6 +188,7 @@ jobs:
       - name: Event wizard occasion hydration regressions
         run: |
           pnpm test:event-wizard-update-loop
+          pnpm exec tsx src/components/business/wizard/event/steps/organizer/organizerSelection.contract.test.ts
           pnpm exec tsx src/components/business/wizard/event/steps/Step1Basics.interests.contract.test.ts
           pnpm exec tsx src/components/business/wizard/event/nativePrebooking.validation.test.ts
           pnpm exec tsx src/components/business/wizard/event/ctaStepMapper.test.ts
@@ -489,6 +490,19 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm test:business-identity
 
+      - name: Business contact SMS shared-budget PostgreSQL integration
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          NODE_OPTIONS: --conditions=react-server
+          SMS_BY_TOKEN: synthetic_ci_sms_token
+          SMS_BY_BASE_URL: https://sms-budget.invalid
+          FORCE_SMS: "true"
+          OTP_SECRET: synthetic_ci_otp_secret_no_real_data_20261119
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/lib/phone-verification/phoneOtpSendOutcome.test.ts
+          pnpm test:business-phone-sms-budget-integration
+
       - name: Business Mini App signed authentication and live membership PostgreSQL
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
@@ -571,6 +585,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/services/direct/directBookingThread.postgres.integration.test.ts
           pnpm exec tsx src/server/services/direct/directComplaint.postgres.integration.test.ts
+          pnpm exec tsx src/app/api/business/events/organizer-from-verified-business/route.postgres.integration.test.ts
 
       - name: Business support PostgreSQL isolation
         env:

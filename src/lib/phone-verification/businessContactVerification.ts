@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma";
 import { normalizePhoneToE164 } from "@/lib/phone/phoneNormalize";
 import { genCode4, hashCode, safeEq } from "@/lib/otp/otp";
 import { sendQuickSms } from "@/lib/sms/smsBy";
+import { SmsByDeliveryError } from "@/lib/sms/smsByResponse";
+import { checkActivationRateLimit } from "@/server/auth/activationRateLimit";
 import {
   type BusinessContactOtpClientState,
   BUSINESS_CONTACT_VERIFICATION_CODE_LENGTH,
@@ -13,6 +15,7 @@ import {
 } from "./businessContactVerification.shared";
 import {
   BusinessContactOtpEscalationError,
+  BusinessContactSmsRateLimitError,
 } from "./businessContactOtpErrors";
 import {
   buildBusinessContactOtpClientState,
@@ -26,6 +29,8 @@ import {
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_SEC = 60;
+const SMS_SENDS_PER_HOUR = 12;
+const SMS_SEND_WINDOW_MS = 60 * 60 * 1000;
 
 const USER_OTP_ESCALATION_SELECT = {
   businessContactOtpFailedAttempts: true,
@@ -117,6 +122,19 @@ export async function sendBusinessContactVerificationCode(params: {
 
   assertCanSendBusinessContactOtp(escalationUser, now);
 
+  // Consume the *shared* per-user budget before OTP writes/provider calls.
+  // Both onboarding and account-settings routes call this service; enforcing
+  // the limit in just one HTTP handler permits cross-route quota bypass.
+  // Charge attempts even when provider delivery later fails or numbers change.
+  // Paid SMS must fail CLOSED on a limiter/DB statement failure. The generic
+  // checkRateLimit is intentionally fail-open for login, and is unsafe here.
+  const budget = await checkActivationRateLimit({
+    key: `business-contact-sms:user:${params.userId}`,
+    limit: SMS_SENDS_PER_HOUR,
+    windowMs: SMS_SEND_WINDOW_MS,
+  });
+  if (!budget.allowed) throw new BusinessContactSmsRateLimitError();
+
   // A verified contact must not be associated with another user's account.
   const otherOwner = await prisma.user.findFirst({
     where: {
@@ -194,13 +212,24 @@ export async function sendBusinessContactVerificationCode(params: {
       `[OTP dev] ${phoneE164} [${BUSINESS_CONTACT_VERIFICATION_PURPOSE}] -> ${code}`
     );
   } else {
-    const smsResult = await sendQuickSms({
-      phoneDigits,
-      message: `Ваш код: ${code}`,
-    });
-    console.log(
-      `[OTP sms] sent to ${phoneE164} [${BUSINESS_CONTACT_VERIFICATION_PURPOSE}] -> sms_id=${smsResult.sms_id} status=${smsResult.status}`
-    );
+    try {
+      const smsResult = await sendQuickSms({
+        phoneDigits,
+        message: `Ваш код: ${code}`,
+      });
+      // Provider accepted the message; actual handset delivery is not yet confirmed.
+      console.info("[business-contact-otp] SMS queued", { status: smsResult.status ?? null });
+    } catch (error) {
+      // Do not erase the OTP/cooldown on provider errors. HTTP 5xx, malformed
+      // responses and timeouts are ambiguous: the provider may still deliver
+      // the code. Even an explicit refusal must not refund the send budget
+      // (otherwise a caller can hammer the provider during an outage).
+      // The existing 60-second cooldown and 10-minute expiry remain enforced.
+      console.warn("[business-contact-otp] SMS not confirmed", {
+        reason: error instanceof SmsByDeliveryError ? error.reason : "UNKNOWN",
+      });
+      throw error;
+    }
   }
 
   const fresh = await prisma.user.findUnique({

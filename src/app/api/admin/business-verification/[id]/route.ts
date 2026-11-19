@@ -66,9 +66,30 @@ export async function GET(
       );
     }
 
+    // Access requests are a separate workflow from business verification.
+    // Only admins may see applicant information and review the requests.
+    const accessRequests =
+      user.role === "ADMIN"
+        ? await prisma.businessAccessRequest.findMany({
+            where: { businessId: business.id },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: {
+              id: true,
+              status: true,
+              name: true,
+              requesterRole: true,
+              createdAt: true,
+              requesterUser: { select: { email: true } },
+            },
+          })
+        : [];
+
     return NextResponse.json({
       ok: true,
       business,
+      accessRequests,
+      canReviewAccessRequests: user.role === "ADMIN",
       /** Видимость (operationalStatus) меняет только ADMIN — см. PATCH /api/admin/business/[id]/status */
       canRecordNpdCheck: user.role === "ADMIN",
       canManageBusinessVisibility: user.role === "ADMIN",
