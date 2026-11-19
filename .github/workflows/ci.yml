@@ -188,6 +188,7 @@ jobs:
       - name: Event wizard occasion hydration regressions
         run: |
           pnpm test:event-wizard-update-loop
+          pnpm exec tsx src/components/business/wizard/event/steps/organizer/organizerSelection.contract.test.ts
           pnpm exec tsx src/components/business/wizard/event/steps/Step1Basics.interests.contract.test.ts
           pnpm exec tsx src/components/business/wizard/event/nativePrebooking.validation.test.ts
           pnpm exec tsx src/components/business/wizard/event/ctaStepMapper.test.ts
@@ -584,6 +585,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/services/direct/directBookingThread.postgres.integration.test.ts
           pnpm exec tsx src/server/services/direct/directComplaint.postgres.integration.test.ts
+          pnpm exec tsx src/app/api/business/events/organizer-from-verified-business/route.postgres.integration.test.ts
 
       - name: Business support PostgreSQL isolation
         env:
