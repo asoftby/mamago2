@@ -73,4 +73,10 @@ if ! run_job "/api/cron/standard-booking-expiry" "standard-booking-expiry"; then
   overall_status=1
 fi
 
+# Identity retention (постановление № 850): drop sealed identification data one year after account deletion.
+if ! run_job "/api/cron/identity-retention-purge" "identity-retention-purge"; then
+  echo "[mamago-notifications] identity-retention-purge failed" >&2
+  overall_status=1
+fi
+
 exit "$overall_status"

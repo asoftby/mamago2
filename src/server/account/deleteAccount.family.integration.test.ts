@@ -9,6 +9,9 @@ import { createHash, randomUUID } from "node:crypto";
 import test, { after } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { deleteAccount } from "./deleteAccount.service";
+import { installTestIdentityRetentionKey } from "@/server/privacy/identityRetention/testKey";
+
+installTestIdentityRetentionKey();
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL must point at a disposable test database");

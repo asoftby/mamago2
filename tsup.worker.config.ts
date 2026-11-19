@@ -25,6 +25,7 @@ export default defineConfig({
     "ops/legacy-routes-current-to-articles-cutover":
       "scripts/legacy-routes-current-to-articles-cutover.ts",
     "ops/inbox-purge-smoke": "scripts/ops/inbox-purge-smoke.ts",
+    "ops/identity-retention-disclose": "scripts/privacy/identity-retention-disclose.ts",
     "ops/legacy-routes-article-media-backfill":
       "scripts/legacy-routes-article-media-backfill.ts",
     "ops/family-core-backfill": "scripts/family-core-backfill.ts",
