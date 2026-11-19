@@ -4720,6 +4720,8 @@ enum NotificationType {
   DIRECT_COMPLAINT_OPENED
   /// Жалоба рассмотрена (получает заявитель; без внутренней заметки модератора)
   DIRECT_COMPLAINT_RESOLVED
+  /// Клиент ждёт ответа в Direct-треде (только бизнесу; внешние каналы, не показывается в колокольчике)
+  DIRECT_CLIENT_WAITING
   SUPPORT_BUSINESS_REPLY
   SUPPORT_STAFF_MESSAGE
   IMPORT_CHANNELS_DIGEST
