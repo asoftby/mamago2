@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type RequesterRole = "OWNER" | "DIRECTOR" | "MARKETER" | "MANAGER" | "OTHER";
+type AccessRequestStatus = "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_INFO";
+type AccessRequestSummary = {
+  id: string;
+  status: AccessRequestStatus;
+  createdAt: string;
+};
 
 const ROLE_LABELS: Record<RequesterRole, string> = {
   OWNER: "Владелец",
@@ -21,19 +27,49 @@ const ROLE_LABELS: Record<RequesterRole, string> = {
  * already typed in.
  */
 export function AccessRequestPanel({ unp }: { unp: string }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [requesterRole, setRequesterRole] = useState<RequesterRole>("OWNER");
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; message: string; requestId?: string } | null>(null);
+  const [existingRequest, setExistingRequest] = useState<AccessRequestSummary | null>(null);
+  const [statusCheckFailed, setStatusCheckFailed] = useState(false);
+
+  // Query only this authenticated user's request; a GET never creates a request.
+  // The saved status survives reloads unlike the original ephemeral success banner.
+  useEffect(() => {
+    if (!/^[0-9]{9}$/.test(unp)) return;
+    const controller = new AbortController();
+    setExistingRequest(null);
+    setStatusCheckFailed(false);
+
+    void fetch(`/api/business/access-requests?unp=${encodeURIComponent(unp)}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Не удалось проверить статус заявки");
+        return response.json();
+      })
+      .then((data: { ok: boolean; request?: AccessRequestSummary | null }) => {
+        if (!controller.signal.aborted) {
+          setExistingRequest(data.ok ? (data.request ?? null) : null);
+          setStatusCheckFailed(!data.ok);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setStatusCheckFailed(true);
+      });
+
+    return () => controller.abort();
+  }, [unp]);
 
   const canSubmit = name.trim().length >= 2 && (phone.trim() || email.trim());
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!canSubmit || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -56,6 +92,7 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
       if (response.ok && json.ok) {
         setResult({
           ok: true,
+          requestId: typeof json.requestId === "string" ? json.requestId : undefined,
           message:
             json.message ??
             (json.alreadyPending
@@ -77,8 +114,31 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
 
   if (result?.ok) {
     return (
-      <div className="mt-3 rounded-md border border-green-200 bg-green-50 p-4">
-        <p className="text-sm text-green-800">{result.message}</p>
+      <div className="mt-3 rounded-md border border-green-200 bg-green-50 p-4" role="status">
+        <p className="text-sm font-medium text-green-800">{result.message}</p>
+        {result.requestId && (
+          <p className="mt-2 break-all text-xs text-green-800">
+            Номер сохранённой заявки: {result.requestId}
+          </p>
+        )}
+        <p className="mt-2 text-xs text-green-800">
+          После проверки статус можно увидеть здесь при повторном входе.
+        </p>
+      </div>
+    );
+  }
+
+  if (existingRequest?.status === "PENDING" || existingRequest?.status === "APPROVED") {
+    return (
+      <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-4" role="status">
+        <p className="text-sm font-medium text-gray-900">
+          {existingRequest.status === "PENDING"
+            ? "Ваш запрос доступа сохранён и ожидает проверки."
+            : "Ваш запрос доступа одобрен."}
+        </p>
+        <p className="mt-2 break-all text-xs text-gray-600">
+          Номер заявки: {existingRequest.id}
+        </p>
       </div>
     );
   }
@@ -98,7 +158,40 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 space-y-3 rounded-md border border-gray-200 p-4">
+    <div
+      role="group"
+      aria-label="Запрос доступа к существующей компании"
+      className="mt-3 space-y-3 rounded-md border border-gray-200 p-4"
+      onKeyDown={(event) => {
+        // The access-request controls live inside the parent onboarding form.
+        // Prevent Enter in our own inputs from submitting the onboarding form.
+        if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+          event.preventDefault();
+          event.stopPropagation();
+          void handleSubmit();
+        }
+      }}
+    >
+      <p className="text-sm font-medium text-gray-900">
+        Эта компания уже зарегистрирована. Запрос доступа ещё не отправлен.
+      </p>
+      <p className="text-sm text-gray-600">
+        Заполните данные представителя и нажмите «Отправить заявку».
+        После сохранения вы получите номер заявки.
+      </p>
+      {statusCheckFailed && (
+        <p className="text-sm text-amber-800" role="status">
+          Не удалось проверить ранее отправленные заявки. Это не препятствует повторной отправке.
+        </p>
+      )}
+      {existingRequest?.status === "REJECTED" && (
+        <p className="text-sm text-amber-800">Предыдущий запрос отклонён. Можно подать новый.</p>
+      )}
+      {existingRequest?.status === "NEEDS_INFO" && (
+        <p className="text-sm text-amber-800">
+          По предыдущему запросу требуются дополнительные данные. Уточните их в комментарии.
+        </p>
+      )}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="access-request-name">
           Имя
@@ -169,13 +262,13 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
       {result && !result.ok && <p className="text-sm text-red-600">{result.message}</p>}
 
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={!canSubmit || isSubmitting}>
+        <Button type="button" size="sm" onClick={() => void handleSubmit()} disabled={!canSubmit || isSubmitting}>
           {isSubmitting ? "Отправка..." : "Отправить заявку"}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
           Отмена
         </Button>
       </div>
-    </form>
+    </div>
   );
 }

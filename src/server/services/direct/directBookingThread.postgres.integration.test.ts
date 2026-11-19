@@ -253,16 +253,16 @@ test("staff notifications: owner and active managers are told once; inactive mem
   const r = await openBusinessDirectThreadForBooking({ bookingRequestId: booking.id, actorUserId: owner, message: "Привет" });
   const messageId = r.firstMessageId!;
 
+  await notifyBusinessStaffDirectCreated({ businessId, threadId: r.threadId, threadNumber: r.threadNumber });
+  const createdRows = await prisma.notification.findMany({ where: { entityId: r.threadId, type: "DIRECT_THREAD_CREATED" } });
+  assert.deepEqual(createdRows.map((n) => n.userId).sort(), expected);
+
   const messageParams = { businessId, threadId: r.threadId, threadNumber: r.threadNumber, messageId };
   await notifyBusinessStaffDirectMessage(messageParams);
   await notifyBusinessStaffDirectMessage(messageParams); // retry must not double-notify
   const messageRows = await prisma.notification.findMany({ where: { entityId: messageId, type: "DIRECT_NEW_MESSAGE" } });
   assert.deepEqual(messageRows.map((n) => n.userId).sort(), expected);
   assert.ok(messageRows.every((n) => n.audience === "BUSINESS" && n.ctaAction === `/business/direct/${r.threadId}`));
-
-  await notifyBusinessStaffDirectCreated({ businessId, threadId: r.threadId, threadNumber: r.threadNumber });
-  const createdRows = await prisma.notification.findMany({ where: { entityId: r.threadId, type: "DIRECT_THREAD_CREATED" } });
-  assert.deepEqual(createdRows.map((n) => n.userId).sort(), expected);
 
   // Nobody outside the business team was notified.
   assert.equal(await prisma.notification.count({ where: { entityId: { in: [messageId, r.threadId] }, userId: { in: [customer, stranger, otherOwner, inactive] } } }), 0);
@@ -557,4 +557,42 @@ test("business waiting pings are atomic under overlapping customer messages", as
     where: { type: "DIRECT_NEW_MESSAGE", entityId: { in: messages }, userId: { in: [owner, manager] } },
   });
   assert.equal(bellCount, messages.length * 2, "every customer message still reaches the business bell");
+});
+
+test("created and waiting external Direct pings share one claim across concurrent workers", async () => {
+  const staff = [owner, manager].sort();
+  for (const ordering of ["parallel", "waiting-first", "created-first"] as const) {
+    const booking = await newBooking();
+    const thread = await openBusinessDirectThreadForBooking({
+      bookingRequestId: booking.id, actorUserId: owner, message: `Race ${ordering}`,
+    });
+    const params = { businessId, threadId: thread.threadId, threadNumber: thread.threadNumber };
+    const messageId = `race-${ordering}-${sfx}`;
+    const created = () => notifyBusinessStaffDirectCreated(params);
+    const waiting = () => notifyBusinessStaffDirectMessage({ ...params, messageId });
+    if (ordering === "parallel") {
+      await Promise.all([created(), waiting(), created(), waiting()]);
+    } else if (ordering === "waiting-first") {
+      await waiting();
+      await created();
+    } else {
+      await created();
+      await waiting();
+    }
+    const notices = await prisma.notification.findMany({
+      where: { userId: { in: staff }, entityType: "DIRECT_THREAD", entityId: thread.threadId,
+        type: { in: ["DIRECT_THREAD_CREATED", "DIRECT_CLIENT_WAITING"] } },
+      select: { userId: true, type: true },
+    });
+    assert.deepEqual(notices.map(n => n.userId).sort(), staff,
+      `exactly one external notice per recipient for ${ordering}`);
+    if (ordering === "waiting-first") {
+      assert.ok(notices.every(n => n.type === "DIRECT_CLIENT_WAITING"),
+        "late thread creation must not issue duplicate external delivery");
+    }
+    const bellCount = await prisma.notification.count({
+      where: { type: "DIRECT_NEW_MESSAGE", entityId: messageId, userId: { in: staff } },
+    });
+    assert.equal(bellCount, 2, `new message reaches each business bell for ${ordering}`);
+  }
 });
