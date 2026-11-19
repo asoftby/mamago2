@@ -57,3 +57,21 @@ test("sms.by request has exactly the three fields of the working integration", (
   assert.equal(body.has("alphaname_id"), false);
   assert.equal(body.has("sender"), false);
 });
+
+test("incomplete HTTP 200 with SMS id is ambiguous, never a definite provider rejection", () => {
+  for (const payload of [{ sms_id: "12345" }, { sms_id: "12345", status: "PENDING_UNKNOWN" }]) {
+    assert.throws(
+      () => parseSmsByResponse(200, JSON.stringify(payload)),
+      (e: unknown) => e instanceof SmsByDeliveryError && e.reason === "INVALID_RESPONSE",
+    );
+  }
+});
+
+test("explicit negative status proves rejection even with SMS id", () => {
+  for (const status of ["ERROR", "FAILED", "REJECTED"]) {
+    assert.throws(
+      () => parseSmsByResponse(200, JSON.stringify({ sms_id: "12345", status })),
+      (e: unknown) => e instanceof SmsByDeliveryError && e.reason === "PROVIDER_REJECTED",
+    );
+  }
+});
