@@ -124,6 +124,19 @@ export async function createDirectMessage(input: CreateDirectMessageInput) {
       }
     }
 
+    // Serialize every send with moderator status changes. The earlier status
+    // read is only a fast-fail; it is not sufficient under concurrency.
+    if (input.senderType !== DirectActorType.BUSINESS) {
+      await tx.$queryRaw`SELECT "id" FROM "DirectThread" WHERE "id" = ${input.threadId} FOR UPDATE`;
+      const live = await tx.directThread.findUnique({
+        where: { id: input.threadId },
+        select: { status: true },
+      });
+      if (!live || live.status === DirectThreadStatus.BLOCKED || live.status === DirectThreadStatus.ARCHIVED) {
+        throw new DirectMessageError("Thread is blocked or archived — messages cannot be sent");
+      }
+    }
+
     const created = await tx.directMessage.create({
       data: {
         threadId: input.threadId,
