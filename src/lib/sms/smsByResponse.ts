@@ -47,6 +47,9 @@ export function buildSmsByRequestBody(params: {
 const ACCEPTED_STATUSES = new Set([
   "NEW", "QUEUED", "ACCEPTED", "SENT", "DELIVERED", "SUCCESS", "OK",
 ]);
+const REJECTED_STATUSES = new Set([
+  "ERROR", "FAILED", "REJECTED", "CANCELLED", "DENIED", "INVALID",
+]);
 
 export function parseSmsByResponse(
   httpStatus: number,
@@ -70,8 +73,14 @@ export function parseSmsByResponse(
   }
   const status = typeof data.status === "string" ? data.status.toUpperCase() : "";
   const providerError = data.error != null && data.error !== false && data.error !== "";
-  if (providerError || !ACCEPTED_STATUSES.has(status)) {
+  // Only explicit negative provider signals prove non-dispatch. Missing or
+  // unknown status might mean the SMS was queued before a malformed response;
+  // keep the OTP and let the user enter the possibly arriving code.
+  if (providerError || REJECTED_STATUSES.has(status)) {
     throw new SmsByDeliveryError("PROVIDER_REJECTED", httpStatus);
+  }
+  if (!ACCEPTED_STATUSES.has(status)) {
+    throw new SmsByDeliveryError("INVALID_RESPONSE", httpStatus);
   }
   const messageId = data.sms_id ?? data.message_id;
   if (

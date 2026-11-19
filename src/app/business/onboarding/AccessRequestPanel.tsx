@@ -198,7 +198,8 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
         </label>
         <Input
           id="access-request-name"
-          required
+          // This panel lives inside the parent registration form. Its validation
+          // is handled by canSubmit/API, never by the browser's parent submit.
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -222,7 +223,9 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
         </label>
         <Input
           id="access-request-email"
-          type="email"
+          // Avoid native email validity blocking unrelated onboarding submit.
+          type="text"
+          inputMode="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />

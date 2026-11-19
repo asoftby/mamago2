@@ -107,13 +107,9 @@ export async function GET(request: NextRequest) {
 
     const merged = [
       ...businesses.map((business) => {
-        // Prefer the already-linked Organizer over an unlinked row with the same UNP.
-        // This matches the selection endpoint and avoids showing a different name after selection.
-        const existing =
-          existingForBusinesses.find((organizer) => organizer.linkedBusinessId === business.id) ??
-          existingForBusinesses.find(
-            (organizer) => business.unp && organizer.unp === business.unp && !organizer.linkedBusinessId,
-          );
+        // Only linked Organizer IDs can be selected directly. An unlinked
+        // legacy UNP match must go through POST so the association is persisted.
+        const existing = existingForBusinesses.find((organizer) => organizer.linkedBusinessId === business.id);
         return existing
           ? serialize(existing, true)
           : {
@@ -125,7 +121,12 @@ export async function GET(request: NextRequest) {
               isVerified: true,
             };
       }),
-      ...organizers.map((organizer) => serialize(organizer)),
+      // When a verified company matched a legacy unlinked organizer by UNP,
+      // prefer the Business placeholder above. Avoid a second result that
+      // bypasses the association endpoint and leaves linkedBusinessId empty.
+      ...organizers.filter((organizer) =>
+        organizer.linkedBusinessId || !organizer.unp || !businessUnps.includes(organizer.unp)
+      ).map((organizer) => serialize(organizer)),
     ];
     const seen = new Set<string>();
     const results = merged.filter((item) => {

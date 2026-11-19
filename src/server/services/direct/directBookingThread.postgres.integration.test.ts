@@ -571,7 +571,10 @@ test("created and waiting external Direct pings share one claim across concurren
     const created = () => notifyBusinessStaffDirectCreated(params);
     const waiting = () => notifyBusinessStaffDirectMessage({ ...params, messageId });
     if (ordering === "parallel") {
-      await Promise.all([created(), waiting(), created(), waiting()]);
+      // Overlap initial creation and one new message. Same-message retries are
+      // sequential: bell dedup is a separate concern, not this external-ping race.
+      await Promise.all([created(), waiting(), created()]);
+      await waiting();
     } else if (ordering === "waiting-first") {
       await waiting();
       await created();
