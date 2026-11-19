@@ -8,6 +8,7 @@ import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneIn
 import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
 import { formatPhoneForDisplay } from "@/lib/phone/display";
 import { isValidE164Phone } from "@/lib/phone/e164";
+import { resolvePhoneOtpSendOutcome, type PhoneOtpSendPayload } from "@/lib/phone-verification/phoneOtpSendOutcome";
 
 interface PhoneVerificationModalProps {
   open: boolean;
@@ -35,6 +36,7 @@ export function PhoneVerificationModal({
   const [otpDigits, setOtpDigits] = useState<string[]>(emptyDigits);
   const [otpError, setOtpError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [deliveryWarning, setDeliveryWarning] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const autoSubmitLockRef = useRef(false);
@@ -89,17 +91,17 @@ export function PhoneVerificationModal({
         body: JSON.stringify({ phone: phoneE164 }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string; resendAfterSec?: number; phoneE164?: string }
-        | null;
-
-      if (!response.ok) {
-        setPhoneError(data?.error || "Не удалось отправить код");
+      const data = (await response.json().catch(() => null)) as PhoneOtpSendPayload | null;
+      const result = resolvePhoneOtpSendOutcome(response.ok, data, phoneE164);
+      if (result.step === "entry") {
+        setPhoneError(result.error);
         return;
       }
 
-      setSentPhoneE164(data?.phoneE164 ?? phoneE164);
-      setCooldown(typeof data?.resendAfterSec === "number" ? data.resendAfterSec : 60);
+      // Enter the retained OTP even when the provider response is ambiguous.
+      setSentPhoneE164(result.phoneE164);
+      setCooldown(result.cooldownSec);
+      setDeliveryWarning(result.warning);
       setOtpDigits(emptyDigits());
       setStep("confirm");
       requestAnimationFrame(() => otpInputRefs[0].current?.focus());
@@ -185,6 +187,7 @@ export function PhoneVerificationModal({
   }
 
   function restartFlow() {
+    setDeliveryWarning(null);
     setStep("entry");
     setOtpDigits(emptyDigits());
     setOtpError("");
@@ -253,9 +256,14 @@ export function PhoneVerificationModal({
                     Введите код
                   </h3>
                   <p className="text-sm text-gray-500">
-                    Код отправлен на {formatPhoneForDisplay(sentPhoneE164)}
+                    {deliveryWarning ? "Код мог быть отправлен на " : "Код отправлен на "}
+                    {formatPhoneForDisplay(sentPhoneE164)}
                   </p>
                 </div>
+
+                {deliveryWarning ? (
+                  <p role="status" className="text-sm text-amber-700">{deliveryWarning}</p>
+                ) : null}
 
                 <div className="space-y-3">
                   <div className="flex gap-3">

@@ -59,7 +59,7 @@ async function main() {
   const { POST: settings } = await import("../settings/phone/send-otp/route");
   let userId: string | null = null;
 
-  const phoneAt = (index: number) => "+3752912345" + String(index).padStart(2, "0");
+  const phoneAt = (index: number) => "+375291234" + String(567 + index).padStart(3, "0");
   const fromStart = (index: number) => start(new NextRequest("http://localhost/api/phone/start", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ phone: phoneAt(index), purpose: "BUSINESS_CONTACT_VERIFICATION" }),
@@ -77,7 +77,9 @@ async function main() {
     // Twelve attempts spread between distinct destinations and both routes.
     for (let i = 0; i < 12; i++) {
       const res = i % 2 === 0 ? await fromStart(i) : await fromSettings(i);
-      assert.equal(res.status, i === 3 ? 503 : 200, "attempt " + (i + 1) + " consumed quota");
+      const bodyForDiagnostics = await res.clone().json().catch(() => null);
+      assert.equal(res.status, i === 3 ? 503 : 200,
+        "attempt " + (i + 1) + ": " + JSON.stringify(bodyForDiagnostics));
       if (i === 3) {
         const body = await res.json() as { code: string };
         assert.equal(body.code, "SMS_DELIVERY_FAILED", "definite provider failure is not dispatched");

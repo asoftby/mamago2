@@ -13,6 +13,7 @@ import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneIn
 import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
 import { formatPhoneForDisplay, maskPhoneForDisplay } from "@/lib/phone/display";
 import { isValidE164Phone } from "@/lib/phone/e164";
+import { resolvePhoneOtpSendOutcome, type PhoneOtpSendPayload } from "@/lib/phone-verification/phoneOtpSendOutcome";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +56,7 @@ export function PhoneSettingsClient(props: {
   const [cooldown, setCooldown] = useState(0);
   const [otpDigits, setOtpDigits] = useState<string[]>(emptyDigits);
   const [otpError, setOtpError] = useState("");
+  const [deliveryWarning, setDeliveryWarning] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
@@ -113,20 +115,17 @@ export function PhoneSettingsClient(props: {
         body: JSON.stringify({ phone: values.phone }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string; resendAfterSec?: number; phoneE164?: string }
-        | null;
-
-      if (!response.ok) {
-        setError("phone", {
-          type: "server",
-          message: data?.error || "Не удалось отправить код",
-        });
+      const data = (await response.json().catch(() => null)) as PhoneOtpSendPayload | null;
+      const result = resolvePhoneOtpSendOutcome(response.ok, data, values.phone);
+      if (result.step === "entry") {
+        setError("phone", { type: "server", message: result.error });
         return;
       }
 
-      setSentPhoneE164(data?.phoneE164 ?? values.phone);
-      setCooldown(typeof data?.resendAfterSec === "number" ? data.resendAfterSec : 60);
+      // Delivery may be unconfirmed yet the persisted OTP remains valid.
+      setSentPhoneE164(result.phoneE164);
+      setCooldown(result.cooldownSec);
+      setDeliveryWarning(result.warning);
       setOtpDigits(emptyDigits());
       setStep("confirm");
       requestAnimationFrame(() => otpInputRefs[0].current?.focus());
@@ -215,6 +214,7 @@ export function PhoneSettingsClient(props: {
       setValue("phone", "");
       setOtpDigits(emptyDigits());
       setOtpError("");
+      setDeliveryWarning(null);
       router.refresh();
     } finally {
       setIsUnlinking(false);
@@ -243,6 +243,7 @@ export function PhoneSettingsClient(props: {
     setStep("entry");
     setOtpDigits(emptyDigits());
     setOtpError("");
+    setDeliveryWarning(null);
     setCooldown(0);
     setSentPhoneE164(null);
     setValue("phone", props.initialPhoneE164 ?? "");
@@ -304,9 +305,14 @@ export function PhoneSettingsClient(props: {
                 Подтвердите номер
               </h2>
               <p className="text-sm text-neutral-500">
-                Код отправлен на {formatPhoneForDisplay(sentPhoneE164)}
+                {deliveryWarning ? "Код мог быть отправлен на " : "Код отправлен на "}
+                {formatPhoneForDisplay(sentPhoneE164)}
               </p>
             </div>
+
+            {deliveryWarning ? (
+              <p role="status" className="text-sm text-amber-700">{deliveryWarning}</p>
+            ) : null}
 
             <div className="space-y-3">
               <div className="flex gap-3">
