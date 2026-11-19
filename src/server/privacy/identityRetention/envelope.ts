@@ -24,7 +24,7 @@ import {
 
 export const IDENTITY_RETENTION_PUBLIC_KEY_ENV = "IDENTITY_RETENTION_PUBLIC_KEY";
 const ALGORITHM = "RSA-OAEP-256/A256GCM";
-const MIN_RSA_BITS = 3072;
+const MIN_RSA_BITS = 4096;
 
 export type IdentityRetentionPayload = {
   schemaVersion: 1;

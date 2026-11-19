@@ -13,7 +13,7 @@ import {
   sealIdentityPayload,
 } from "./envelope";
 
-function keyPair(bits = 3072, passphrase?: string) {
+function keyPair(bits = 4096, passphrase?: string) {
   return generateKeyPairSync("rsa", {
     modulusLength: bits,
     publicKeyEncoding: { type: "spki", format: "pem" },
@@ -23,8 +23,8 @@ function keyPair(bits = 3072, passphrase?: string) {
   });
 }
 
-const main = keyPair(3072, "test-passphrase");
-const other = keyPair(3072);
+const main = keyPair(4096, "test-passphrase");
+const other = keyPair(4096);
 
 const user = {
   id: "user-1",
@@ -94,6 +94,7 @@ test("public key: missing, garbage and weak keys are rejected; env accepts escap
   assert.equal(codeOf(() => loadPublicKey("   ")), "MISSING");
   assert.equal(codeOf(() => loadPublicKey("garbage")), "INVALID");
   assert.equal(codeOf(() => loadPublicKey(keyPair(2048).publicKey)), "TOO_WEAK");
+  assert.equal(codeOf(() => loadPublicKey(keyPair(3072).publicKey)), "TOO_WEAK");
   const ec = generateKeyPairSync("ec", { namedCurve: "P-256", publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
   assert.equal(codeOf(() => loadPublicKey(ec.publicKey)), "INVALID");
 
@@ -131,7 +132,7 @@ test("operator selector matches phone by digits (any format), business phone, em
 });
 
 test("server refuses RSA private PEM in the public-key environment variable", () => {
-  const unencrypted = keyPair(3072);
+  const unencrypted = keyPair(4096);
   assert.throws(
     () => loadPublicKey(unencrypted.privateKey),
     (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "INVALID",

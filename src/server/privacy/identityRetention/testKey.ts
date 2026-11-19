@@ -7,7 +7,7 @@ import { IDENTITY_RETENTION_PUBLIC_KEY_ENV, loadPrivateKey } from "./envelope";
 
 export function installTestIdentityRetentionKey() {
   const pair = generateKeyPairSync("rsa", {
-    modulusLength: 3072,
+    modulusLength: 4096,
     publicKeyEncoding: { type: "spki", format: "pem" },
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
   });
