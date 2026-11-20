@@ -14,8 +14,8 @@ test("all Direct senders lock the thread and recheck status before inserting", (
   const otherSection = transaction.slice(others, insert);
   for (const section of [businessSection, otherSection]) {
     assert.match(section, /FOR UPDATE/);
-    assert.match(section, /tx\\.directThread\\.findUnique/);
+    assert.match(section, /tx\.directThread\.findUnique/);
   }
-  assert.match(otherSection, /DirectThreadStatus\\.BLOCKED/);
-  assert.match(otherSection, /DirectThreadStatus\\.ARCHIVED/);
+  assert.match(otherSection, /DirectThreadStatus\.BLOCKED/);
+  assert.match(otherSection, /DirectThreadStatus\.ARCHIVED/);
 });
