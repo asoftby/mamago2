@@ -204,8 +204,10 @@ jobs:
       - name: Direct marketplace business write-policy regressions
         run: pnpm exec tsx src/server/services/direct/directBusinessWritePolicy.test.ts
 
-      - name: Direct send response privacy regression
-        run: pnpm exec tsx src/server/services/direct/directMessageDto.test.ts
+      - name: Direct send privacy and lock-order contracts
+        run: |
+          pnpm exec tsx src/server/services/direct/directMessageDto.test.ts
+          pnpm exec tsx src/server/services/direct/directMessageLock.contract.test.ts
 
       - name: Business booking contact minimization regressions
         run: pnpm exec tsx src/server/services/booking/businessBookingContactProjection.test.ts
