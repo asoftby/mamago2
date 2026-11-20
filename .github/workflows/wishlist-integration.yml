@@ -2,7 +2,7 @@ name: Wishlist core DB integration
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "test/birthday-complete-demo-catalog-*", "feat/birthday-final-scenario-family-*"]
     paths:
       - ".github/workflows/wishlist-integration.yml"
       - "src/server/wishlist/**"
