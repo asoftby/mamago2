@@ -140,8 +140,8 @@ export default async function EventParticipantsPage({
   const rows = await prisma.bookingRequest.findMany({
     where,
     select: {
-      id: true, customerName: showNames, status: true, source: true,
-      adultsCount: true, childrenCount: true, participantChildren: showNames,
+      id: true, customerName: true, status: true, source: true,
+      adultsCount: true, childrenCount: true, participantChildren: true,
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     skip: (page - 1) * PAGE_SIZE,
