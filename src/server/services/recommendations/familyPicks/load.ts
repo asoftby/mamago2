@@ -443,9 +443,14 @@ type PersonalLoadDependencies = {
   loadExcluded: (userId: string, now: Date, selection: PersonalFamilySelection) => Promise<PlannedActivityExclusions>;
   loadAffinity: typeof resolveSelectedExperienceAffinity;
   loadExtras: (ids: string[], now: Date, range: { start: Date; end: Date }) => Promise<PersonalExtras[]>;
+  resolveBoostContext?: (citySlug: string) => Promise<{ cityId: string; regionId: string | null } | null>;
 };
 const personalDependencies: PersonalLoadDependencies = {
   loadProfile: loadFamilyPicksProfile,
+  resolveBoostContext: async (citySlug) => {
+    const city = await findCityBySlug(citySlug);
+    return city ? { cityId: city.id, regionId: await getDiscoveryRegionContext(city.id, citySlug) } : null;
+  },
   rank: rankPlanSuggestionsForCity,
   loadAffinity: resolveSelectedExperienceAffinity,
   loadExcluded: async (userId, now, selection) => {
@@ -575,8 +580,9 @@ export async function loadPersonalFamilyPicks(input: {
     deps.loadExcluded(profile.userId, now, selection), deps.loadAffinity({ userId: profile.userId, subjects, now }),
   ]);
   const excluded = [...new Set([...storedExcluded.excludedActivityIds, ...(input.excludeActivityIds ?? [])])];
-  const homeCity = await findCityBySlug(input.citySlug);
-  const homeBoostRegionId = homeCity ? await getDiscoveryRegionContext(homeCity.id, input.citySlug) : null;
+  // Injected test dependencies omit this optional lookup; no database access leaks into tests.
+  const homeBoostContext = deps.resolveBoostContext ? await deps.resolveBoostContext(input.citySlug) : null;
+  const homeBoostRegionId = homeBoostContext?.regionId ?? null;
   let lastAlgorithmVersion: string | null = null;
   for (const horizon of PERSONAL_FAMILY_PICKS_POLICY.horizons) {
     const window = resolvePersonalShowWindow(now, horizon);
@@ -612,7 +618,7 @@ export async function loadPersonalFamilyPicks(input: {
         sharedScore: personalHomeBoostScore(
           suggestion.score,
           getPublicationBoostLevel((extra.boosts ?? []).filter(boost =>
-            isBoostForDiscoveryRegion(boost, homeBoostRegionId, suggestion.activity.cityId === homeCity?.id))),
+            isBoostForDiscoveryRegion(boost, homeBoostRegionId, suggestion.activity.cityId === homeBoostContext?.cityId))),
         ),
         occurrences: excludePlannedFamilyPickDates(extra.id, collectConfirmedOccurrences({
           sessions: extra.sessions, hasStoredSessions: extra._count.sessions > 0,
