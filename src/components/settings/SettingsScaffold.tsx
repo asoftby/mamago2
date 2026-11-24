@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
-import { ChevronLeft } from "lucide-react";
 import { buildSettingsHomeHref } from "@/lib/settings/registry";
 import type { SettingsContext, SettingsSectionId } from "@/lib/settings/types";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
-import { HistoryBackButton } from "@/components/navigation/HistoryBackButton";
 import { SettingsPageLayout } from "./SettingsPageLayout";
 import { SettingsSectionNav } from "./SettingsSectionNav";
 
@@ -29,8 +27,8 @@ export function SettingsScaffold(props: {
   );
 
   // Business settings belong to BusinessShell, not the public full-height
-  // SettingsPageLayout. Preserve the shared settings functionality and
-  // back navigation while adopting the same header as /business/bookings.
+  // SettingsPageLayout. Back + crumbs live once in BusinessCabinetNav (shell);
+  // do not render a second control here.
   if (props.context.surfaceScope === "BUSINESS") {
     return (
       <div className="space-y-6">
@@ -44,15 +42,6 @@ export function SettingsScaffold(props: {
           }
         />
         <div className={`mx-auto ${props.maxWidthClassName ?? "max-w-2xl"}`}>
-          {props.currentSectionId !== "home" ? (
-            <HistoryBackButton
-              fallbackHref={homeHref}
-              className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-              К настройкам
-            </HistoryBackButton>
-          ) : null}
           {sections}
         </div>
       </div>
@@ -64,7 +53,7 @@ export function SettingsScaffold(props: {
       title={props.title}
       maxWidthClassName={props.maxWidthClassName}
       backHref={props.currentSectionId === "home" ? (props.context.surfaceScope === "ADMIN" ? "/admin" : null) : homeHref}
-      backLabel={props.currentSectionId === "home" && props.context.surfaceScope === "ADMIN" ? "← Админка" : "← Настройки"}
+      backLabel={props.currentSectionId === "home" && props.context.surfaceScope === "ADMIN" ? "Админка" : "К настройкам"}
     >
       {sections}
     </SettingsPageLayout>

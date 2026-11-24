@@ -1,7 +1,6 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Building2 } from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
@@ -10,7 +9,6 @@ import { useBookingsMenuBadge } from "@/components/business/bookings/useBookings
 import {
   BUSINESS_BOOKINGS_HREF,
   BUSINESS_DASHBOARD_HREF,
-  BUSINESS_BILLING_REQUISITES_HREF,
   businessNavigation,
 } from "@/lib/business/navigation";
 import type { BuildInfo } from "@/lib/system/buildInfo";
@@ -37,6 +35,13 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
       businessPathname === pattern || businessPathname.startsWith(`${pattern}/`)
     );
 
+  const releaseVersion = buildInfo?.currentReleaseVersion ?? buildInfo?.appVersion ?? null;
+  // Prefer immutable image BUILD_ID (номер сборки), then short git SHA from getBuildInfo().
+  const buildLabel =
+    buildInfo?.buildId ??
+    buildInfo?.commitShortSha ??
+    (releaseVersion ? `v${releaseVersion}` : null);
+
   return (
     <aside className="w-full lg:w-[248px] h-full border-r border-stone-200/80 bg-white/75 backdrop-blur flex flex-col">
       <nav className={variant === "sheet" ? "flex flex-col gap-1.5 p-4 flex-1" : "sticky top-16 flex flex-col gap-1.5 p-4 flex-1"}>
@@ -46,12 +51,12 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
           chromeTone="business"
         />
         {businessNavigation
-          .flatMap((item) => {
-            if (item.type === "item" && item.href.includes("/billing") && process.env.NEXT_PUBLIC_BILLING_ENABLED !== "true") {
-              return [{ type: "item" as const, label: "Реквизиты", href: BUSINESS_BILLING_REQUISITES_HREF, icon: Building2 }];
-            }
-            return [item];
-          })
+          .filter(
+            (item) =>
+              !(item.type === "item" &&
+                item.href.includes("/billing") &&
+                process.env.NEXT_PUBLIC_BILLING_ENABLED !== "true"),
+          )
           .map((item, index) => {
           if (item.type === "item") {
             const patterns = item.match ?? [item.href];
@@ -103,17 +108,25 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
             </SidebarGroup>
           );
         })}
+
+        {buildLabel ? (
+          <p
+            className="mt-auto pt-4 text-center font-mono text-xs text-stone-400"
+            title={
+              [
+                buildInfo?.label,
+                releaseVersion ? `v${releaseVersion}` : null,
+                buildInfo?.buildId ? `BUILD_ID ${buildInfo.buildId}` : null,
+                buildInfo?.commitSha,
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
+          >
+            Сборка: {buildLabel}
+          </p>
+        ) : null}
       </nav>
-      {buildInfo && (
-        <div className="px-4 pb-4 pt-2 text-center">
-          <span className="font-mono text-[10px] text-gray-400">
-            {(() => {
-              const ver = buildInfo.currentReleaseVersion ?? buildInfo.appVersion;
-              return buildInfo.commitShortSha ? `v${ver} · ${buildInfo.commitShortSha}` : `v${ver}`;
-            })()}
-          </span>
-        </div>
-      )}
     </aside>
   );
 }

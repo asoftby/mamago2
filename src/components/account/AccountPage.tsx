@@ -1,12 +1,12 @@
 import type { ComponentProps, ReactNode } from "react";
-import Link from "next/link";
+import { BackButton } from "@/components/ui/back-button";
 import { Surface } from "@/components/ui/surface";
 import { H2 } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 
 /**
  * Единый каркас страниц личного кабинета `/me/*` (эталон — «Моя семья»).
- * Только разметка: контейнер, одна ссылка назад, h1, вводный текст, действия.
+ * Только разметка: контейнер, кнопка назад, h1, вводный текст, действия.
  * Размер h1 на телефоне (34px) задаёт `.me-page h1` в globals.css.
  */
 export type AccountPageProps = {
@@ -14,6 +14,7 @@ export type AccountPageProps = {
   lead?: ReactNode;
   /** Родительская страница (не `/me`: ссылку «Мой аккаунт» не показываем). */
   backHref?: string;
+  /** Accessible name for the canonical icon-only back control. */
   backLabel?: string;
   /** Кнопки справа от заголовка (например «Настройки»). */
   actions?: ReactNode;
@@ -21,11 +22,15 @@ export type AccountPageProps = {
   children?: ReactNode;
 };
 
+function accessibleBackLabel(label: string): string {
+  return label.replace(/^←\s*/, "").trim() || "Назад";
+}
+
 export function AccountPage({
   title,
   lead,
   backHref,
-  backLabel = "← Назад",
+  backLabel = "Назад",
   actions,
   className,
   children,
@@ -33,9 +38,7 @@ export function AccountPage({
   return (
     <main className={cn("mx-auto min-h-[70vh] w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8", className)}>
       {backHref ? (
-        <Link href={backHref} className="inline-flex min-h-11 items-center text-sm text-neutral-600 hover:text-neutral-900">
-          {backLabel}
-        </Link>
+        <BackButton href={backHref} aria-label={accessibleBackLabel(backLabel)} />
       ) : null}
       <header className={cn("mb-6 flex flex-wrap items-end justify-between gap-4", backHref ? "mt-3" : "mt-0")}>
         <div className="min-w-0">

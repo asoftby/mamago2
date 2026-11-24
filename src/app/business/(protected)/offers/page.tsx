@@ -127,6 +127,9 @@ export default async function OffersPage({
     ...offer,
     boostDisabled: !freeBoost.availableToday || !boostCandidates.get(offer.id)?.eligible || Boolean(boostCandidates.get(offer.id)?.activeBoostUntil),
     boostNextFreeAt: boostCandidates.get(offer.id)?.activeFreeBoostUntil ?? null,
+    // Both free and paid active Boost end times come from the persisted Boost record.
+    isPromoted: Boolean(boostCandidates.get(offer.id)?.activeBoostUntil),
+    boostEndsAt: boostCandidates.get(offer.id)?.activeBoostUntil ?? null,
     metrics: metricsByEntity.get(`OFFER:${offer.id}`) ?? {
       views: 0,
       saves: 0,

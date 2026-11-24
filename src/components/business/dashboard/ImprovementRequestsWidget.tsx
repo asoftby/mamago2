@@ -255,7 +255,7 @@ export function ImprovementRequestsWidget({
                   <Button
                     asChild
                     size="sm"
-                    variant={urgency?.urgent ? "default" : "outline"}
+                    variant={urgency?.urgent ? "business" : "outline"}
                     className={urgency?.urgent ? "rounded-2xl bg-amber-600 hover:bg-amber-700" : "rounded-2xl border-stone-200 bg-white hover:bg-stone-50"}
                   >
                     <Link href={`/business/places/${request.entityId}/edit`}>

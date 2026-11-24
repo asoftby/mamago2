@@ -1,7 +1,7 @@
 "use client";
 
-import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
-import { useState } from "react";
+import { formatPrice, formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -26,6 +26,8 @@ import {
   BUSINESS_PUBLICATION_ACTION_ICON,
   BUSINESS_PUBLICATION_ACTION_NEUTRAL,
   BUSINESS_PUBLICATION_ACTION_PROMOTE,
+  BUSINESS_PUBLICATION_ACTIONS_ICON_ROW,
+  BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW,
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 import { PublicationStatusChip } from "@/components/business/shared/PublicationStatusChip";
@@ -35,8 +37,16 @@ import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPub
 import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
+import { getActiveBoostEndAt } from "@/lib/promotion/boostCountdown";
+import { EVENT_PROMOTE_BLOCK_TITLE, getEventPromoteBlockReason } from "@/lib/promotion/canPromoteEvent";
 import type { EventTemporalState } from "@/lib/events/eventTemporalState";
 import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
+import { getPlaceSearchAddressMetaLine } from "@/lib/placeLocationString";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import {
+  PublicationBoostActiveButton,
+  PublicationBoostLightningBadge,
+} from "@/components/business/shared/PublicationBoostActiveUi";
 
 interface Activity {
   id: string;
@@ -59,9 +69,17 @@ interface Activity {
   place: {
     id: string;
     title: string;
+    shortAddress?: string | null;
+    formattedAddr?: string | null;
+    customAddress?: string | null;
     city?: {
       slug: string;
+      name?: string;
     } | null;
+  } | null;
+  venue?: {
+    title?: string | null;
+    addressLine?: string | null;
   } | null;
   images: Array<{
     id: string;
@@ -74,9 +92,8 @@ interface Activity {
   /** Сессионное состояние (getEventTemporalState по неотозванным сеансам); считает страница списка. */
   temporalState?: EventTemporalState | null;
   isPromoted?: boolean;
-  /** Server-computed Boost eligibility and free quota; never infer from card status. */
+  /** Eligibility must come from the server, not from client-side status. */
   boostDisabled?: boolean;
-  /** Timer only for a successfully activated free Boost on this event. */
   boostNextFreeAt?: string | null;
   promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
@@ -110,28 +127,68 @@ export function canShowEventArchiveAction(status: ContentStatus): boolean {
   return archivableStatuses.includes(status);
 }
 
-function buildEventSubtitle(activity: Activity): string {
-  const parts: string[] = [];
-  if (activity.place?.title) {
-    parts.push(`Где проходит: ${activity.place.title}`);
+function buildEventAddressLine(activity: Activity): string | null {
+  if (activity.place) {
+    const formatted = getPlaceSearchAddressMetaLine({
+      city: activity.place.city?.name ? { name: activity.place.city.name } : null,
+      shortAddress: activity.place.shortAddress,
+      formattedAddr: activity.place.formattedAddr,
+      customAddress: activity.place.customAddress,
+    });
+    if (formatted && formatted !== "Место") {
+      return `Адрес: ${formatted}`;
+    }
+    if (activity.place.title?.trim()) {
+      return `Адрес: ${activity.place.title.trim()}`;
+    }
   }
+  const venueAddress = activity.venue?.addressLine?.trim();
+  if (venueAddress) {
+    return `Адрес: ${venueAddress}`;
+  }
+  const venueTitle = activity.venue?.title?.trim();
+  if (venueTitle) {
+    return `Адрес: ${venueTitle}`;
+  }
+  return null;
+}
+
+function buildEventSubtitle(activity: Activity): ReactNode {
+  const addressLine = buildEventAddressLine(activity);
+
+  const datePriceParts: string[] = [];
   const displayedDate = activity.displayOccurrenceAt ?? activity.nextOccurrenceAt;
   if (displayedDate) {
-    parts.push(
+    datePriceParts.push(
       format(new Date(displayedDate), "d MMM yyyy", {
         locale: ru,
       }),
     );
   }
   if (activity.priceText) {
-    parts.push(formatPrice(activity.priceText));
+    datePriceParts.push(formatPrice(activity.priceText));
   } else if (activity.priceFrom != null) {
-    parts.push(formatPriceFrom(activity.priceFrom, { hideZero: true }));
+    datePriceParts.push(formatPriceFrom(activity.priceFrom, { hideZero: true }));
   }
-  if (parts.length === 0 && activity.shortDesc?.trim()) {
-    return activity.shortDesc.trim();
+  const datePriceLine =
+    datePriceParts.length > 0
+      ? datePriceParts.join(" · ")
+      : null;
+
+  if (!addressLine && !datePriceLine) {
+    return activity.shortDesc?.trim() || "Место и время уточняются";
   }
-  return parts.length > 0 ? parts.join(" · ") : "Место и время уточняются";
+
+  return (
+    <>
+      {addressLine ? <p className="w-full truncate">{addressLine}</p> : null}
+      {datePriceLine ? (
+        <p className="w-full">
+          {renderCurrencyText(normalizeUiCurrencyText(datePriceLine), { iconSize: "sm" })}
+        </p>
+      ) : null}
+    </>
+  );
 }
 
 export function EventCardHorizontal({
@@ -167,6 +224,7 @@ export function EventCardHorizontal({
 
   const canDeleteEvent = canShowEventDeleteAction(activity.status);
   const canArchiveEvent = canShowEventArchiveAction(activity.status);
+  const promoteBlockReason = getEventPromoteBlockReason(activity.status, activity.temporalState);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 
@@ -208,15 +266,14 @@ export function EventCardHorizontal({
       }
     : null;
 
+  const boostEndsAt = getActiveBoostEndAt(activity.promotionPerformance);
+  const isBoostActive = Boolean(activity.isPromoted);
+
   const statusRow = (
-    <div className="flex flex-wrap items-center gap-2">
-      <PublicationStatusChip
-        status={activity.status}
-        temporalState={activity.temporalState}
-      />
-      {/* Boost never adds a label/ribbon to the publication card.
-          Active status and performance are available in the Boost section. */}
-    </div>
+    <PublicationStatusChip
+      status={activity.status}
+      temporalState={activity.temporalState}
+    />
   );
 
   return (
@@ -227,6 +284,7 @@ export function EventCardHorizontal({
         imageAlt={activity.title}
         placeholderIcon={Calendar}
         title={activity.title}
+        isPromoted={isBoostActive}
         typeChip={
           <BusinessChip tone="muted" size="default" className="text-stone-700">
             {activityTypeLabelRu(activity.type)}
@@ -234,105 +292,134 @@ export function EventCardHorizontal({
         }
         subtitle={buildEventSubtitle(activity)}
         statusRow={statusRow}
+        statusTrailing={
+          isBoostActive ? <PublicationBoostLightningBadge /> : null
+        }
         updatedLine={updatedLine}
         createdLine={createdLine}
         metrics={cardMetrics}
         metricsPeriodLabel="сегодня"
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => setStatisticsOpen(true)}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
-              )}
-            >
-              <BarChart3 className="h-4 w-4 shrink-0" />
-              Статистика
-            </button>
-
-            <Link
-              href={publicEventHref ?? `/me/events/${activity.id}/preview`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={BUSINESS_PUBLICATION_ACTION_ICON}
-              title="Просмотр"
-              aria-label="Просмотр"
-            >
-              <Eye className="h-4 w-4" />
-            </Link>
-
-            <Link
-              href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent(returnTo)}`}
-              className={BUSINESS_PUBLICATION_ACTION_ICON}
-              title="Редактировать"
-              aria-label="Редактировать"
-            >
-              <Pencil className="h-4 w-4" />
-            </Link>
-
-            <BoostLauncher
-              target={{ id: activity.id, publicationType: "EVENT", title: activity.title }}
-              disabled={activity.boostDisabled !== false || activity.isPromoted === true}
-              cooldownUntil={activity.boostNextFreeAt}
-              className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
-            >
-              <Zap className="h-4 w-4 shrink-0" />
-              Продвигать
-            </BoostLauncher>
-
-            {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
-              href={buildPromotionLaunchHref({
-                publicationType: "EVENT",
-                publicationId: activity.id,
-              })}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_PROMOTE,
-              )}
-            >
-              <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Promotion выключен
-            </Link>}
-
-            {onArchive && canArchiveEvent ? (
+            <div className={BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW}>
               <button
                 type="button"
-                onClick={handleArchive}
-                disabled={isArchiving}
+                onClick={() => setStatisticsOpen(true)}
+                className={cn(
+                  BUSINESS_PUBLICATION_ACTION_BUTTON,
+                  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+                )}
+              >
+                <BarChart3 className="h-4 w-4 shrink-0" />
+                Статистика
+              </button>
+
+              {isBoostActive ? (
+                <PublicationBoostActiveButton endsAt={boostEndsAt} />
+              ) : promoteBlockReason ? (
+                <button
+                  type="button"
+                  disabled
+                  title={EVENT_PROMOTE_BLOCK_TITLE[promoteBlockReason]}
+                  className={cn(
+                    BUSINESS_PUBLICATION_ACTION_BUTTON,
+                    BUSINESS_PUBLICATION_ACTION_PROMOTE,
+                  )}
+                >
+                  <Zap className="h-4 w-4 shrink-0" />
+                  Продвинуть
+                </button>
+              ) : (
+                <BoostLauncher
+                  target={{ id: activity.id, publicationType: "EVENT", title: activity.title }}
+                  disabled={activity.boostDisabled !== false}
+                  cooldownUntil={activity.boostNextFreeAt}
+                  className={cn(
+                    BUSINESS_PUBLICATION_ACTION_BUTTON,
+                    BUSINESS_PUBLICATION_ACTION_PROMOTE,
+                  )}
+                >
+                  <Zap className="h-4 w-4 shrink-0" />
+                  Продвигать
+                </BoostLauncher>
+              )}
+
+              {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled ? (
+                <Link
+                  href={buildPromotionLaunchHref({
+                    publicationType: "EVENT",
+                    publicationId: activity.id,
+                  })}
+                  className={cn(
+                    BUSINESS_PUBLICATION_ACTION_BUTTON,
+                    BUSINESS_PUBLICATION_ACTION_PROMOTE,
+                  )}
+                >
+                  <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
+                  Promotion выключен
+                </Link>
+              ) : null}
+            </div>
+
+            <div className={BUSINESS_PUBLICATION_ACTIONS_ICON_ROW}>
+              <Link
+                href={publicEventHref ?? `/me/events/${activity.id}/preview`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={BUSINESS_PUBLICATION_ACTION_ICON}
+                title="Просмотр"
+                aria-label="Просмотр"
+              >
+                <Eye className="h-4 w-4" />
+              </Link>
+
+              <Link
+                href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent(returnTo)}`}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
+                title="Редактировать"
+                aria-label="Редактировать"
+              >
+                <Pencil className="h-4 w-4" />
+              </Link>
+
+              {onArchive && canArchiveEvent ? (
+                <button
+                  type="button"
+                  onClick={handleArchive}
+                  disabled={isArchiving}
+                  className={BUSINESS_PUBLICATION_ACTION_ICON}
                   title="В архив"
                   aria-label="В архив"
-              >
-                <Archive className="h-4 w-4" />
-              </button>
-            ) : null}
+                >
+                  <Archive className="h-4 w-4" />
+                </button>
+              ) : null}
 
-            {onUnarchive ? (
-              <button
-                type="button"
-                onClick={handleUnarchive}
-                disabled={isArchiving}
-                className={BUSINESS_PUBLICATION_ACTION_ICON}
-                title="Восстановить"
-                aria-label="Восстановить"
-              >
-                <ArchiveRestore className="h-4 w-4" />
-              </button>
-            ) : null}
+              {onUnarchive ? (
+                <button
+                  type="button"
+                  onClick={handleUnarchive}
+                  disabled={isArchiving}
+                  className={BUSINESS_PUBLICATION_ACTION_ICON}
+                  title="Восстановить"
+                  aria-label="Восстановить"
+                >
+                  <ArchiveRestore className="h-4 w-4" />
+                </button>
+              ) : null}
 
-            {canDeleteEvent ? (
-              <button
-                type="button"
-                onClick={() => void onDelete(activity.id)}
-                className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
-                title="Удалить черновик"
-                aria-label="Удалить черновик"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            ) : null}
+              {canDeleteEvent ? (
+                <button
+                  type="button"
+                  onClick={() => void onDelete(activity.id)}
+                  className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
+                  title="Удалить черновик"
+                  aria-label="Удалить черновик"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
           </>
         }
       />

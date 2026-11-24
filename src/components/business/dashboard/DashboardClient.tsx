@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
 import { shouldAutoOpenBusinessTour } from "@/lib/business/shouldAutoOpenBusinessTour";
 import Link from "next/link";
-import { CirclePlay, Settings } from "lucide-react";
+import { ChevronRight, CirclePlay } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -37,6 +37,8 @@ export type DashboardData = {
   businessName: string;
   legalName?: string | null;
   city?: string | null;
+  /** When present and APPROVED, settings link shows «✓ Верифицирован». */
+  verificationStatus?: "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
   // Balance
   depositBalance: number;
   periodSpend: number;
@@ -56,6 +58,7 @@ export type DashboardData = {
       id: string;
       title: string;
       publicationType: "EVENT" | "OFFER";
+      coverImageUrl: string | null;
       activeBoostUntil: string | null;
       activeFreeBoostUntil: string | null;
       eligible: boolean;
@@ -513,24 +516,34 @@ export function DashboardClient({ data, defaultPeriod = "week", verificationBann
           actions={
             <Link
               href={data.hrefs.settings}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex w-full min-h-10 flex-row items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:w-auto md:justify-start"
               title="Настройки бизнеса"
             >
-              {data.legalName ?? data.businessName}{data.city ? ` · ${data.city}` : ""}
-              <Settings className="h-4 w-4 shrink-0 text-stone-400" aria-hidden="true" />
+              <span className="flex min-w-0 flex-col items-start gap-0.5">
+                <span>
+                  {data.legalName ?? data.businessName}
+                  {data.city ? ` · ${data.city}` : ""}
+                </span>
+                {data.verificationStatus === "APPROVED" ? (
+                  <span className="text-[11px] font-medium leading-none text-emerald-700">
+                    ✓ Верифицирован
+                  </span>
+                ) : null}
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-stone-400" aria-hidden="true" />
             </Link>
           }
         />
       </div>
 
-      {/* Verification and tour share the top row on mobile and desktop. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {verificationBanner}
+      {/* Non-approved verification chip + tour; approved status lives in settings link. */}
+      <div className="flex w-full flex-wrap items-center justify-between gap-3">
+        {data.verificationStatus !== "APPROVED" ? verificationBanner : null}
         <button
           type="button"
           onClick={() => setTourOpen(true)}
           aria-label="Возможности кабинета — короткий обзор основных функций"
-          className="inline-flex max-w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:w-auto"
         >
           <CirclePlay className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>Возможности кабинета</span>

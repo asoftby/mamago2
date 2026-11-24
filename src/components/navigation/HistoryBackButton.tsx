@@ -1,14 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { BackButton } from "@/components/ui/back-button";
 import { canUseHistoryBack } from "@/hooks/useSmartBack";
 import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 
 type Props = {
   fallbackHref: string;
   className?: string;
-  children: ReactNode;
   ariaLabel?: string;
 };
 
@@ -37,10 +36,13 @@ function getSurfaceEntryFallback(currentPathname: string, fallbackHref: string):
   return "/me";
 }
 
+/**
+ * Smart history back that falls back to a surface entry when history is unsafe.
+ * Visuals come from the canonical `BackButton`.
+ */
 export function HistoryBackButton({
   fallbackHref,
   className,
-  children,
   ariaLabel = "Назад",
 }: Props) {
   const router = useRouter();
@@ -58,13 +60,10 @@ export function HistoryBackButton({
   };
 
   return (
-    <button
-      type="button"
+    <BackButton
       aria-label={ariaLabel}
-      onClick={handleClick}
       className={className}
-    >
-      {children}
-    </button>
+      onClick={handleClick}
+    />
   );
 }

@@ -11,6 +11,7 @@ import {
   accountDropdownRowAccent,
   accountDropdownRowActive,
   accountDropdownRowDefault,
+  BUSINESS_CHROME_AVATAR_FALLBACK_INNER,
   isAccountRowActive,
 } from "@/components/account/accountDropdownTokens";
 import { AppMenu } from "@/components/account/AppMenu";
@@ -160,7 +161,7 @@ export function AccountDropdownContent({
     chromeTone === "admin"
       ? "flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-700"
       : chromeTone === "business"
-        ? "flex h-full w-full items-center justify-center rounded-full bg-sky-100 text-[11px] font-semibold text-sky-900"
+        ? BUSINESS_CHROME_AVATAR_FALLBACK_INNER
         : "flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary";
 
   return (

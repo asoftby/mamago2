@@ -237,7 +237,7 @@ function PlaceMapModalOpen({
       </div>
 
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[100] flex justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <Button
+        <Button variant="business"
           type="button"
           onClick={handleConfirm}
           disabled={!tempPin}

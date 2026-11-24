@@ -14,7 +14,7 @@ import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 // ─── Action button style tokens ───────────────────────────────────────────────
 
 export const BUSINESS_PUBLICATION_ACTION_BUTTON =
-  "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex min-h-12 h-auto min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 sm:min-h-10 sm:w-auto sm:flex-none sm:shrink-0";
 
 export const BUSINESS_PUBLICATION_ACTION_NEUTRAL =
   "border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950";
@@ -22,11 +22,42 @@ export const BUSINESS_PUBLICATION_ACTION_NEUTRAL =
 export const BUSINESS_PUBLICATION_ACTION_PROMOTE =
   "bg-[#3D7A3D] text-white shadow-[0_4px_14px_rgba(61,122,61,0.28)] hover:bg-[#2f6b2f] px-4 font-semibold";
 
+/** Active Boost: muted stone slot + outer amber glow (see animate-mg-boost-amber-glow). No grey stroke. */
+export const BUSINESS_PUBLICATION_ACTION_PROMOTE_ACTIVE =
+  "cursor-not-allowed border border-transparent bg-stone-50 px-4 font-semibold text-stone-500 disabled:opacity-100 animate-mg-boost-amber-glow";
+
+/** Icon-only actions: ≥44px tap target on mobile; compact on desktop. */
 export const BUSINESS_PUBLICATION_ACTION_ICON =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl p-0 text-stone-500 hover:bg-stone-100 hover:text-stone-900 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl p-0 text-stone-500 hover:bg-stone-100 hover:text-stone-900 disabled:pointer-events-none disabled:opacity-50 sm:h-9 sm:w-9";
 
 export const BUSINESS_PUBLICATION_ACTION_DANGER_ICON =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl p-0 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl p-0 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-50 sm:h-9 sm:w-9";
+
+/** Primary labeled actions (Статистика / Продвинуть): full-width pair on mobile.
+ *  items-stretch equalizes height when the active Boost button is two-line. */
+export const BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW =
+  "flex w-full items-stretch gap-3 sm:w-auto sm:shrink-0";
+
+/** Lightning badge fill — pale cream/amber behind Zap. */
+export const BUSINESS_PUBLICATION_BOOST_LIGHTNING_BG = "bg-amber-50";
+
+/** Zap icon color on the lightning badge (also «Сейчас продвигается» label). */
+export const BUSINESS_PUBLICATION_BOOST_LIGHTNING_ICON = "text-amber-500";
+
+/** Card outer border while Boost is active — same amber family as lightning bg. */
+export const BUSINESS_PUBLICATION_BOOST_BORDER = "border-amber-200";
+
+/** Caption inside the active Boost timer button — lowercase, lightning accent. */
+export const BUSINESS_PUBLICATION_PROMOTE_ACTIVE_LABEL =
+  "text-[10px] font-medium leading-tight text-amber-500";
+
+/** Icon actions: second row on mobile; inline after buttons on sm+. */
+export const BUSINESS_PUBLICATION_ACTIONS_ICON_ROW =
+  "flex w-full items-center justify-evenly gap-4 sm:w-auto sm:justify-start sm:gap-2";
+
+/** Footer actions stack: column on mobile, one horizontal row on sm+. */
+export const BUSINESS_PUBLICATION_ACTIONS_STACK =
+  "flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +85,8 @@ type BusinessPublicationCardProps = {
   typeChip?: ReactNode;
   subtitle: ReactNode;
   statusRow?: ReactNode;
+  /** Right edge of the type/status badges row (e.g. Boost lightning). */
+  statusTrailing?: ReactNode;
   updatedLine?: string | null;
   createdLine?: string | null;
   footnote?: ReactNode;
@@ -63,6 +96,8 @@ type BusinessPublicationCardProps = {
   metricsPeriodLabel?: string;
   /** Совет / подсказка внизу карточки */
   tip?: { text: string; ctaLabel?: string; ctaHref?: string } | null;
+  /** Active Boost: amber outer border matching lightning badge bg family. */
+  isPromoted?: boolean;
   actions: ReactNode;
   className?: string;
 };
@@ -90,7 +125,7 @@ function MetricCell({
   const isNegative = delta?.startsWith("-");
   const trendIcon = isPositive ? "↑" : isNegative ? "↓" : null;
   return (
-    <div className="flex min-w-[90px] flex-col gap-1 rounded-2xl bg-stone-50 px-4 py-3">
+    <div className="flex min-w-0 flex-1 flex-col gap-1 rounded-2xl bg-stone-50 px-4 py-3">
       <div className="flex items-center gap-1.5 text-stone-400">
         {icon}
         <span className="text-xs font-medium">{label}</span>
@@ -135,12 +170,14 @@ export function BusinessPublicationCard({
   typeChip,
   subtitle,
   statusRow,
+  statusTrailing,
   updatedLine,
   createdLine,
   footnote,
   metrics,
   metricsPeriodLabel,
   tip,
+  isPromoted = false,
   actions,
   className,
 }: BusinessPublicationCardProps) {
@@ -193,11 +230,15 @@ export function BusinessPublicationCard({
   return (
     <div
       className={cn(
-        "group rounded-[20px] border border-stone-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
+        "group rounded-[20px] border bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
         "transition-shadow hover:shadow-[0_6px_24px_rgba(15,23,42,0.07)]",
+        isPromoted
+          ? BUSINESS_PUBLICATION_BOOST_BORDER
+          : "border-stone-200/90",
         className,
       )}
       data-publication-type={type}
+      data-promoted={isPromoted ? "true" : undefined}
     >
       {/* ── Top section ── */}
       <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
@@ -207,33 +248,38 @@ export function BusinessPublicationCard({
 
           <div className="min-w-0 flex-1 space-y-1.5">
             {/* Type and status are peer pills above the publication name. */}
-            {(typeChip || statusRow) ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {typeChip}
-                {statusRow}
+            {(typeChip || statusRow || statusTrailing) ? (
+              <div className="flex w-full items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  {typeChip}
+                  {statusRow}
+                </div>
+                {statusTrailing}
               </div>
             ) : null}
 
             {/* Title */}
             {titleHref ? (
               <Link href={titleHref} className="block min-w-0">
-                <h3 className="truncate text-xl font-bold text-stone-950 transition-colors hover:text-stone-700">
+                <h3 className="truncate text-base font-bold text-stone-950 transition-colors hover:text-stone-700 sm:text-xl">
                   {title}
                 </h3>
               </Link>
             ) : (
-              <h3 className="min-w-0 truncate text-xl font-bold text-stone-950">
+              <h3 className="min-w-0 truncate text-base font-bold text-stone-950 sm:text-xl">
                 {title}
               </h3>
             )}
 
-            {/* Subtitle */}
+            {/* Subtitle: string stays one truncated line; ReactNode can be multi-line */}
             {subtitle ? (
-              <p className="truncate text-sm text-stone-500">
-                {typeof subtitle === "string"
-                  ? renderCurrencyText(normalizeUiCurrencyText(subtitle), { iconSize: "sm" })
-                  : subtitle}
-              </p>
+              typeof subtitle === "string" ? (
+                <p className="truncate text-sm text-stone-500">
+                  {renderCurrencyText(normalizeUiCurrencyText(subtitle), { iconSize: "sm" })}
+                </p>
+              ) : (
+                <div className="min-w-0 w-full space-y-0.5 text-sm text-stone-500">{subtitle}</div>
+              )
             ) : null}
 
             {/* Footnote */}
@@ -243,56 +289,56 @@ export function BusinessPublicationCard({
 
         {/* Right: metrics */}
         {hasMetrics ? (
-          <div className="flex shrink-0 flex-col gap-1 sm:self-center"> 
-            <div className="flex gap-3">
-            <MetricCell
-              icon={<TrendingUp className="h-3.5 w-3.5" />}
-              label="Просмотры"
-              value={fmtNum(metrics!.views)}
-              delta={metrics!.viewsDelta}
-            />
-            <MetricCell
-              icon={
-                type === "event" ? (
-                  <CalendarPlus className="h-3.5 w-3.5" />
-                ) : (
-                  <Users className="h-3.5 w-3.5" />
-                )
-              }
-              label={type === "event" ? "В план" : "Заявки"}
-              value={fmtNum(
-                type === "event" ? metrics!.planAdds : metrics!.ctaClicks,
-              )}
-              delta={
-                type === "event" ? metrics!.planAddsDelta : metrics!.ctaClicksDelta
-              }
-            />
-            </div>
+          <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:shrink-0 sm:self-center">
             {metricsPeriodLabel ? (
-              <p className="text-center text-xs font-medium text-stone-500" aria-label={`Период статистики: ${metricsPeriodLabel}`}>
-                {metricsPeriodLabel}
+              <p
+                className="text-xs font-medium text-stone-500"
+                aria-label={`Период статистики: ${metricsPeriodLabel}`}
+              >
+                {metricsPeriodLabel === "сегодня"
+                  ? "Статистика за сегодня:"
+                  : `Статистика за ${metricsPeriodLabel}:`}
               </p>
             ) : null}
+            <div className="flex w-full gap-3">
+              <MetricCell
+                icon={<TrendingUp className="h-3.5 w-3.5" />}
+                label="Просмотры"
+                value={fmtNum(metrics!.views)}
+                delta={metrics!.viewsDelta}
+              />
+              <MetricCell
+                icon={
+                  type === "event" ? (
+                    <CalendarPlus className="h-3.5 w-3.5" />
+                  ) : (
+                    <Users className="h-3.5 w-3.5" />
+                  )
+                }
+                label={type === "event" ? "В план" : "Заявки"}
+                value={fmtNum(
+                  type === "event" ? metrics!.planAdds : metrics!.ctaClicks,
+                )}
+                delta={
+                  type === "event" ? metrics!.planAddsDelta : metrics!.ctaClicksDelta
+                }
+              />
+            </div>
           </div>
         ) : null}
       </div>
 
       {/* ── Bottom action bar ── */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 px-5 py-3">
-        {/* Updated / created timestamps */}
+      <div className="space-y-3 border-t border-stone-100 px-5 py-3">
         {hasHydrated && (updatedLine || createdLine) ? (
-          <div className="mr-auto min-w-0 text-xs text-stone-400">
+          <div className="min-w-0 text-xs text-stone-400">
             {updatedLine ? <p>{updatedLine}</p> : null}
             {createdLine ? <p>{createdLine}</p> : null}
           </div>
-        ) : (
-          <div className="mr-auto" />
-        )}
+        ) : null}
 
-        {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {actions}
-        </div>
+        {/* Callers supply primary + icon rows; stack collapses to one row on sm+. */}
+        <div className={BUSINESS_PUBLICATION_ACTIONS_STACK}>{actions}</div>
       </div>
 
       {/* ── Tip row ── */}

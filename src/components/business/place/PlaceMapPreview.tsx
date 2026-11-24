@@ -131,7 +131,7 @@ export function PlaceMapPreview({ lat, lng, onOpenMap, actionLabel = "Откры
     <div className="relative h-[280px] w-full rounded-xl border border-gray-300 overflow-hidden">
       <div ref={mapRef} className="w-full h-full" />
       
-      <Button
+      <Button variant="business"
         onClick={onOpenMap}
         className="absolute bottom-4 right-4 rounded-full shadow-lg"
         size="sm"

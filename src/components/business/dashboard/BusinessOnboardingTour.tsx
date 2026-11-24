@@ -216,7 +216,7 @@ export function BusinessOnboardingTour({
               <ArrowLeft className="h-4 w-4" /> Назад
             </button>
           )}
-          <button ref={nextButton} type="button" onClick={() => index < STEPS.length - 1 ? setIndex((value) => value + 1) : finish("tour_complete")} className="flex items-center gap-1 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+          <button ref={nextButton} type="button" onClick={() => index < STEPS.length - 1 ? setIndex((value) => value + 1) : finish("tour_complete")} className="flex items-center gap-1 rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800">
             {index === STEPS.length - 1 ? "Завершить" : "Далее"}
             {index < STEPS.length - 1 && <ArrowRight className="h-4 w-4" />}
           </button>

@@ -29,9 +29,17 @@ interface Activity {
   place: {
     id: string;
     title: string;
+    shortAddress?: string | null;
+    formattedAddr?: string | null;
+    customAddress?: string | null;
     city?: {
       slug: string;
+      name?: string;
     } | null;
+  } | null;
+  venue?: {
+    title?: string | null;
+    addressLine?: string | null;
   } | null;
   images: Array<{
     id: string;

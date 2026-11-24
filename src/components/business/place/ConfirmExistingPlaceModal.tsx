@@ -173,7 +173,7 @@ export function ConfirmExistingPlaceModal({
         )}
 
         <DialogFooter className="flex-col sm:flex-col gap-2">
-          <Button
+          <Button variant="business"
             onClick={() => runClaimWithEmailGate()}
             disabled={isLoading || isClaiming || claimSuccess}
             className="w-full"
