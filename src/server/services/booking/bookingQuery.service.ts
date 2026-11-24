@@ -813,7 +813,7 @@ export async function updateBookingStatus(
         console.error("[updateBookingStatus] notifyUserBookingConfirmed failed:", err),
       );
     } else if (newStatus === BookingStatus.REJECTED) {
-      notifyUserBookingCancelled(notifyParams).catch((err) =>
+      notifyUserBookingCancelled({ ...notifyParams, rejectionReason: actor?.reason ?? null }).catch((err) =>
         console.error("[updateBookingStatus] notifyUserBookingCancelled failed:", err),
       );
     } else if (newStatus === BookingStatus.COMPLETED) {

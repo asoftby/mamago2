@@ -36,6 +36,16 @@ import type {
   BookingStatusCounts,
 } from "@/server/services/booking/bookingQuery.service";
 
+type BookingDecisionPreview = {
+  canConfirm: boolean;
+  code: "AVAILABLE" | "FULL" | "UNLIMITED" | "NOT_APPLICABLE" | "UNAVAILABLE";
+  message: string;
+  capacity: number | null;
+  remaining: number | null;
+  adultsRemaining?: number | null;
+  childrenRemaining?: number | null;
+};
+
 type StatusFilter = "all" | BookingStatus;
 type SortMode = "newest" | "oldest";
 type CalendarViewMode = "month" | "week" | "day";
@@ -590,7 +600,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [selectedBookingId, detailRefreshRevision]);
 
   const handleStatusChange = useCallback(
-    async (id: string, status: BookingStatus) => {
+    async (id: string, status: BookingStatus, reason?: string) => {
       setItems((prev) => prev.map((booking) => (booking.id === id ? { ...booking, status } : booking)));
 
       try {
@@ -598,7 +608,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status, ...(reason ? { reason } : {}) }),
         });
 
         if (!res.ok) {
@@ -620,6 +630,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
       } catch (err) {
         void fetchBookings();
         toast.error(err instanceof Error ? err.message : "Ошибка обновления");
+        throw err;
       }
     },
     [fetchBookings, refreshBusinessUnreadOnly],
@@ -1600,9 +1611,39 @@ export function BookingDetailsDrawer({
   onOpenChange: (open: boolean) => void;
   onSelectPrev: () => void;
   onSelectNext: () => void;
-  onStatusChange: (id: string, status: BookingStatus) => Promise<void>;
+  onStatusChange: (id: string, status: BookingStatus, reason?: string) => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [decision, setDecision] = useState<BookingDecisionPreview | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDecision(null);
+    setDecisionError(null);
+    if (!open || !booking?.id || booking.status !== BookingStatus.NEW || booking.publicationType !== "EVENT") {
+      return () => controller.abort();
+    }
+    // A Telegram Mini App link opens this same authorized booking detail.
+    void fetch("/api/business/bookings/" + encodeURIComponent(booking.id) + "/decision", {
+      cache: "no-store", credentials: "include", signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok) throw new Error("Не удалось проверить места");
+      return res.json() as Promise<BookingDecisionPreview>;
+    }).then((result) => {
+      if (!controller.signal.aborted) setDecision(result);
+    }).catch(() => {
+      if (!controller.signal.aborted) setDecisionError("Не удалось проверить места. Обновите заявку.");
+    });
+    return () => controller.abort();
+  }, [open, booking?.id, booking?.status, booking?.publicationType]);
+
+  useEffect(() => {
+    setRejectOpen(false);
+    setRejectionReason("");
+  }, [booking?.id]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chat, setChat] = useState<{ bookingId: string; open: boolean }>({ bookingId: "", open: false });
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -1617,7 +1658,7 @@ export function BookingDetailsDrawer({
   const price = formatPriceLabel(booking);
   const isNew = booking.status === BookingStatus.NEW;
   const isConfirmed = booking.status === BookingStatus.CONFIRMED;
-  const canConfirm = isNew;
+  const canConfirm = isNew && (booking.publicationType !== "EVENT" || decision?.canConfirm === true);
   const canReject = isNew || isConfirmed;
   const canComplete = isConfirmed;
   const history = buildHistoryEntries(booking);
@@ -1627,7 +1668,14 @@ export function BookingDetailsDrawer({
   const handleAction = async (status: BookingStatus) => {
     setUpdating(status);
     try {
-      await onStatusChange(booking.id, status);
+      await onStatusChange(booking.id, status,
+        status === BookingStatus.REJECTED ? rejectionReason.trim() : undefined);
+      if (status === BookingStatus.REJECTED) {
+        setRejectOpen(false);
+        setRejectionReason("");
+      }
+    } catch {
+      // The caller displays the API error. Keep the rejection reason for retry.
     } finally {
       setUpdating(null);
     }
@@ -1754,6 +1802,12 @@ export function BookingDetailsDrawer({
             ) : null}
           </div>
 
+          {booking.status === BookingStatus.REJECTED && booking.rejectionReason ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-semibold">Причина отказа</p>
+              <p className="mt-1 whitespace-pre-wrap">{booking.rejectionReason}</p>
+            </div>
+          ) : null}
           {isConfirmed ? (
             <div className="mt-5 flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3.5 text-[15px] leading-snug text-emerald-800">
               <Check className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1839,19 +1893,58 @@ export function BookingDetailsDrawer({
         </div>
 
         <div className="shrink-0 border-t border-stone-200 bg-white px-5 pb-5 pt-4 sm:px-6">
-          {canConfirm ? (
+          {isNew && booking.publicationType === "EVENT" ? (
+            <p role="status" className={cn(
+              "mb-3 rounded-xl border px-3 py-2 text-sm",
+              decision?.canConfirm ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900",
+            )}>
+              {decisionError ?? decision?.message ?? "Проверяем свободные места для этой заявки…"}
+              {decision?.remaining !== null && decision?.remaining !== undefined
+                ? ` · Свободно: ${decision.remaining}` : ""}
+            </p>
+          ) : null}
+          {rejectOpen && canReject ? (
+            <div className="space-y-3">
+              <label htmlFor="business-booking-rejection-reason" className="block text-sm font-semibold text-stone-900">
+                Причина отказа — обязательна
+              </label>
+              <textarea
+                id="business-booking-rejection-reason"
+                rows={3}
+                maxLength={500}
+                autoFocus
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Например: на выбранное время мест нет. Если они освободятся, мы свяжемся с вами."
+                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-700"
+              />
+              <p className="text-xs text-stone-500">От 5 до 500 символов. Причина сохраняется в истории заявки.</p>
+              <div className="flex gap-2">
+                <button type="button" disabled={updating !== null}
+                  className="h-11 flex-1 rounded-xl border px-4 text-sm font-semibold"
+                  onClick={() => setRejectOpen(false)}>Назад</button>
+                <button type="button"
+                  disabled={updating !== null || rejectionReason.trim().length < 5}
+                  className="h-11 flex-1 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  onClick={() => void handleAction(BookingStatus.REJECTED)}>
+                  {updating === BookingStatus.REJECTED ? "Сохраняем…" : "Отклонить заявку"}
+                </button>
+              </div>
+            </div>
+          ) : isNew ? (
             <div className="flex flex-col gap-1 md:flex-row-reverse md:items-center md:gap-4">
               <button
                 type="button"
-                onClick={() => handleAction(BookingStatus.CONFIRMED)}
-                disabled={updating !== null}
+                onClick={() => void handleAction(BookingStatus.CONFIRMED)}
+                disabled={updating !== null || !canConfirm}
                 className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-stone-950 px-6 text-base font-semibold text-white transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70 md:flex-1"
               >
                 {updating === BookingStatus.CONFIRMED ? "Сохраняем..." : "Подтвердить заявку"}
               </button>
               <button
                 type="button"
-                onClick={() => handleAction(BookingStatus.REJECTED)}
+                onClick={() => setRejectOpen(true)}
                 disabled={updating !== null}
                 className="inline-flex h-12 w-full items-center justify-center rounded-2xl px-6 text-base font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70 md:w-auto"
               >
@@ -1865,7 +1958,7 @@ export function BookingDetailsDrawer({
                   {canComplete ? (
                     <button
                       type="button"
-                      onClick={() => handleAction(BookingStatus.COMPLETED)}
+                      onClick={() => void handleAction(BookingStatus.COMPLETED)}
                       disabled={updating !== null}
                       className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-100 disabled:cursor-wait disabled:opacity-70"
                     >
@@ -1875,7 +1968,7 @@ export function BookingDetailsDrawer({
                   {canReject ? (
                     <button
                       type="button"
-                      onClick={() => handleAction(BookingStatus.REJECTED)}
+                      onClick={() => setRejectOpen(true)}
                       disabled={updating !== null}
                       className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70"
                     >
