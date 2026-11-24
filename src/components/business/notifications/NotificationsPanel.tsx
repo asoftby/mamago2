@@ -21,6 +21,7 @@ import { NotificationDetailDialog } from "./NotificationDetailDialog";
 import { NotificationListItem } from "./NotificationListItem";
 import { NotificationSettingsInModal } from "./NotificationSettingsInModal";
 import { useOnboardingNotificationCta } from "@/features/notifications/hooks/useOnboardingNotificationCta";
+import { canArchiveNotificationRow } from "@/lib/notifications/notificationLifecycle";
 
 export type NotificationsPanelProps = {
   /** Вызывается при закрытии popover/sheet (кнопка X и т.д.) */
@@ -112,11 +113,27 @@ export function NotificationsPanel({
   }, [refreshCounts, refreshRecent]);
 
   const markItemAsReadLocally = useCallback(
-    async (notificationId: string) => {
+    async (notification: NotificationApiRow) => {
       // resolve-action has persisted readAt before this callback fires.
       // The bell is a queue of unread notifications, not a history feed.
-      setItems((current) => current.filter((notification) => notification.id !== notificationId));
+      setItems((current) => current.filter((item) => item.id !== notification.id));
       await refreshCounts();
+
+      // Archive viewed, resolved notifications. Pending business actions
+      // must remain available in the full inbox until they are resolved.
+      if (canArchiveNotificationRow(notification)) {
+        try {
+          const response = await fetch(`/api/notifications/${notification.id}/archive`, {
+            method: "POST",
+            credentials: "include",
+          });
+          if (!response.ok && response.status !== 409) {
+            console.error("[notifications] Could not archive viewed notification", response.status);
+          }
+        } catch (error) {
+          console.error("[notifications] Could not archive viewed notification", error);
+        }
+      }
     },
     [refreshCounts],
   );
@@ -155,8 +172,8 @@ export function NotificationsPanel({
         await handleNotificationClick({
           notification,
           router,
-          onAfterRead: (notificationId) => {
-            void markItemAsReadLocally(notificationId);
+          onAfterRead: () => {
+            void markItemAsReadLocally(notification);
           },
           onModal: setDetailAction,
           onClose,
@@ -175,8 +192,8 @@ export function NotificationsPanel({
         await handleNotificationClick({
           notification,
           router,
-          onAfterRead: (notificationId) => {
-            void markItemAsReadLocally(notificationId);
+          onAfterRead: () => {
+            void markItemAsReadLocally(notification);
           },
           onModal: setDetailAction,
           onClose,
