@@ -494,8 +494,8 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     await updateBookingStatus(dayBooking.bookingId, business.id, "REJECTED", {
       actorId: owner.id, actorRole: "BUSINESS_OWNER", reason: "Нет мест на выбранную дату",
     });
-    const rejected = await getBusinessBookingById(dayBooking.bookingId, business.id);
-    assert.equal(rejected?.rejectionReason, "Нет мест на выбранную дату",
+    const rejectedBookingDetail = await getBusinessBookingById(dayBooking.bookingId, business.id);
+    assert.equal(rejectedBookingDetail?.rejectionReason, "Нет мест на выбранную дату",
       "rejection reason persisted before transaction commits");
     const manualDate = await book({ publicationId: dateOnly.id, requestedDate: today });
     const manualDateRow = await prisma.bookingRequest.findUniqueOrThrow({ where: { id: manualDate.bookingId } });
