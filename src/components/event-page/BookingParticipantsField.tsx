@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { EventSeatMode } from "@/lib/booking/eventSeatPolicy";
 import { RS, RsChip, RsChipRow, RsInput, RsSection } from "@/components/request/requestSheetKit";
 import {
   BOOKING_CHILD_NAME_MAX,
@@ -26,6 +27,7 @@ type Props = {
   ageRule?: EventAgeRule | null;
   /** Ошибки ручных детей по key (после попытки отправки). */
   errors?: Record<string, string>;
+  seatMode?: EventSeatMode;
 };
 
 function profileChildLabel(child: ProfileChild): string {
@@ -46,7 +48,7 @@ function Warning({ text }: { text: string }) {
 }
 
 /** Блок «Кого записываем»: взрослые, дети из профиля и ручные дети. Данные детей — только возраст и имя. */
-export function BookingParticipantsField({ value, onChange, isAuthenticated, ageRule = null, errors = {} }: Props) {
+export function BookingParticipantsField({ value, onChange, isAuthenticated, ageRule = null, errors = {}, seatMode = "ALL" }: Props) {
   const [profile, setProfile] = useState<ProfileChild[]>([]);
 
   // Один запрос за детьми профиля — только для вошедших.
@@ -77,16 +79,16 @@ export function BookingParticipantsField({ value, onChange, isAuthenticated, age
 
   return (
     <RsSection
-      label="Кого записываем"
-      hint="Организатор увидит имя и возраст детей — больше ничего из вашего профиля."
+      label="Кто придёт на мероприятие"
+      hint="Контактное лицо не добавляется в участники автоматически. Укажите всех, кто действительно придёт. Из детского профиля передаём только имя и возраст."
     >
       <div className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-2.5" style={{ borderColor: RS.line2, background: "#fff" }}>
-        <span className="text-[15px]" style={{ color: RS.ink }}>Взрослые</span>
+        <span className="text-[15px]" style={{ color: RS.ink }}>{seatMode === "CHILDREN" ? "Взрослые сопровождающие" : "Взрослые участники"}</span>
         <div className="flex items-center gap-3">
           <button
             type="button"
             aria-label="Меньше взрослых"
-            disabled={value.adults <= 1}
+            disabled={value.adults <= 0}
             onClick={() => onChange({ ...value, adults: clampAdults(value.adults - 1) })}
             className="h-10 w-10 rounded-full border text-lg disabled:opacity-40"
             style={{ borderColor: RS.line2 }}

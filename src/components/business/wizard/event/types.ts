@@ -2,6 +2,7 @@
 
 import type { ActivityFormat, AgePolicy } from "@prisma/client";
 import type { EventFormatPreset } from "@/lib/business/eventFormatSignals";
+import type { EventSeatMode } from "@/lib/booking/eventSeatPolicy";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import type {
   AgeBucket,
@@ -152,6 +153,10 @@ export interface EventFormData {
   simpleBookingDate: string | null; // YYYY-MM-DD
   simpleBookingTime: string | null; // HH:mm–HH:mm
   simpleBookingCapacity: number | null;
+  /** One seat-accounting mode for every session in this event. */
+  eventSeatMode: EventSeatMode;
+  adultSeatCapacity: number | null;
+  childSeatCapacity: number | null;
   
   // Time slots (advanced)
   timeSlots: {

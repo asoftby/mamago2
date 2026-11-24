@@ -7,6 +7,7 @@ import { AgePolicy } from "@prisma/client";
 import type { Activity, ActivityFormat } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
+import { getEventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
 import {
   mapEventFormatsToSignals,
   resolveEventFormatsFromScheduleJson,
@@ -507,6 +508,10 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     typeof scheduleJson.simpleBookingCapacity === "number"
       ? scheduleJson.simpleBookingCapacity
       : null;
+  const seatPolicy = getEventSeatPolicy(scheduleJson);
+  formData.eventSeatMode = seatPolicy.mode;
+  formData.adultSeatCapacity = seatPolicy.adultsCapacity;
+  formData.childSeatCapacity = seatPolicy.childrenCapacity;
 
   const timeSlotsRaw = scheduleJson.timeSlots;
   formData.timeSlots =
@@ -836,6 +841,9 @@ export function buildEventPayload(data: EventFormData): EventPayload {
       simpleBookingDate: data.simpleBookingDate,
       simpleBookingTime: data.simpleBookingTime,
       simpleBookingCapacity: data.simpleBookingCapacity,
+      eventSeatMode: data.eventSeatMode,
+      adultSeatCapacity: data.adultSeatCapacity,
+      childSeatCapacity: data.childSeatCapacity,
       timeSlots: data.timeSlots,
 
       contacts: {
@@ -984,7 +992,10 @@ export function extractChanges(current: EventFormData, original: EventFormData):
     current.allDay !== original.allDay ||
     current.startTime !== original.startTime ||
     current.endTime !== original.endTime ||
-    current.repeatEnabled !== original.repeatEnabled
+    current.repeatEnabled !== original.repeatEnabled ||
+    current.eventSeatMode !== original.eventSeatMode ||
+    current.adultSeatCapacity !== original.adultSeatCapacity ||
+    current.childSeatCapacity !== original.childSeatCapacity
   ) {
     changes.scheduleJson = buildEventPayload(current).scheduleJson as Record<string, unknown> | undefined;
   }

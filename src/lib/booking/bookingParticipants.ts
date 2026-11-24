@@ -99,8 +99,11 @@ export function resolveParticipants(params: {
   now?: Date;
 }): ResolvedParticipants {
   const { adultsCount, children, profileChildren, now = new Date() } = params;
-  if (!Number.isInteger(adultsCount) || adultsCount < 1 || adultsCount > BOOKING_MAX_ADULTS) {
-    throw new BookingParticipantsError("adultsCount", `Взрослых должно быть от 1 до ${BOOKING_MAX_ADULTS}`);
+  if (!Number.isInteger(adultsCount) || adultsCount < 0 || adultsCount > BOOKING_MAX_ADULTS) {
+    throw new BookingParticipantsError("adultsCount", `Взрослых должно быть от 0 до ${BOOKING_MAX_ADULTS}`);
+  }
+  if (adultsCount === 0 && children.length === 0) {
+    throw new BookingParticipantsError("adultsCount", "Нужно указать хотя бы одного участника");
   }
   if (children.length > BOOKING_MAX_CHILDREN) {
     throw new BookingParticipantsError("children", `Не больше ${BOOKING_MAX_CHILDREN} детей в одной заявке`);

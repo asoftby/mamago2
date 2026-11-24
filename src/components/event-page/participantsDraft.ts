@@ -13,11 +13,11 @@ export type ParticipantsDraft = {
   manual: Array<{ key: string; age: string; name: string }>;
 };
 
-export const INITIAL_PARTICIPANTS_DRAFT: ParticipantsDraft = { adults: 1, profileChildIds: [], manual: [] };
+export const INITIAL_PARTICIPANTS_DRAFT: ParticipantsDraft = { adults: 0, profileChildIds: [], manual: [] };
 
 export function clampAdults(value: number): number {
-  if (!Number.isFinite(value)) return 1;
-  return Math.min(BOOKING_MAX_ADULTS, Math.max(1, Math.trunc(value)));
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(BOOKING_MAX_ADULTS, Math.max(0, Math.trunc(value)));
 }
 
 export function totalChildren(draft: ParticipantsDraft): number {

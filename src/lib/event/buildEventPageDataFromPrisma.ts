@@ -1,5 +1,6 @@
 import type { ActivityFormat, EventVenueKind } from "@prisma/client";
 import { eventAgeRuleFromActivity } from "@/lib/booking/bookingParticipants";
+import { getEventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
@@ -315,7 +316,7 @@ export function resolveSimpleBookingWithAgeRule(
   activity: ActivityForEventPageInput,
 ): EventPageData["cta"]["simpleBooking"] {
   const base = resolveSimpleBooking(activityId, activity);
-  return base ? { ...base, ageRule: eventAgeRuleFromActivity(activity) } : base;
+  return base ? { ...base, ageRule: eventAgeRuleFromActivity(activity), seatMode: getEventSeatPolicy(activity.scheduleJson).mode } : base;
 }
 
 export function resolveSimpleBooking(

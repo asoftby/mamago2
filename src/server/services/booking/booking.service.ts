@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import { resolveStandardSlotStart, standardResponseDeadline } from "@/lib/booking/standardResponseDeadline";
 import prisma from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { getEventSeatPolicy, calculateEventSeatAvailability, getEventSeatError } from "@/lib/booking/eventSeatPolicy";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
 import { reserveSlot, SlotReservationError } from "@/server/offers/reserveSlot";
@@ -24,6 +25,8 @@ import { childScopeFor } from "@/server/family/familyAccess";
 import { businessNotificationRecipients } from "./businessNotificationRecipients";
 import {
   BookingParticipantsError,
+  BOOKING_MAX_ADULTS,
+  BOOKING_MAX_CHILDREN,
   requestedProfileChildIds,
   resolveParticipants,
   type BookingChildInput,
@@ -691,6 +694,16 @@ async function createPublicationBooking(
   if (adultsCount + childrenCount < 1) {
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
+  // Public EVENT bookings always obey the family-size limit, including the
+  // legacy count-only API payload. Manual bookings retain business controls.
+  if (!manual && input.publicationType === PublicationType.EVENT) {
+    if (!Number.isSafeInteger(adultsCount) || adultsCount > BOOKING_MAX_ADULTS) {
+      throw new BookingValidationError("adultsCount", `Не больше ${BOOKING_MAX_ADULTS} взрослых в одной заявке`);
+    }
+    if (!Number.isSafeInteger(childrenCount) || childrenCount > BOOKING_MAX_CHILDREN) {
+      throw new BookingValidationError("childrenCount", `Не больше ${BOOKING_MAX_CHILDREN} детей в одной заявке`);
+    }
+  }
 
   // Event occurrences are auto-linked only after locking the Activity and
   // resolving the persisted session date/time. An early day-only match would
@@ -770,7 +783,7 @@ async function createPublicationBooking(
           throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
         }
         date = new Date(dateKey);
-        capacity = day.capacity;
+        capacity = day.capacity ?? activity.bookingCapacityPerSlot ?? undefined;
       } else if (manual && activity.bookingMode === BookingMode.USE_PUBLICATION_DATES) {
         const dateKey = date?.toISOString().slice(0, 10) ?? "";
         if (!dateKey || dateKey < getLocalDateKey() || input.selectedSessionId || time) {
@@ -784,6 +797,7 @@ async function createPublicationBooking(
           select: { id: true },
         });
         if (!session) throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
+        capacity = activity.bookingCapacityPerSlot ?? undefined;
       } else if (input.selectedSessionId) {
         const session = await tx.activitySession.findFirst({
           where: {
@@ -829,14 +843,22 @@ async function createPublicationBooking(
       if (duplicate) {
         throw new BookingValidationError("customerPhone", "Заявка на эту запись уже существует");
       }
-      if (capacity !== undefined) {
+      const seatPolicy = getEventSeatPolicy(activity.scheduleJson);
+      if (capacity !== undefined || seatPolicy.mode === "SEPARATE") {
         const { _sum } = await tx.bookingRequest.aggregate({
           where: active,
           _sum: { adultsCount: true, childrenCount: true },
         });
-        if ((_sum.adultsCount ?? 0) + (_sum.childrenCount ?? 0) + adultsCount + childrenCount > capacity) {
-          throw new BookingValidationError("selectedSessionId", "На выбранное время недостаточно мест");
-        }
+        const availability = calculateEventSeatAvailability({
+          policy: seatPolicy, capacity,
+          usedAdults: _sum.adultsCount ?? 0,
+          usedChildren: _sum.childrenCount ?? 0,
+        });
+        const error = getEventSeatError(availability, adultsCount, childrenCount, seatPolicy.mode);
+        if (error) throw new BookingValidationError("participants", error);
+      } else {
+        const error = getEventSeatError(null, adultsCount, childrenCount, seatPolicy.mode);
+        if (error) throw new BookingValidationError("participants", error);
       }
 
       const linkedPlanItemId = manual ? null : await ensureEventBookingPlanItem(tx, {

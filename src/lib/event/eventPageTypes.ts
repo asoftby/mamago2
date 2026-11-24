@@ -78,6 +78,8 @@ export type EventSimpleBookingData = {
   label?: string;
   /** Возрастное ограничение события — для мягкого предупреждения о возрасте детей. */
   ageRule?: import("@/lib/booking/bookingParticipants").EventAgeRule | null;
+  /** Legacy events default to ALL. */
+  seatMode?: import("@/lib/booking/eventSeatPolicy").EventSeatMode;
 };
 
 export type EventPageCtaConfig = {

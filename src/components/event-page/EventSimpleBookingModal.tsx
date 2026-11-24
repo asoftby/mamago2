@@ -8,10 +8,12 @@ import { z } from "zod";
 import { RS, RsChip, RsChipRow, RsConfirmBar, RsDateCards, RsInput, RsSection, RsSuccess, RsTextarea, RequestSheetFrame } from "@/components/request/requestSheetKit";
 import type { EventSimpleBookingData, EventBookingSlot } from "@/lib/event/eventPageTypes";
 import { BookingParticipantsField } from "./BookingParticipantsField";
+import { getEventSeatError, occupiedEventSeats, type EventSeatAvailability } from "@/lib/booking/eventSeatPolicy";
 import {
   INITIAL_PARTICIPANTS_DRAFT,
   participantsDraftToPayload,
   validateParticipantsDraft,
+  totalChildren,
   type ParticipantsDraft,
 } from "./participantsDraft";
 
@@ -62,7 +64,7 @@ function slotTimeLabel(slot: EventBookingSlot) {
   return slot.endTime ? `${slot.startTime}–${slot.endTime}` : slot.startTime;
 }
 
-type SlotSeats = Record<string, { capacity: number; remaining: number }>;
+type SlotSeats = Record<string, EventSeatAvailability>;
 
 /* ─────────────── main component ─────────────── */
 type Props = {
@@ -99,6 +101,8 @@ export function EventSimpleBookingModal({
   const [participants, setParticipants] = useState<ParticipantsDraft>(INITIAL_PARTICIPANTS_DRAFT);
   const [participantErrors, setParticipantErrors] = useState<Record<string, string>>({});
   const [seatsBySlot, setSeatsBySlot] = useState<SlotSeats>({});
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
+  const contactRef = useRef<HTMLDivElement | null>(null);
   const inFlight = useRef(false);
   const initialSlot = slots.find((slot) => slot.id === initialSessionId);
 
@@ -106,13 +110,17 @@ export function EventSimpleBookingModal({
   const selectedSlot = selectedDate?.slots.find((slot) => slot.id === (timeId || initialSlot?.id)) ?? selectedDate?.slots[0];
 
   const selectedSeats = selectedSlot ? seatsBySlot[selectedSlot.id] : undefined;
-  // The write API remains the transactional authority for remaining capacity.
-  const valid = (slots.length === 0 || Boolean(selectedSlot)) && selectedSeats?.remaining !== 0;
+  const seatMode = selectedSeats?.mode ?? booking.seatMode ?? "ALL";
+  const childrenCount = totalChildren(participants);
+  const requestedPlaces = occupiedEventSeats(seatMode, participants.adults, childrenCount);
+  const seatError = getEventSeatError(selectedSeats, participants.adults, childrenCount, seatMode);
+  // Advisory UX; transactional write remains authoritative.
+  const valid = (slots.length === 0 || Boolean(selectedSlot)) && !seatError;
 
   // Fetch advisory availability when the booking sheet opens, not during page view.
-  const hasTimedSlots = slots.some((slot) => Boolean(slot.startTime));
+  const hasBookableSlots = slots.length > 0;
   useEffect(() => {
-    if (!open || !hasTimedSlots) return;
+    if (!open || !hasBookableSlots) return;
     // Do not abort the request during sheet cleanup: a development AbortError
     // can surface in the React overlay. Ignore results after closing instead.
     let cancelled = false;
@@ -133,12 +141,24 @@ export function EventSimpleBookingModal({
     return () => {
       cancelled = true;
     };
-  }, [open, hasTimedSlots, booking.activityId]);
+  }, [open, hasBookableSlots, booking.activityId]);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { customerName: "", customerPhone: "", comment: "" },
   });
+
+  useEffect(() => {
+    if (apiError) {
+      errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      errorRef.current?.focus({ preventScroll: true });
+    }
+  }, [apiError]);
+  useEffect(() => {
+    if (errors.customerName || errors.customerPhone) {
+      contactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [errors.customerName, errors.customerPhone]);
 
   async function onSubmit(values: FormValues) {
     if (!valid || inFlight.current) return;
@@ -229,6 +249,7 @@ export function EventSimpleBookingModal({
         </RsSuccess>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          {apiError ? <p ref={errorRef} tabIndex={-1} role="alert" className="mb-4 rounded-2xl bg-[#FDECEA] px-4 py-3 text-sm font-semibold text-[#8C2A20]">{apiError}</p> : null}
           {dateGroups.length > 0 ? (
             <>
               <RsSection label="Дата">
@@ -240,6 +261,13 @@ export function EventSimpleBookingModal({
                     setTimeId(dateGroups.find((g) => g.isoDate === iso)?.slots[0]?.id ?? "");
                   }}
                 />
+                {!selectedSlot?.startTime && selectedSeats ? (
+                  <p role="status" className="mt-2 text-sm font-medium text-stone-700">
+                    {seatMode === "SEPARATE"
+                      ? `Свободно: взрослых мест — ${selectedSeats.adultsRemaining ?? 0}, детских — ${selectedSeats.childrenRemaining ?? 0}`
+                      : `Свободных мест: ${selectedSeats.remaining}`}
+                  </p>
+                ) : null}
               </RsSection>
               {selectedSlot?.startTime && selectedDate ? (
                 <RsSection label="Время">
@@ -252,7 +280,11 @@ export function EventSimpleBookingModal({
                   </RsChipRow>
                   {selectedSeats && (
                     <p role="status" className={`mt-2 text-xs font-medium ${selectedSeats.remaining === 0 ? "text-red-700" : "text-stone-600"}`}>
-                      Свободных мест: {selectedSeats.remaining}
+                      {seatMode === "SEPARATE"
+                        ? `Свободно: взрослых мест — ${selectedSeats.adultsRemaining ?? 0}, детских — ${selectedSeats.childrenRemaining ?? 0}`
+                        : seatMode === "CHILDREN" ? `Свободно детских мест: ${selectedSeats.remaining}`
+                        : seatMode === "ADULTS" ? `Свободно взрослых мест: ${selectedSeats.remaining}`
+                        : `Свободных мест: ${selectedSeats.remaining}`}
                     </p>
                   )}
                 </RsSection>
@@ -260,24 +292,38 @@ export function EventSimpleBookingModal({
             </>
           ) : null}
 
-          <RsSection label="Имя" error={errors.customerName?.message}>
+          <div ref={contactRef} className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
+            <h3 className="mb-2 text-base font-semibold text-stone-900">1. Контакт для связи</h3>
+            <p className="mb-3 text-sm text-stone-600">Организатор свяжется с вами по этому номеру. Контактное лицо не становится участником автоматически.</p>
+          <RsSection label="Имя контактного лица" error={errors.customerName?.message}>
             <RsInput placeholder="Как вас зовут" autoComplete="name" invalid={!!errors.customerName} {...register("customerName")} />
           </RsSection>
           <RsSection label="Телефон" error={errors.customerPhone?.message}>
             <RsInput type="tel" inputMode="tel" placeholder="+375 XX XXX-XX-XX" autoComplete="tel" invalid={!!errors.customerPhone} {...register("customerPhone")} />
           </RsSection>
+          </div>
+          <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
+            <h3 className="mb-2 text-base font-semibold text-stone-900">2. Участники</h3>
           <BookingParticipantsField
             value={participants}
             onChange={setParticipants}
             isAuthenticated={isAuthenticated}
             ageRule={booking.ageRule ?? null}
             errors={participantErrors}
+            seatMode={seatMode}
           />
+          <p className="mt-2 text-sm font-semibold text-stone-700" aria-live="polite">Придёт: {participants.adults} взрослых, {childrenCount} детей · Занимают {requestedPlaces} мест</p>
+          {seatError && participants.adults + childrenCount > 0 ? (
+            <p role="alert" className="mt-2 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{seatError}</p>
+          ) : null}
+          {participants.adults + childrenCount === 0 ? (
+            <p className="mt-2 text-xs text-stone-600">Добавьте хотя бы одного участника, чтобы отправить заявку.</p>
+          ) : null}
+          </div>
           <RsSection label="Комментарий" hint="необязательно" error={errors.comment?.message}>
             <RsTextarea rows={3} placeholder="Вопросы организатору…" {...register("comment")} />
           </RsSection>
-          {apiError ? <p role="alert" className="m-0 mb-3 rounded-2xl bg-[#FDECEA] px-4 py-3 text-sm font-semibold text-[#8C2A20]">{apiError}</p> : null}
-
+ 
           <RsConfirmBar
             summary={summary}
             label={selectedSlot ? "выбрано" : isRequest ? "заявка на участие" : "запись"}

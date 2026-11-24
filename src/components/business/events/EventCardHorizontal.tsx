@@ -12,6 +12,7 @@ import {
   Trash2,
   Calendar,
   BarChart3,
+  Users,
   Zap,
 } from "lucide-react";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
@@ -302,6 +303,13 @@ export function EventCardHorizontal({
         actions={
           <>
             <div className={BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW}>
+              <Link
+                href={`/business/events/${activity.id}/participants`}
+                className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_NEUTRAL)}
+              >
+                <Users className="h-4 w-4 shrink-0" />
+                Участники
+              </Link>
               <button
                 type="button"
                 onClick={() => setStatisticsOpen(true)}
