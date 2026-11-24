@@ -11,6 +11,8 @@ import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookin
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
 import { createManualBooking, createPublicBooking } from "./booking.service";
 import { getEventSlotAvailability } from "./eventSlotAvailability";
+import { getBusinessBookingDecisionAvailability } from "./bookingDecisionAvailability.service";
+import { BookingDecisionCapacityError, getBusinessBookingById } from "./bookingQuery.service";
 import { getBusinessBookings, updateBookingStatus } from "./bookingQuery.service";
 import { eventRosterWhere } from "@/lib/business/eventRosterScope";
 import { getBusinessInbox } from "./businessInbox.service";
@@ -258,6 +260,23 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.ok(kidsGroup.bookingId);
     assert.equal((await getEventSlotAvailability(childrenOnly.id))?.[childrenOnly.sessions[0]!.id]?.remaining, 0,
       "public availability must use children-only quota after group booking");
+    // A NEW request already occupies the last two child places. Remaining
+    // zero must not disable its confirmation in the business Mini App.
+    const decisionBefore = await getBusinessBookingDecisionAvailability(prisma, kidsGroup.bookingId, business.id);
+    assert.equal(decisionBefore?.remaining, 0);
+    assert.equal(decisionBefore?.canConfirm, true);
+    const shrunkSchedule = {
+      participationMode: "time-slots", eventSeatMode: "CHILDREN",
+      timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "16:00", capacity: 1 }] }] },
+    };
+    await prisma.activity.update({ where: { id: childrenOnly.id }, data: { scheduleJson: shrunkSchedule } });
+    assert.equal((await getBusinessBookingDecisionAvailability(prisma, kidsGroup.bookingId, business.id))?.canConfirm, false);
+    await assert.rejects(updateBookingStatus(kidsGroup.bookingId, business.id, "CONFIRMED"),
+      (err: unknown) => err instanceof BookingDecisionCapacityError,
+      "server confirmation rechecks changed capacity transactionally");
+    await prisma.activity.update({ where: { id: childrenOnly.id }, data: { scheduleJson: childrenOnly.scheduleJson! } });
+    await updateBookingStatus(kidsGroup.bookingId, business.id, "CONFIRMED");
+    assert.equal((await prisma.bookingRequest.findUniqueOrThrow({ where: { id: kidsGroup.bookingId } })).status, "CONFIRMED");
     await assert.rejects(createPublicBooking({
       publicationType: "EVENT", publicationId: childrenOnly.id,
       selectedSessionId: childrenOnly.sessions[0]!.id,
@@ -472,7 +491,12 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.ok((await getBusinessBookings({ businessId: business.id, date: new Date(date) }))
       .items.some((item) => item.id === manualSlot.bookingId && item.source === "MANUAL"));
     await assert.rejects(book({ publicationId: dateOnly.id, requestedDate: today }), /недостаточно мест/);
-    await updateBookingStatus(dayBooking.bookingId, business.id, "REJECTED");
+    await updateBookingStatus(dayBooking.bookingId, business.id, "REJECTED", {
+      actorId: owner.id, actorRole: "BUSINESS_OWNER", reason: "Нет мест на выбранную дату",
+    });
+    const rejected = await getBusinessBookingById(dayBooking.bookingId, business.id);
+    assert.equal(rejected?.rejectionReason, "Нет мест на выбранную дату",
+      "rejection reason persisted before transaction commits");
     const manualDate = await book({ publicationId: dateOnly.id, requestedDate: today });
     const manualDateRow = await prisma.bookingRequest.findUniqueOrThrow({ where: { id: manualDate.bookingId } });
     assert.equal(manualDateRow.requestedDate?.toISOString(), new Date(today).toISOString());
