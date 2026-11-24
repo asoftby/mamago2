@@ -32,7 +32,8 @@ export function composePromotedCards<T extends { isPromoted?: boolean }>(
     let p = 0;
 
     while (o < organic.length || f < free.length || p < paid.length) {
-      // A boosted item may lead a relevant group, followed by at least three\n      // organic cards before the next boosted slot. No absolute first-place guarantee.\n      const boostedSlot = o >= organic.length || result.length % 4 === 0;
+      // A boosted item may lead a relevant group, followed by at least three
+      // organic cards before the next boosted slot. No absolute first-place guarantee.\n      const boostedSlot = o >= organic.length || result.length % 4 === 0;
       if (p < paid.length && boostedSlot) result.push(paid[p++]);
       else if (f < free.length && boostedSlot) result.push(free[f++]);
       else result.push(organic[o++]);
