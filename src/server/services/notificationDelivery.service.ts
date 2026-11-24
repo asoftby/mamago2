@@ -346,8 +346,28 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
     // Route only BUSINESS audience through the separate bot, and only for
     // explicitly connected, currently authorized recipients. Never route
     // USER or ADMIN messages through the business bot.
+    // Booking notices must be tied to the business of the persisted order,
+    // not merely to whichever business bot this user connected last.
+    const bookingBusiness = notification.audience === "BUSINESS" &&
+      notification.entityType === "BOOKING" && notification.entityId
+      ? await prisma.bookingRequest.findUnique({
+          where: { id: notification.entityId },
+          select: { businessId: true },
+        })
+      : null;
+    if (notification.audience === "BUSINESS" &&
+        notification.entityType === "BOOKING" && !bookingBusiness?.businessId) {
+      await prisma.notificationDelivery.update({
+        where: { id: deliveryId },
+        data: { status: "SKIPPED", errorMessage: "BOOKING_BUSINESS_NOT_FOUND" },
+      });
+      return;
+    }
     const businessRecipient = notification.audience === "BUSINESS"
-      ? await getActiveBusinessTelegramRecipient(notification.userId)
+      ? await getActiveBusinessTelegramRecipient(
+          notification.userId,
+          bookingBusiness?.businessId ?? undefined,
+        )
       : null;
     // BUSINESS is isolated even when its dedicated bot is unconfigured,
     // disabled, or disconnected. Never leak a business notice to Info Bot.
