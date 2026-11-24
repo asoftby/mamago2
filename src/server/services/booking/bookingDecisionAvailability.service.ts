@@ -73,7 +73,7 @@ export async function getBusinessBookingDecisionAvailability(
   const request = await db.bookingRequest.findFirst({
     where: { id: bookingId, businessId, kind: BookingKind.STANDARD },
     select: {
-      status: true, activityId: true, publicationType: true,
+      status: true, activityId: true, publicationType: true, holdUntil: true,
       adultsCount: true, childrenCount: true,
       selectedSessionId: true, requestedDate: true, requestedTime: true,
       session: { select: { startsAt: true, withdrawnAt: true, isSaleOpen: true } },
@@ -81,6 +81,9 @@ export async function getBusinessBookingDecisionAvailability(
   });
   if (!request) return null;
   if (request.status !== BookingStatus.NEW) return unavailable("Заявка уже обработана");
+  if (request.holdUntil && request.holdUntil.getTime() <= now.getTime()) {
+    return unavailable("Срок резервирования истёк. Подтвердить эту заявку нельзя");
+  }
   if (request.publicationType !== PublicationType.EVENT || !request.activityId) {
     return { canConfirm: true, code: "NOT_APPLICABLE", message: "Для этой заявки учёт мест по сеансам не применяется", remaining: null, capacity: null };
   }

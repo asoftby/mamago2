@@ -9,7 +9,7 @@ import { allocationTransition } from "./allocationTransition";
 import { getBusinessBookingDecisionAvailability } from "./bookingDecisionAvailability.service";
 import { assertActiveBookingHold, BookingHoldExpiredError } from "./bookingHold";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
-import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
+import { BookingKind, BookingStatus, Prisma, PublicationType } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
 import type { BookingDisplay } from "./booking.types";
 import { recordStatusChanged } from "./bookingActivity.service";
@@ -583,6 +583,8 @@ export async function updateBookingStatus(
       id: true,
       businessId: true,
       kind: true,
+      publicationType: true,
+      activityId: true,
       status: true,
       createdAt: true,
       firstResponseAt: true,
@@ -645,9 +647,10 @@ export async function updateBookingStatus(
     // Lock Activity first, exactly like event booking creation, to prevent
     // confirmations racing a new booking or event-capacity edits. Locking a
     // request first and Activity second risks a deadlock with the create path.
-    if (newStatus === BookingStatus.CONFIRMED && existing.activity?.id) {
+    if (newStatus === BookingStatus.CONFIRMED &&
+        existing.publicationType === PublicationType.EVENT && existing.activityId) {
       await tx.$queryRaw`SELECT "id" FROM "Activity"
-        WHERE "id" = ${existing.activity.id} AND "businessId" = ${businessId} FOR UPDATE`;
+        WHERE "id" = ${existing.activityId} AND "businessId" = ${businessId} FOR UPDATE`;
     }
     // Serialize concurrent status updates for the same request before reading state.
     await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${bookingId} FOR UPDATE`;
@@ -665,7 +668,7 @@ export async function updateBookingStatus(
     // status update must not allow confirmation using a stale pre-lock clock.
     const checkedAt = new Date();
     assertActiveBookingHold(newStatus, current.holdUntil, checkedAt);
-    if (newStatus === BookingStatus.CONFIRMED && existing.activity?.id) {
+    if (newStatus === BookingStatus.CONFIRMED && existing.publicationType === PublicationType.EVENT) {
       const decision = await getBusinessBookingDecisionAvailability(tx, bookingId, businessId, checkedAt);
       if (!decision?.canConfirm) {
         throw new BookingDecisionCapacityError(
