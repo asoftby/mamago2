@@ -173,7 +173,6 @@ export async function getKudaDiscoveryFeed(
         where: { startAt: { lte: now }, endAt: { gt: now } },
         select: { id: true, isFreeDaily: true, purchaseRequestKey: true, targetRegionIds: true },
       },
-    },
   } satisfies Prisma.ActivityInclude;
 
   const queryOrder = [{ nextOccurrenceAt: { sort: "asc" as const, nulls: "last" as const } }, { createdAt: "desc" as const }, { id: "asc" as const }];
