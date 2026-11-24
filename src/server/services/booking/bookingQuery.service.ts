@@ -6,6 +6,7 @@
 import prisma from "@/lib/prisma";
 import { resolveBookingServiceEnd } from "@/lib/booking/effectiveServiceEnd";
 import { allocationTransition } from "./allocationTransition";
+import { getBusinessBookingDecisionAvailability } from "./bookingDecisionAvailability.service";
 import { assertActiveBookingHold, BookingHoldExpiredError } from "./bookingHold";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
@@ -550,6 +551,13 @@ export class BookingStatusTransitionError extends Error {
   }
 }
 
+export class BookingDecisionCapacityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BookingDecisionCapacityError";
+  }
+}
+
 export class BookingOwnershipError extends Error {
   constructor() {
     super("Заявка не принадлежит этому бизнесу");
@@ -634,6 +642,13 @@ export async function updateBookingStatus(
   // Keep the request status and its resource allocation in one transaction.
   // A confirmed booking must never lose its resource when the original hold expires.
   const updated = await prisma.$transaction(async (tx) => {
+    // Lock Activity first, exactly like event booking creation, to prevent
+    // confirmations racing a new booking or event-capacity edits. Locking a
+    // request first and Activity second risks a deadlock with the create path.
+    if (newStatus === BookingStatus.CONFIRMED && existing.activity?.id) {
+      await tx.$queryRaw`SELECT "id" FROM "Activity"
+        WHERE "id" = ${existing.activity.id} AND "businessId" = ${businessId} FOR UPDATE`;
+    }
     // Serialize concurrent status updates for the same request before reading state.
     await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${bookingId} FOR UPDATE`;
     const current = await tx.bookingRequest.findUnique({
@@ -650,6 +665,14 @@ export async function updateBookingStatus(
     // status update must not allow confirmation using a stale pre-lock clock.
     const checkedAt = new Date();
     assertActiveBookingHold(newStatus, current.holdUntil, checkedAt);
+    if (newStatus === BookingStatus.CONFIRMED && existing.activity?.id) {
+      const decision = await getBusinessBookingDecisionAvailability(tx, bookingId, businessId, checkedAt);
+      if (!decision?.canConfirm) {
+        throw new BookingDecisionCapacityError(
+          decision?.message ?? "Недостаточно мест. Обновите заявку перед подтверждением",
+        );
+      }
+    }
 
     const allocations = await tx.bookingAllocation.findMany({
       where: { bookingRequestId: bookingId },

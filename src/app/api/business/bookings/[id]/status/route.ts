@@ -19,6 +19,7 @@ import {
   updateBookingStatus,
   BookingStatusTransitionError,
   BookingOwnershipError,
+  BookingDecisionCapacityError,
 } from "@/server/services/booking/bookingQuery.service";
 import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
 import { businessBookingListProjection } from "@/server/services/booking/businessBookingContactProjection";
@@ -67,6 +68,9 @@ export async function PATCH(
   } catch (err) {
     if (err instanceof BookingOwnershipError) {
       return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    if (err instanceof BookingDecisionCapacityError) {
+      return NextResponse.json({ error: err.message, code: "EVENT_CAPACITY_CHANGED" }, { status: 409 });
     }
     if (err instanceof BookingHoldExpiredError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
