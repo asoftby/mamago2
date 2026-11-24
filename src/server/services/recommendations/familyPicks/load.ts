@@ -381,7 +381,7 @@ type PersonalExtras = {
   nextOccurrenceAt: Date | null;
   sessions: { startsAt: Date; withdrawnAt: Date | null; soldOut?: boolean }[];
   _count: { sessions: number };
-  boosts?: { isFreeDaily: boolean; targetRegionIds: string[] }[];
+  boosts?: { isFreeDaily: boolean; purchaseRequestKey: string | null; targetRegionIds: string[] }[];
 };
 
 /** An old plan visit must never suppress a future session of the same event. */
@@ -489,7 +489,7 @@ const personalDependencies: PersonalLoadDependencies = {
       id: true, businessId: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true, nextOccurrenceAt: true,
       priceMode: true, priceFrom: true, priceTo: true, currency: true,
       _count: { select: { sessions: true } },
-      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { isFreeDaily: true, targetRegionIds: true } },
+      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { isFreeDaily: true, purchaseRequestKey: true, targetRegionIds: true } },
       // Keep withdrawn rows to prevent fallback resurrecting a cancelled session.
       sessions: { where: { startsAt: { gte: range.start, lt: range.end } }, select: { startsAt: true, withdrawnAt: true } },
     },
