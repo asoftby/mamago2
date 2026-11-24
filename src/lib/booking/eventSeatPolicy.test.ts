@@ -8,7 +8,7 @@ assert.equal(occupiedEventSeats("CHILDREN", 1, 2), 2);
 assert.equal(occupiedEventSeats("ADULTS", 1, 2), 1);
 const total = calculateEventSeatAvailability({ policy: getEventSeatPolicy(null), capacity: 2, usedAdults: 0, usedChildren: 0 });
 assert.deepEqual(total, { capacity: 2, remaining: 2 });
-assert.ok(getEventSeatError(total, 1, 2, "ALL")?.includes("Нужно мест: 3"));
+assert.ok(getEventSeatError(total, 1, 2, "ALL")?.includes("Нужно: 3"));
 const kids = calculateEventSeatAvailability({ policy: getEventSeatPolicy({ eventSeatMode: "CHILDREN" }), capacity: 2, usedAdults: 2, usedChildren: 0 });
 assert.deepEqual(kids, { mode: "CHILDREN", capacity: 2, remaining: 2 });
 assert.equal(getEventSeatError(kids, 1, 2, "CHILDREN"), null);

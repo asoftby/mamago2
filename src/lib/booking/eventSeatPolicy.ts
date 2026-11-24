@@ -97,7 +97,7 @@ export function getEventSeatError(
   }
   const requested = occupiedEventSeats(mode, adults, children);
   if (requested > availability.remaining) {
-    return "Нужно мест: " + requested + ". Свободно: " + availability.remaining + ". Уменьшите количество участников";
+    return "На выбранное время недостаточно мест. Нужно: " + requested + ", свободно: " + availability.remaining + ". Уменьшите количество участников";
   }
   return null;
 }
