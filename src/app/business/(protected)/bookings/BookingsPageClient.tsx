@@ -777,6 +777,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
         selectedDate={selectedDate}
         selectedDayBucket={selectedDayBucket}
         sessionSummaries={selectedDaySummaries}
+        monthSummaries={calendarSummaries}
         monthGrid={monthGrid}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -950,6 +951,7 @@ function BookingsCalendarOverview({
   selectedDate,
   selectedDayBucket,
   sessionSummaries,
+  monthSummaries,
   monthGrid,
   viewMode,
   onViewModeChange,
@@ -964,6 +966,7 @@ function BookingsCalendarOverview({
   selectedDate: Date;
   selectedDayBucket: CalendarBookingBucket | null;
   sessionSummaries: EventCalendarSummary[];
+  monthSummaries: EventCalendarSummary[];
   monthGrid: CalendarCell[];
   viewMode: CalendarViewMode;
   onViewModeChange: (mode: CalendarViewMode) => void;
@@ -991,6 +994,7 @@ function BookingsCalendarOverview({
             monthAnchor={monthAnchor}
             selectedDate={selectedDate}
             calendarBuckets={calendarBuckets}
+            monthSummaries={monthSummaries}
             onSelectDate={onSelectDate}
           />
         </div>
@@ -1088,12 +1092,14 @@ function BookingMonthGrid({
   monthAnchor,
   selectedDate,
   calendarBuckets,
+  monthSummaries,
   onSelectDate,
 }: {
   cells: CalendarCell[];
   monthAnchor: Date;
   selectedDate: Date;
   calendarBuckets: Map<string, CalendarBookingBucket>;
+  monthSummaries: EventCalendarSummary[];
   onSelectDate: (date: Date) => void;
 }) {
   const selectedKey = toDateKey(selectedDate);
@@ -1101,6 +1107,13 @@ function BookingMonthGrid({
   const mobileCells = cells.filter((cell) => cell.date.getMonth() === monthAnchor.getMonth());
   const selectedMobileDayRef = useRef<HTMLButtonElement | null>(null);
   const visibleMonthKey = `${monthAnchor.getFullYear()}-${monthAnchor.getMonth()}`;
+  const participantsByDay = useMemo(() => {
+    const result = new Map<string, number>();
+    for (const entry of monthSummaries) {
+      result.set(entry.date, (result.get(entry.date) ?? 0) + entry.adults + entry.children);
+    }
+    return result;
+  }, [monthSummaries]);
 
   useEffect(() => {
     selectedMobileDayRef.current?.scrollIntoView({
@@ -1131,7 +1144,9 @@ function BookingMonthGrid({
               >
                 <span className="text-[11px] uppercase text-stone-400">{CALENDAR_WEEKDAYS[(cell.date.getDay() + 6) % 7]}</span>
                 <span className={cn("mt-1 font-semibold", isTodayCell && "text-sky-600")}>{cell.date.getDate()}</span>
-                <span className="mt-1 text-[10px] text-stone-400">{bucket?.total ? formatBookingsCount(bucket.total) : "—"}</span>
+                <span className="mt-1 text-[10px] text-stone-600">
+                  {participantsByDay.get(cell.key) ? participantsByDay.get(cell.key) + " чел." : bucket?.total ? formatBookingsCount(bucket.total) : "—"}
+                </span>
               </button>
             );
           })}
@@ -1157,6 +1172,7 @@ function BookingMonthGrid({
               key={cell.key}
               cell={cell}
               bucket={bucket}
+              eventPeople={participantsByDay.get(cell.key) ?? 0}
               isSelected={isSelected}
               isToday={isTodayCell}
               onClick={() => onSelectDate(cell.date)}
@@ -1173,6 +1189,7 @@ function BookingMonthGrid({
 function BookingCalendarDayCell({
   cell,
   bucket,
+  eventPeople,
   isSelected,
   isToday,
   isCurrentMonth,
@@ -1180,6 +1197,7 @@ function BookingCalendarDayCell({
 }: {
   cell: CalendarCell;
   bucket: CalendarBookingBucket | undefined;
+  eventPeople: number;
   isSelected: boolean;
   isToday: boolean;
   isCurrentMonth: boolean;
@@ -1208,10 +1226,11 @@ function BookingCalendarDayCell({
       </span>
 
       <div className="w-full space-y-2">
-        {bucket ? (
+        {bucket || eventPeople ? (
           <>
+            {eventPeople > 0 ? <p className="text-xs font-semibold text-sky-800">{eventPeople} участников</p> : null}
             <div className="flex flex-wrap items-center gap-1.5">
-              {bucket.statusDots.slice(0, 3).map((status) => (
+              {(bucket?.statusDots ?? []).slice(0, 3).map((status) => (
                 <span
                   key={`${cell.key}-${status}`}
                   className={cn("h-2.5 w-2.5 rounded-full", STATUS_META[status].dotClass)}
@@ -1221,7 +1240,7 @@ function BookingCalendarDayCell({
                 <span className="text-[11px] font-medium text-stone-400">+{extraCount}</span>
               ) : null}
             </div>
-            <div className="text-xs text-stone-400">{formatBookingsCount(bucket.total)}</div>
+            {bucket?.total ? <div className="text-xs text-stone-400">{formatBookingsCount(bucket.total)}</div> : null}
           </>
         ) : (
           <div className="text-xs text-stone-300">Нет записей</div>
