@@ -366,8 +366,8 @@ function validateStep6(data: EventFormData): ValidationResult {
     }
 
     if (data.eventSeatMode === "SEPARATE" &&
-      (!Number.isSafeInteger(data.adultSeatCapacity) || (data.adultSeatCapacity ?? -1) < 0 ||
-       !Number.isSafeInteger(data.childSeatCapacity) || (data.childSeatCapacity ?? -1) < 0 ||
+      (!Number.isSafeInteger(data.adultSeatCapacity ?? -1) || (data.adultSeatCapacity ?? -1) < 0 ||
+       !Number.isSafeInteger(data.childSeatCapacity ?? -1) || (data.childSeatCapacity ?? -1) < 0 ||
        (data.adultSeatCapacity ?? 0) + (data.childSeatCapacity ?? 0) < 1)) {
       errors.push("Укажите лимиты мест для взрослых и детей");
     }
