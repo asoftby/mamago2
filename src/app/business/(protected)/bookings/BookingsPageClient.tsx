@@ -423,6 +423,7 @@ function getQuickDateItems(baseDate: Date) {
 export function BookingsPageClient({ revision = 0 }: { revision?: number } = {}) {
   const [items, setItems] = useState<BusinessBookingItem[]>([]);
   const [calendarSummaries, setCalendarSummaries] = useState<EventCalendarSummary[]>([]);
+  const [summaryRefreshRevision, setSummaryRefreshRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<StatusFilter>("all");
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
@@ -562,7 +563,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
         }
       });
     return () => controller.abort();
-  }, [monthAnchor, revision]);
+  }, [monthAnchor, revision, summaryRefreshRevision]);
 
   // The bulk API deliberately excludes contacts and child names. Fetch just
   // the one selected order after a deliberate click; the detail API audits
@@ -611,6 +612,9 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
         setDetailRefreshRevision((version) => version + 1);
         toast.success("Статус обновлён");
 
+        // The calendar aggregate is a separate API from the capped inbox.
+        // After a successful confirmation/rejection, invalidate that query too.
+        setSummaryRefreshRevision((value) => value + 1);
         void fetchBookings();
         void refreshBusinessUnreadOnly({ force: true });
       } catch (err) {

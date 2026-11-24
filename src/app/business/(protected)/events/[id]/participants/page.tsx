@@ -9,7 +9,7 @@ import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { parseStoredChildren, formatChildLabel } from "@/lib/booking/bookingParticipants";
 import { calculateEventSeatAvailability, getEventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
-import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { eventRosterWhere, canShowEventRosterNames } from "@/lib/business/eventRosterScope";
 import { formatHHMM } from "@/lib/formatters/date";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
@@ -61,18 +61,39 @@ export default async function EventParticipantsPage({
     orderBy: { startsAt: "asc" },
     take: 150,
   });
-  const requestedSession = query.sessionId && !sessions.some((item) => item.id === query.sessionId)
+  const requestedDate = query.date && /^\d{4}-\d{2}-\d{2}$/.test(query.date) &&
+    !Number.isNaN(new Date(query.date).getTime()) &&
+    new Date(query.date).toISOString().slice(0, 10) === query.date ? query.date : null;
+  if (query.date && !requestedDate) notFound();
+  const listedSession = query.sessionId
+    ? sessions.find((s) => s.id === query.sessionId)
+    : requestedDate
+      ? sessions.find((s) => getLocalDateKey(s.startsAt) === requestedDate)
+      : undefined;
+  // Resolve explicitly requested occurrences outside the first 150 sessions.
+  // Never silently show another day if a date/deep link cannot be resolved.
+  const requestedSession = !listedSession && query.sessionId
     ? await prisma.activitySession.findFirst({
         where: { id: query.sessionId, activityId: id, withdrawnAt: null },
         select: { id: true, startsAt: true, title: true },
       })
-    : null;
+    : !listedSession && requestedDate
+      ? await prisma.activitySession.findFirst({
+          where: {
+            activityId: id, withdrawnAt: null,
+            startsAt: {
+              gte: localWallClockToUtc(requestedDate, "00:00"),
+              lt: localWallClockToUtc(addDaysLocal(requestedDate, 1), "00:00"),
+            },
+          },
+          select: { id: true, startsAt: true, title: true },
+          orderBy: { startsAt: "asc" },
+        })
+      : null;
+  if ((query.sessionId || requestedDate) && !listedSession && !requestedSession) notFound();
   if (requestedSession) sessions.push(requestedSession);
   sessions.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
-  const selected = sessions.find((s) => s.id === query.sessionId) ??
-    (query.date && /^\d{4}-\d{2}-\d{2}$/.test(query.date)
-      ? sessions.find((s) => getLocalDateKey(s.startsAt) === query.date)
-      : undefined) ??
+  const selected = listedSession ?? requestedSession ??
     sessions.find((s) => s.startsAt >= now) ?? sessions[sessions.length - 1];
   const page = safePage(query.page);
 
