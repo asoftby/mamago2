@@ -291,7 +291,7 @@ async function triggerBookingCreatedSideEffects(context: BookingSideEffectsConte
   for (const recipientUserId of recipients) promises.push(notifyBookingCreated({
     ownerUserId: recipientUserId,
     bookingId: context.bookingId,
-    waitForDelivery: context.entityType === "EVENT",
+    waitForDelivery: true,
     offerId: context.offerId ?? null,
     offerTitle: context.offerTitle ?? null,
     activityId: context.activityId ?? null,
@@ -448,7 +448,7 @@ export async function createPublicClassSlotBooking(input: {
   });
 
   if (!result.replayed) {
-    triggerBookingCreatedSideEffects({
+    await triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
@@ -986,7 +986,7 @@ async function createPublicationBooking(
     }, manual?.tx, manual?.actorId);
     if (manual) return result;
 
-    triggerBookingCreatedSideEffects({
+    await triggerBookingCreatedSideEffects({
       planItemId: planLink.planItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
@@ -1076,7 +1076,7 @@ async function createPublicationBooking(
   }, manual?.tx, manual?.actorId);
   if (manual) return result;
 
-  triggerBookingCreatedSideEffects({
+  await triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
@@ -1204,7 +1204,7 @@ export async function createCampShiftBooking(
     status: BookingStatus.NEW,
   });
 
-  triggerBookingCreatedSideEffects({
+  await triggerBookingCreatedSideEffects({
     bookingId: result.bookingId,
     userId: input.userId ?? null,
     entityType: "OFFER",
