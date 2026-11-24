@@ -697,7 +697,9 @@ export async function updateBookingStatus(
         ...(newStatus === BookingStatus.CONFIRMED && current.holdUntil
           ? { holdUntil: { gt: checkedAt } } : {}),
       },
-      data: { status: newStatus, ...derivedData },
+      data: { status: newStatus, ...derivedData,
+        ...(newStatus === BookingStatus.REJECTED ? { lastActivityAt: checkedAt } : {}),
+      },
     });
     if (result.count !== 1) {
       // Only NEW -> CONFIRMED can be guarded by holdUntil here.

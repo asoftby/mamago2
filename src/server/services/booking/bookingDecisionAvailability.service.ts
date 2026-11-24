@@ -76,7 +76,7 @@ export async function getBusinessBookingDecisionAvailability(
       status: true, activityId: true, publicationType: true,
       adultsCount: true, childrenCount: true,
       selectedSessionId: true, requestedDate: true, requestedTime: true,
-      session: { select: { startsAt: true } },
+      session: { select: { startsAt: true, withdrawnAt: true, isSaleOpen: true } },
     },
   });
   if (!request) return null;
@@ -92,6 +92,10 @@ export async function getBusinessBookingDecisionAvailability(
   if (!activity.bookingEnabled) return unavailable("Запись на событие отключена");
   if (activity.bookingMode === BookingMode.REQUEST_ONLY) {
     return { canConfirm: true, code: "NOT_APPLICABLE", message: "Это заявка без сеанса: отдельный лимит мест не настроен", remaining: null, capacity: null };
+  }
+  if (request.selectedSessionId &&
+      (!request.session || request.session.withdrawnAt || request.session.isSaleOpen === false)) {
+    return unavailable("Сеанс закрыт или отозван");
   }
   const calendar = getEventBookingSchedule(activity.scheduleJson, activity.bookingMode);
   const date = request.session ? getLocalDateKey(request.session.startsAt)

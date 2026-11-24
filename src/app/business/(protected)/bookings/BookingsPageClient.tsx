@@ -513,7 +513,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [searchParams]);
 
   useEffect(() => {
-    const idFromUrl = searchParams.get("id");
+    const idFromUrl = searchParams.get("id") ?? searchParams.get("request");
     if (idFromUrl) setSelectedBookingId(idFromUrl);
   }, [searchParams]);
 
@@ -677,7 +677,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   useEffect(() => {
     if (selectedBookingId &&
         !visibleItems.some((item) => item.id === selectedBookingId) &&
-        searchParams.get("id") !== selectedBookingId &&
+        (searchParams.get("id") ?? searchParams.get("request")) !== selectedBookingId &&
         selectedBookingDetail?.id !== selectedBookingId) {
       setSelectedBookingId(null);
     }
