@@ -9,6 +9,7 @@ import {
   evaluateAge,
   formatChildNames,
   selectFamilyPicks,
+  personalHomeBoostScore,
   type FamilyChild,
   type FamilyContext,
   type FamilyPickCandidate,
@@ -386,4 +387,12 @@ test("age filter keys cover each child with a known age", () => {
   const keys = ageFilterKeysForChildren([{ ageMonths: 60 }, { ageMonths: 20 }]);
   assert.ok(keys.length >= 2);
   assert.deepEqual(keys, [...new Set(keys)]);
+});
+
+
+test("HOME Boost strengthens paid over free over organic without guaranteeing first", () => {
+  assert.equal(personalHomeBoostScore(40, "NONE"), 40);
+  assert.equal(personalHomeBoostScore(40, "FREE"), 52);
+  assert.equal(personalHomeBoostScore(40, "PAID"), 70);
+  assert.ok(personalHomeBoostScore(100, "NONE") > personalHomeBoostScore(40, "PAID"));
 });

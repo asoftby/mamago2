@@ -22,6 +22,7 @@ import {
   expireBookingUnitHolds, isAllocationOverlapError, lockBookingUnits,
 } from "@/server/services/booking/resourceAllocation";
 import { childScopeFor } from "@/server/family/familyAccess";
+import { businessNotificationRecipients } from "./businessNotificationRecipients";
 import {
   BookingParticipantsError,
   BOOKING_MAX_ADULTS,
@@ -107,6 +108,7 @@ interface BookingSideEffectsContext {
   entityTitle: string | null;
   cityId: string | null;
   ownerUserId: string | null;
+  businessId: string | null;
   customerName: string;
   childName?: string | null;
   childAge?: number | null;
@@ -267,10 +269,32 @@ async function triggerBookingCreatedSideEffects(context: BookingSideEffectsConte
   }).catch((err) => console.error("[booking.service] analytics failed:", err));
 
   const promises: Promise<unknown>[] = [];
-  if (context.ownerUserId) promises.push(notifyBookingCreated({
-    ownerUserId: context.ownerUserId,
+  // Authorized staff may have connected the Business Bot instead of the owner.
+  // Notify active OWNER/MANAGER members too, with per-user dedup by bookingId.
+  const members = context.businessId ? await prisma.businessMember.findMany({
+    where: {
+      businessId: context.businessId,
+      isActive: true,
+      role: { in: ["OWNER", "MANAGER"] },
+      business: { operationalStatus: "ACTIVE" },
+    },
+    select: { userId: true },
+  }).catch((error) => {
+    console.error("[booking.service] business recipients lookup failed:", {
+      bookingId: context.bookingId, error,
+    });
+    return [] as Array<{ userId: string }>;
+  }) : [];
+  const recipients = businessNotificationRecipients(context.ownerUserId, members);
+  if (recipients.length === 0) {
+    console.error("[booking.service] no business notification recipient:", {
+      bookingId: context.bookingId, businessId: context.businessId,
+    });
+  }
+  for (const recipientUserId of recipients) promises.push(notifyBookingCreated({
+    ownerUserId: recipientUserId,
     bookingId: context.bookingId,
-    waitForDelivery: context.entityType === "EVENT",
+    waitForDelivery: true,
     offerId: context.offerId ?? null,
     offerTitle: context.offerTitle ?? null,
     activityId: context.activityId ?? null,
@@ -427,7 +451,7 @@ export async function createPublicClassSlotBooking(input: {
   });
 
   if (!result.replayed) {
-    triggerBookingCreatedSideEffects({
+    await triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
@@ -436,6 +460,7 @@ export async function createPublicClassSlotBooking(input: {
     entityTitle: offer.title,
     cityId: offer.place.cityId ?? null,
     ownerUserId: offer.place.ownerBusiness?.ownerUserId ?? null,
+    businessId: offer.place.ownerBusinessId,
     customerName,
     childName: child?.name?.trim() || null,
     childAge,
@@ -885,6 +910,7 @@ async function createPublicationBooking(
       entityTitle: activity.title,
       cityId: activity.cityId ?? null,
       ownerUserId: activity.business?.ownerUserId ?? null,
+      businessId: activity.businessId,
       customerName,
       activityId: activity.id,
       activityTitle: activity.title,
@@ -982,7 +1008,7 @@ async function createPublicationBooking(
     }, manual?.tx, manual?.actorId);
     if (manual) return result;
 
-    triggerBookingCreatedSideEffects({
+    await triggerBookingCreatedSideEffects({
       planItemId: planLink.planItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
@@ -991,6 +1017,7 @@ async function createPublicationBooking(
       entityTitle: offer.title,
       cityId: offer.place.cityId ?? null,
       ownerUserId: offer.place.ownerBusiness?.ownerUserId ?? null,
+      businessId: offer.place.ownerBusinessId,
       customerName,
       offerId: offer.id,
       offerTitle: offer.title,
@@ -1071,7 +1098,7 @@ async function createPublicationBooking(
   }, manual?.tx, manual?.actorId);
   if (manual) return result;
 
-  triggerBookingCreatedSideEffects({
+  await triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
@@ -1080,6 +1107,7 @@ async function createPublicationBooking(
     entityTitle: place.title,
     cityId: place.cityId ?? null,
     ownerUserId: place.ownerBusiness?.ownerUserId ?? null,
+    businessId: place.ownerBusinessId,
     customerName,
     placeId: place.id,
     placeTitle: place.title,
@@ -1198,7 +1226,7 @@ export async function createCampShiftBooking(
     status: BookingStatus.NEW,
   });
 
-  triggerBookingCreatedSideEffects({
+  await triggerBookingCreatedSideEffects({
     bookingId: result.bookingId,
     userId: input.userId ?? null,
     entityType: "OFFER",
@@ -1206,6 +1234,7 @@ export async function createCampShiftBooking(
     entityTitle: offer.title ?? null,
     cityId: offer.place?.cityId ?? null,
     ownerUserId: offer.place?.ownerBusiness?.ownerUserId ?? null,
+    businessId: offer.place?.ownerBusinessId ?? null,
     customerName,
     childName: normalizeOptionalString(input.childName),
     childAge: input.childAge ?? null,
