@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import type { EventCalendarSummary } from "@/lib/business/eventCalendarSummary";
+
 import { formatChildLabel, formatParticipantsLine } from "@/lib/booking/bookingParticipants";
 import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
@@ -419,6 +422,7 @@ function getQuickDateItems(baseDate: Date) {
 
 export function BookingsPageClient({ revision = 0 }: { revision?: number } = {}) {
   const [items, setItems] = useState<BusinessBookingItem[]>([]);
+  const [calendarSummaries, setCalendarSummaries] = useState<EventCalendarSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<StatusFilter>("all");
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
@@ -539,6 +543,29 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
     void fetchBookings();
   }, [fetchBookings, revision]);
 
+  // Accurate per-session attendance is aggregated on the server; the generic
+  // bookings inbox is deliberately capped at 200 rows and strips PII.
+  useEffect(() => {
+    const controller = new AbortController();
+    const from = toDateKey(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1));
+    const to = toDateKey(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1));
+    void fetch("/api/business/bookings/calendar-summary?from=" + from + "&to=" + to, {
+      credentials: "include", cache: "no-store", signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json() as Promise<{ slots: EventCalendarSummary[] }>;
+      })
+      .then((body) => { if (!controller.signal.aborted) setCalendarSummaries(body.slots ?? []); })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.error("[BookingsPageClient] calendar event summary", error);
+          setCalendarSummaries([]);
+        }
+      });
+    return () => controller.abort();
+  }, [monthAnchor, revision]);
+
   // The bulk API deliberately excludes contacts and child names. Fetch just
   // the one selected order after a deliberate click; the detail API audits
   // any active customer-contact disclosure before returning it.
@@ -599,6 +626,10 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   const calendarBuckets = useMemo(() => buildCalendarBuckets(items), [items]);
   const selectedDateKey = toDateKey(selectedDate);
   const selectedDayBucket = calendarBuckets.get(selectedDateKey) ?? null;
+  const selectedDaySummaries = useMemo(
+    () => calendarSummaries.filter((item) => item.date === selectedDateKey),
+    [calendarSummaries, selectedDateKey],
+  );
   const monthGrid = useMemo(() => getMonthGrid(monthAnchor), [monthAnchor]);
 
   const counts = useMemo<BookingStatusCounts>(() => {
@@ -745,6 +776,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
         monthAnchor={monthAnchor}
         selectedDate={selectedDate}
         selectedDayBucket={selectedDayBucket}
+        sessionSummaries={selectedDaySummaries}
         monthGrid={monthGrid}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -917,6 +949,7 @@ function BookingsCalendarOverview({
   monthAnchor,
   selectedDate,
   selectedDayBucket,
+  sessionSummaries,
   monthGrid,
   viewMode,
   onViewModeChange,
@@ -930,6 +963,7 @@ function BookingsCalendarOverview({
   monthAnchor: Date;
   selectedDate: Date;
   selectedDayBucket: CalendarBookingBucket | null;
+  sessionSummaries: EventCalendarSummary[];
   monthGrid: CalendarCell[];
   viewMode: CalendarViewMode;
   onViewModeChange: (mode: CalendarViewMode) => void;
@@ -965,6 +999,7 @@ function BookingsCalendarOverview({
           <BookingCalendarDayPanel
             selectedDate={selectedDate}
             bucket={selectedDayBucket}
+            sessionSummaries={sessionSummaries}
             onViewAll={() => onViewAllForDate(selectedDate)}
           />
         </div>
@@ -1199,15 +1234,19 @@ function BookingCalendarDayCell({
 function BookingCalendarDayPanel({
   selectedDate,
   bucket,
+  sessionSummaries,
   onViewAll,
 }: {
   selectedDate: Date;
   bucket: CalendarBookingBucket | null;
+  sessionSummaries: EventCalendarSummary[];
   onViewAll: () => void;
 }) {
   const bookings = bucket?.bookings ?? [];
   const visible = bookings.slice(0, 5);
-  const label = bookings.length === 0 ? "Нет записей" : formatBookingsCount(bookings.length);
+  const eventBookings = sessionSummaries.reduce((sum, item) => sum + item.bookings, 0);
+  const totalPeople = sessionSummaries.reduce((sum, item) => sum + item.adults + item.children, 0);
+  const label = Math.max(bookings.length, eventBookings) === 0 ? "Нет записей" : formatBookingsCount(Math.max(bookings.length, eventBookings));
 
   return (
     <div className="flex h-full min-h-[320px] flex-col p-4 sm:min-h-[580px] sm:p-6">
@@ -1215,13 +1254,18 @@ function BookingCalendarDayPanel({
         <div>
           <h3 className="text-lg font-semibold text-stone-950">{formatCalendarHeaderDate(selectedDate)}</h3>
           <p className="mt-1 text-sm text-stone-500">Записи выбранного дня</p>
+          {sessionSummaries.length ? (
+            <p className="mt-1 text-sm font-semibold text-stone-800">
+              События: {eventBookings} заявок · {totalPeople} участников
+            </p>
+          ) : null}
         </div>
         <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
           {label}
         </span>
       </div>
 
-      {bookings.length === 0 ? (
+      {bookings.length === 0 && sessionSummaries.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <CalendarDays className="h-10 w-10 text-stone-300" />
           <div className="mt-4 text-base font-semibold text-stone-700">На эту дату записей нет</div>
@@ -1230,6 +1274,30 @@ function BookingCalendarDayPanel({
       ) : (
         <>
           <div className="mt-4 flex-1 space-y-3">
+            {sessionSummaries.length > 0 ? (
+              <div className="space-y-2 rounded-2xl border border-sky-100 bg-sky-50/70 p-3">
+                <h4 className="text-sm font-semibold text-stone-900">События и участники</h4>
+                {sessionSummaries.map((session) => (
+                  <div key={session.activityId + "|" + session.date + "|" + session.time} className="rounded-xl bg-white p-3">
+                    <div className="text-sm font-semibold text-stone-900">
+                      {session.time ? session.time + " · " : ""}{session.title}
+                    </div>
+                    <p className="mt-1 text-sm text-stone-600">
+                      {session.bookings} заявок · {session.adults} взрослых · {session.children} детей
+                    </p>
+                    <p className="mt-1 text-xs text-stone-500">
+                      {session.confirmedCount} подтверждено · {session.newCount} ожидают
+                    </p>
+                    {session.sessionId ? (
+                      <Link
+                        href={"/business/events/" + encodeURIComponent(session.activityId) + "/participants?sessionId=" + encodeURIComponent(session.sessionId)}
+                        className="mt-2 inline-flex min-h-9 items-center rounded-full border border-stone-200 px-3 text-xs font-semibold text-stone-800"
+                      >Все участники</Link>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {visible.map((booking) => (
               <div key={booking.id} className="rounded-[22px] border border-stone-200 bg-stone-50/70 p-4">
                 <div className="flex items-start gap-3">
@@ -1245,7 +1313,7 @@ function BookingCalendarDayPanel({
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-stone-500">
-                      {booking.customerName}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
+                      {booking.customerName} · {booking.adultsCount} взрослых · {booking.childrenCount} детей{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", STATUS_META[booking.status].chipClass)}>
