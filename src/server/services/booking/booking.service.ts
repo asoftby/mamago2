@@ -21,6 +21,7 @@ import {
   expireBookingUnitHolds, isAllocationOverlapError, lockBookingUnits,
 } from "@/server/services/booking/resourceAllocation";
 import { childScopeFor } from "@/server/family/familyAccess";
+import { businessNotificationRecipients } from "./businessNotificationRecipients";
 import {
   BookingParticipantsError,
   requestedProfileChildIds,
@@ -281,9 +282,8 @@ async function triggerBookingCreatedSideEffects(context: BookingSideEffectsConte
     });
     return [] as Array<{ userId: string }>;
   }) : [];
-  const recipients = new Set(members.map((member) => member.userId));
-  if (context.ownerUserId) recipients.add(context.ownerUserId);
-  if (recipients.size === 0) {
+  const recipients = businessNotificationRecipients(context.ownerUserId, members);
+  if (recipients.length === 0) {
     console.error("[booking.service] no business notification recipient:", {
       bookingId: context.bookingId, businessId: context.businessId,
     });
