@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { buildEventCalendarSummary } from "@/lib/business/eventCalendarSummary";
+import { localWallClockToUtc } from "@/lib/date/localDateKey";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -26,6 +27,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Ожидаются from/to и период до 45 дней" }, { status: 400 });
   }
   try {
+    // Booking-request calendar snapshots are UTC midnight, but ActivitySession
+    // timestamps are instants in Minsk time. Use explicit local bounds.
+    const sessionFrom = localWallClockToUtc(from.toISOString().slice(0, 10), "00:00");
+    const sessionTo = localWallClockToUtc(to.toISOString().slice(0, 10), "00:00");
     // One grouped DB query, not the truncated general inbox list.
     const groups = await prisma.bookingRequest.groupBy({
       by: ["activityId", "selectedSessionId", "requestedDate", "requestedTime", "status"],
@@ -34,7 +39,7 @@ export async function GET(request: NextRequest) {
         publicationType: PublicationType.EVENT, activityId: { not: null },
         status: { in: [BookingStatus.NEW, BookingStatus.CONFIRMED] },
         OR: [
-          { session: { startsAt: { gte: from, lt: to } } },
+          { session: { startsAt: { gte: sessionFrom, lt: sessionTo } } },
           { requestedDate: { gte: from, lt: to } },
         ],
       },
