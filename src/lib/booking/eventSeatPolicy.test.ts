@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { calculateEventSeatAvailability, getEventSeatError, getEventSeatPolicy, occupiedEventSeats } from "./eventSeatPolicy";
+import { calculateEventSeatAvailability, getEventSeatError, getEventSeatPolicy, occupiedEventSeats, validateEventSeatConfiguration } from "./eventSeatPolicy";
 
 assert.deepEqual(getEventSeatPolicy(null), { mode: "ALL", adultsCapacity: null, childrenCapacity: null });
 assert.equal(getEventSeatPolicy({ eventSeatMode: "unknown" }).mode, "ALL");
@@ -26,4 +26,14 @@ assert.ok(getEventSeatError(split, 1, 3, "SEPARATE")?.includes("детских")
 assert.equal(getEventSeatError(null, 0, 0, "ALL"), "Укажите хотя бы одного участника");
 assert.equal(getEventSeatError(null, 1, 0, "CHILDREN"), "Добавьте хотя бы одного ребёнка");
 assert.equal(getEventSeatError(null, 0, 1, "ADULTS"), "Добавьте хотя бы одного взрослого");
+assert.equal(validateEventSeatConfiguration(null), null, "legacy event has no seat mode");
+assert.equal(validateEventSeatConfiguration({ eventSeatMode: "ALL" }), null);
+assert.equal(validateEventSeatConfiguration({ eventSeatMode: "CHILDREN" }), null);
+assert.equal(validateEventSeatConfiguration({ eventSeatMode: "invalid" }), "Некорректный режим учёта мест");
+assert.ok(validateEventSeatConfiguration({ eventSeatMode: "SEPARATE", childSeatCapacity: 3 }));
+assert.ok(validateEventSeatConfiguration({ eventSeatMode: "SEPARATE", childSeatCapacity: -1, adultSeatCapacity: 2 }));
+assert.ok(validateEventSeatConfiguration({ eventSeatMode: "SEPARATE", childSeatCapacity: 3.5, adultSeatCapacity: 1 }));
+assert.ok(validateEventSeatConfiguration({ eventSeatMode: "SEPARATE", childSeatCapacity: 0, adultSeatCapacity: 0 }));
+assert.ok(validateEventSeatConfiguration({ eventSeatMode: "SEPARATE", childSeatCapacity: 2, adultSeatCapacity: 10001 }));
+assert.equal(validateEventSeatConfiguration({ eventSeatMode: "SEPARATE", childSeatCapacity: 2, adultSeatCapacity: 0 }), null);
 console.log("eventSeatPolicy: ok");

@@ -21,6 +21,30 @@ function nonNegativeInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
+/**
+ * Business write contract for event seat quotas. The wizard validates these
+ * controls, but every authenticated API caller must meet the same invariant.
+ * Missing eventSeatMode is valid for legacy events (defaults to ALL).
+ */
+export function validateEventSeatConfiguration(scheduleJson: unknown): string | null {
+  const data = scheduleJson && typeof scheduleJson === "object" && !Array.isArray(scheduleJson)
+    ? scheduleJson as Record<string, unknown>
+    : {};
+  const raw = data.eventSeatMode;
+  if (raw === undefined || raw === null) return null;
+  if (!EVENT_SEAT_MODES.some((mode) => mode === raw)) {
+    return "Некорректный режим учёта мест";
+  }
+  if (raw !== "SEPARATE") return null;
+  const validQuota = (value: unknown) =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 10_000;
+  if (!validQuota(data.adultSeatCapacity) || !validQuota(data.childSeatCapacity) ||
+      (data.adultSeatCapacity as number) + (data.childSeatCapacity as number) < 1) {
+    return "Укажите корректные лимиты мест для взрослых и детей (0–10000, хотя бы одно место)";
+  }
+  return null;
+}
+
 /** Old events deliberately default to ALL, preserving existing booking logic. */
 export function getEventSeatPolicy(scheduleJson: unknown): EventSeatPolicy {
   const data = scheduleJson && typeof scheduleJson === "object" && !Array.isArray(scheduleJson)
