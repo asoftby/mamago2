@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { BookingKind, BookingStatus, PublicationType } from "@prisma/client";
+import { BookingKind, BookingMode, BookingStatus, PublicationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
@@ -36,7 +36,7 @@ export default async function EventParticipantsPage({
   params, searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sessionId?: string; page?: string }>;
+  searchParams: Promise<{ sessionId?: string; date?: string; page?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -70,6 +70,9 @@ export default async function EventParticipantsPage({
   if (requestedSession) sessions.push(requestedSession);
   sessions.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const selected = sessions.find((s) => s.id === query.sessionId) ??
+    (query.date && /^\d{4}-\d{2}-\d{2}$/.test(query.date)
+      ? sessions.find((s) => getLocalDateKey(s.startsAt) === query.date)
+      : undefined) ??
     sessions.find((s) => s.startsAt >= now) ?? sessions[sessions.length - 1];
   const page = safePage(query.page);
 
@@ -95,7 +98,7 @@ export default async function EventParticipantsPage({
     status: { in: ACTIVE_STATUSES },
     OR: [
       { selectedSessionId: selected.id },
-      { selectedSessionId: null, requestedDate: new Date(slotDate), requestedTime: slotTime },
+      { selectedSessionId: null, requestedDate: new Date(slotDate), requestedTime: activity.bookingMode === BookingMode.USE_PUBLICATION_DATES ? null : slotTime },
     ],
   };
   // Counts use a full aggregate, never the 200-row generic bookings inbox.

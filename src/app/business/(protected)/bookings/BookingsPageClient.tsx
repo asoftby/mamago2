@@ -1288,12 +1288,11 @@ function BookingCalendarDayPanel({
                     <p className="mt-1 text-xs text-stone-500">
                       {session.confirmedCount} подтверждено · {session.newCount} ожидают
                     </p>
-                    {session.sessionId ? (
-                      <Link
-                        href={"/business/events/" + encodeURIComponent(session.activityId) + "/participants?sessionId=" + encodeURIComponent(session.sessionId)}
-                        className="mt-2 inline-flex min-h-9 items-center rounded-full border border-stone-200 px-3 text-xs font-semibold text-stone-800"
-                      >Все участники</Link>
-                    ) : null}
+                    <Link
+                      href={"/business/events/" + encodeURIComponent(session.activityId) + "/participants?" +
+                        (session.sessionId ? "sessionId=" + encodeURIComponent(session.sessionId) : "date=" + encodeURIComponent(session.date))}
+                      className="mt-2 inline-flex min-h-9 items-center rounded-full border border-stone-200 px-3 text-xs font-semibold text-stone-800"
+                    >Все участники</Link>
                   </div>
                 ))}
               </div>
