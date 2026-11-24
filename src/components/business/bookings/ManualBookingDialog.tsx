@@ -429,7 +429,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
               </select>
             </label>
             {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-            <Button type="submit" className="min-h-11" disabled={!ready || busy}>
+            <Button variant="business" type="submit" className="min-h-11" disabled={!ready || busy}>
               {busy ? "Сохраняем…" : "Добавить запись"}
             </Button>
           </fieldset>

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Clock3, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getBoostRemainingMinutes, formatBoostCountdown } from "@/lib/promotion/boostCountdown";
+import { useBoostCountdown } from "@/lib/promotion/useBoostCountdown";
 import {
   Dialog,
   DialogContent,
@@ -52,34 +52,18 @@ export function BoostLauncher({
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null);
+  const { remainingMs, label: liveCountdown } = useBoostCountdown(cooldownUntil);
+  const refreshedForDeadline = useRef<string | null>(null);
 
+  // One server re-check at expiry; no API polling while seconds tick locally.
   useEffect(() => {
-    // Without an active free Boost nothing is displayed from remainingMinutes
-    // (coolingDown requires cooldownUntil), so no state reset is needed here.
-    if (!cooldownUntil) return;
-    const nextAt = Date.parse(cooldownUntil);
-    if (!Number.isFinite(nextAt)) return;
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-    let refreshed = false;
-    const update = () => {
-      const remaining = getBoostRemainingMinutes(cooldownUntil, Date.now());
-      setRemainingMinutes(remaining);
-      if (remaining === 0 && !refreshed) {
-        refreshed = true;
-        if (intervalId) clearInterval(intervalId);
-        // Re-read server eligibility/quota when an active free Boost finishes.
-        router.refresh();
-      }
-    };
-    update();
-    // One browser-only timer per active FREE Boost, no API polling.
-    if (!refreshed) intervalId = setInterval(update, 15_000);
-    return () => { if (intervalId) clearInterval(intervalId); };
-  }, [cooldownUntil, router]);
+    if (!cooldownUntil || remainingMs !== 0 || refreshedForDeadline.current === cooldownUntil) return;
+    refreshedForDeadline.current = cooldownUntil;
+    router.refresh();
+  }, [cooldownUntil, remainingMs, router]);
 
-  const coolingDown = Boolean(cooldownUntil) && remainingMinutes !== 0;
-  const countdownLabel = remainingMinutes === null ? "24:00" : formatBoostCountdown(remainingMinutes);
+  const coolingDown = Boolean(cooldownUntil) && remainingMs !== 0;
+  const countdownLabel = liveCountdown ?? "--:--:--";
 
   function showDialog() {
     if (disabled || coolingDown) return;
@@ -151,7 +135,7 @@ export function BoostLauncher({
         onClick={showDialog}
         disabled={disabled || coolingDown}
         aria-label={coolingDown ? `Бесплатный Boost через ${countdownLabel}` : undefined}
-        title={coolingDown ? "Следующее бесплатное поднятие" : undefined}
+        title={coolingDown ? "До завершения активного бесплатного Boost" : undefined}
         className={cn(className, "disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none disabled:hover:bg-stone-200")}
       >
         {coolingDown ? (

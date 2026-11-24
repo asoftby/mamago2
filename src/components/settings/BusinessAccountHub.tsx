@@ -17,21 +17,41 @@ export function BusinessAccountHub({ context }: { context: SettingsContext }) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-sm divide-y divide-neutral-100">
-      <SettingsLinkRow href={`${base}/profile`} icon={User} label="Имя и аватар" description={name} />
+      <SettingsLinkRow
+        href={`${base}/profile`}
+        icon={User}
+        label="Имя и аватар"
+        description={name}
+        iconTone="business"
+      />
       <SettingsLinkRow
         href={`${base}/email`}
         icon={Mail}
         label="Email"
         description={context.viewer.email}
         badge={context.viewer.emailVerifiedAt ? undefined : "не подтверждён"}
+        iconTone="business"
       />
-      <SettingsLinkRow href={`${base}/password`} icon={Lock} label="Пароль" description="Сменить пароль" />
-      <SettingsLinkRow href={`${base}/phone`} icon={Smartphone} label="Телефон" description={phone} />
+      <SettingsLinkRow
+        href={`${base}/password`}
+        icon={Lock}
+        label="Пароль"
+        description="Сменить пароль"
+        iconTone="business"
+      />
+      <SettingsLinkRow
+        href={`${base}/phone`}
+        icon={Smartphone}
+        label="Телефон"
+        description={phone}
+        iconTone="business"
+      />
       <SettingsLinkRow
         href={`${base}/privacy`}
         icon={Shield}
         label="Конфиденциальность"
         description="Управляйте данными и удалением аккаунта"
+        iconTone="business"
       />
     </div>
   );

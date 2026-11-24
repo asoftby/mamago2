@@ -178,6 +178,7 @@ export default async function BusinessDashboardPage({
     businessName: business.name,
     legalName: business.legalName ?? null,
     city: null, // TODO: add city to Business model or derive from places
+    verificationStatus,
     depositBalance: balance,
     periodSpend: workspace.periodSpend,
     lowBalanceThreshold,

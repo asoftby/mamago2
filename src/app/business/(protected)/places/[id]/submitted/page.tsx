@@ -65,7 +65,7 @@ export default async function PlaceSubmittedPage({
         </p>
 
         <div className="space-y-3">
-          <Button asChild className="w-full" size="lg">
+          <Button variant="business" asChild className="w-full" size="lg">
             <Link href={isRevisionSubmission ? `/editor/place/${id}/edit` : "/business/places"}>
               {isRevisionSubmission ? "Вернуться к публикации" : "Перейти к списку мест"}
             </Link>

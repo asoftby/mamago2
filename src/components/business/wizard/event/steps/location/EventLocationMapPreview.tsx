@@ -25,7 +25,7 @@ export function EventLocationMapPreview({ lat, lng, onOpenMap }: EventLocationMa
         title="Предпросмотр выбранного местоположения"
       />
 
-      <Button
+      <Button variant="business"
         type="button"
         onClick={onOpenMap}
         className="absolute bottom-4 right-4 rounded-full shadow-lg"

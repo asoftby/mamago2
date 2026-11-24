@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, Circle, Eye, MapPin, MessageCircle, Tag, BarChart3 } from "lucide-react";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BUSINESS_CTA_SOLID } from "@/components/business/ui/businessCta";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
+import { cn } from "@/lib/utils";
 import { BusinessInboxPreview } from "./BusinessInboxPreview";
 import { sendBusinessOnboardingAction } from "./BusinessOnboardingTour";
 import type { DashboardData } from "./DashboardClient";
@@ -88,17 +90,17 @@ export function NewBusinessDashboard({ data }: Props) {
         <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="space-y-5" data-business-tour="create">
             {!hasLive && draftLink ? (
-              <Link href={draftLink} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:w-auto">
+              <Link href={draftLink} className={cn("inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold sm:w-auto", BUSINESS_CTA_SOLID)}>
                 Продолжить черновик <ArrowRight className="h-4 w-4" />
               </Link>
             ) : !hasLive && hasPending ? (
-              <Link href={data.hrefs.publications} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:w-auto">
+              <Link href={data.hrefs.publications} className={cn("inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold sm:w-auto", BUSINESS_CTA_SOLID)}>
                 Посмотреть мои публикации <ArrowRight className="h-4 w-4" />
               </Link>
             ) : hasLive ? (
               <div className="flex flex-wrap gap-3">
                 {publicHref && (
-                  <Link href={publicHref} onClick={openPublic} className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90">
+                  <Link href={publicHref} onClick={openPublic} className={cn("inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold", BUSINESS_CTA_SOLID)}>
                     <Eye className="h-4 w-4" /> Посмотреть публикацию
                   </Link>
                 )}
@@ -121,7 +123,7 @@ export function NewBusinessDashboard({ data }: Props) {
                   ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Link href={chosen.href} data-business-tour-target="create-button" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:w-auto">
+                  <Link href={chosen.href} data-business-tour-target="create-button" className={cn("inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold sm:w-auto", BUSINESS_CTA_SOLID)}>
                     Создать публикацию <ArrowRight className="h-4 w-4" />
                   </Link>
                   <CreatePublicationQuickMenu publicationMode="business" trigger={(onClick) => (
@@ -138,7 +140,7 @@ export function NewBusinessDashboard({ data }: Props) {
             {(hasDraft || hasPending || hasLive) && (
               <div data-business-tour-target="create-button" className="inline-flex">
                 <CreatePublicationQuickMenu publicationMode="business" trigger={(onClick) => (
-                  <button type="button" onClick={onClick} className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90">
+                  <button type="button" onClick={onClick} className={cn("rounded-xl px-5 py-3 text-sm font-semibold", BUSINESS_CTA_SOLID)}>
                     Создать публикацию
                   </button>
                 )} />

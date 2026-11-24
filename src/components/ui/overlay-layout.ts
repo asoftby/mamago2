@@ -15,6 +15,14 @@ export const mobileSheetHeightTall = "h-[min(88vh,100dvh)]";
 /** Альтернатива — почти на весь экран */
 export const mobileSheetHeightFull = "h-[min(92vh,100dvh)]";
 
+/**
+ * Content-sized bottom sheet: height follows header+body+footer.
+ * Caps at ~80dvh so long lists scroll inside the body instead of growing forever.
+ * `!h-auto` overrides SheetContent's default bottom `h-auto`/`h-*` conflicts cleanly.
+ */
+export const mobileSheetHeightContent =
+  "!h-auto max-h-[min(80dvh,100dvh)]";
+
 /** Скругление верха мобильного sheet */
 export const mobileSheetTopRadius = "rounded-t-3xl";
 

@@ -127,7 +127,7 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
             <p className="text-sm font-medium">Дни доступности</p>
             <div className="flex flex-wrap gap-2">
               {days.map((day, index) => <Button type="button" key={day} size="sm"
-                variant={selected.includes(index + 1) ? "default" : "outline"}
+                variant={selected.includes(index + 1) ? "business" : "outline"}
                 onClick={() => setSelected(old => old.includes(index + 1)
                   ? old.filter(value => value !== index + 1) : [...old, index + 1])}>
                 {day}
@@ -148,7 +148,7 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {success && <p role="status" className="text-sm">{success}</p>}
-          <Button type="button" onClick={() => void create()} disabled={pending}>
+          <Button variant="business" type="button" onClick={() => void create()} disabled={pending}>
             {pending ? "Сохранение…" : "Добавить ресурс и расписание"}
           </Button>
         </>

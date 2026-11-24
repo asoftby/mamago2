@@ -266,7 +266,7 @@ export function BookingServicesEditor({ offerId }: { offerId: string | null }) {
               {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
               {message && <p role="status" className="text-sm">{message}</p>}
               <div className="flex gap-2">
-                <Button type="button" disabled={!dirty || saving} onClick={() => void save()}>
+                <Button variant="business" type="button" disabled={!dirty || saving} onClick={() => void save()}>
                   {saving ? "Сохраняем…" : "Сохранить услуги и стоимость"}
                 </Button>
                 {dirty && <Button type="button" variant="outline" disabled={saving}

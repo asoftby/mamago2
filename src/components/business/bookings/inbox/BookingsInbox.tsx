@@ -227,22 +227,22 @@ function InboxCard({
 
   let primary: React.ReactNode = null;
   if (isParty && action === "RESPOND") {
-    primary = <Button className="h-11 w-full sm:w-auto" onClick={() => onReply(item)}>Ответить</Button>;
+    primary = <Button variant="business" className="h-11 w-full sm:w-auto" onClick={() => onReply(item)}>Ответить</Button>;
   } else if (isParty && action === "RECONFIRM") {
     primary = (
       <div className="flex flex-wrap gap-2">
-        <Button className="h-11" onClick={() => onConfirm(item)}>Подтвердить заказ</Button>
+        <Button variant="business" className="h-11" onClick={() => onConfirm(item)}>Подтвердить заказ</Button>
         <Button variant="outline" className="h-11" onClick={() => onReply(item)}>
           Предложить другие условия
         </Button>
       </div>
     );
   } else if (isParty && action === "EXTEND_OR_CLOSE") {
-    primary = <Button className="h-11 w-full sm:w-auto" onClick={() => onResolve(item)}>Продлить или закрыть</Button>;
+    primary = <Button variant="business" className="h-11 w-full sm:w-auto" onClick={() => onResolve(item)}>Продлить или закрыть</Button>;
   } else if (!isParty && action === "CLOSE_VISIT") {
-    primary = <Button className="h-11 w-full sm:w-auto" onClick={() => onOutcome(item)}>Отметить итог</Button>;
+    primary = <Button variant="business" className="h-11 w-full sm:w-auto" onClick={() => onOutcome(item)}>Отметить итог</Button>;
   } else if (!isParty && (action === "RESPOND" || action === "VIEW_UPCOMING" || action === "WAIT_CUSTOMER" || action === "VIEW_ARCHIVE")) {
-    primary = <Button variant={action === "RESPOND" ? "default" : "outline"} className="h-11 w-full sm:w-auto" onClick={() => onStandard(item.id)}>{action === "RESPOND" ? "Открыть заявку" : "Подробнее"}</Button>;
+    primary = <Button variant={action === "RESPOND" ? "business" : "outline"} className="h-11 w-full sm:w-auto" onClick={() => onStandard(item.id)}>{action === "RESPOND" ? "Открыть заявку" : "Подробнее"}</Button>;
   }
 
   const urgent = item.urgency === "CUSTOMER_WAITING";

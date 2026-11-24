@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Zap } from "lucide-react";
+import { BUSINESS_CTA_SOLID } from "@/components/business/ui/businessCta";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { cn } from "@/lib/utils";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
@@ -25,7 +26,10 @@ export function DashboardActionStack({
             type="button"
             data-business-tour-target="create-button"
             onClick={onClick}
-            className="w-full rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800 active:scale-[0.98]"
+            className={cn(
+              "w-full rounded-2xl px-5 py-3 text-sm font-semibold transition active:scale-[0.98]",
+              BUSINESS_CTA_SOLID,
+            )}
           >
             Создать публикацию
           </button>

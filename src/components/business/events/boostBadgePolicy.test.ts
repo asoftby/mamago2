@@ -38,9 +38,12 @@ test("Unavailable Boost buttons are disabled before opening the dialog", () => {
   const launcher = read("src/components/business/promotion/BoostLauncher.tsx");
   assert.match(launcher, /disabled={disabled \|\| coolingDown}/);
   assert.match(launcher, /cooldownUntil/);
-  assert.match(launcher, /Boolean\(cooldownUntil\) && remainingMinutes !== 0/);
+  assert.match(launcher, /Boolean\(cooldownUntil\) && remainingMs !== 0/);
   assert.match(launcher, /router\.refresh\(\)/);
-  assert.match(launcher, /setInterval\(update, 15_000\)/);
+  assert.match(launcher, /useBoostCountdown\(cooldownUntil\)/);
+  const sharedClock = read("src/lib/promotion/useBoostCountdown.ts");
+  assert.match(sharedClock, /setInterval\(\(\) =>/);
+  assert.match(sharedClock, /1_000/);
   assert.match(launcher, /if \(disabled \|\| coolingDown\) return/);
   assert.match(launcher, /disabled={!item\.eligible \|\| Boolean\(item\.activeBoostUntil\)}/);
 

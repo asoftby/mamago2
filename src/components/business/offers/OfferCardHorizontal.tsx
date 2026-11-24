@@ -20,6 +20,8 @@ import {
   BUSINESS_PUBLICATION_ACTION_ICON,
   BUSINESS_PUBLICATION_ACTION_NEUTRAL,
   BUSINESS_PUBLICATION_ACTION_PROMOTE,
+  BUSINESS_PUBLICATION_ACTIONS_ICON_ROW,
+  BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW,
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
@@ -27,6 +29,11 @@ import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
+import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
+import {
+  PublicationBoostActiveButton,
+  PublicationBoostLightningBadge,
+} from "@/components/business/shared/PublicationBoostActiveUi";
 
 interface Offer {
   id: string;
@@ -41,10 +48,6 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
-  /** Server-computed Boost eligibility and free quota. */
-  boostDisabled?: boolean;
-  /** Timer only for a successfully activated free Boost on this offer. */
-  boostNextFreeAt?: string | null;
   rejectionReason?: string | null;
   archivedAt: Date | null;
   dateFrom: Date | null;
@@ -60,6 +63,12 @@ interface Offer {
   };
   updatedAt: Date;
   createdAt: Date;
+  /** Active Boost window from list payload (`Boost.endAt` while startAt ≤ now < endAt). */
+  isPromoted?: boolean;
+  /** Server-computed free Boost quota and target eligibility. */
+  boostDisabled?: boolean;
+  boostNextFreeAt?: string | null;
+  boostEndsAt?: Date | string | null;
   metrics: {
     views: number;
     saves: number;
@@ -169,6 +178,13 @@ export function OfferCardHorizontal({
       }
     : null;
 
+  const isBoostActive = Boolean(offer.isPromoted);
+  const canShowPromote =
+    offer.status === "PUBLISHED" &&
+    !offer.archivedAt &&
+    !offer.place.archivedAt &&
+    isBoostableOfferProductType(offer.kind, offer.productType ?? null);
+
   return (
     <>
       <BusinessPublicationCard
@@ -179,6 +195,7 @@ export function OfferCardHorizontal({
         title={offer.title}
         titleHref={viewOfferHref}
         imageHref={viewOfferHref}
+        isPromoted={isBoostActive}
         typeChip={
           <BusinessChip tone="muted" size="compact">
             {kindLabel}
@@ -192,95 +209,106 @@ export function OfferCardHorizontal({
             reason={offer.status === "REJECTED" ? offer.rejectionReason : null}
           />
         }
+        statusTrailing={
+          isBoostActive ? <PublicationBoostLightningBadge /> : null
+        }
         updatedLine={updatedLine}
         createdLine={createdLine}
         metrics={cardMetrics}
         tip={tip}
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => setStatisticsOpen(true)}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
-              )}
-            >
-              <BarChart3 className="h-4 w-4 shrink-0" />
-              Статистика
-            </button>
-
-            <Link
-              href={viewOfferHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={BUSINESS_PUBLICATION_ACTION_ICON}
-              title="Просмотр"
-              aria-label="Просмотр"
-            >
-              <Eye className="h-4 w-4" />
-            </Link>
-
-            <Link
-              href={`/business/offers/${offer.id}/edit`}
-              className={BUSINESS_PUBLICATION_ACTION_ICON}
-              title="Редактировать"
-              aria-label="Редактировать"
-            >
-              <Pencil className="h-4 w-4" />
-            </Link>
-
-            {<BoostLauncher
-              target={{ id: offer.id, publicationType: "OFFER", title: offer.title }}
-              disabled={offer.boostDisabled !== false}
-              cooldownUntil={offer.boostNextFreeAt}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_PROMOTE,
-              )}
-            >
-              <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Продвигать
-            </BoostLauncher>}
-
-            {onArchive && offer.status !== "DRAFT" ? (
+            <div className={BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW}>
               <button
                 type="button"
-                onClick={handleArchive}
-                disabled={isArchiving}
-                className={BUSINESS_PUBLICATION_ACTION_ICON}
-                title="В архив"
-                aria-label="В архив"
+                onClick={() => setStatisticsOpen(true)}
+                className={cn(
+                  BUSINESS_PUBLICATION_ACTION_BUTTON,
+                  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+                )}
               >
-                <Archive className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4 shrink-0" />
+                Статистика
               </button>
-            ) : null}
 
-            {onUnarchive ? (
-              <button
-                type="button"
-                onClick={handleUnarchive}
-                disabled={isArchiving}
+              {isBoostActive ? (
+                <PublicationBoostActiveButton endsAt={offer.boostEndsAt} />
+              ) : canShowPromote ? (
+                <BoostLauncher
+                  target={{ id: offer.id, publicationType: "OFFER", title: offer.title }}
+                  disabled={offer.boostDisabled !== false}
+                  cooldownUntil={offer.boostNextFreeAt}
+                  className={cn(
+                    BUSINESS_PUBLICATION_ACTION_BUTTON,
+                    BUSINESS_PUBLICATION_ACTION_PROMOTE,
+                  )}
+                >
+                  <Zap className="h-4 w-4 shrink-0" />
+                  Продвигать
+                </BoostLauncher>
+              ) : null}
+            </div>
+
+            <div className={BUSINESS_PUBLICATION_ACTIONS_ICON_ROW}>
+              <Link
+                href={viewOfferHref}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={BUSINESS_PUBLICATION_ACTION_ICON}
-                title="Восстановить"
-                aria-label="Восстановить"
+                title="Просмотр"
+                aria-label="Просмотр"
               >
-                <ArchiveRestore className="h-4 w-4" />
-              </button>
-            ) : null}
+                <Eye className="h-4 w-4" />
+              </Link>
 
-            {offer.status === "DRAFT" ? (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => void onDelete(offer.id)}
-                className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
-                title="Удалить черновик"
-                aria-label="Удалить черновик"
+              <Link
+                href={`/business/offers/${offer.id}/edit`}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
+                title="Редактировать"
+                aria-label="Редактировать"
               >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            ) : null}
+                <Pencil className="h-4 w-4" />
+              </Link>
+
+              {onArchive && offer.status !== "DRAFT" ? (
+                <button
+                  type="button"
+                  onClick={handleArchive}
+                  disabled={isArchiving}
+                  className={BUSINESS_PUBLICATION_ACTION_ICON}
+                  title="В архив"
+                  aria-label="В архив"
+                >
+                  <Archive className="h-4 w-4" />
+                </button>
+              ) : null}
+
+              {onUnarchive ? (
+                <button
+                  type="button"
+                  onClick={handleUnarchive}
+                  disabled={isArchiving}
+                  className={BUSINESS_PUBLICATION_ACTION_ICON}
+                  title="Восстановить"
+                  aria-label="Восстановить"
+                >
+                  <ArchiveRestore className="h-4 w-4" />
+                </button>
+              ) : null}
+
+              {offer.status === "DRAFT" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => void onDelete(offer.id)}
+                  className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
+                  title="Удалить черновик"
+                  aria-label="Удалить черновик"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ) : null}
+            </div>
           </>
         }
       />

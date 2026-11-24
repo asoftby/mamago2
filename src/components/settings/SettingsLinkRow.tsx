@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { ElementType, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import {
+  settingsSectionIconClass,
+  settingsSectionIconTileClass,
+  type SettingsIconTileTone,
+} from "@/components/settings/settingsSectionIconTile";
 import { cn } from "@/lib/utils";
 
 export function SettingsLinkRow(props: {
@@ -9,16 +14,19 @@ export function SettingsLinkRow(props: {
   label: string;
   description?: ReactNode;
   badge?: ReactNode;
+  /** Business cabinet matches profile «A» soft sky; personal stays neutral. */
+  iconTone?: SettingsIconTileTone;
 }) {
   const Icon = props.icon;
+  const iconTone = props.iconTone ?? "neutral";
 
   return (
     <Link
       href={props.href}
       className="flex items-center gap-4 px-5 py-4 transition-colors group hover:bg-neutral-50"
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100">
-        <Icon className="h-4 w-4 text-neutral-500" />
+      <div className={settingsSectionIconTileClass(iconTone, "sm")}>
+        <Icon className={settingsSectionIconClass(iconTone)} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

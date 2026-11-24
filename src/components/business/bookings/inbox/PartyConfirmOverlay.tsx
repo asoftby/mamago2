@@ -137,7 +137,7 @@ function PartyConfirmForm({ item, onClose, onDone }: { item: InboxItem; onClose:
         <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
           Отмена
         </Button>
-        <Button type="button" className="flex-1" onClick={() => void submit()}
+        <Button variant="business" type="button" className="flex-1" onClick={() => void submit()}
           disabled={saving || loading || (!selectedUnit && !available?.manualAllowed) || !available || available.quoteVersion !== item.quote?.version}>
           {saving ? "Подтверждаем…" : "Подтвердить бронирование"}
         </Button>

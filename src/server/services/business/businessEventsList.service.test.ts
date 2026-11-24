@@ -141,7 +141,7 @@ test("pure helpers: fallback chain and temporal state", () => {
 
 test("pure helpers: boost state is server-computed and conservative", () => {
   const candidate = (over: Record<string, unknown>) => ({
-    id: "x", title: "x", publicationType: "EVENT" as const, activeBoostUntil: null,
+    id: "x", title: "x", publicationType: "EVENT" as const, coverImageUrl: null, activeBoostUntil: null,
     activeFreeBoostUntil: null, eligible: true, reason: null, ...over,
   });
   assert.equal(resolveBoostState({ availableToday: true, candidate: candidate({}) }).boostDisabled, false);

@@ -282,7 +282,7 @@ export function PlaceGalleryUpload({
             <button
               onClick={handleSaveDraftClick}
               disabled={isSavingDraft}
-              className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="inline-flex items-center rounded-lg bg-stone-900 px-4 py-2 text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
             >
               {isSavingDraft ? (
                 <>

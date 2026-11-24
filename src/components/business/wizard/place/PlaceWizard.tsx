@@ -1223,7 +1223,7 @@ export function PlaceWizard({
               <Button variant="outline" size="sm" onClick={() => draft.discardDraft()}>
                 {draftConflictsWithEntity ? "Взять актуальную версию" : "Начать заново"}
               </Button>
-              <Button size="sm" onClick={handleRestoreDraft}>
+              <Button variant="business" size="sm" onClick={handleRestoreDraft}>
                 {draftConflictsWithEntity ? "Применить черновик" : "Продолжить"}
               </Button>
             </div>

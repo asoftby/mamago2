@@ -13,6 +13,7 @@ export default async function SettingsSecurityPage({
   const context = await requireSettingsContext({ requestedScope: "USER" });
   const resolvedSearchParams = (await searchParams) ?? {};
   const fromBusiness = resolvedSearchParams.from === "business";
+  const iconTone = fromBusiness ? "business" : "neutral";
 
   return (
     <SettingsScaffold context={context} title="Безопасность">
@@ -23,6 +24,7 @@ export default async function SettingsSecurityPage({
             icon={Lock}
             label="Назад к бизнесу"
             description="Вернуться в настройки бизнеса"
+            iconTone="business"
           />
         ) : null}
         <section>
@@ -32,18 +34,21 @@ export default async function SettingsSecurityPage({
               icon={Mail}
               label="Email"
               description={context.viewer.email}
+              iconTone={iconTone}
             />
             <SettingsLinkRow
               href="/settings/password"
               icon={Lock}
               label="Пароль"
               description="Сменить пароль"
+              iconTone={iconTone}
             />
             <SettingsLinkRow
               href="/settings/phone"
               icon={Smartphone}
               label="Телефон"
               description={context.viewer.phoneE164 ?? "Не указан"}
+              iconTone={iconTone}
             />
           </div>
         </section>

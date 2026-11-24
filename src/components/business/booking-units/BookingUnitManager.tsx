@@ -152,7 +152,7 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
               <h2 className="text-lg font-semibold text-stone-950">Мои ресурсы</h2>
               <p className="mt-1 text-sm text-stone-600">Площадки, комнаты и исполнители для детских праздников.</p>
             </div>
-            <Button onClick={createUnit} disabled={busy || loading}><Plus /> Добавить ресурс</Button>
+            <Button variant="business" onClick={createUnit} disabled={busy || loading}><Plus /> Добавить ресурс</Button>
           </div>
           {loading ? <p role="status" className="text-sm text-stone-600">Загрузка ресурсов…</p> : null}
           {listError ? (
@@ -336,7 +336,7 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={busy}>{busy ? "Сохранение…" : editingId ? "Сохранить изменения" : "Создать ресурс"}</Button>
+            <Button variant="business" type="submit" disabled={busy}>{busy ? "Сохранение…" : editingId ? "Сохранить изменения" : "Создать ресурс"}</Button>
             <Button type="button" variant="outline" disabled={busy} onClick={() => { setForm(null); setEditingId(null); setError(""); }}>Отмена</Button>
             {editingId ? <Button type="button" variant="ghost" disabled={busy} onClick={() => void editUnit(editingId)}><RefreshCw /> Загрузить актуальную версию</Button> : null}
           </div>
