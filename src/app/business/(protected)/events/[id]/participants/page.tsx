@@ -9,7 +9,7 @@ import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { parseStoredChildren, formatChildLabel } from "@/lib/booking/bookingParticipants";
 import { calculateEventSeatAvailability, getEventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
-import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { formatHHMM } from "@/lib/formatters/date";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
@@ -52,13 +52,23 @@ export default async function EventParticipantsPage({
   });
   if (!activity) notFound();
 
+  const now = new Date();
+  // Show upcoming choices first. Explicitly requested past/far-future sessions
+  // must remain reachable even when an event has more than 150 occurrences.
   const sessions = await prisma.activitySession.findMany({
     where: { activityId: id, withdrawnAt: null },
     select: { id: true, startsAt: true, title: true },
     orderBy: { startsAt: "asc" },
     take: 150,
   });
-  const now = new Date();
+  const requestedSession = query.sessionId && !sessions.some((item) => item.id === query.sessionId)
+    ? await prisma.activitySession.findFirst({
+        where: { id: query.sessionId, activityId: id, withdrawnAt: null },
+        select: { id: true, startsAt: true, title: true },
+      })
+    : null;
+  if (requestedSession) sessions.push(requestedSession);
+  sessions.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const selected = sessions.find((s) => s.id === query.sessionId) ??
     sessions.find((s) => s.startsAt >= now) ?? sessions[sessions.length - 1];
   const page = safePage(query.page);
@@ -109,7 +119,10 @@ export default async function EventParticipantsPage({
 
   // The roster is operational, not a permanent customer database. Do not show
   // names for past events. Each active roster disclosure is audited and rate-limited.
-  const showNames = selected.startsAt.getTime() >= now.getTime() - 6 * 60 * 60 * 1000;
+  // Match operational contact policy: hide attendee identities once the event
+  // has ended. A session without a configured end is treated as ended at start.
+  const end = slot?.endTime ? localWallClockToUtc(slotDate, slot.endTime) : selected.startsAt;
+  const showNames = end.getTime() > now.getTime();
   if (showNames) {
     const rate = await checkRateLimit("business_event_roster:" + business.id + ":" + user.id, 40, 15 * 60 * 1000);
     if (!rate.allowed) {
@@ -127,8 +140,8 @@ export default async function EventParticipantsPage({
   const rows = await prisma.bookingRequest.findMany({
     where,
     select: {
-      id: true, customerName: true, status: true, source: true,
-      adultsCount: true, childrenCount: true, participantChildren: true,
+      id: true, customerName: showNames, status: true, source: true,
+      adultsCount: true, childrenCount: true, participantChildren: showNames,
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     skip: (page - 1) * PAGE_SIZE,
