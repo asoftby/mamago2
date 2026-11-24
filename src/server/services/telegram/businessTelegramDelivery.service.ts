@@ -13,13 +13,16 @@ export function businessTelegramDeliveryEnabled(): boolean {
   return process.env.TELEGRAM_BUSINESS_DELIVERY_ENABLED === "true";
 }
 
-export async function getActiveBusinessTelegramRecipient(userId: string) {
+export async function getActiveBusinessTelegramRecipient(userId: string, expectedBusinessId?: string) {
   const config = getBusinessTelegramConfig();
   if (!businessTelegramDeliveryEnabled() || !config.configured) return null;
   const connection = await prismaBase.businessTelegramConnection.findUnique({
     where: { userId_environment: { userId, environment: config.environment } },
   });
   if (!connection?.isActive || connection.botUsername !== config.botUsername) return null;
+  // One Telegram connection can belong to another business of this user.
+  // Never deliver a booking notice to the wrong business chat.
+  if (expectedBusinessId && connection.businessId !== expectedBusinessId) return null;
 
   // Authorization is checked at delivery time, including revocations.
   const membership = await prismaBase.businessMember.findFirst({
