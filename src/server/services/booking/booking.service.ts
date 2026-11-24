@@ -772,6 +772,7 @@ async function createPublicationBooking(
           select: { id: true },
         });
         if (!session) throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
+        capacity = activity.bookingCapacityPerSlot ?? undefined;
       } else if (input.selectedSessionId) {
         const session = await tx.activitySession.findFirst({
           where: {

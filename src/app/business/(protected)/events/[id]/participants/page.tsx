@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { BookingKind, BookingMode, BookingStatus, PublicationType } from "@prisma/client";
+import { BookingMode, BookingStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
@@ -10,15 +10,14 @@ import { parseStoredChildren, formatChildLabel } from "@/lib/booking/bookingPart
 import { calculateEventSeatAvailability, getEventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
-import { resolveBookingServiceEnd } from "@/lib/booking/effectiveServiceEnd";
+import { eventRosterWhere, canShowEventRosterNames } from "@/lib/business/eventRosterScope";
 import { formatHHMM } from "@/lib/formatters/date";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 100;
-const ACTIVE_STATUSES = [BookingStatus.NEW, BookingStatus.CONFIRMED];
-const dateTime = new Intl.DateTimeFormat("ru-RU", {
+ const dateTime = new Intl.DateTimeFormat("ru-RU", {
   timeZone: "Europe/Minsk", day: "numeric", month: "long",
   year: "numeric", hour: "2-digit", minute: "2-digit",
 });
@@ -91,17 +90,12 @@ export default async function EventParticipantsPage({
 
   const slotDate = getLocalDateKey(selected.startsAt);
   const slotTime = formatHHMM(selected.startsAt);
-  const where = {
+  const where = eventRosterWhere({
     businessId: business.id,
     activityId: id,
-    kind: BookingKind.STANDARD,
-    publicationType: PublicationType.EVENT,
-    status: { in: ACTIVE_STATUSES },
-    OR: [
-      { selectedSessionId: selected.id },
-      { selectedSessionId: null, requestedDate: new Date(slotDate), requestedTime: activity.bookingMode === BookingMode.USE_PUBLICATION_DATES ? null : slotTime },
-    ],
-  };
+    sessionStartsAt: selected.startsAt,
+    bookingMode: activity.bookingMode,
+  });
   // Counts use a full aggregate, never the 200-row generic bookings inbox.
   const groups = await prisma.bookingRequest.groupBy({
     by: ["status"], where,
@@ -121,12 +115,9 @@ export default async function EventParticipantsPage({
     usedAdults: adultsCount, usedChildren: childrenCount,
   });
 
-  // Use the established per-booking privacy boundary. A booking for an
-  // occurrence remains actionable through the end of its Minsk calendar day.
-  // This also covers date-only events (whose session may start at midnight).
-  // Never expose the contact name/child details after the effective service end.
-  const end = resolveBookingServiceEnd({ requestedDate: new Date(slotDate) });
-  const showNames = end !== null && end.getTime() > now.getTime();
+  // Bulk names are disclosed only on the Minsk event day, for check-in, and
+  // only after the rate limit + durable audit below. Pre-event counts remain.
+  const showNames = canShowEventRosterNames({ now, sessionStartsAt: selected.startsAt });
   if (showNames) {
     const rate = await checkRateLimit("business_event_roster:" + business.id + ":" + user.id, 40, 15 * 60 * 1000);
     if (!rate.allowed) {
@@ -228,7 +219,7 @@ export default async function EventParticipantsPage({
           {page < pages ? <Link href={rosterHref(id, selected.id, page + 1)} className="rounded-full border px-4 py-2">Следующая</Link> : null}
         </nav>
       ) : null}
-      {!showNames ? <p className="text-xs text-stone-500">После проведения мероприятия персональные данные участников скрыты.</p> : null}
+      {!showNames ? <p className="text-xs text-stone-500">Имена участников доступны организатору только в день мероприятия. До этого и после него отображается обезличенный список.</p> : null}
     </div>
   );
 }

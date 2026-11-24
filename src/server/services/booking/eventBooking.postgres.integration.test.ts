@@ -11,6 +11,7 @@ import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookin
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
 import { createManualBooking, createPublicBooking } from "./booking.service";
 import { getBusinessBookings, updateBookingStatus } from "./bookingQuery.service";
+import { eventRosterWhere } from "@/lib/business/eventRosterScope";
 import { getBusinessInbox } from "./businessInbox.service";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -379,6 +380,19 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     const rejected = raced.find((entry) => entry.status === "rejected");
     assert.match(String(rejected?.reason), /недостаточно мест/);
     const winner = successes[0]!;
+    const rosterCount = await prisma.bookingRequest.count({
+      where: eventRosterWhere({
+        businessId: business.id, activityId: calendar.id,
+        sessionStartsAt: first.startsAt, bookingMode: calendar.bookingMode,
+      }),
+    });
+    assert.equal(rosterCount, 1, "roster must count aliases by timestamp, not session ID");
+    assert.equal(await prisma.bookingRequest.count({
+      where: eventRosterWhere({
+        businessId: "foreign-business", activityId: calendar.id,
+        sessionStartsAt: first.startsAt, bookingMode: calendar.bookingMode,
+      }),
+    }), 0, "another tenant must never see this session");
 
     const duplicateRace = await Promise.allSettled([submit(calendar.id, 4, second.id), submit(calendar.id, 4, second.id)]);
     assert.equal(duplicateRace.filter((entry) => entry.status === "fulfilled").length, 1);
