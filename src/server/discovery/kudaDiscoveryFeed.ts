@@ -155,11 +155,7 @@ export async function getKudaDiscoveryFeed(
   const GALLERY_FOR_COVER = 40;
 
   /** Пул кандидатов для сортировки; без избыточного findMany (было ×5 до 400 — долго на TTFB). */
-  const rows = await prisma.activity.findMany({
-    where: options?.onlyIds ? { AND: [where, { id: { in: options.onlyIds } }] } : where,
-    ...(!options?.allCandidates ? { take: Math.min(take * 3, options?.candidatePoolCap ?? 200) } : {}),
-    orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }],
-    include: {
+  const candidateInclude = {
       images: {
         orderBy: { sortOrder: "asc" },
         take: options?.rankOnly ? 0 : GALLERY_FOR_COVER,
@@ -178,7 +174,29 @@ export async function getKudaDiscoveryFeed(
         select: { id: true, isFreeDaily: true, purchaseRequestKey: true, targetRegionIds: true },
       },
     },
+  } satisfies Prisma.ActivityInclude;
+
+  const queryOrder = [{ nextOccurrenceAt: { sort: "asc" as const, nulls: "last" as const } }, { createdAt: "desc" as const }, { id: "asc" as const }];
+  const baseRows = await prisma.activity.findMany({
+    where: options?.onlyIds ? { AND: [where, { id: { in: options.onlyIds } }] } : where,
+    ...(!options?.allCandidates ? { take: Math.min(take * 3, options?.candidatePoolCap ?? 200) } : {}),
+    orderBy: queryOrder,
+    include: candidateInclude,
   });
+  // Boosted publications can otherwise disappear before ranking when the
+  // date-first candidate cap is reached (notably HOME's seven-card preview).
+  // Reuse the exact same visibility/geography/date WHERE for both queries.
+  const boostedRows = options?.allCandidates || options?.onlyIds ? [] : await prisma.activity.findMany({
+    where: { AND: [where, { boosts: { some: {
+      startAt: { lte: now }, endAt: { gt: now },
+    } } }] },
+    orderBy: queryOrder,
+    take: 48,
+    include: candidateInclude,
+  });
+  const byId = new Map(baseRows.map(row => [row.id, row]));
+  for (const row of boostedRows) byId.set(row.id, row);
+  const rows = [...byId.values()];
   perf.mark("candidates");
 
   const cityIds = Array.from(
