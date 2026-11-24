@@ -63,10 +63,50 @@ export function computeEventSlotAvailability(input: {
 export async function getEventSlotAvailability(activityId: string): Promise<EventSlotAvailability | null> {
   const now = new Date();
   const activity = await prisma.activity.findFirst({
-    where: { ...getPublicActivityDetailWhere(), id: activityId, type: "EVENT", bookingEnabled: true, bookingMode: BookingMode.USE_PUBLICATION_SLOTS },
+    where: {
+      ...getPublicActivityDetailWhere(), id: activityId, type: "EVENT", bookingEnabled: true,
+      bookingMode: { in: [BookingMode.USE_PUBLICATION_SLOTS, BookingMode.USE_PUBLICATION_DATES] },
+    },
     select: { id: true, scheduleJson: true, bookingMode: true, bookingCapacityPerSlot: true },
   });
   if (!activity) return null;
+  // Date-only calendar: the modal identifies days by YYYY-MM-DD rather than
+  // ActivitySession ids. Count active bookings for each configured date.
+  if (activity.bookingMode === BookingMode.USE_PUBLICATION_DATES) {
+    const configured = getEventBookingSchedule(activity.scheduleJson, activity.bookingMode);
+    const days = [...configured.values()].filter((slot) => !slot.startTime && slot.date >= getLocalDateKey(now));
+    if (days.length === 0) return {};
+    const bookings = await prisma.bookingRequest.findMany({
+      where: {
+        activityId, publicationType: PublicationType.EVENT,
+        status: { in: [BookingStatus.NEW, BookingStatus.CONFIRMED] },
+        selectedSessionId: null,
+        requestedDate: { in: days.map((slot) => new Date(slot.date)) },
+        requestedTime: null,
+      },
+      select: { requestedDate: true, adultsCount: true, childrenCount: true },
+    });
+    const counts = new Map<string, { adults: number; children: number }>();
+    for (const booking of bookings) {
+      const key = booking.requestedDate?.toISOString().slice(0, 10);
+      if (!key) continue;
+      const used = counts.get(key) ?? { adults: 0, children: 0 };
+      used.adults += booking.adultsCount;
+      used.children += booking.childrenCount;
+      counts.set(key, used);
+    }
+    const policy = getEventSeatPolicy(activity.scheduleJson);
+    const result: EventSlotAvailability = {};
+    for (const slot of days) {
+      const used = counts.get(slot.date) ?? { adults: 0, children: 0 };
+      const availability = calculateEventSeatAvailability({
+        policy, capacity: slot.capacity ?? activity.bookingCapacityPerSlot,
+        usedAdults: used.adults, usedChildren: used.children,
+      });
+      if (availability) result[slot.date] = availability;
+    }
+    return result;
+  }
   // First resolve available sessions, then scope active requests to them.
   // A request may have a selectedSessionId but no requestedDate.
   const sessions = await prisma.activitySession.findMany({

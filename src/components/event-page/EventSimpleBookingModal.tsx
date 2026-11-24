@@ -118,9 +118,9 @@ export function EventSimpleBookingModal({
   const valid = (slots.length === 0 || Boolean(selectedSlot)) && !seatError;
 
   // Fetch advisory availability when the booking sheet opens, not during page view.
-  const hasTimedSlots = slots.some((slot) => Boolean(slot.startTime));
+  const hasBookableSlots = slots.length > 0;
   useEffect(() => {
-    if (!open || !hasTimedSlots) return;
+    if (!open || !hasBookableSlots) return;
     // Do not abort the request during sheet cleanup: a development AbortError
     // can surface in the React overlay. Ignore results after closing instead.
     let cancelled = false;
@@ -141,7 +141,7 @@ export function EventSimpleBookingModal({
     return () => {
       cancelled = true;
     };
-  }, [open, hasTimedSlots, booking.activityId]);
+  }, [open, hasBookableSlots, booking.activityId]);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -261,6 +261,13 @@ export function EventSimpleBookingModal({
                     setTimeId(dateGroups.find((g) => g.isoDate === iso)?.slots[0]?.id ?? "");
                   }}
                 />
+                {!selectedSlot?.startTime && selectedSeats ? (
+                  <p role="status" className="mt-2 text-sm font-medium text-stone-700">
+                    {seatMode === "SEPARATE"
+                      ? `Свободно: взрослых мест — ${selectedSeats.adultsRemaining ?? 0}, детских — ${selectedSeats.childrenRemaining ?? 0}`
+                      : `Свободных мест: ${selectedSeats.remaining}`}
+                  </p>
+                ) : null}
               </RsSection>
               {selectedSlot?.startTime && selectedDate ? (
                 <RsSection label="Время">
