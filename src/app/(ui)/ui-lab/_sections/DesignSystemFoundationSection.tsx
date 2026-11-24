@@ -11,6 +11,7 @@ import { ChipsRow } from "@/components/ui/chips-row";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { BackButton } from "@/components/ui/back-button";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { PublicationPresentationPreview } from "./PublicationPresentationPreview";
 import { CloseIcon } from "@/components/ui/close-icon";
@@ -34,6 +35,7 @@ export function DesignSystemFoundationSection() {
         <RenderSafe title="Buttons — variants" file="src/components/ui/button.tsx">
           <div className="flex flex-wrap items-center gap-3">
             <Button>Основная</Button>
+            <Button variant="business">Business solid</Button>
             <Button variant="secondary">Вторичная</Button>
             <Button variant="outline">Контурная</Button>
             <Button variant="ghost">Прозрачная</Button>
@@ -61,6 +63,27 @@ export function DesignSystemFoundationSection() {
           <p className="mt-3 text-xs text-muted-foreground">
             Differences in height, padding and radius must be resolved at the primitive level.
           </p>
+        </RenderSafe>
+
+        <RenderSafe title="Back — единая круглая кнопка «Назад»" file="src/components/ui/back-button.tsx">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Канон: белый круг, тонкая серая рамка, только ArrowLeft. Текст не показываем —
+            только aria-label («Назад» / «К настройкам»).
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Кнопка</p>
+              <BackButton aria-label="Назад" onClick={() => undefined} />
+            </div>
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Ссылка</p>
+              <BackButton href="/ui-lab" aria-label="К настройкам" />
+            </div>
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Disabled</p>
+              <BackButton aria-label="Назад" disabled />
+            </div>
+          </div>
         </RenderSafe>
 
         <RenderSafe title="Close — одна иконка и единая кнопка закрытия" file="src/components/ui/modal-close-button.tsx">

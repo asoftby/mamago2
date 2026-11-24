@@ -57,6 +57,7 @@ export default async function PublicationsOffersPage({
 
   const placeIds = userPlaces.map(p => p.id);
 
+  const now = new Date();
   const offers = placeIds.length > 0
     ? await prisma.offer.findMany({
         where: {
@@ -81,6 +82,12 @@ export default async function PublicationsOffersPage({
           createdAt: true,
           slug: true,
           campProgramType: true,
+          boosts: {
+            where: { startAt: { lte: now }, endAt: { gt: now } },
+            orderBy: { endAt: "desc" },
+            take: 1,
+            select: { endAt: true },
+          },
           placeId: true,
           place: {
             select: {
@@ -117,8 +124,10 @@ export default async function PublicationsOffersPage({
     })),
   });
 
-  const offersWithMetrics = placedOffers.map((offer) => ({
+  const offersWithMetrics = placedOffers.map(({ boosts, ...offer }) => ({
     ...offer,
+    isPromoted: boosts.length > 0,
+    boostEndsAt: boosts[0]?.endAt ?? null,
     metrics: metricsByEntity.get(`OFFER:${offer.id}`) ?? {
       views: 0,
       saves: 0,
@@ -126,6 +135,7 @@ export default async function PublicationsOffersPage({
       ctaClicks: 0,
     },
   }));
+  offersWithMetrics.sort((a, b) => Number(b.isPromoted) - Number(a.isPromoted));
 
   return (
     <div className="space-y-6">

@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   desktopDialogShellLarge,
+  mobileSheetHeightContent,
   mobileSheetHeightFull,
   mobileSheetHeightTall,
   mobileSheetShellBase,
@@ -26,7 +27,7 @@ import {
 
 const DESKTOP_MEDIA = "(min-width: 768px)";
 
-export type ResponsiveOverlayHeightMode = "tall" | "full";
+export type ResponsiveOverlayHeightMode = "tall" | "full" | "content";
 
 export type ResponsiveOverlayVariant = "chromeless" | "framed";
 
@@ -47,6 +48,10 @@ export type ResponsiveOverlayProps = {
   showCloseButton?: boolean;
   /** Полоска над контентом на mobile (см. MyPlanOverlay — свой handle) */
   mobileTopSlot?: React.ReactNode;
+  /**
+   * - tall/full: fixed sheet height, body flex-grows (stats, my-plan, …)
+   * - content: sheet height = header + body + footer (capped); no empty flex-1 gap
+   */
   heightMode?: ResponsiveOverlayHeightMode;
   dialogContentClassName?: string;
   sheetContentClassName?: string;
@@ -78,9 +83,14 @@ export function ResponsiveOverlay({
   className,
 }: ResponsiveOverlayProps) {
   const isDesktop = useMediaQuery(DESKTOP_MEDIA);
+  const fitContent = heightMode === "content";
 
   const heightClass =
-    heightMode === "full" ? mobileSheetHeightFull : mobileSheetHeightTall;
+    heightMode === "full"
+      ? mobileSheetHeightFull
+      : heightMode === "content"
+        ? mobileSheetHeightContent
+        : mobileSheetHeightTall;
 
   const framedHeader =
     variant === "framed" && (title != null || subtitle != null || showCloseButton) ? (
@@ -103,11 +113,13 @@ export function ResponsiveOverlay({
       </div>
     ) : null;
 
+  // tall/full: flex-1 fills remaining sheet height (scroll belongs on children).
+  // content: no flex-1 — body is only as tall as its children; scrolls if sheet hits max-h.
   const body = (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-hidden",
-        variant === "chromeless" && "min-h-0",
+        "flex min-h-0 flex-col",
+        fitContent ? "overflow-y-auto overscroll-contain" : "flex-1 overflow-hidden",
         bodyClassName,
       )}
     >
@@ -120,6 +132,8 @@ export function ResponsiveOverlay({
       <div
         className={cn(
           "shrink-0 border-t border-neutral-200/90 bg-white",
+          // mt-auto only for fixed-height sheets; on content-sized it would create empty gap.
+          !fitContent && "mt-auto",
           overlaySafeFooterPadding,
         )}
       >
@@ -135,8 +149,12 @@ export function ResponsiveOverlay({
           onInteractOutside={onInteractOutside}
           showCloseButton={false}
           className={cn(
-            desktopDialogShellLarge,
-            variant === "framed" && "!max-h-[90vh]",
+            fitContent
+              ? "flex max-h-[min(90vh,100dvh)] w-[min(92vw,28rem)] max-w-md flex-col gap-0 overflow-hidden rounded-3xl border border-neutral-200/80 bg-white p-0 shadow-2xl"
+              : cn(
+                  desktopDialogShellLarge,
+                  variant === "framed" && "!max-h-[90vh]",
+                ),
             dialogContentClassName,
             className,
           )}
@@ -162,6 +180,7 @@ export function ResponsiveOverlay({
         className={cn(
           mobileSheetShellBase,
           heightClass,
+          "!gap-0",
           sheetContentClassName,
           className,
         )}
@@ -169,7 +188,7 @@ export function ResponsiveOverlay({
         <SheetHeader className="sr-only">
           <SheetTitle>{a11yTitle}</SheetTitle>
         </SheetHeader>
-        {mobileTopSlot}
+        {mobileTopSlot ? <div className="shrink-0">{mobileTopSlot}</div> : null}
         {variant === "framed" ? framedHeader : null}
         {body}
         {footerEl}

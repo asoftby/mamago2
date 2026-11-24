@@ -104,7 +104,7 @@ export function PartyResourceEditor({ unitId, offerId, onSaved }: {
         {exceptions.some(e=>e.kind!=="CLOSED"||e.startMinutes!==null)&&<p className="text-xs text-muted-foreground">Особые интервалы сохранены без изменений.</p>}
         {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
         {message&&<p role="status" className="text-sm">{message}</p>}
-        <Button type="button" disabled={busy} onClick={()=>void save()}>{busy?"Сохранение…":"Сохранить расписание"}</Button>
+        <Button variant="business" type="button" disabled={busy} onClick={()=>void save()}>{busy?"Сохранение…":"Сохранить расписание"}</Button>
         <p className="text-xs text-muted-foreground">При будущих бронированиях изменение ресурса запрещено сервером. Конфликт вернёт ошибку.</p>
       </>}
     </section>

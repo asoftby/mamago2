@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { createBusinessAction } from "./actions";
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneVerificationField } from "@/components/phone/PhoneVerificationField";
 import { UnpLookupField } from "@/components/business/UnpLookupField";
@@ -25,13 +25,14 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
 
   return (
-    <PrimaryButton
+    <Button
       type="submit"
+      variant="business"
       disabled={pending || disabled}
-      className="w-full"
+      className="h-auto w-full rounded-[16px] px-4 py-[14px] text-[16px] font-semibold"
     >
       {pending ? "Отправка на проверку..." : "Отправить на проверку"}
-    </PrimaryButton>
+    </Button>
   );
 }
 

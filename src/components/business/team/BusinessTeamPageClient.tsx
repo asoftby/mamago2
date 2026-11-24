@@ -690,7 +690,7 @@ export function BusinessTeamPageClient({ businessId, isOwner, inviteNotice }: Pr
               </div>
             ) : null}
 
-            <Button
+            <Button variant="business"
               type="submit"
               disabled={submitting}
               className="rounded-2xl bg-stone-900 hover:bg-stone-800"

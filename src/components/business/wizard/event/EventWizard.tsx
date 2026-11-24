@@ -1546,7 +1546,7 @@ function EventWizardInner({
             >
               Не сохранять
             </Button>
-            <Button
+            <Button variant="business"
               type="button"
               disabled={leaveDialogBusy}
               onClick={() => void handleLeaveSaveDraft()}

@@ -137,6 +137,7 @@ export default async function OffersPage({
       ctaClicks: 0,
     },
   }));
+  offersWithMetrics.sort((a, b) => Number(b.isPromoted) - Number(a.isPromoted));
 
   return (
     <div className="space-y-6">

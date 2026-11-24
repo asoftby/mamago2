@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BUSINESS_CTA_SOLID } from "@/components/business/ui/businessCta";
 import { cn } from "@/lib/utils";
 import { DepositTopUpModal } from "./DepositTopUpModal";
 
@@ -32,9 +33,9 @@ export function DepositTopUpTrigger({
         className={cn(
           "inline-flex items-center justify-center gap-1.5 text-sm transition",
           variant === "primary" &&
-            "rounded-2xl bg-primary px-5 py-3 font-semibold text-white hover:bg-primary/90 active:scale-[0.98]",
+            cn("rounded-2xl px-5 py-3 font-semibold active:scale-[0.98]", BUSINESS_CTA_SOLID),
           variant === "warning" &&
-            "rounded-2xl bg-primary px-5 py-3 font-semibold text-white hover:bg-primary/90 active:scale-[0.98]",
+            cn("rounded-2xl px-5 py-3 font-semibold active:scale-[0.98]", BUSINESS_CTA_SOLID),
           variant === "ghost" &&
             "text-stone-500 hover:text-stone-800 underline underline-offset-2",
           className,

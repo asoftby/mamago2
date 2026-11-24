@@ -194,7 +194,7 @@ function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: (
       </div>
       <div className="flex shrink-0 gap-2 border-t border-stone-200 px-4 py-3 sm:px-5">
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onClose} disabled={submitting}>Отмена</Button>
-        <Button type="button" className="h-11 flex-1" onClick={submit} disabled={submitting}>
+        <Button variant="business" type="button" className="h-11 flex-1" onClick={submit} disabled={submitting}>
           {submitting ? "Отправляем…" : type === "DECLINED" ? "Отправить отказ" : "Отправить ответ"}
         </Button>
       </div>
@@ -281,7 +281,7 @@ function PartyResolveForm({ item, onClose, onDone }: { item: InboxItem; onClose:
           Закрыть заявку
         </Button>
         {canExtend ? (
-          <Button type="button" className="h-11 flex-1" onClick={() => run("EXTEND")} disabled={submitting}>
+          <Button variant="business" type="button" className="h-11 flex-1" onClick={() => run("EXTEND")} disabled={submitting}>
             {submitting ? "Сохраняем…" : "Продлить"}
           </Button>
         ) : null}
@@ -325,7 +325,7 @@ export function VisitOutcomeOverlay({ item, onClose, onDone }: OverlayProps) {
       subtitle={item ? `${item.title ?? "Запись"} · ${formatInboxSchedule(item)}` : undefined}
     >
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-        <Button type="button" className="h-12 w-full" onClick={() => run("HELD")} disabled={submitting}>
+        <Button variant="business" type="button" className="h-12 w-full" onClick={() => run("HELD")} disabled={submitting}>
           Да, состоялся
         </Button>
         <div className="space-y-2 rounded-2xl border border-stone-200 p-3">

@@ -479,6 +479,7 @@ export function Step8Organizer({
                         </div>
                         <div className="mt-4">
                           <Button
+                            variant="business"
                             type="button"
                             onClick={handleApplyImportOrganizer}
                             disabled={!isEditable || !importHint?.name}

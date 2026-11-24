@@ -520,6 +520,42 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   }
 }
 
+/* Business publication: soft amber glow while Boost is active (no hard border) */
+@keyframes mg-boost-amber-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 6px 0 rgba(251, 191, 36, 0.35),
+      0 0 14px -2px rgba(245, 158, 11, 0.28),
+      0 0 22px -4px rgba(252, 211, 77, 0.2);
+  }
+  40% {
+    box-shadow:
+      0 0 10px 1px rgba(245, 158, 11, 0.48),
+      0 0 22px -1px rgba(251, 191, 36, 0.38),
+      0 0 32px -2px rgba(253, 230, 138, 0.28);
+  }
+  70% {
+    box-shadow:
+      0 0 8px 0 rgba(252, 211, 77, 0.42),
+      0 0 18px -2px rgba(245, 158, 11, 0.32),
+      0 0 26px -3px rgba(251, 191, 36, 0.22);
+  }
+}
+
+.animate-mg-boost-amber-glow {
+  animation: mg-boost-amber-glow 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-mg-boost-amber-glow {
+    animation: none;
+    box-shadow:
+      0 0 8px 0 rgba(251, 191, 36, 0.4),
+      0 0 16px -2px rgba(245, 158, 11, 0.3);
+  }
+}
+
 /* Мой план: градиент непрерывно скользит по рамке (conic + rotate) */
 @keyframes mg-plan-ai-border-spin {
   from {

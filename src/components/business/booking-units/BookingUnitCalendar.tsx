@@ -79,7 +79,7 @@ export function BookingUnitCalendar({ unitId }: { unitId: string }) {
         <label className="text-sm">Начало блокировки <Input type="datetime-local" required value={start} onChange={event => setStart(event.target.value)} /></label>
         <label className="text-sm">Окончание блокировки <Input type="datetime-local" required value={end} onChange={event => setEnd(event.target.value)} /></label>
         <label className="text-sm md:col-span-2">Причина (необязательно) <Input maxLength={500} value={note} onChange={event => setNote(event.target.value)} placeholder="Например, частный праздник" /></label>
-        <div className="md:col-span-2"><Button type="submit" disabled={busy}>{busy ? "Сохранение…" : "Закрыть время"}</Button></div>
+        <div className="md:col-span-2"><Button variant="business" type="submit" disabled={busy}>{busy ? "Сохранение…" : "Закрыть время"}</Button></div>
       </form>
       <label className="block text-sm">Показать занятость с даты
         <Input type="date" value={rangeFrom} onChange={event => setRangeFrom(event.target.value)} />

@@ -265,7 +265,7 @@ export function AccessRequestPanel({ unp }: { unp: string }) {
       {result && !result.ok && <p className="text-sm text-red-600">{result.message}</p>}
 
       <div className="flex gap-2">
-        <Button type="button" size="sm" onClick={() => void handleSubmit()} disabled={!canSubmit || isSubmitting}>
+        <Button variant="business" type="button" size="sm" onClick={() => void handleSubmit()} disabled={!canSubmit || isSubmitting}>
           {isSubmitting ? "Отправка..." : "Отправить заявку"}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
