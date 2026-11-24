@@ -29,8 +29,8 @@ const createBookingSchema = z.object({
   planItemId: z.string().min(1).optional(),
 }).superRefine((value, ctx) => {
   if (value.children === undefined) return;
-  if (value.adultsCount < 1 || value.adultsCount > BOOKING_MAX_ADULTS) {
-    ctx.addIssue({ code: "custom", path: ["adultsCount"], message: `Взрослых должно быть от 1 до ${BOOKING_MAX_ADULTS}` });
+  if (value.adultsCount < 0 || value.adultsCount > BOOKING_MAX_ADULTS) {
+    ctx.addIssue({ code: "custom", path: ["adultsCount"], message: `Взрослых должно быть от 0 до ${BOOKING_MAX_ADULTS}` });
   }
 });
 
