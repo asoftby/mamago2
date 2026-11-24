@@ -41,4 +41,17 @@ for (let n = 1; n <= 32; n++) {
 assert.deepEqual(freeOnly.slice(0, 4).map(row => row.id), ["free0", "organic0", "organic1", "organic2"]);\nassert.deepEqual(mixed.slice(0, 4).map(row => row.id), ["paid0", "organic0", "organic1", "organic2"]);\nassert.deepEqual(composePromotedCards(free, () => "all", () => true), free,
   "Free-only scarcity retains eligible inventory");
 
+// Regression: two otherwise equally relevant same-date events.
+const sameDay = composePromotedCards([
+  { id: "ordinary", isPromoted: false },
+  { id: "promoted", isPromoted: true },
+], () => "2026-11-28");
+assert.deepEqual(sameDay.map(row => row.id), ["promoted", "ordinary"]);
+// Different relevance bands remain authoritative even with a paid Boost.
+const differentDates = composePromotedCards([
+  { id: "today", isPromoted: false },
+  { id: "next-month-paid", isPromoted: true },
+], row => row.id === "today" ? "today" : "next-month");
+assert.deepEqual(differentDates.map(row => row.id), ["today", "next-month-paid"]);
+
 console.log("promotion composition: OK");
