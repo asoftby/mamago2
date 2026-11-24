@@ -26,6 +26,7 @@ import { buildSettingsHomeHref } from "@/lib/settings/registry";
 import { requireSettingsContext } from "@/lib/settings/resolveSettingsContext";
 import type { SettingsScope } from "@/lib/settings/types";
 import { getNotificationSettingsSurfaceData } from "@/server/services/notificationSettings.service";
+import { getBusinessVerificationBadge } from "@/lib/settings/businessVerificationPresentation";
 
 function CompanyInfoRow(props: { label: string; value: string }) {
   return (
@@ -140,6 +141,8 @@ export async function renderCompanySettingsPage(surfaceScope: SettingsScope = "U
   const context = await requireSettingsContext({ requestedScope: surfaceScope });
   const business = context.businessContext;
 
+  const verificationBadge = business ? getBusinessVerificationBadge(business.verificationStatus) : null;
+
   if (!business) {
     return (
       <SettingsScaffold context={context} title="Компания" currentSectionId="company">
@@ -162,8 +165,8 @@ export async function renderCompanySettingsPage(surfaceScope: SettingsScope = "U
               <p className="text-sm font-medium text-neutral-900">
                 Статус компании
               </p>
-              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
-                Подтвержден
+              <span className={`inline-flex items-center rounded-full border px-3 py-2 text-xs font-medium ${verificationBadge?.toneClass ?? ""}`}>
+                {verificationBadge?.label}
               </span>
               <p className="text-sm text-neutral-600">
                 Текущий статус: {business.verificationStatus}
