@@ -39,6 +39,9 @@ function removePersonalFields(booking: BusinessBookingItem): BusinessBookingItem
     customerPhone: "",
     customerEmail: null,
     customerComment: null,
+    // Rejection reasons are free text and may accidentally contain PII.
+    // Do not expose them in bulk views or expired individual details.
+    rejectionReason: null,
     childName: null,
     childAge: null,
     participantChildren: booking.participantChildren.map((child) => ({ ...child, name: null })),

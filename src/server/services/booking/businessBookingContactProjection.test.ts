@@ -23,6 +23,7 @@ const booking = {
   participantsOutsideAge: [{ name: "Саша", age: 7 }],
   display: { title: "Секция", meta: "Саша · 7 лет" },
   bookingPriceSnapshot: { extra: "Саша", phone: "+375291234567" },
+  rejectionReason: "Мария, ждём звонка по +375291234567",
 } as unknown as BusinessBookingItem;
 
 test("bulk business bookings never expose PII, even on NEW status", () => {
@@ -34,6 +35,7 @@ test("bulk business bookings never expose PII, even on NEW status", () => {
   assert.equal(listed.participantChildren[0]?.age, 7);
   assert.equal(listed.customerPhone, "");
   assert.equal(listed.bookingPriceSnapshot, null);
+  assert.equal(listed.rejectionReason, null);
   // The source object is not mutated: exact-order detail can still be queried.
   assert.equal(booking.customerPhone, "+375291234567");
 });
@@ -70,6 +72,8 @@ test("rejected booking still provides audited single-order contact until service
   assert.equal(disclosed.detail.customerEmail, null);
   const elapsed = { ...future, endsAt: new Date(Date.now() - 1_000).toISOString() };
   assert.equal(projectBusinessBookingDetailWithDisclosure(elapsed).revealsContact, false);
+  assert.equal(businessBookingDetailProjection(elapsed).rejectionReason, null,
+    "Free-text rejection notes are redacted after service end");
   const undatedOld = { ...booking, status: BookingStatus.REJECTED,
     endsAt: null, createdAt: new Date(Date.now() - 31 * 86_400_000).toISOString() };
   assert.equal(projectBusinessBookingDetailWithDisclosure(undatedOld).revealsContact, false);
