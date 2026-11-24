@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import { resolveStandardSlotStart, standardResponseDeadline } from "@/lib/booking/standardResponseDeadline";
 import prisma from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { getEventSeatPolicy, calculateEventSeatAvailability, getEventSeatError } from "@/lib/booking/eventSeatPolicy";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
 import { reserveSlot, SlotReservationError } from "@/server/offers/reserveSlot";
@@ -804,14 +805,22 @@ async function createPublicationBooking(
       if (duplicate) {
         throw new BookingValidationError("customerPhone", "Заявка на эту запись уже существует");
       }
-      if (capacity !== undefined) {
+      const seatPolicy = getEventSeatPolicy(activity.scheduleJson);
+      if (capacity !== undefined || seatPolicy.mode === "SEPARATE") {
         const { _sum } = await tx.bookingRequest.aggregate({
           where: active,
           _sum: { adultsCount: true, childrenCount: true },
         });
-        if ((_sum.adultsCount ?? 0) + (_sum.childrenCount ?? 0) + adultsCount + childrenCount > capacity) {
-          throw new BookingValidationError("selectedSessionId", "На выбранное время недостаточно мест");
-        }
+        const availability = calculateEventSeatAvailability({
+          policy: seatPolicy, capacity,
+          usedAdults: _sum.adultsCount ?? 0,
+          usedChildren: _sum.childrenCount ?? 0,
+        });
+        const error = getEventSeatError(availability, adultsCount, childrenCount, seatPolicy.mode);
+        if (error) throw new BookingValidationError("participants", error);
+      } else {
+        const error = getEventSeatError(null, adultsCount, childrenCount, seatPolicy.mode);
+        if (error) throw new BookingValidationError("participants", error);
       }
 
       const linkedPlanItemId = manual ? null : await ensureEventBookingPlanItem(tx, {

@@ -51,4 +51,14 @@ assert.equal(
 assert.equal(computeEventSlotAvailability({ sessions, configured: new Map(), fallbackCapacity: 5, bookings: [] }).s1?.remaining, 5);
 assert.deepEqual(computeEventSlotAvailability({ sessions, configured: new Map(), fallbackCapacity: null, bookings: [] }), {});
 
+const childrenPolicy = { mode: "CHILDREN" as const, adultsCapacity: null, childrenCapacity: null };
+assert.deepEqual(computeEventSlotAvailability({
+  sessions, configured, fallbackCapacity: null, policy: childrenPolicy,
+  bookings: [{ adultsCount: 3, childrenCount: 1, session: { startsAt: start }, requestedDate: null, requestedTime: null }],
+}), { s1: { mode: "CHILDREN", capacity: 8, remaining: 7 } });
+const splitPolicy = { mode: "SEPARATE" as const, adultsCapacity: 2, childrenCapacity: 4 };
+assert.equal(computeEventSlotAvailability({
+  sessions, configured, fallbackCapacity: null, policy: splitPolicy,
+  bookings: [{ adultsCount: 1, childrenCount: 2, session: { startsAt: start }, requestedDate: null, requestedTime: null }],
+}).s1?.childrenRemaining, 2);
 console.log("eventSlotAvailability: ok");

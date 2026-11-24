@@ -3,10 +3,11 @@ import prisma from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
+import { calculateEventSeatAvailability, getEventSeatPolicy, type EventSeatPolicy, type EventSeatAvailability } from "@/lib/booking/eventSeatPolicy";
 import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
 
 /** Seats per bookable ActivitySession id. Only slots with a capacity limit are present. */
-export type EventSlotAvailability = Record<string, { capacity: number; remaining: number }>;
+export type EventSlotAvailability = Record<string, EventSeatAvailability>;
 
 type ActiveBooking = {
   adultsCount: number;
@@ -34,19 +35,26 @@ export function computeEventSlotAvailability(input: {
   sessions: readonly { id: string; startsAt: Date }[];
   configured: ReturnType<typeof getEventBookingSchedule>;
   fallbackCapacity: number | null;
+  policy?: EventSeatPolicy;
   bookings: readonly ActiveBooking[];
 }): EventSlotAvailability {
-  const taken = new Map<string, number>();
+  const taken = new Map<string, { adults: number; children: number }>();
   for (const booking of input.bookings) {
     const key = bookingSlotKey(booking);
-    if (key) taken.set(key, (taken.get(key) ?? 0) + booking.adultsCount + booking.childrenCount);
+    if (!key) continue;
+    const prev = taken.get(key) ?? { adults: 0, children: 0 };
+    taken.set(key, { adults: prev.adults + booking.adultsCount, children: prev.children + booking.childrenCount });
   }
   const result: EventSlotAvailability = {};
   for (const session of input.sessions) {
     const key = eventBookingSlotKey(getLocalDateKey(session.startsAt), formatHHMM(session.startsAt));
     const capacity = input.configured.get(key)?.capacity ?? input.fallbackCapacity ?? undefined;
-    if (capacity === undefined) continue;
-    result[session.id] = { capacity, remaining: Math.max(0, capacity - (taken.get(key) ?? 0)) };
+    const used = taken.get(key) ?? { adults: 0, children: 0 };
+    const availability = calculateEventSeatAvailability({
+      policy: input.policy ?? getEventSeatPolicy(null), capacity,
+      usedAdults: used.adults, usedChildren: used.children,
+    });
+    if (availability) result[session.id] = availability;
   }
   return result;
 }
@@ -83,6 +91,7 @@ export async function getEventSlotAvailability(activityId: string): Promise<Even
     sessions,
     configured: getEventBookingSchedule(activity.scheduleJson, activity.bookingMode),
     fallbackCapacity: activity.bookingCapacityPerSlot ?? null,
+    policy: getEventSeatPolicy(activity.scheduleJson),
     bookings,
   });
 }
