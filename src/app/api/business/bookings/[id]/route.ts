@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { z } from "zod";
+import { businessBookingDecisionSchema } from "@/lib/booking/businessBookingDecisionSchema";
 import { BookingStatus } from "@prisma/client";
 import {
   updateBookingStatus,
@@ -18,13 +19,7 @@ import {
   businessBookingListProjection,
 } from "@/server/services/booking/businessBookingContactProjection";
 
-const updateBookingSchema = z.object({
-  status: z.enum([
-    BookingStatus.CONFIRMED,
-    BookingStatus.REJECTED,
-    BookingStatus.COMPLETED,
-  ]),
-});
+const updateBookingSchema = businessBookingDecisionSchema;
 
 /** Tenant-scoped single STANDARD detail: no 200-row calendar cap. */
 export async function GET(
@@ -86,6 +81,7 @@ export async function PATCH(
     const updatedBooking = await updateBookingStatus(id, business.id, data.status, {
       actorId: user.id,
       actorRole: user.role,
+      reason: data.reason ?? null,
       metadata: {
         source: "business_legacy_patch_route",
       },

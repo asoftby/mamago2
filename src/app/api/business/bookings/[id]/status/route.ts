@@ -11,7 +11,7 @@
 
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { businessBookingDecisionSchema } from "@/lib/booking/businessBookingDecisionSchema";
 import { BookingStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
@@ -23,13 +23,7 @@ import {
 import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
 import { businessBookingListProjection } from "@/server/services/booking/businessBookingContactProjection";
 
-const bodySchema = z.object({
-  status: z.enum([
-    BookingStatus.CONFIRMED,
-    BookingStatus.REJECTED,
-    BookingStatus.COMPLETED,
-  ]),
-});
+const bodySchema = businessBookingDecisionSchema;
 
 export async function PATCH(
   request: NextRequest,
@@ -63,6 +57,7 @@ export async function PATCH(
     const updated = await updateBookingStatus(id, business.id, parsed.data.status, {
       actorId: user.id,
       actorRole: user.role,
+      reason: parsed.data.reason ?? null,
       metadata: {
         source: "business_status_endpoint",
       },

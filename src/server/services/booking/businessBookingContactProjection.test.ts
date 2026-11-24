@@ -46,9 +46,9 @@ test("single active order only exposes fulfillment contact, never email", () => 
   assert.equal(businessBookingDetailRevealsContact(detail), true);
 });
 
-test("historical bookings are permanently redacted in business detail", () => {
+test("completed, customer-cancelled and expired bookings remain redacted", () => {
   for (const status of [
-    BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.EXPIRED,
+    BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.EXPIRED,
   ]) {
     const historical = businessBookingDetailProjection({ ...booking, status });
     assert.equal(historical.customerPhone, "", status);
@@ -58,6 +58,21 @@ test("historical bookings are permanently redacted in business detail", () => {
     assert.equal(historical.participantChildren[0]?.name, null, status);
     assert.equal(businessBookingDetailRevealsContact(historical), false, status);
   }
+});
+
+test("rejected booking still provides audited single-order contact until service end", () => {
+  const future = { ...booking, status: BookingStatus.REJECTED,
+    endsAt: new Date(Date.now() + 86_400_000).toISOString() };
+  assert.equal(businessBookingListProjection(future).customerPhone, "", "bulk archive still never exposes contacts");
+  const disclosed = projectBusinessBookingDetailWithDisclosure(future);
+  assert.equal(disclosed.revealsContact, true);
+  assert.equal(disclosed.detail.customerPhone, booking.customerPhone);
+  assert.equal(disclosed.detail.customerEmail, null);
+  const elapsed = { ...future, endsAt: new Date(Date.now() - 1_000).toISOString() };
+  assert.equal(projectBusinessBookingDetailWithDisclosure(elapsed).revealsContact, false);
+  const undatedOld = { ...booking, status: BookingStatus.REJECTED,
+    endsAt: null, createdAt: new Date(Date.now() - 31 * 86_400_000).toISOString() };
+  assert.equal(projectBusinessBookingDetailWithDisclosure(undatedOld).revealsContact, false);
 });
 
 test("stale CONFIRMED or NEW booking cannot expose contacts after known service end", () => {

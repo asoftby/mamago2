@@ -114,6 +114,8 @@ export interface BusinessBookingItem {
   directThreadId: string | null;
   /** Platform policy allows Direct for this publication type; null = not evaluated by the caller. */
   directAvailable: boolean | null;
+  /** Reason from the last business rejection, only populated for single-order detail. */
+  rejectionReason?: string | null;
 }
 
 export interface GetBusinessBookingsOptions {
@@ -383,6 +385,7 @@ function mapBooking(raw: {
     hasCustomerAccount: raw.userId !== null,
     directThreadId: null,
     directAvailable: null,
+    rejectionReason: null,
   };
 }
 
@@ -518,6 +521,16 @@ export async function getBusinessBookingById(
   });
   if (!row) return null;
   const item = mapBooking(row);
+  if (item.status === BookingStatus.REJECTED) {
+    const activity = await prisma.bookingActivity.findFirst({
+      where: { bookingId, type: "STATUS_CHANGED" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { payload: true },
+    });
+    const payload = activity?.payload;
+    item.rejectionReason = payload && typeof payload === "object" && !Array.isArray(payload) &&
+      typeof payload.reason === "string" ? payload.reason : null;
+  }
   await attachDirectThreadIds([item], businessId);
   return item;
 }
@@ -670,6 +683,17 @@ export async function updateBookingStatus(
       }
       throw new BookingStatusTransitionError(current.status, newStatus);
     }
+    if (newStatus === BookingStatus.REJECTED) {
+      // Persist before commit. Fire-and-forget status history can race with
+      // the immediate details GET, so a required reason cannot use that path.
+      await tx.bookingActivity.create({
+        data: {
+          bookingId, type: "STATUS_CHANGED", actorType: actor?.actorId ? "BUSINESS" : "SYSTEM",
+          actorId: actor?.actorId ?? null,
+          payload: { from: current.status, to: newStatus, reason: actor?.reason?.trim() ?? null },
+        },
+      });
+    }
     return tx.bookingRequest.findUniqueOrThrow({
       where: { id: bookingId },
       select: BOOKING_SELECT,
@@ -703,7 +727,9 @@ export async function updateBookingStatus(
   });
 
   // Fire-and-forget: activity event
-  recordStatusChanged(bookingId, existing.status, newStatus);
+  if (newStatus !== BookingStatus.REJECTED) {
+    recordStatusChanged(bookingId, existing.status, newStatus, actor?.actorId);
+  }
 
   // Fire-and-forget: analytics tracking
   if (newStatus === BookingStatus.CONFIRMED) {
