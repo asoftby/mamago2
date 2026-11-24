@@ -575,8 +575,25 @@ export async function retryFailedDelivery(
         return false;
       }
     } else if (delivery.channel === "TELEGRAM") {
+      const retryBusiness = delivery.notification.audience === "BUSINESS" &&
+        delivery.notification.entityType === "BOOKING" && delivery.notification.entityId
+        ? await prisma.bookingRequest.findUnique({
+            where: { id: delivery.notification.entityId },
+            select: { businessId: true },
+          })
+        : null;
+      if (delivery.notification.audience === "BUSINESS" &&
+          delivery.notification.entityType === "BOOKING" && !retryBusiness?.businessId) {
+        await prisma.notificationDelivery.update({
+          where: { id: deliveryId },
+          data: { status: "SKIPPED", errorMessage: "BOOKING_BUSINESS_NOT_FOUND" },
+        });
+        return false;
+      }
       const businessRecipient = delivery.notification.audience === "BUSINESS"
-        ? await getActiveBusinessTelegramRecipient(delivery.userId)
+        ? await getActiveBusinessTelegramRecipient(
+            delivery.userId, retryBusiness?.businessId ?? undefined,
+          )
         : null;
       // Retry must preserve audience isolation: BUSINESS messages must never
       // fall back to the family Telegram bot, even when its business bot is
