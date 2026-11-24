@@ -119,9 +119,9 @@ export function NotificationsPanel({
       setItems((current) => current.filter((item) => item.id !== notification.id));
       await refreshCounts();
 
-      // Archive viewed, resolved notifications. Pending business actions
-      // must remain available in the full inbox until they are resolved.
-      if (canArchiveNotificationRow(notification)) {
+      // Archive routine viewed messages. A new booking remains in the full
+      // business notification history while its order awaits action.
+      if (notification.type !== "BOOKING_CREATED" && canArchiveNotificationRow(notification)) {
         try {
           const response = await fetch(`/api/notifications/${notification.id}/archive`, {
             method: "POST",
