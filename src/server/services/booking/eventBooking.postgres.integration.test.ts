@@ -10,6 +10,7 @@ import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
 import { createManualBooking, createPublicBooking } from "./booking.service";
+import { getEventSlotAvailability } from "./eventSlotAvailability";
 import { getBusinessBookings, updateBookingStatus } from "./bookingQuery.service";
 import { eventRosterWhere } from "@/lib/business/eventRosterScope";
 import { getBusinessInbox } from "./businessInbox.service";
@@ -255,6 +256,8 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       adultsCount: 1, childrenCount: 2, children: [{ age: 6 }, { age: 8 }],
     });
     assert.ok(kidsGroup.bookingId);
+    assert.equal((await getEventSlotAvailability(childrenOnly.id))?.[childrenOnly.sessions[0]!.id]?.remaining, 0,
+      "public availability must use children-only quota after group booking");
     await assert.rejects(createPublicBooking({
       publicationType: "EVENT", publicationId: childrenOnly.id,
       selectedSessionId: childrenOnly.sessions[0]!.id,
@@ -282,6 +285,9 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.equal(contenders.filter((entry) => entry.status === "fulfilled").length, 1,
       "separate quotas must be enforced by the activity row lock");
     assert.match(String(contenders.find((entry) => entry.status === "rejected")?.reason), /Недостаточно взрослых мест/);
+    const separateRemaining = (await getEventSlotAvailability(separate.id))?.[separate.sessions[0]!.id];
+    assert.equal(separateRemaining?.adultsRemaining, 0);
+    assert.equal(separateRemaining?.childrenRemaining, 0);
 
     const today = getLocalDateKey();
     const dateOnly = await makeEvent({
@@ -327,6 +333,8 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       customerName: "First family", customerPhone: "+375291110083",
     };
     await createPublicBooking(fallbackInput);
+    assert.equal((await getEventSlotAvailability(dateWithFallback.id))?.[fallbackDay]?.remaining, 0,
+      "date-only availability must honor the event-wide fallback limit");
     await assert.rejects(createPublicBooking({
       ...fallbackInput, customerPhone: "+375291110084",
     }), /недостаточно мест/, "date-only slots must enforce event fallback quota");
