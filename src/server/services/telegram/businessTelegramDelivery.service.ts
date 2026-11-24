@@ -31,7 +31,19 @@ export async function getActiveBusinessTelegramRecipient(userId: string, expecte
       business: { operationalStatus: "ACTIVE" } },
     select: { id: true },
   });
-  if (!membership) return null;
+  // Legacy owner relationships may predate BusinessMember backfill.
+  // Retain exact owner authorization without granting access to other staff.
+  if (!membership) {
+    const business = await prismaBase.business.findFirst({
+      where: {
+        id: connection.businessId,
+        ownerUserId: userId,
+        operationalStatus: "ACTIVE",
+      },
+      select: { id: true },
+    });
+    if (!business) return null;
+  }
   return { chatId: connection.telegramChatId, businessId: connection.businessId };
 }
 
