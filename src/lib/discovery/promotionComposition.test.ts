@@ -36,9 +36,11 @@ const freeOnly = composePromotedCards(
 );
 assert.equal(freeOnly.length, free.length + organic.length);
 for (let n = 1; n <= 32; n++) {
-  assert.ok(freeOnly.slice(0, n).filter(row => row.id.startsWith("free")).length <= Math.floor(n / 4));
+  assert.ok(freeOnly.slice(0, n).filter(row => row.id.startsWith("free")).length <= Math.ceil(n / 4));
 }
-assert.deepEqual(freeOnly.slice(0, 4).map(row => row.id), ["free0", "organic0", "organic1", "organic2"]);\nassert.deepEqual(mixed.slice(0, 4).map(row => row.id), ["paid0", "organic0", "organic1", "organic2"]);\nassert.deepEqual(composePromotedCards(free, () => "all", () => true), free,
+assert.deepEqual(freeOnly.slice(0, 4).map(row => row.id), ["free0", "organic0", "organic1", "organic2"]);
+assert.deepEqual(mixed.slice(0, 4).map(row => row.id), ["paid0", "organic0", "organic1", "organic2"]);
+assert.deepEqual(composePromotedCards(free, () => "all", () => true), free,
   "Free-only scarcity retains eligible inventory");
 
 // Regression: two otherwise equally relevant same-date events.
