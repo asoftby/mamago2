@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 import type { Subject } from "@/lib/decision/decisionContext";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+import { getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
+import { getPublicationBoostLevel } from "@/server/services/ranking/businessQualityBoost";
 import { activeFamilyUserIds, activePlanScopeFor } from "@/server/family/familyAccess";
 import {
   type RankedPlanSuggestion,
@@ -24,6 +26,7 @@ import {
 } from "./config";
 import {
   selectPersonalFamilyPicks,
+  personalHomeBoostScore,
   type PersonalFamilySelection,
   type PersonalFamilyPick,
   type PersonalFamilyCandidate,
@@ -378,6 +381,7 @@ type PersonalExtras = {
   nextOccurrenceAt: Date | null;
   sessions: { startsAt: Date; withdrawnAt: Date | null; soldOut?: boolean }[];
   _count: { sessions: number };
+  boosts?: { isFreeDaily: boolean; purchaseRequestKey: string | null; targetRegionIds: string[] }[];
 };
 
 /** An old plan visit must never suppress a future session of the same event. */
@@ -439,9 +443,14 @@ type PersonalLoadDependencies = {
   loadExcluded: (userId: string, now: Date, selection: PersonalFamilySelection) => Promise<PlannedActivityExclusions>;
   loadAffinity: typeof resolveSelectedExperienceAffinity;
   loadExtras: (ids: string[], now: Date, range: { start: Date; end: Date }) => Promise<PersonalExtras[]>;
+  resolveBoostContext?: (citySlug: string) => Promise<{ cityId: string; regionId: string | null } | null>;
 };
 const personalDependencies: PersonalLoadDependencies = {
   loadProfile: loadFamilyPicksProfile,
+  resolveBoostContext: async (citySlug) => {
+    const city = await findCityBySlug(citySlug);
+    return city ? { cityId: city.id, regionId: await getDiscoveryRegionContext(city.id, citySlug) } : null;
+  },
   rank: rankPlanSuggestionsForCity,
   loadAffinity: resolveSelectedExperienceAffinity,
   loadExcluded: async (userId, now, selection) => {
@@ -485,6 +494,7 @@ const personalDependencies: PersonalLoadDependencies = {
       id: true, businessId: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true, nextOccurrenceAt: true,
       priceMode: true, priceFrom: true, priceTo: true, currency: true,
       _count: { select: { sessions: true } },
+      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { isFreeDaily: true, purchaseRequestKey: true, targetRegionIds: true } },
       // Keep withdrawn rows to prevent fallback resurrecting a cancelled session.
       sessions: { where: { startsAt: { gte: range.start, lt: range.end } }, select: { startsAt: true, withdrawnAt: true } },
     },
@@ -570,6 +580,9 @@ export async function loadPersonalFamilyPicks(input: {
     deps.loadExcluded(profile.userId, now, selection), deps.loadAffinity({ userId: profile.userId, subjects, now }),
   ]);
   const excluded = [...new Set([...storedExcluded.excludedActivityIds, ...(input.excludeActivityIds ?? [])])];
+  // Injected test dependencies omit this optional lookup; no database access leaks into tests.
+  const homeBoostContext = deps.resolveBoostContext ? await deps.resolveBoostContext(input.citySlug) : null;
+  const homeBoostRegionId = homeBoostContext?.regionId ?? null;
   let lastAlgorithmVersion: string | null = null;
   for (const horizon of PERSONAL_FAMILY_PICKS_POLICY.horizons) {
     const window = resolvePersonalShowWindow(now, horizon);
@@ -600,7 +613,13 @@ export async function loadPersonalFamilyPicks(input: {
       return [{
         id: extra.id, categoryId: suggestion.activity.eventCategory?.id ?? null, businessId: extra.businessId,
         agePolicy: extra.agePolicy, ageMinMonths: extra.ageMinMonths, ageMaxMonths: extra.ageMaxMonths,
-        sharedScore: suggestion.score,
+        // HOME personalization uses its own ranking path: apply the same
+        // active publication signal without changing eligibility or My Plan ranking.
+        sharedScore: personalHomeBoostScore(
+          suggestion.score,
+          getPublicationBoostLevel((extra.boosts ?? []).filter(boost =>
+            isBoostForDiscoveryRegion(boost, homeBoostRegionId, suggestion.activity.cityId === homeBoostContext?.cityId))),
+        ),
         occurrences: excludePlannedFamilyPickDates(extra.id, collectConfirmedOccurrences({
           sessions: extra.sessions, hasStoredSessions: extra._count.sessions > 0,
           nextOccurrenceAt: extra.nextOccurrenceAt, rangeStart: range.start, rangeEnd: range.end, now,

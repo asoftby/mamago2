@@ -1,6 +1,6 @@
 /**
- * At most one Boost (paid or free) per four cards within a relevance band,
- * while organic inventory remains. PAID consumes available Boost slots before
+ * At most one Boost (paid or free) per four-card block within a relevance band,
+ * while organic inventory remains. A boost may lead its own relevance band; PAID consumes available slots before
  * FREE. Never remove/duplicate candidates, borrow from a worse relevance band,
  * or modify page size/count/cursors. If only boosted inventory remains, retain
  * it instead of inventing organic cards.
@@ -32,7 +32,9 @@ export function composePromotedCards<T extends { isPromoted?: boolean }>(
     let p = 0;
 
     while (o < organic.length || f < free.length || p < paid.length) {
-      const boostedSlot = o >= organic.length || result.length % 4 === 3;
+      // A boosted item may lead a relevant group, followed by at least three
+      // organic cards before the next boosted slot. No absolute first-place guarantee.
+      const boostedSlot = o >= organic.length || result.length % 4 === 0;
       if (p < paid.length && boostedSlot) result.push(paid[p++]);
       else if (f < free.length && boostedSlot) result.push(free[f++]);
       else result.push(organic[o++]);
