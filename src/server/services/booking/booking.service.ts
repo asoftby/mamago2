@@ -24,6 +24,8 @@ import {
 import { childScopeFor } from "@/server/family/familyAccess";
 import {
   BookingParticipantsError,
+  BOOKING_MAX_ADULTS,
+  BOOKING_MAX_CHILDREN,
   requestedProfileChildIds,
   resolveParticipants,
   type BookingChildInput,
@@ -667,6 +669,16 @@ async function createPublicationBooking(
   if (adultsCount + childrenCount < 1) {
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
+  // Public EVENT bookings always obey the family-size limit, including the
+  // legacy count-only API payload. Manual bookings retain business controls.
+  if (!manual && input.publicationType === PublicationType.EVENT) {
+    if (!Number.isSafeInteger(adultsCount) || adultsCount > BOOKING_MAX_ADULTS) {
+      throw new BookingValidationError("adultsCount", `Не больше ${BOOKING_MAX_ADULTS} взрослых в одной заявке`);
+    }
+    if (!Number.isSafeInteger(childrenCount) || childrenCount > BOOKING_MAX_CHILDREN) {
+      throw new BookingValidationError("childrenCount", `Не больше ${BOOKING_MAX_CHILDREN} детей в одной заявке`);
+    }
+  }
 
   // Event occurrences are auto-linked only after locking the Activity and
   // resolving the persisted session date/time. An early day-only match would
@@ -746,7 +758,7 @@ async function createPublicationBooking(
           throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
         }
         date = new Date(dateKey);
-        capacity = day.capacity;
+        capacity = day.capacity ?? activity.bookingCapacityPerSlot ?? undefined;
       } else if (manual && activity.bookingMode === BookingMode.USE_PUBLICATION_DATES) {
         const dateKey = date?.toISOString().slice(0, 10) ?? "";
         if (!dateKey || dateKey < getLocalDateKey() || input.selectedSessionId || time) {

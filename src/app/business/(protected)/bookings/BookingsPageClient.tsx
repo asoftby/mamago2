@@ -503,10 +503,8 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
 
   useEffect(() => {
     const idFromUrl = searchParams.get("id");
-    if (idFromUrl && items.length > 0) {
-      setSelectedBookingId(idFromUrl);
-    }
-  }, [searchParams, items]);
+    if (idFromUrl) setSelectedBookingId(idFromUrl);
+  }, [searchParams]);
 
   const fetchBookings = useCallback(
     async () => {
@@ -662,10 +660,13 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [activeListDate, items, sortMode, tab]);
 
   useEffect(() => {
-    if (selectedBookingId && !visibleItems.some((item) => item.id === selectedBookingId)) {
+    if (selectedBookingId &&
+        !visibleItems.some((item) => item.id === selectedBookingId) &&
+        searchParams.get("id") !== selectedBookingId &&
+        selectedBookingDetail?.id !== selectedBookingId) {
       setSelectedBookingId(null);
     }
-  }, [selectedBookingId, visibleItems]);
+  }, [selectedBookingId, visibleItems, searchParams, selectedBookingDetail]);
 
   const selectedBooking = useMemo(
     () => selectedBookingDetail?.id === selectedBookingId

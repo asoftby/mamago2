@@ -9,7 +9,8 @@ import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { parseStoredChildren, formatChildLabel } from "@/lib/booking/bookingParticipants";
 import { calculateEventSeatAvailability, getEventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
-import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { resolveBookingServiceEnd } from "@/lib/booking/effectiveServiceEnd";
 import { formatHHMM } from "@/lib/formatters/date";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
@@ -114,18 +115,18 @@ export default async function EventParticipantsPage({
 
   const policy = getEventSeatPolicy(activity.scheduleJson);
   const slot = getEventBookingSchedule(activity.scheduleJson, activity.bookingMode)
-    .get(eventBookingSlotKey(slotDate, slotTime));
+    .get(eventBookingSlotKey(slotDate, activity.bookingMode === BookingMode.USE_PUBLICATION_DATES ? "" : slotTime));
   const availability = calculateEventSeatAvailability({
     policy, capacity: slot?.capacity ?? activity.bookingCapacityPerSlot,
     usedAdults: adultsCount, usedChildren: childrenCount,
   });
 
-  // The roster is operational, not a permanent customer database. Do not show
-  // names for past events. Each active roster disclosure is audited and rate-limited.
-  // Match operational contact policy: hide attendee identities once the event
-  // has ended. A session without a configured end is treated as ended at start.
-  const end = slot?.endTime ? localWallClockToUtc(slotDate, slot.endTime) : selected.startsAt;
-  const showNames = end.getTime() > now.getTime();
+  // Use the established per-booking privacy boundary. A booking for an
+  // occurrence remains actionable through the end of its Minsk calendar day.
+  // This also covers date-only events (whose session may start at midnight).
+  // Never expose the contact name/child details after the effective service end.
+  const end = resolveBookingServiceEnd({ requestedDate: new Date(slotDate) });
+  const showNames = end !== null && end.getTime() > now.getTime();
   if (showNames) {
     const rate = await checkRateLimit("business_event_roster:" + business.id + ":" + user.id, 40, 15 * 60 * 1000);
     if (!rate.allowed) {
@@ -211,7 +212,7 @@ export default async function EventParticipantsPage({
                     <p className="text-xs font-medium text-stone-500">{row.status === BookingStatus.CONFIRMED ? "Подтверждено" : "Ожидает подтверждения"}</p>
                   </div>
                   <Link className="inline-flex min-h-10 items-center justify-center rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold"
-                    href={"/business/bookings?tab=" + (row.status === BookingStatus.NEW ? "action" : "upcoming") + "&kind=standard&request=" + encodeURIComponent(row.id)}>
+                    href={"/business/bookings?id=" + encodeURIComponent(row.id)}>
                     Открыть заявку
                   </Link>
                 </div>
