@@ -8,7 +8,7 @@ Contacts are available only through the audited, rate-limited individual detail 
 
 Event confirmation locks Activity before BookingRequest and reassesses seat policy and nonexpired occupancy. Offer confirmation locks the group, ordered resource units and session before BookingRequest. It reuses loadSlotSnapshot/calculateSlots, excluding its own seat/resource hold, and checks allocation expiry. PostgreSQL exclusion constraints remain authoritative for overlapping resources. PARTY requests retain the existing partyConfirm path and resource selection/locking.
 
-The decision read occurs only when opening a pending request. There is no polling or shared private cache. Offer decisions add one request lookup and the existing bounded-time slot snapshot reads to confirmation. Request history in the shared snapshot can still grow with the offer history. No latency improvement has been measured.
+The decision read occurs only when opening a pending request. There is no polling or shared private cache. Offer decisions add one request lookup and the existing bounded-time slot snapshot reads to confirmation. Decision snapshots restrict other requests to the relevant session/time window. No latency improvement has been measured.
 
 ## DEV acceptance
 

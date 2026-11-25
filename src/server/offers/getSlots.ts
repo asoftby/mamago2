@@ -38,7 +38,14 @@ export async function loadSlotSnapshot(
       select: { id: true, startAt: true, endAt: true, capacity: true, isCancelled: true },
     }),
     db.bookingRequest.findMany({
-      where: { ...(excludeBookingRequestId ? { id: { not: excludeBookingRequestId } } : {}), offerId: input.offerId, ...(input.classGroupId ? { OR: [{ classGroupId: input.classGroupId }, { classGroupId: null }] } : {}), status: { in: ["NEW", "CONFIRMED"] } },
+      where: { ...(excludeBookingRequestId ? {
+        id: { not: excludeBookingRequestId },
+        AND: [{ OR: [
+          { startsAt: { gte: input.from, lt: input.to } },
+          { offerSession: { startAt: { gte: input.from, lt: input.to } } },
+          { campShiftDateFrom: { gte: input.from, lt: input.to } },
+        ] }],
+      } : {}), offerId: input.offerId, ...(input.classGroupId ? { OR: [{ classGroupId: input.classGroupId }, { classGroupId: null }] } : {}), status: { in: ["NEW", "CONFIRMED"] } },
       select: {
         offerSessionId: true, startsAt: true, seats: true, status: true, holdUntil: true,
         campShiftDateFrom: true, campShiftDateTo: true, childrenCount: true,

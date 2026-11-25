@@ -1623,6 +1623,7 @@ export function BookingDetailsDrawer({
   const [rejectionComment, setRejectionComment] = useState("");
   const [decision, setDecision] = useState<BookingDecisionPreview | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionRevision, setDecisionRevision] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1643,7 +1644,7 @@ export function BookingDetailsDrawer({
       if (!controller.signal.aborted) setDecisionError("Не удалось проверить места. Обновите заявку.");
     });
     return () => controller.abort();
-  }, [open, booking?.id, booking?.status, booking?.publicationType]);
+  }, [open, booking?.id, booking?.status, booking?.publicationType, decisionRevision]);
 
   useEffect(() => {
     setRejectOpen(false);
@@ -1682,9 +1683,7 @@ export function BookingDetailsDrawer({
         setRejectionComment("");
       }
     } catch {
-      setDecision(null);
-      void fetch("/api/business/bookings/" + encodeURIComponent(booking.id) + "/decision", { cache: "no-store" })
-        .then((res) => res.ok ? res.json() : null).then(setDecision).catch(() => setDecisionError("Не удалось проверить места"));
+      setDecisionRevision((revision) => revision + 1);
       // The caller displays the API error. Keep the rejection reason for retry.
     } finally {
       setUpdating(null);
