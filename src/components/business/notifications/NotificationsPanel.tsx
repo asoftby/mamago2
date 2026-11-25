@@ -21,6 +21,7 @@ import { NotificationDetailDialog } from "./NotificationDetailDialog";
 import { NotificationListItem } from "./NotificationListItem";
 import { NotificationSettingsInModal } from "./NotificationSettingsInModal";
 import { useOnboardingNotificationCta } from "@/features/notifications/hooks/useOnboardingNotificationCta";
+import { canArchiveNotificationRow } from "@/lib/notifications/notificationLifecycle";
 
 export type NotificationsPanelProps = {
   /** Вызывается при закрытии popover/sheet (кнопка X и т.д.) */
@@ -82,7 +83,7 @@ export function NotificationsPanel({
   const refreshRecent = useCallback(async () => {
     setLoading(true);
     try {
-      const page = await fetchNotificationsPageApi(0, 7, stream, "inbox");
+      const page = await fetchNotificationsPageApi(0, 7, stream, "unread");
       setItems(page.notifications);
     } catch (error) {
       console.error(error);
@@ -112,19 +113,27 @@ export function NotificationsPanel({
   }, [refreshCounts, refreshRecent]);
 
   const markItemAsReadLocally = useCallback(
-    async (notificationId: string) => {
-      setItems((current) =>
-        current.map((notification) =>
-          notification.id === notificationId
-            ? {
-                ...notification,
-                seenAt: notification.seenAt ?? new Date().toISOString(),
-                readAt: notification.readAt ?? new Date().toISOString(),
-              }
-            : notification,
-        ),
-      );
+    async (notification: NotificationApiRow) => {
+      // resolve-action has persisted readAt before this callback fires.
+      // The bell is a queue of unread notifications, not a history feed.
+      setItems((current) => current.filter((item) => item.id !== notification.id));
       await refreshCounts();
+
+      // Archive routine viewed messages. A new booking remains in the full
+      // business notification history while its order awaits action.
+      if (notification.type !== "BOOKING_CREATED" && canArchiveNotificationRow(notification)) {
+        try {
+          const response = await fetch(`/api/notifications/${notification.id}/archive`, {
+            method: "POST",
+            credentials: "include",
+          });
+          if (!response.ok && response.status !== 409) {
+            console.error("[notifications] Could not archive viewed notification", response.status);
+          }
+        } catch (error) {
+          console.error("[notifications] Could not archive viewed notification", error);
+        }
+      }
     },
     [refreshCounts],
   );
@@ -157,11 +166,24 @@ export function NotificationsPanel({
         return;
       }
 
-      if (!notification.actionUrl) return;
-      onClose();
-      router.push(notification.actionUrl);
+      // The CTA must follow the same server-side read path as clicking
+      // the row. A direct router.push left the notification unread.
+      try {
+        await handleNotificationClick({
+          notification,
+          router,
+          onAfterRead: () => {
+            void markItemAsReadLocally(notification);
+          },
+          onModal: setDetailAction,
+          onClose,
+        });
+      } catch (error) {
+        console.error(error);
+        toast.error("Не удалось открыть уведомление");
+      }
     },
-    [handleOnboardingCta, onClose, router],
+    [handleOnboardingCta, markItemAsReadLocally, onClose, router],
   );
 
   const handleRowClick = useCallback(
@@ -170,8 +192,8 @@ export function NotificationsPanel({
         await handleNotificationClick({
           notification,
           router,
-          onAfterRead: (notificationId) => {
-            void markItemAsReadLocally(notificationId);
+          onAfterRead: () => {
+            void markItemAsReadLocally(notification);
           },
           onModal: setDetailAction,
           onClose,

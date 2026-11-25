@@ -107,7 +107,9 @@ export async function GET(req: NextRequest) {
     const total =
       tab === "archive"
         ? await countUserArchived(user.id, { stream, options: queryOpts })
-        : await countUnifiedNotifications(user.id, stream, queryOpts);
+        : tab === "unread"
+          ? unreadCount
+          : await countUnifiedNotifications(user.id, stream, queryOpts);
     const hasMore = cursorMode
       ? nextCursor != null
       : offset + notifications.length < total;
