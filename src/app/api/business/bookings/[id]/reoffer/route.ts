@@ -96,6 +96,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         userId: original.userId, audience: "USER", type: "SYSTEM",
         title: "Освободилось место", body: "Организатор предлагает вам повторно записаться. Подтвердите, если ещё хотите посетить событие.",
         ctaLabel: "Ответить", ctaAction: `/booking-reoffers/${invitation.id}`,
+        metadata: { source: "BOOKING_REOFFER" },
       });
     } catch {
       console.error("[booking-reoffer] notification dispatch failed", { invitationId: invitation.id });
