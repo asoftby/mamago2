@@ -38,17 +38,7 @@ import type {
   BookingStatusCounts,
 } from "@/server/services/booking/bookingQuery.service";
 
-type BookingDecisionPreview = {
-  requested?: number;
-  occupied?: number;
-  canConfirm: boolean;
-  code: "AVAILABLE" | "FULL" | "UNLIMITED" | "NOT_APPLICABLE" | "UNAVAILABLE";
-  message: string;
-  capacity: number | null;
-  remaining: number | null;
-  adultsRemaining?: number | null;
-  childrenRemaining?: number | null;
-};
+type BookingDecisionPreview = import("@/server/services/booking/bookingDecisionAvailability.service").BookingDecisionAvailability;
 
 type StatusFilter = "all" | BookingStatus;
 type SortMode = "newest" | "oldest";
@@ -1910,10 +1900,18 @@ export function BookingDetailsDrawer({
             )}>
               {decisionError ?? decision?.message ?? "Проверяем свободные места для этой заявки…"}
               {decision?.capacity != null ? ` · Всего мест: ${decision.capacity}` : ""}
-              {decision?.occupied != null ? ` · Занято (включая заявку): ${decision.occupied}` : ""}
+              {decision?.occupied != null ? ` · Занято: ${decision.occupied}` : ""}
               {decision?.requested != null ? ` · Запрошено: ${decision.requested}` : ""}
               {decision?.remaining !== null && decision?.remaining !== undefined
                 ? ` · Свободно: ${decision.remaining}` : ""}
+              {decision?.resourceLimits?.map((resource) => (
+                <span key={resource.id} className="mt-1 block">
+                  {resource.name}
+                  {resource.capacity === null ? " · Без ограничения вместимости" :
+                    resource.capacity !== undefined ? ` · Вместимость: ${resource.capacity}` : ""}
+                  {` · Запрошено: ${resource.requested} · ${resource.available ? "Доступен" : "Недоступен"}`}
+                </span>
+              ))}
             </p>
           ) : null}
           {rejectOpen && canReject ? (

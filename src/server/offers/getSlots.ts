@@ -29,6 +29,8 @@ export async function loadSlotSnapshot(
   if (!offer?.bookingEnabled || !booking ||
       (offer.bookingMode !== "USE_PUBLICATION_DATES" && offer.bookingMode !== "USE_PUBLICATION_SLOTS")) return null;
 
+  if (input.classGroupId && !offer.classGroups.some((group) => group.id === input.classGroupId)) return null;
+
   const openingHoursId = offer.inheritPlaceOpeningHours
     ? offer.place?.openingHoursId
     : offer.openingHoursId;
@@ -114,6 +116,8 @@ export async function loadSlotSnapshot(
     } : null,
     units: links.map(({ bookingUnit: unit }) => ({
       id: unit.id,
+      name: unit.name,
+      capacity: unit.capacity,
       timezone: unit.timezone,
       prepMinutes: unit.prepMinutes,
       cleanupMinutes: unit.cleanupMinutes,

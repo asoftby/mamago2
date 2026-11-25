@@ -591,7 +591,7 @@ export async function updateBookingStatus(
       kind: true,
       publicationType: true,
       activityId: true,
-      classGroupId: true, offerSessionId: true,
+      classGroupId: true, offerSessionId: true, startsAt: true,
       allocations: { select: { bookingUnitId: true } },
       status: true,
       createdAt: true,
@@ -670,6 +670,11 @@ export async function updateBookingStatus(
       }
       if (existing.offerSessionId) {
         await tx.$queryRaw`SELECT "id" FROM "OfferSession" WHERE "id" = ${existing.offerSessionId} FOR UPDATE`;
+      } else if (existing.offer && existing.startsAt && existing.allocations.length === 0) {
+        // Legacy requests may have the exact window but no persisted session ID.
+        await tx.$queryRaw`SELECT "id" FROM "OfferSession"
+          WHERE "offerId" = ${existing.offer.id}
+            AND "startAt" = (${existing.startsAt}::timestamptz AT TIME ZONE 'UTC') FOR UPDATE`;
       }
     }
     // Serialize concurrent status updates for the same request before reading state.

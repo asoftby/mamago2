@@ -9,6 +9,7 @@ import { getEventSeatPolicy, calculateEventSeatAvailability, occupiedEventSeats,
 type Db = Prisma.TransactionClient;
 
 export type BookingDecisionAvailability = {
+  resourceLimits?: Array<{ id: string; name: string; capacity?: number | null; requested: number; available: boolean }>;
   requested?: number;
   occupied?: number;
   canConfirm: boolean;
@@ -90,31 +91,78 @@ export async function getBusinessBookingDecisionAvailability(
   if (request.holdUntil && request.holdUntil.getTime() <= now.getTime()) {
     return unavailable("Срок резервирования истёк. Подтвердить эту заявку нельзя");
   }
+  if (request.publicationType === PublicationType.EVENT && !request.activityId) {
+    return unavailable("Событие заявки больше недоступно");
+  }
+  if (request.offerId && request.offerSessionId && (!request.startsAt || !request.endsAt)) {
+    const session = await db.offerSession.findFirst({
+      where: { id: request.offerSessionId, offerId: request.offerId },
+      select: { startAt: true, endAt: true },
+    });
+    if (!session) return unavailable("Сеанс заявки больше недоступен");
+    request.startsAt ??= session.startAt;
+    request.endsAt ??= session.endAt;
+  }
+  if (request.offerId && (!request.startsAt || !request.endsAt)) {
+    const offer = await db.offer.findUnique({
+      where: { id: request.offerId }, select: { bookingEnabled: true, bookingMode: true },
+    });
+    if (offer?.bookingEnabled && (offer.bookingMode === "USE_PUBLICATION_DATES" || offer.bookingMode === "USE_PUBLICATION_SLOTS")) {
+      return unavailable("Для старой заявки не определён сеанс. Нужна новая запись на актуальное время");
+    }
+  }
   if (request.offerId && request.startsAt && request.endsAt) {
     const query = { offerId: request.offerId, classGroupId: request.classGroupId ?? undefined,
       from: request.startsAt, to: new Date(request.endsAt.getTime() + 1), requestedSeats: request.seats };
     const snapshot = await loadSlotSnapshot(query, db, bookingId);
     if (!snapshot) return unavailable("Расписание больше недоступно");
-    if (snapshot.units.length > 0 && request.allocations.length === 0) {
-      return unavailable("У заявки отсутствует резерв обязательного ресурса");
+    if (snapshot.hasClassGroups && !request.classGroupId) {
+      return unavailable("Для старой заявки не определена группа. Нужна новая запись на актуальное время");
     }
-    if (request.allocations.some((a) => !["HELD", "CONFIRMED"].includes(a.status) ||
-      (a.status === "HELD" && a.expiresAt !== null && a.expiresAt <= now))) {
-      return unavailable("Резерв ресурса истёк или освобождён");
+    if (snapshot.scheduleKind === "ON_REQUEST_WINDOWS" && request.allocations.length === 0) {
+      return unavailable("У заявки отсутствует резерв обязательного ресурса");
     }
     // Lead time controls new reservations. This request already holds its slot.
     const slot = calculateSlots({ ...snapshot, leadTimeHours: 0 }, {
       ...query, ...(snapshot.scheduleKind === "ON_REQUEST_WINDOWS" ? {
         requestedDurationMinutes: (request.endsAt.getTime() - request.startsAt.getTime()) / 60_000,
       } : {}),
-    }, now).find((slot) =>
+    }, now, { includeUnavailable: true }).find((slot) =>
       slot.startsAt.getTime() === request.startsAt!.getTime() &&
       slot.endsAt.getTime() === request.endsAt!.getTime());
-    if (!slot || request.allocations.some((a) => !slot.unitIds.includes(a.bookingUnitId))) {
-      return unavailable("Недостаточно мест или выбранный ресурс недоступен");
+    if (snapshot.scheduleKind !== "ON_REQUEST_WINDOWS" &&
+        (!slot?.sessionId || (request.offerSessionId && slot.sessionId !== request.offerSessionId))) {
+      return unavailable("Сеанс старой заявки не найден или изменился. Нужна новая запись на актуальное время");
     }
-    return { canConfirm: true, code: "AVAILABLE", message: "Достаточно мест и ресурсов для подтверждения",
-      remaining: slot.remainingSeats, capacity: snapshot.sessions.find((s) => s.id === slot.sessionId)?.capacity ?? snapshot.capacity };
+    const units = new Map(snapshot.units.map((unit) => [unit.id, unit]));
+    const resourceLimits = request.allocations.map((allocation) => {
+      const unit = units.get(allocation.bookingUnitId);
+      return {
+        id: allocation.bookingUnitId, name: unit?.name ?? "Ресурс",
+        capacity: unit?.capacity, requested: request.seats,
+        available: Boolean(unit && (unit.capacity == null || unit.capacity >= request.seats) && slot?.unitIds.includes(unit.id)),
+      };
+    });
+    if (request.allocations.some((allocation) => !["HELD", "CONFIRMED"].includes(allocation.status) ||
+      (allocation.status === "HELD" && allocation.expiresAt !== null && allocation.expiresAt <= now))) {
+      return { ...unavailable("Резерв ресурса истёк или освобождён"), requested: request.seats,
+        resourceLimits: resourceLimits.map((resource) => ({ ...resource, available: false })) };
+    }
+    if (!slot || resourceLimits.some((resource) => !resource.available)) {
+      return { ...unavailable("Недостаточно мест или выбранный ресурс недоступен"), requested: request.seats, resourceLimits };
+    }
+    const heldSeats = request.holdUntil ? request.seats : 0;
+    const canConfirm = slot.remainingSeats === null || slot.remainingSeats >= request.seats;
+    return {
+      canConfirm, code: canConfirm ? "AVAILABLE" : "FULL",
+      message: canConfirm ? "Достаточно мест и ресурсов для подтверждения" :
+        "Недостаточно свободных мест. Запрошено " + request.seats + ", доступно " + Math.max(0, slot.remainingSeats ?? 0),
+      requested: request.seats,
+      occupied: slot.occupiedSeats === undefined ? undefined : slot.occupiedSeats + heldSeats,
+      remaining: slot.remainingSeats === null ? null : Math.max(0, slot.remainingSeats - heldSeats),
+      capacity: slot.capacity ?? null,
+      resourceLimits,
+    };
   }
   if (request.publicationType !== PublicationType.EVENT || !request.activityId) {
     return { canConfirm: true, code: "NOT_APPLICABLE", message: "Для этой заявки учёт мест по сеансам не применяется", remaining: null, capacity: null };

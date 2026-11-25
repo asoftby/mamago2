@@ -502,6 +502,12 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.equal(manualDateRow.requestedDate?.toISOString(), new Date(today).toISOString());
     assert.equal(manualDateRow.requestedTime, null);
 
+    const orphan = await prisma.bookingRequest.create({ data: {
+      businessId: business.id, publicationType: "EVENT", customerName: "Orphan event test", customerPhone: "+375291112233",
+    } });
+    assert.equal((await getBusinessBookingDecisionAvailability(prisma, orphan.id, business.id))?.canConfirm, false);
+    await assert.rejects(updateBookingStatus(orphan.id, business.id, "CONFIRMED"), BookingDecisionCapacityError);
+
   } finally {
     await prisma.bookingRequest.deleteMany({ where: { businessId: business.id } });
     await prisma.planItem.deleteMany({ where: { userId: owner.id } });

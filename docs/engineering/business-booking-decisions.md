@@ -32,3 +32,12 @@ Russian templates use Unicode SMS. Confirmation and each standard reason without
 The public SMS.by SMS page lists 0.028 BYN per message for the lowest-volume bracket, while its tariff page displays 0.046 BYN for Belarusian operators. These pages differ, and the account-specific contracted rate has not been confirmed. A planning range is 0.028–0.046 BYN for a one-segment notification and 0.252–0.414 BYN for nine segments. These estimates cover Belarusian numbers. International destinations have different provider tariffs. Actual billing depends on the account tariff and provider-reported parts. Sources checked on 2026-11-25. [SMS.by SMS pricing](https://sms.by/sending-sms), [SMS.by tariffs](https://sms.by/tariffs), [SMS.by API](https://sms.by/api-docs/sms-messages/).
 
 The additive 20261125143000_guest_booking_decision_sms migration creates delivery and attempt tables with unique decision and attempt keys. Existing data and notification records are retained. Apply migrations before the new app version. Tests use injected/mock SMS providers and disposable PostgreSQL, with no real SMS sent.
+
+
+## Capacity preview and legacy links
+
+The decision preview includes requested, occupied and free group seats from calculateSlots. Its private includeUnavailable option exposes full/zero-capacity sessions for inspection. Ordinary public slot payloads and full-slot filtering are preserved. The request’s own live hold is counted once in displayed occupancy and excluded from the additional-seat check. Each selected exclusive resource exposes its name, capacity, requested seats and availability. Resource capacities are enforced by the shared calculator for reservations and confirmation.
+
+Exact legacy OfferSession references resolve their stored window. A request with an exact window but no session ID locks the existing session by offer/time, using UTC wall-clock comparison consistent with Prisma timestamps. Requests with an unresolved structured window, withdrawn group or missing event cannot be confirmed without a new valid booking. Generic request-only enquiries preserve their existing behavior. The usual preview reuses its existing snapshot reads. Legacy resolution adds bounded primary-key lookups only when the stored window is missing.
+
+PR #1209 provides session allocation ownership and the cross-owner exclusion constraint. Its session assignment writes were explicitly deferred to lifecycle work, and current schedule editors retain that boundary. This PR preserves the owner model and adds no session assignment workflow or release flag.
