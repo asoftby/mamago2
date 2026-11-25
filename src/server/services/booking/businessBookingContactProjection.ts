@@ -20,7 +20,8 @@ const ACTIVE_CONTACT_STATUSES = new Set<BookingStatus>([
 /** Contacts remain actionable during the service window (including a business
  * rejection), but completed, user-cancelled and elapsed orders stay hidden. */
 function canRevealBusinessBookingContacts(booking: BusinessBookingItem, now: Date = new Date()): boolean {
-  if (!ACTIVE_CONTACT_STATUSES.has(booking.status)) return false;
+  if (!ACTIVE_CONTACT_STATUSES.has(booking.status) &&
+      !(booking.status === BookingStatus.CANCELLED && booking.cancellationActor === "BUSINESS")) return false;
   if (booking.endsAt) {
     const endTimestamp = new Date(booking.endsAt).getTime();
     return Number.isFinite(endTimestamp) && endTimestamp > now.getTime();

@@ -56,6 +56,8 @@ jobs:
       - name: Apply migrations to disposable database
         run: pnpm exec prisma migrate deploy
       - name: Run concurrent reservation integration tests
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx src/server/offers/reserveSlot.integration.test.ts
       - name: Atomic multi-resource holds and concurrent bundle reservations
         env:
@@ -89,3 +91,8 @@ jobs:
         env:
           NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx --test src/server/services/booking/eventBooking.postgres.integration.test.ts
+
+      - name: Guest decision SMS queue, concurrency, safe retry and mock provider
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm test:guest-booking-sms

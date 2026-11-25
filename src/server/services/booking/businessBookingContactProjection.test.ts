@@ -130,3 +130,11 @@ test("contact projection and disclosure audit gate share the same expiry snapsho
   assert.equal(atCutoff.revealsContact, false);
   assert.equal(atCutoff.detail.customerPhone, "");
 });
+
+test("only explicitly attributed business cancellations disclose within service window", () => {
+  const cancelled = { ...booking, status: BookingStatus.CANCELLED, endsAt: new Date(Date.now() + 60_000).toISOString() };
+  assert.equal(businessBookingDetailProjection(cancelled).customerPhone, "");
+  assert.equal(businessBookingDetailProjection({ ...cancelled, cancellationActor: "BUSINESS" }).customerPhone, booking.customerPhone);
+  assert.equal(businessBookingDetailProjection({ ...cancelled, cancellationActor: "BUSINESS", endsAt: new Date(Date.now() - 1).toISOString() }).customerPhone, "");
+  assert.equal(businessBookingListProjection({ ...cancelled, cancellationActor: "BUSINESS" }).customerPhone, "");
+});

@@ -4,15 +4,15 @@
  * Обновляет статус заявки.
  * Допустимые переходы:
  *   NEW → CONFIRMED | REJECTED
- *   CONFIRMED → COMPLETED | REJECTED
+ *   CONFIRMED → COMPLETED | CANCELLED
  *
- * Body: { status: "CONFIRMED" | "REJECTED" | "COMPLETED" }
+ * Reasons and comments are validated by businessBookingDecisionSchema.
  */
 
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { dispatchGuestBookingSms } from "@/server/services/booking/guestBookingSms.service";
 import { businessBookingDecisionSchema } from "@/lib/booking/businessBookingDecisionSchema";
-import { BookingStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import {
@@ -36,12 +36,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const business = await getMyBusiness(user.id);
+    const { id } = await params;
+    const business = await getMyBusiness(user.id, id);
     if (!business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
-    const { id } = await params;
     const body: unknown = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
@@ -63,6 +63,15 @@ export async function PATCH(
         source: "business_status_endpoint",
       },
     });
+    if (!updated.hasCustomerAccount && parsed.data.status !== "COMPLETED") {
+      after(async () => {
+        try {
+          await dispatchGuestBookingSms({ bookingId: id, limit: 3 });
+        } catch {
+          console.error("[booking-sms] after-response dispatch failed");
+        }
+      });
+    }
     await attachDirectAvailabilityToBusinessBookings([updated]);
     return NextResponse.json(businessBookingListProjection(updated));
   } catch (err) {

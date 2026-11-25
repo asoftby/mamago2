@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { getBusinessBookingDecisionAvailability } from "@/server/services/booking/bookingDecisionAvailability.service";
 import { createNotification } from "@/server/services/notification.service";
+import { localWallClockToUtc } from "@/lib/date/localDateKey";
+import { isSameSiteBrowserOrigin } from "@/lib/security/isSameSiteBrowserOrigin";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { BookingKind, BookingStatus, PublicationType } from "@prisma/client";
 
@@ -12,7 +14,7 @@ export const dynamic = "force-dynamic";
 async function context(id: string) {
   const user = await getCurrentUser();
   if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  const business = await getMyBusiness(user.id);
+  const business = await getMyBusiness(user.id, id);
   if (!business) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   const original = await prisma.bookingRequest.findFirst({
     where: { id, businessId: business.id, kind: BookingKind.STANDARD },
@@ -49,7 +51,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameSiteBrowserOrigin({ origin: request.headers.get("origin"), host: request.headers.get("host"),
+    protocol: request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol })) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
   const { id } = await params;
   const result = await context(id);
   if (result.error) return result.error;
@@ -66,10 +72,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   if (decision?.code !== "AVAILABLE" || !decision.canConfirm) {
     return NextResponse.json({ error: decision?.message ?? "Свободных мест нет" }, { status: 409 });
   }
-  const endOfDate = original.requestedDate
-    ? new Date(original.requestedDate.getTime() + 24 * 60 * 60 * 1000 - 1)
+  const fallbackStart = original.requestedDate
+    ? localWallClockToUtc(original.requestedDate.toISOString().slice(0, 10), original.requestedTime ?? "00:00")
     : null;
-  const deadline = original.session?.startsAt ?? endOfDate;
+  const deadline = original.session?.startsAt ?? (fallbackStart && (original.requestedTime
+    ? fallbackStart : new Date(fallbackStart.getTime() + 24 * 60 * 60 * 1000 - 1)));
   const expiresAt = new Date(Math.min(now.getTime() + 24 * 60 * 60 * 1000, deadline?.getTime() ?? 0));
   if (expiresAt.getTime() <= now.getTime() + 60_000) {
     return NextResponse.json({ error: "До начала события недостаточно времени" }, { status: 409 });
@@ -90,8 +97,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         title: "Освободилось место", body: "Организатор предлагает вам повторно записаться. Подтвердите, если ещё хотите посетить событие.",
         ctaLabel: "Ответить", ctaAction: `/booking-reoffers/${invitation.id}`,
       });
-    } catch (error) {
-      console.error("[booking-reoffer] notification dispatch failed", error);
+    } catch {
+      console.error("[booking-reoffer] notification dispatch failed", { invitationId: invitation.id });
     }
     return NextResponse.json(invitation, { status: 201 });
   } catch (error) {
@@ -102,7 +109,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameSiteBrowserOrigin({ origin: request.headers.get("origin"), host: request.headers.get("host"),
+    protocol: request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol })) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
   const { id } = await params;
   const result = await context(id);
   if (result.error) return result.error;

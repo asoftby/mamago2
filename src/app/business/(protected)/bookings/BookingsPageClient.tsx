@@ -1,5 +1,7 @@
 "use client";
 
+import { businessRejectionReasons } from "@/lib/booking/businessBookingDecisionSchema";
+import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import type { EventCalendarSummary } from "@/lib/business/eventCalendarSummary";
 
@@ -36,15 +38,7 @@ import type {
   BookingStatusCounts,
 } from "@/server/services/booking/bookingQuery.service";
 
-type BookingDecisionPreview = {
-  canConfirm: boolean;
-  code: "AVAILABLE" | "FULL" | "UNLIMITED" | "NOT_APPLICABLE" | "UNAVAILABLE";
-  message: string;
-  capacity: number | null;
-  remaining: number | null;
-  adultsRemaining?: number | null;
-  childrenRemaining?: number | null;
-};
+type BookingDecisionPreview = import("@/server/services/booking/bookingDecisionAvailability.service").BookingDecisionAvailability;
 
 type StatusFilter = "all" | BookingStatus;
 type SortMode = "newest" | "oldest";
@@ -600,7 +594,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [selectedBookingId, detailRefreshRevision]);
 
   const handleStatusChange = useCallback(
-    async (id: string, status: BookingStatus, reason?: string) => {
+    async (id: string, status: BookingStatus, reason?: string, comment?: string) => {
       setItems((prev) => prev.map((booking) => (booking.id === id ? { ...booking, status } : booking)));
 
       try {
@@ -608,7 +602,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ status, ...(reason ? { reason } : {}) }),
+          body: JSON.stringify({ status, ...(reason ? { reason, comment } : {}) }),
         });
 
         if (!res.ok) {
@@ -1611,21 +1605,23 @@ export function BookingDetailsDrawer({
   onOpenChange: (open: boolean) => void;
   onSelectPrev: () => void;
   onSelectNext: () => void;
-  onStatusChange: (id: string, status: BookingStatus, reason?: string) => Promise<void>;
+  onStatusChange: (id: string, status: BookingStatus, reason?: string, comment?: string) => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionComment, setRejectionComment] = useState("");
   const [decision, setDecision] = useState<BookingDecisionPreview | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [reoffer, setReoffer] = useState<{ eligible: boolean; reason: string | null; invitation: { status: string; expiresAt: string } | null } | null>(null);
   const [sendingReoffer, setSendingReoffer] = useState(false);
+  const [decisionRevision, setDecisionRevision] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
     setDecision(null);
     setDecisionError(null);
-    if (!open || !booking?.id || booking.status !== BookingStatus.NEW || booking.publicationType !== "EVENT") {
+    if (!open || !booking?.id || booking.status !== BookingStatus.NEW) {
       return () => controller.abort();
     }
     // A Telegram Mini App link opens this same authorized booking detail.
@@ -1640,17 +1636,19 @@ export function BookingDetailsDrawer({
       if (!controller.signal.aborted) setDecisionError("Не удалось проверить места. Обновите заявку.");
     });
     return () => controller.abort();
-  }, [open, booking?.id, booking?.status, booking?.publicationType]);
+  }, [open, booking?.id, booking?.status, booking?.publicationType, decisionRevision]);
 
   useEffect(() => {
     setRejectOpen(false);
     setRejectionReason("");
+    setRejectionComment("");
   }, [booking?.id]);
 
   useEffect(() => {
     const controller = new AbortController();
     setReoffer(null);
-    if (!open || !booking?.id || booking.status !== BookingStatus.REJECTED) return () => controller.abort();
+    if (!open || !booking?.id || booking.status !== BookingStatus.REJECTED ||
+        booking.publicationType !== "EVENT" || !booking.hasCustomerAccount) return () => controller.abort();
     void fetch(`/api/business/bookings/${encodeURIComponent(booking.id)}/reoffer`, {
       credentials: "include", cache: "no-store", signal: controller.signal,
     }).then((response) => {
@@ -1659,7 +1657,7 @@ export function BookingDetailsDrawer({
     }).then((next) => { if (!controller.signal.aborted) setReoffer(next); })
       .catch(() => { if (!controller.signal.aborted) setReoffer({ eligible: false, reason: "Проверка недоступна", invitation: null }); });
     return () => controller.abort();
-  }, [open, booking?.id, booking?.status]);
+  }, [open, booking?.id, booking?.status, booking?.publicationType, booking?.hasCustomerAccount]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chat, setChat] = useState<{ bookingId: string; open: boolean }>({ bookingId: "", open: false });
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -1674,7 +1672,7 @@ export function BookingDetailsDrawer({
   const price = formatPriceLabel(booking);
   const isNew = booking.status === BookingStatus.NEW;
   const isConfirmed = booking.status === BookingStatus.CONFIRMED;
-  const canConfirm = isNew && (booking.publicationType !== "EVENT" || decision?.canConfirm === true);
+  const canConfirm = isNew && decision?.canConfirm === true;
   const canReject = isNew || isConfirmed;
   const canComplete = isConfirmed;
   const history = buildHistoryEntries(booking);
@@ -1685,12 +1683,14 @@ export function BookingDetailsDrawer({
     setUpdating(status);
     try {
       await onStatusChange(booking.id, status,
-        status === BookingStatus.REJECTED ? rejectionReason.trim() : undefined);
-      if (status === BookingStatus.REJECTED) {
+        status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED ? rejectionReason : undefined, rejectionComment);
+      if (status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED) {
         setRejectOpen(false);
         setRejectionReason("");
+        setRejectionComment("");
       }
     } catch {
+      setDecisionRevision((revision) => revision + 1);
       // The caller displays the API error. Keep the rejection reason for retry.
     } finally {
       setUpdating(null);
@@ -1707,7 +1707,7 @@ export function BookingDetailsDrawer({
       const next = (await response.json()) as { error?: string; status?: string; expiresAt?: string };
       if (!response.ok) throw new Error(next.error ?? "Не удалось отправить предложение");
       setReoffer({ eligible: false, reason: null, invitation: { status: next.status ?? "OFFERED", expiresAt: next.expiresAt ?? "" } });
-      toast.success("Предложение создано. Проверьте доставку уведомления в журнале.");
+      toast.success("Предложение создано. Клиент сможет ответить в mamaGo.");
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Ошибка соединения");
     } finally {
@@ -1836,7 +1836,7 @@ export function BookingDetailsDrawer({
             ) : null}
           </div>
 
-          {booking.status === BookingStatus.REJECTED && booking.rejectionReason ? (
+          {(booking.status === BookingStatus.REJECTED || booking.status === BookingStatus.CANCELLED) && booking.rejectionReason ? (
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <p className="font-semibold">Причина отказа</p>
               <p className="mt-1 whitespace-pre-wrap">{booking.rejectionReason}</p>
@@ -1927,18 +1927,29 @@ export function BookingDetailsDrawer({
         </div>
 
         <div className="shrink-0 border-t border-stone-200 bg-white px-5 pb-5 pt-4 sm:px-6">
-          {isNew && booking.publicationType === "EVENT" ? (
+          {isNew ? (
             <p role="status" className={cn(
               "mb-3 rounded-xl border px-3 py-2 text-sm",
               decision?.canConfirm ? "border-emerald-200 bg-emerald-50 text-emerald-900"
                 : "border-amber-200 bg-amber-50 text-amber-900",
             )}>
               {decisionError ?? decision?.message ?? "Проверяем свободные места для этой заявки…"}
+              {decision?.capacity != null ? ` · Всего мест: ${decision.capacity}` : ""}
+              {decision?.occupied != null ? ` · Занято: ${decision.occupied}` : ""}
+              {decision?.requested != null ? ` · Запрошено: ${decision.requested}` : ""}
               {decision?.remaining !== null && decision?.remaining !== undefined
                 ? ` · Свободно: ${decision.remaining}` : ""}
+              {decision?.resourceLimits?.map((resource) => (
+                <span key={resource.id} className="mt-1 block">
+                  {resource.name}
+                  {resource.capacity === null ? " · Без ограничения вместимости" :
+                    resource.capacity !== undefined ? ` · Вместимость: ${resource.capacity}` : ""}
+                  {` · Запрошено: ${resource.requested} · ${resource.available ? "Доступен" : "Недоступен"}`}
+                </span>
+              ))}
             </p>
           ) : null}
-          {booking.status === BookingStatus.REJECTED ? (
+          {booking.status === BookingStatus.REJECTED && booking.publicationType === "EVENT" && booking.hasCustomerAccount ? (
             <div className="mb-3 space-y-2 rounded-xl border border-stone-200 p-3 text-sm">
               {reoffer?.invitation ? (
                 <p>Повторное предложение: {reoffer.invitation.status === "OFFERED" ? "ожидает ответа клиента" : reoffer.invitation.status}</p>
@@ -1955,26 +1966,27 @@ export function BookingDetailsDrawer({
               <label htmlFor="business-booking-rejection-reason" className="block text-sm font-semibold text-stone-900">
                 Причина отказа — обязательна
               </label>
-              <textarea
-                id="business-booking-rejection-reason"
-                rows={3}
-                maxLength={500}
-                autoFocus
-                value={rejectionReason}
+              <select id="business-booking-rejection-reason" value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Например: на выбранное время мест нет. Если они освободятся, мы свяжемся с вами."
-                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-700"
-              />
-              <p className="text-xs text-stone-500">От 5 до 500 символов. Причина сохраняется в истории заявки.</p>
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base">
+                <option value="">Выберите причину</option>
+                {businessRejectionReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+              </select>
+              <label htmlFor="business-booking-rejection-comment" className="block text-sm">
+                Пояснение{rejectionReason === "Другая причина" ? " — обязательно" : " (необязательно)"}
+              </label>
+              <Textarea id="business-booking-rejection-comment" maxLength={500} rows={3}
+                value={rejectionComment} required={rejectionReason === "Другая причина"}
+                onChange={(e) => setRejectionComment(e.target.value)} />
               <div className="flex gap-2">
                 <button type="button" disabled={updating !== null}
                   className="h-11 flex-1 rounded-xl border px-4 text-sm font-semibold"
                   onClick={() => setRejectOpen(false)}>Назад</button>
                 <button type="button"
-                  disabled={updating !== null || rejectionReason.trim().length < 5}
+                  disabled={updating !== null || !rejectionReason || (rejectionReason === "Другая причина" && !rejectionComment.trim())}
                   className="h-11 flex-1 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
-                  onClick={() => void handleAction(BookingStatus.REJECTED)}>
-                  {updating === BookingStatus.REJECTED ? "Сохраняем…" : "Отклонить заявку"}
+                  onClick={() => void handleAction(isConfirmed ? BookingStatus.CANCELLED : BookingStatus.REJECTED)}>
+                  {updating ? "Сохраняем…" : isConfirmed ? "Отменить запись" : "Отклонить заявку"}
                 </button>
               </div>
             </div>
@@ -1994,7 +2006,7 @@ export function BookingDetailsDrawer({
                 disabled={updating !== null}
                 className="inline-flex h-12 w-full items-center justify-center rounded-2xl px-6 text-base font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70 md:w-auto"
               >
-                {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+                {updating ? "Сохраняем..." : isConfirmed ? "Отменить запись" : "Отклонить"}
               </button>
             </div>
           ) : canComplete || canReject ? (
@@ -2018,7 +2030,7 @@ export function BookingDetailsDrawer({
                       disabled={updating !== null}
                       className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70"
                     >
-                      {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+                      {updating ? "Сохраняем..." : isConfirmed ? "Отменить запись" : "Отклонить"}
                     </button>
                   ) : null}
                 </div>

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { dispatchGuestBookingSms } from "@/server/services/booking/guestBookingSms.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { z } from "zod";
 import { businessBookingDecisionSchema } from "@/lib/booking/businessBookingDecisionSchema";
-import { BookingStatus } from "@prisma/client";
 import {
   updateBookingStatus,
   getBusinessBookingById,
@@ -29,9 +29,9 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const business = await getMyBusiness(user.id);
-  if (!business) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
+  const business = await getMyBusiness(user.id, id);
+  if (!business) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const item = await getBusinessBookingById(id, business.id);
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await attachDirectAvailabilityToBusinessBookings([item]);
@@ -69,7 +69,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const business = await getMyBusiness(user.id);
+    const { id } = await params;
+    const business = await getMyBusiness(user.id, id);
     
     if (!business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
@@ -77,7 +78,6 @@ export async function PATCH(
 
     const body = await request.json();
     const data = updateBookingSchema.parse(body);
-    const { id } = await params;
 
     const updatedBooking = await updateBookingStatus(id, business.id, data.status, {
       actorId: user.id,
@@ -88,6 +88,15 @@ export async function PATCH(
       },
     });
 
+    if (!updatedBooking.hasCustomerAccount && data.status !== "COMPLETED") {
+      after(async () => {
+        try {
+          await dispatchGuestBookingSms({ bookingId: id, limit: 3 });
+        } catch {
+          console.error("[booking-sms] after-response dispatch failed");
+        }
+      });
+    }
     await attachDirectAvailabilityToBusinessBookings([updatedBooking]);
     // Status-changing responses must not quietly repopulate the bulk list with PII.
     return NextResponse.json(businessBookingListProjection(updatedBooking));

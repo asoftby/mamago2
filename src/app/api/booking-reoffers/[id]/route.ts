@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { createPublicBooking, BookingValidationError } from "@/server/services/booking/booking.service";
 import { BookingStatus, PublicationType } from "@prisma/client";
+import { getBusinessBookingDecisionAvailability } from "@/server/services/booking/bookingDecisionAvailability.service";
+import { isSameSiteBrowserOrigin } from "@/lib/security/isSameSiteBrowserOrigin";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -34,17 +36,24 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const now = new Date();
   const status = invitation.status === "OFFERED" && invitation.expiresAt <= now
     ? "EXPIRED" : invitation.status;
+  const availability = status === "OFFERED" && invitation.originalBooking.status === BookingStatus.REJECTED
+    ? await getBusinessBookingDecisionAvailability(prisma, invitation.originalBookingId, invitation.businessId, now, { reoffer: true })
+    : null;
   return NextResponse.json({
     id: invitation.id, status, expiresAt: invitation.expiresAt,
     publicationTitle: invitation.originalBooking.activity?.title ?? "Событие",
     requestedDate: invitation.originalBooking.requestedDate,
     requestedTime: invitation.originalBooking.requestedTime,
-    canAccept: status === "OFFERED" && invitation.originalBooking.status === BookingStatus.REJECTED,
+    canAccept: availability?.canConfirm === true,
     newBookingId: invitation.newBookingId,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameSiteBrowserOrigin({ origin: request.headers.get("origin"), host: request.headers.get("host"),
+    protocol: request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol })) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
   const id = (await params).id;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -57,7 +66,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id, customerUserId: user.id, status: "OFFERED", expiresAt: { gt: new Date() } },
       data: { status: "DECLINED", declinedAt: new Date() },
     });
-    return NextResponse.json({ status: change.count === 1 ? "DECLINED" : invitation.status });
+    const latest = change.count === 1 ? null : await prisma.bookingReoffer.findFirst({
+      where: { id, customerUserId: user.id }, select: { status: true, expiresAt: true, newBookingId: true },
+    });
+    return NextResponse.json({ status: change.count === 1 ? "DECLINED" :
+      latest?.status === "OFFERED" && latest.expiresAt <= new Date() ? "EXPIRED" : latest?.status ?? "CANCELED",
+      ...(latest?.newBookingId ? { bookingId: latest.newBookingId } : {}),
+    });
   }
   if (invitation.status === "ACCEPTED" && invitation.newBookingId) {
     return NextResponse.json({ status: "ACCEPTED", bookingId: invitation.newBookingId });
@@ -96,7 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error instanceof BookingValidationError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
-    console.error("[booking-reoffer] acceptance failed", error);
+    console.error("[booking-reoffer] acceptance failed", { invitationId: id });
     return NextResponse.json({ error: "Запись не создана. Попробуйте ещё раз." }, { status: 500 });
   }
 }

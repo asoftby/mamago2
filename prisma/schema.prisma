@@ -6429,7 +6429,7 @@ model BookingRequest {
   firstResponseAt     DateTime?
   /// Время завершения (CONFIRMED → COMPLETED)
   completedAt         DateTime?
-  /// Время отклонения (NEW|CONFIRMED → REJECTED)
+  /// Время отклонения. Исторические отмены подтверждённых записей также могли заполнять это поле.
   rejectedAt          DateTime?
   /// Время ответа в минутах (diff firstResponseAt − createdAt)
   responseTimeMinutes Int?
@@ -6446,6 +6446,7 @@ model BookingRequest {
   place        Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
   session      ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
   offerSession OfferSession? @relation(fields: [offerSessionId], references: [id], onDelete: SetNull)
+  smsDeliveries BookingSmsDelivery[]
   activities   BookingActivity[]
   feedback     BookingFeedback?
   directThread DirectThread?
@@ -6543,6 +6544,7 @@ model BookingActivity {
   createdAt DateTime                 @default(now())
 
   booking BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  smsDelivery BookingSmsDelivery?
 
   @@index([bookingId, createdAt])
   @@index([bookingId, type])
