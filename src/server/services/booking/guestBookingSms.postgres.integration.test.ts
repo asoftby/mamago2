@@ -278,3 +278,20 @@ test("database failure after provider acceptance cannot cause an automatic dupli
   assert.equal(calls, 1);
   assert.equal((await delivery(row.id)).status, "UNCERTAIN");
 });
+
+
+test("legacy free-text visit times cannot create an unbounded paid SMS", async () => {
+  const row = await booking();
+  await db.bookingRequest.update({ where: { id: row.id }, data: {
+    startsAt: null, endsAt: null, requestedDate: new Date("2027-01-15"), requestedTime: "legacy-time-".repeat(500),
+  } });
+  await decide(row.id, "CONFIRMED");
+  let message = "";
+  await dispatchGuestBookingSms({ bookingId: row.id }, {
+    now: dueClock, send: async (params) => { message = params.message; return accepted(); },
+  });
+  assert.ok(message.includes("15.01"));
+  assert.equal(message.includes("legacy-time"), false);
+  assert.ok(message.length <= 70);
+  assert.equal((await delivery(row.id)).estimatedParts, 1);
+});

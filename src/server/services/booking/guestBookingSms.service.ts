@@ -47,7 +47,8 @@ function prepare(row: Delivery): PreparedSms | string {
   if (!phone) return "RECIPIENT_UNAVAILABLE";
   const start = booking.startsAt ?? booking.session?.startsAt ?? booking.offerSession?.startAt;
   const date = start ? getLocalDateKey(start) : booking.requestedDate?.toISOString().slice(0, 10);
-  const time = start ? formatHHMM(start) : booking.requestedTime;
+  const requestedTime = booking.requestedTime?.match(/^(?:[01]\d|2[0-3]):[0-5]\d$/)?.[0];
+  const time = start ? formatHHMM(start) : requestedTime;
   const when = date ? date.slice(8, 10) + "." + date.slice(5, 7) + (time ? " " + time : "") : "";
   const copy = buildGuestBookingSms({ bookingId: row.bookingId, status: row.decisionStatus, when, reason });
   return { phoneDigits: phone.slice(1), ...copy };
