@@ -215,7 +215,7 @@ test("unavailable selected option resource creates no partial booking or price s
   assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: room } }), 0);
 });
 
-test("business confirmation and rejection transition ALL held bundle resources", async () => {
+test("business confirmation and cancellation transition ALL held bundle resources", async () => {
   const room = await unit("Transition room");
   const equipment = await unit("Transition equipment");
   const offerId = await offer([room, equipment]);
@@ -226,11 +226,11 @@ test("business confirmation and rejection transition ALL held bundle resources",
   const confirmed = await db.bookingAllocation.findMany({ where: { bookingRequestId: bookingId } });
   assert.equal(confirmed.length, 2);
   assert.ok(confirmed.every(a => a.status === "CONFIRMED" && a.expiresAt === null));
-  await updateBookingStatus(bookingId, businessId, BookingStatus.REJECTED);
+  await updateBookingStatus(bookingId, businessId, BookingStatus.CANCELLED);
   const released = await db.bookingAllocation.findMany({ where: { bookingRequestId: bookingId } });
   assert.equal(released.length, 2);
   assert.ok(released.every(a => a.status === "RELEASED" && a.expiresAt === null));
-  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: bookingId } })).status, "REJECTED");
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: bookingId } })).status, "CANCELLED");
 });
 
 test("an occupied required resource rejects the bundle without booking or partial hold", async () => {
@@ -511,6 +511,6 @@ test("manual confirmation shares resource exclusion and releases the same alloca
   assert.equal(row.allocations[0]?.status, "CONFIRMED");
   assert.equal(row.allocations[0]?.expiresAt, null);
   await assert.rejects(reserveSlot({ offerId, startsAt: start, endsAt: end, unitId: room, ...contact }), SlotReservationError);
-  await updateBookingStatus(row.id, businessId, "REJECTED");
+  await updateBookingStatus(row.id, businessId, "CANCELLED");
   await reserveSlot({ offerId, startsAt: start, endsAt: end, unitId: room, ...contact });
 });

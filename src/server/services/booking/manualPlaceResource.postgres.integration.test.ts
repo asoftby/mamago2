@@ -106,7 +106,7 @@ test("confirmed manual PLACE appointment owns one physical allocation and reuses
     /не принадлежит|недоступен/,
   );
 
-  await updateBookingStatus(first.bookingId, businessId, "REJECTED");
+  await updateBookingStatus(first.bookingId, businessId, "CANCELLED");
   assert.equal((await prisma.bookingAllocation.findUniqueOrThrow({
     where: { id: allocations[0]!.id },
   })).status, "RELEASED");
