@@ -55,6 +55,7 @@ interface Activity {
   boostDisabled: boolean;
   boostNextFreeAt: string | null;
   promotionPerformance?: ActivityPromotionPerformance | null;
+  hasBookingHistory: boolean;
   metrics?: {
     views: number;
     saves: number;

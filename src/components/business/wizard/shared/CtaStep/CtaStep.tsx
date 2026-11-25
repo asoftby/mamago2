@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   CalendarDays,
   ExternalLink,
@@ -25,6 +25,8 @@ type CtaStepProps = {
   source: CtaStepSourceContext;
   disabled?: boolean;
   onChange: (value: CtaStepFormValue) => void;
+  /** Event-only occupancy controls rendered inside the selected calendar booking. */
+  calendarFooter?: ReactNode;
 };
 
 function patchValue(
@@ -40,6 +42,7 @@ export function CtaStep({
   source,
   disabled,
   onChange,
+  calendarFooter,
 }: CtaStepProps) {
   const derived = useMemo(
     () => deriveCtaStepState(source, value),
@@ -131,6 +134,7 @@ export function CtaStep({
                   />
 
                   {value.requestMode === "CALENDAR" ? (
+                    <>
                     <CtaCalendarEditor
                       days={value.calendarDays}
                       mode={value.calendarMode ?? "DATE_ONLY"}
@@ -142,6 +146,8 @@ export function CtaStep({
                         patchValue(value, onChange, { calendarDays })
                       }
                     />
+                    {calendarFooter}
+                    </>
                   ) : null}
                 </section>
               );
