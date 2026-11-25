@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { EventCalendarSummary } from "@/lib/business/eventCalendarSummary";
 
 import { formatChildLabel, formatParticipantsLine } from "@/lib/booking/bookingParticipants";
+import { Button } from "@/components/ui/button";
 import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
@@ -1613,6 +1614,13 @@ export function BookingDetailsDrawer({
   const [rejectionComment, setRejectionComment] = useState("");
   const [decision, setDecision] = useState<BookingDecisionPreview | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [reoffer, setReoffer] = useState<{ eligible: boolean; reason: string | null; invitation: { status: string; expiresAt: string } | null } | null>(null);
+  const [sendingReoffer, setSendingReoffer] = useState(false);
+  const reofferBookingRef = useRef(booking?.id);
+  useEffect(() => {
+    reofferBookingRef.current = booking?.id;
+    setSendingReoffer(false);
+  }, [booking?.id]);
   const [decisionRevision, setDecisionRevision] = useState(0);
 
   useEffect(() => {
@@ -1641,6 +1649,21 @@ export function BookingDetailsDrawer({
     setRejectionReason("");
     setRejectionComment("");
   }, [booking?.id]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setReoffer(null);
+    if (!open || !booking?.id || booking.status !== BookingStatus.REJECTED ||
+        booking.publicationType !== "EVENT" || !booking.hasCustomerAccount) return () => controller.abort();
+    void fetch(`/api/business/bookings/${encodeURIComponent(booking.id)}/reoffer`, {
+      credentials: "include", cache: "no-store", signal: controller.signal,
+    }).then((response) => {
+      if (!response.ok) throw new Error("Не удалось проверить повторное предложение");
+      return response.json() as Promise<{ eligible: boolean; reason: string | null; invitation: { status: string; expiresAt: string } | null }>;
+    }).then((next) => { if (!controller.signal.aborted) setReoffer(next); })
+      .catch(() => { if (!controller.signal.aborted) setReoffer({ eligible: false, reason: "Проверка недоступна", invitation: null }); });
+    return () => controller.abort();
+  }, [open, booking?.id, booking?.status, booking?.publicationType, booking?.hasCustomerAccount]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chat, setChat] = useState<{ bookingId: string; open: boolean }>({ bookingId: "", open: false });
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -1677,6 +1700,26 @@ export function BookingDetailsDrawer({
       // The caller displays the API error. Keep the rejection reason for retry.
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const sendReoffer = async () => {
+    if (!booking || sendingReoffer) return;
+    const requestedBookingId = booking.id;
+    setSendingReoffer(true);
+    try {
+      const response = await fetch(`/api/business/bookings/${encodeURIComponent(booking.id)}/reoffer`, {
+        method: "POST", credentials: "include",
+      });
+      const next = (await response.json()) as { error?: string; status?: string; expiresAt?: string };
+      if (reofferBookingRef.current !== requestedBookingId) return;
+      if (!response.ok) throw new Error(next.error ?? "Не удалось отправить предложение");
+      setReoffer({ eligible: false, reason: null, invitation: { status: next.status ?? "OFFERED", expiresAt: next.expiresAt ?? "" } });
+      toast.success("Предложение создано. Клиент сможет ответить в mamaGo.");
+    } catch (cause) {
+      if (reofferBookingRef.current === requestedBookingId) toast.error(cause instanceof Error ? cause.message : "Ошибка соединения");
+    } finally {
+      if (reofferBookingRef.current === requestedBookingId) setSendingReoffer(false);
     }
   };
 
@@ -1913,6 +1956,18 @@ export function BookingDetailsDrawer({
                 </span>
               ))}
             </p>
+          ) : null}
+          {booking.status === BookingStatus.REJECTED && booking.publicationType === "EVENT" && booking.hasCustomerAccount ? (
+            <div className="mb-3 space-y-2 rounded-xl border border-stone-200 p-3 text-sm">
+              {reoffer?.invitation ? (
+                <p>Повторное предложение: {reoffer.invitation.status === "OFFERED" ? "ожидает ответа клиента" : reoffer.invitation.status}</p>
+              ) : reoffer?.eligible ? (
+                <Button type="button" variant="business" disabled={sendingReoffer} onClick={() => void sendReoffer()}
+                  className="min-h-11 w-full">
+                  {sendingReoffer ? "Отправляем…" : "Предложить освободившееся место"}
+                </Button>
+              ) : <p>{reoffer?.reason ?? "Проверяем возможность повторной записи…"}</p>}
+            </div>
           ) : null}
           {rejectOpen && canReject ? (
             <div className="space-y-3">
