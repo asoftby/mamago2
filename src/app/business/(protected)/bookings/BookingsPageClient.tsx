@@ -1618,6 +1618,8 @@ export function BookingDetailsDrawer({
   const [rejectionReason, setRejectionReason] = useState("");
   const [decision, setDecision] = useState<BookingDecisionPreview | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [reoffer, setReoffer] = useState<{ eligible: boolean; reason: string | null; invitation: { status: string; expiresAt: string } | null } | null>(null);
+  const [sendingReoffer, setSendingReoffer] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1644,6 +1646,20 @@ export function BookingDetailsDrawer({
     setRejectOpen(false);
     setRejectionReason("");
   }, [booking?.id]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setReoffer(null);
+    if (!open || !booking?.id || booking.status !== BookingStatus.REJECTED) return () => controller.abort();
+    void fetch(`/api/business/bookings/${encodeURIComponent(booking.id)}/reoffer`, {
+      credentials: "include", cache: "no-store", signal: controller.signal,
+    }).then((response) => {
+      if (!response.ok) throw new Error("Не удалось проверить повторное предложение");
+      return response.json() as Promise<{ eligible: boolean; reason: string | null; invitation: { status: string; expiresAt: string } | null }>;
+    }).then((next) => { if (!controller.signal.aborted) setReoffer(next); })
+      .catch(() => { if (!controller.signal.aborted) setReoffer({ eligible: false, reason: "Проверка недоступна", invitation: null }); });
+    return () => controller.abort();
+  }, [open, booking?.id, booking?.status]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chat, setChat] = useState<{ bookingId: string; open: boolean }>({ bookingId: "", open: false });
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -1678,6 +1694,24 @@ export function BookingDetailsDrawer({
       // The caller displays the API error. Keep the rejection reason for retry.
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const sendReoffer = async () => {
+    if (!booking || sendingReoffer) return;
+    setSendingReoffer(true);
+    try {
+      const response = await fetch(`/api/business/bookings/${encodeURIComponent(booking.id)}/reoffer`, {
+        method: "POST", credentials: "include",
+      });
+      const next = (await response.json()) as { error?: string; status?: string; expiresAt?: string };
+      if (!response.ok) throw new Error(next.error ?? "Не удалось отправить предложение");
+      setReoffer({ eligible: false, reason: null, invitation: { status: next.status ?? "OFFERED", expiresAt: next.expiresAt ?? "" } });
+      toast.success("Предложение создано. Проверьте доставку уведомления в журнале.");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Ошибка соединения");
+    } finally {
+      setSendingReoffer(false);
     }
   };
 
@@ -1903,6 +1937,18 @@ export function BookingDetailsDrawer({
               {decision?.remaining !== null && decision?.remaining !== undefined
                 ? ` · Свободно: ${decision.remaining}` : ""}
             </p>
+          ) : null}
+          {booking.status === BookingStatus.REJECTED ? (
+            <div className="mb-3 space-y-2 rounded-xl border border-stone-200 p-3 text-sm">
+              {reoffer?.invitation ? (
+                <p>Повторное предложение: {reoffer.invitation.status === "OFFERED" ? "ожидает ответа клиента" : reoffer.invitation.status}</p>
+              ) : reoffer?.eligible ? (
+                <button type="button" disabled={sendingReoffer} onClick={() => void sendReoffer()}
+                  className="w-full rounded-xl bg-stone-950 px-4 py-3 font-semibold text-white disabled:opacity-50">
+                  {sendingReoffer ? "Отправляем…" : "Предложить освободившееся место"}
+                </button>
+              ) : <p>{reoffer?.reason ?? "Проверяем возможность повторной записи…"}</p>}
+            </div>
           ) : null}
           {rejectOpen && canReject ? (
             <div className="space-y-3">
