@@ -1487,7 +1487,7 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Открыть заявку",
-    ctaAction: `/business/bookings?tab=action&kind=standard&request=${encodeURIComponent(params.bookingId)}`,
+    ctaAction: `/business/bookings?id=${encodeURIComponent(params.bookingId)}`,
     metadata: { templatePayload },
     waitForDelivery: params.waitForDelivery ?? false,
   });
@@ -1496,6 +1496,8 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
 // ── USER BOOKING LIFECYCLE ────────────────────────────────────────────────────
 
 export interface NotifyUserBookingParams {
+  /** Bounded rejection explanation; never includes customer contact details. */
+  rejectionReason?: string | null;
   /** userId владельца заявки (получатель уведомления) */
   userId: string;
   bookingId: string;
@@ -1588,7 +1590,7 @@ export async function notifyUserBookingCancelled(params: NotifyUserBookingParams
     audience: "USER",
     type: "BOOKING_CANCELLED",
     title: "Заявка отклонена",
-    body: `${title} была отклонена. Вы можете подать новую заявку.`,
+    body: `${title} была отклонена.${params.rejectionReason ? ` Причина: ${params.rejectionReason}` : ""} Вы можете подать новую заявку.`,
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Мои записи",

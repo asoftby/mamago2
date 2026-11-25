@@ -1,0 +1,54 @@
+/// Durable guest-only delivery queue. Recipient and message stay in the booking/history.
+enum BookingSmsDeliveryStatus {
+  PENDING
+  SENDING
+  ACCEPTED
+  FAILED
+  EXHAUSTED
+  UNCERTAIN
+  SKIPPED
+}
+
+model BookingSmsDelivery {
+  id String @id @default(cuid())
+  bookingId String
+  decisionActivityId String @unique
+  decisionStatus BookingStatus
+  status BookingSmsDeliveryStatus @default(PENDING)
+  attemptCount Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  estimatedParts Int?
+  providerMessageId String?
+  providerStatus String?
+  providerParts Int?
+  errorCode String?
+  acceptedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  decisionActivity BookingActivity @relation(fields: [decisionActivityId], references: [id], onDelete: Cascade)
+  attempts BookingSmsAttempt[]
+
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseUntil])
+  @@index([bookingId])
+}
+
+/// Bounded, non-PII attempt journal. Raw provider bodies and message text are never stored.
+model BookingSmsAttempt {
+  id String @id @default(cuid())
+  deliveryId String
+  number Int
+  status BookingSmsDeliveryStatus
+  errorCode String?
+  providerMessageId String?
+  providerStatus String?
+  providerParts Int?
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+
+  delivery BookingSmsDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  @@unique([deliveryId, number])
+}

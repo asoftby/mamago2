@@ -89,7 +89,8 @@ assert.deepEqual(parseStoredChildren([{ name: "Я", age: 3 }]), [{ name: "Я", a
 assert.deepEqual(parseStoredChildren([{ name: "Я", age: 3, phone: "x" }]), [{ name: "Я", age: 3 }].map((c) => c), "extra keys stripped");
 
 // ── client draft → payload ──
-assert.deepEqual(participantsDraftToPayload(INITIAL_PARTICIPANTS_DRAFT), { adultsCount: 1, childrenCount: 0, children: [] });
+assert.deepEqual(participantsDraftToPayload(INITIAL_PARTICIPANTS_DRAFT), { adultsCount: 0, childrenCount: 0, children: [] });
+assert.deepEqual(resolveParticipants({ adultsCount: 0, children: [{ age: 4 }], profileChildren: [], now }).children, [{ name: null, age: 4 }]);
 const draft = { adults: 2, profileChildIds: ["p1"], manual: [{ key: "m1", age: "6", name: " Ваня " }, { key: "m2", age: "", name: "" }] };
 assert.deepEqual(Object.keys(validateParticipantsDraft(draft)), ["m2"]);
 assert.deepEqual(participantsDraftToPayload({ ...draft, manual: [draft.manual[0]!] }), {

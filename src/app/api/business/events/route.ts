@@ -40,6 +40,7 @@ import {
 } from "@/lib/media/resolveMediaAssetReference";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { validateSchedulingCompleteness } from "@/lib/event/schedulingCompleteness";
+import { validateEventSeatConfiguration } from "@/lib/booking/eventSeatPolicy";
 import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 
 function isPlatformContentStaff(role: string): boolean {
@@ -97,6 +98,10 @@ export async function POST(request: NextRequest) {
         ? { organizer: organizerResolution.organizerSnapshot }
         : {}),
     };
+    const seatPolicyError = validateEventSeatConfiguration(scheduleJsonWithOrganizer);
+    if (seatPolicyError) {
+      return NextResponse.json({ error: seatPolicyError, code: "INVALID_EVENT_SEAT_POLICY" }, { status: 400 });
+    }
     const normalizedPrice = normalizePublicationPrice({
       mode: scheduleJsonWithOrganizer.pricingMode as "free" | "fixed" | "from" | "on_request" | undefined,
       min: body.priceFrom,

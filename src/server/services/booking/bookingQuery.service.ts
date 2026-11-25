@@ -3,12 +3,15 @@
  * Чтение и обновление заявок для бизнес-кабинета.
  */
 
+import { BOOKING_DECISION_STATUSES } from "@/lib/booking/guestBookingSms";
+import { lockBookingUnits } from "./resourceAllocation";
 import prisma from "@/lib/prisma";
 import { resolveBookingServiceEnd } from "@/lib/booking/effectiveServiceEnd";
 import { allocationTransition } from "./allocationTransition";
+import { getBusinessBookingDecisionAvailability } from "./bookingDecisionAvailability.service";
 import { assertActiveBookingHold, BookingHoldExpiredError } from "./bookingHold";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
-import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
+import { BookingKind, BookingStatus, Prisma, PublicationType } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
 import type { BookingDisplay } from "./booking.types";
 import { recordStatusChanged } from "./bookingActivity.service";
@@ -114,6 +117,9 @@ export interface BusinessBookingItem {
   directThreadId: string | null;
   /** Platform policy allows Direct for this publication type; null = not evaluated by the caller. */
   directAvailable: boolean | null;
+  /** Reason from the last business rejection, only populated for single-order detail. */
+  rejectionReason?: string | null;
+  cancellationActor?: "BUSINESS" | null;
 }
 
 export interface GetBusinessBookingsOptions {
@@ -383,6 +389,7 @@ function mapBooking(raw: {
     hasCustomerAccount: raw.userId !== null,
     directThreadId: null,
     directAvailable: null,
+    rejectionReason: null,
   };
 }
 
@@ -518,6 +525,19 @@ export async function getBusinessBookingById(
   });
   if (!row) return null;
   const item = mapBooking(row);
+  if (item.status === BookingStatus.REJECTED || item.status === BookingStatus.CANCELLED) {
+    const activity = await prisma.bookingActivity.findFirst({
+      where: { bookingId, type: "STATUS_CHANGED" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { payload: true, actorType: true },
+    });
+    const payload = activity?.payload;
+    item.cancellationActor = activity?.actorType === "BUSINESS" &&
+      payload && typeof payload === "object" && !Array.isArray(payload) && payload.to === item.status
+      ? "BUSINESS" : null;
+    item.rejectionReason = payload && typeof payload === "object" && !Array.isArray(payload) &&
+      typeof payload.reason === "string" ? payload.reason : null;
+  }
   await attachDirectThreadIds([item], businessId);
   return item;
 }
@@ -527,13 +547,20 @@ export async function getBusinessBookingById(
 /** Допустимые переходы статусов */
 const ALLOWED_TRANSITIONS: Partial<Record<BookingStatus, BookingStatus[]>> = {
   [BookingStatus.NEW]: [BookingStatus.CONFIRMED, BookingStatus.REJECTED],
-  [BookingStatus.CONFIRMED]: [BookingStatus.COMPLETED, BookingStatus.REJECTED],
+  [BookingStatus.CONFIRMED]: [BookingStatus.COMPLETED, BookingStatus.CANCELLED],
 };
 
 export class BookingStatusTransitionError extends Error {
   constructor(from: BookingStatus, to: BookingStatus) {
     super(`Нельзя перевести заявку из статуса ${from} в ${to}`);
     this.name = "BookingStatusTransitionError";
+  }
+}
+
+export class BookingDecisionCapacityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BookingDecisionCapacityError";
   }
 }
 
@@ -562,6 +589,10 @@ export async function updateBookingStatus(
       id: true,
       businessId: true,
       kind: true,
+      publicationType: true,
+      activityId: true,
+      classGroupId: true, offerSessionId: true, startsAt: true,
+      allocations: { select: { bookingUnitId: true } },
       status: true,
       createdAt: true,
       firstResponseAt: true,
@@ -594,6 +625,7 @@ export async function updateBookingStatus(
 
   // 4. Вычисляем derived fields для этого перехода
   const now = new Date();
+  const recordDecisionHistory = BOOKING_DECISION_STATUSES.has(newStatus);
   const derivedData: {
     firstResponseAt?: Date;
     responseTimeMinutes?: number;
@@ -621,11 +653,35 @@ export async function updateBookingStatus(
   // Keep the request status and its resource allocation in one transaction.
   // A confirmed booking must never lose its resource when the original hold expires.
   const updated = await prisma.$transaction(async (tx) => {
+    // Lock Activity first, exactly like event booking creation, to prevent
+    // confirmations racing a new booking or event-capacity edits. Locking a
+    // request first and Activity second risks a deadlock with the create path.
+    if (newStatus === BookingStatus.CONFIRMED &&
+        existing.publicationType === PublicationType.EVENT && existing.activityId) {
+      await tx.$queryRaw`SELECT "id" FROM "Activity"
+        WHERE "id" = ${existing.activityId} AND "businessId" = ${businessId} FOR UPDATE`;
+    }
+    if (newStatus === BookingStatus.CONFIRMED) {
+      if (existing.classGroupId) {
+        await tx.$queryRaw`SELECT "id" FROM "OfferClassGroup" WHERE "id" = ${existing.classGroupId} FOR UPDATE`;
+      }
+      if (!await lockBookingUnits(tx, businessId, existing.allocations.map((a) => a.bookingUnitId))) {
+        throw new BookingDecisionCapacityError("Ресурс больше недоступен");
+      }
+      if (existing.offerSessionId) {
+        await tx.$queryRaw`SELECT "id" FROM "OfferSession" WHERE "id" = ${existing.offerSessionId} FOR UPDATE`;
+      } else if (existing.offer && existing.startsAt && existing.allocations.length === 0) {
+        // Legacy requests may have the exact window but no persisted session ID.
+        await tx.$queryRaw`SELECT "id" FROM "OfferSession"
+          WHERE "offerId" = ${existing.offer.id}
+            AND "startAt" = (${existing.startsAt}::timestamptz AT TIME ZONE 'UTC') FOR UPDATE`;
+      }
+    }
     // Serialize concurrent status updates for the same request before reading state.
     await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${bookingId} FOR UPDATE`;
     const current = await tx.bookingRequest.findUnique({
       where: { id: bookingId },
-      select: { status: true, businessId: true, kind: true, holdUntil: true },
+      select: { status: true, businessId: true, kind: true, holdUntil: true, userId: true },
     });
     if (!current || current.businessId !== businessId) throw new BookingOwnershipError();
     if (current.kind !== BookingKind.STANDARD ||
@@ -637,6 +693,14 @@ export async function updateBookingStatus(
     // status update must not allow confirmation using a stale pre-lock clock.
     const checkedAt = new Date();
     assertActiveBookingHold(newStatus, current.holdUntil, checkedAt);
+    if (newStatus === BookingStatus.CONFIRMED) {
+      const decision = await getBusinessBookingDecisionAvailability(tx, bookingId, businessId, checkedAt);
+      if (!decision?.canConfirm) {
+        throw new BookingDecisionCapacityError(
+          decision?.message ?? "Недостаточно мест. Обновите заявку перед подтверждением",
+        );
+      }
+    }
 
     const allocations = await tx.bookingAllocation.findMany({
       where: { bookingRequestId: bookingId },
@@ -661,7 +725,9 @@ export async function updateBookingStatus(
         ...(newStatus === BookingStatus.CONFIRMED && current.holdUntil
           ? { holdUntil: { gt: checkedAt } } : {}),
       },
-      data: { status: newStatus, ...derivedData },
+      data: { status: newStatus, ...derivedData,
+        ...(recordDecisionHistory ? { lastActivityAt: checkedAt } : {}),
+      },
     });
     if (result.count !== 1) {
       // Only NEW -> CONFIRMED can be guarded by holdUntil here.
@@ -669,6 +735,23 @@ export async function updateBookingStatus(
         throw new BookingHoldExpiredError();
       }
       throw new BookingStatusTransitionError(current.status, newStatus);
+    }
+    if (recordDecisionHistory) {
+      // Persist before commit. Fire-and-forget status history can race with
+      // the immediate details GET, so a required reason cannot use that path.
+      const activity = await tx.bookingActivity.create({
+        select: { id: true },
+        data: {
+          bookingId, type: "STATUS_CHANGED", actorType: actor?.actorId ? "BUSINESS" : "SYSTEM",
+          actorId: actor?.actorId ?? null,
+          payload: { from: current.status, to: newStatus, reason: actor?.reason?.trim() ?? null },
+        },
+      });
+      if (!current.userId && actor?.actorId) {
+        await tx.bookingSmsDelivery.create({
+          data: { bookingId, decisionActivityId: activity.id, decisionStatus: newStatus },
+        });
+      }
     }
     return tx.bookingRequest.findUniqueOrThrow({
       where: { id: bookingId },
@@ -703,12 +786,14 @@ export async function updateBookingStatus(
   });
 
   // Fire-and-forget: activity event
-  recordStatusChanged(bookingId, existing.status, newStatus);
+  if (!recordDecisionHistory) {
+    recordStatusChanged(bookingId, existing.status, newStatus, actor?.actorId);
+  }
 
   // Fire-and-forget: analytics tracking
   if (newStatus === BookingStatus.CONFIRMED) {
     void trackBookingConfirmed({
-      userId: existing.userId ?? null,
+      userId: updated.userId ?? null,
       bookingId,
       entityType: "OFFER",
       entityId: existing.offer?.id ?? "",
@@ -722,7 +807,7 @@ export async function updateBookingStatus(
     });
   } else if (newStatus === BookingStatus.COMPLETED) {
     void trackBookingCompleted({
-      userId: existing.userId ?? null,
+      userId: updated.userId ?? null,
       bookingId,
       entityType: "OFFER",
       entityId: existing.offer?.id ?? "",
@@ -735,7 +820,7 @@ export async function updateBookingStatus(
     });
   } else if (newStatus === BookingStatus.REJECTED || newStatus === BookingStatus.CANCELLED) {
     void trackBookingCancelled({
-      userId: existing.userId ?? null,
+      userId: updated.userId ?? null,
       bookingId,
       entityType: "OFFER",
       entityId: existing.offer?.id ?? "",
@@ -749,12 +834,12 @@ export async function updateBookingStatus(
   }
 
   // Fire-and-forget: user lifecycle notifications (только если заявка от авторизованного пользователя)
-  if (existing.userId) {
+  if (updated.userId) {
     const publicationTitle =
       existing.offer?.title ?? existing.activity?.title ?? existing.place?.title ?? null;
 
     const notifyParams = {
-      userId: existing.userId,
+      userId: updated.userId,
       bookingId,
       publicationTitle,
     };
@@ -763,8 +848,8 @@ export async function updateBookingStatus(
       notifyUserBookingConfirmed(notifyParams).catch((err) =>
         console.error("[updateBookingStatus] notifyUserBookingConfirmed failed:", err),
       );
-    } else if (newStatus === BookingStatus.REJECTED) {
-      notifyUserBookingCancelled(notifyParams).catch((err) =>
+    } else if (newStatus === BookingStatus.REJECTED || newStatus === BookingStatus.CANCELLED) {
+      notifyUserBookingCancelled({ ...notifyParams, rejectionReason: actor?.reason ?? null }).catch((err) =>
         console.error("[updateBookingStatus] notifyUserBookingCancelled failed:", err),
       );
     } else if (newStatus === BookingStatus.COMPLETED) {

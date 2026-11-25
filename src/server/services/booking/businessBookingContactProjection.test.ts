@@ -23,6 +23,7 @@ const booking = {
   participantsOutsideAge: [{ name: "Саша", age: 7 }],
   display: { title: "Секция", meta: "Саша · 7 лет" },
   bookingPriceSnapshot: { extra: "Саша", phone: "+375291234567" },
+  rejectionReason: "Мария, ждём звонка по +375291234567",
 } as unknown as BusinessBookingItem;
 
 test("bulk business bookings never expose PII, even on NEW status", () => {
@@ -34,6 +35,7 @@ test("bulk business bookings never expose PII, even on NEW status", () => {
   assert.equal(listed.participantChildren[0]?.age, 7);
   assert.equal(listed.customerPhone, "");
   assert.equal(listed.bookingPriceSnapshot, null);
+  assert.equal(listed.rejectionReason, null);
   // The source object is not mutated: exact-order detail can still be queried.
   assert.equal(booking.customerPhone, "+375291234567");
 });
@@ -46,9 +48,9 @@ test("single active order only exposes fulfillment contact, never email", () => 
   assert.equal(businessBookingDetailRevealsContact(detail), true);
 });
 
-test("historical bookings are permanently redacted in business detail", () => {
+test("completed, customer-cancelled and expired bookings remain redacted", () => {
   for (const status of [
-    BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.EXPIRED,
+    BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.EXPIRED,
   ]) {
     const historical = businessBookingDetailProjection({ ...booking, status });
     assert.equal(historical.customerPhone, "", status);
@@ -58,6 +60,23 @@ test("historical bookings are permanently redacted in business detail", () => {
     assert.equal(historical.participantChildren[0]?.name, null, status);
     assert.equal(businessBookingDetailRevealsContact(historical), false, status);
   }
+});
+
+test("rejected booking still provides audited single-order contact until service end", () => {
+  const future = { ...booking, status: BookingStatus.REJECTED,
+    endsAt: new Date(Date.now() + 86_400_000).toISOString() };
+  assert.equal(businessBookingListProjection(future).customerPhone, "", "bulk archive still never exposes contacts");
+  const disclosed = projectBusinessBookingDetailWithDisclosure(future);
+  assert.equal(disclosed.revealsContact, true);
+  assert.equal(disclosed.detail.customerPhone, booking.customerPhone);
+  assert.equal(disclosed.detail.customerEmail, null);
+  const elapsed = { ...future, endsAt: new Date(Date.now() - 1_000).toISOString() };
+  assert.equal(projectBusinessBookingDetailWithDisclosure(elapsed).revealsContact, false);
+  assert.equal(businessBookingDetailProjection(elapsed).rejectionReason, null,
+    "Free-text rejection notes are redacted after service end");
+  const undatedOld = { ...booking, status: BookingStatus.REJECTED,
+    endsAt: null, createdAt: new Date(Date.now() - 31 * 86_400_000).toISOString() };
+  assert.equal(projectBusinessBookingDetailWithDisclosure(undatedOld).revealsContact, false);
 });
 
 test("stale CONFIRMED or NEW booking cannot expose contacts after known service end", () => {
@@ -110,4 +129,12 @@ test("contact projection and disclosure audit gate share the same expiry snapsho
   assert.equal(justBefore.detail.customerPhone, booking.customerPhone);
   assert.equal(atCutoff.revealsContact, false);
   assert.equal(atCutoff.detail.customerPhone, "");
+});
+
+test("only explicitly attributed business cancellations disclose within service window", () => {
+  const cancelled = { ...booking, status: BookingStatus.CANCELLED, endsAt: new Date(Date.now() + 60_000).toISOString() };
+  assert.equal(businessBookingDetailProjection(cancelled).customerPhone, "");
+  assert.equal(businessBookingDetailProjection({ ...cancelled, cancellationActor: "BUSINESS" }).customerPhone, booking.customerPhone);
+  assert.equal(businessBookingDetailProjection({ ...cancelled, cancellationActor: "BUSINESS", endsAt: new Date(Date.now() - 1).toISOString() }).customerPhone, "");
+  assert.equal(businessBookingListProjection({ ...cancelled, cancellationActor: "BUSINESS" }).customerPhone, "");
 });

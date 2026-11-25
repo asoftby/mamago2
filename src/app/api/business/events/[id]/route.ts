@@ -58,6 +58,7 @@ import {
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 import { validateSchedulingCompleteness } from "@/lib/event/schedulingCompleteness";
+import { validateEventSeatConfiguration } from "@/lib/booking/eventSeatPolicy";
 
 /**
  * GET /api/business/events/[id]
@@ -361,6 +362,12 @@ export async function PATCH(
       };
     }
 
+    if (body.scheduleJson !== undefined) {
+      const seatPolicyError = validateEventSeatConfiguration(nextScheduleJson);
+      if (seatPolicyError) {
+        return NextResponse.json({ error: seatPolicyError, code: "INVALID_EVENT_SEAT_POLICY" }, { status: 400 });
+      }
+    }
     const nextPrimaryRootCategoryId =
       typeof nextScheduleJson.categoryId === "string" ? nextScheduleJson.categoryId : null;
     const nextPrimaryLeafCategoryId =

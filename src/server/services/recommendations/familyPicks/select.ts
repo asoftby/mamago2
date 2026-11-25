@@ -521,6 +521,17 @@ export function selectFamilyPicks(
 }
 
 // Confirmed-age v2 is composition over the shared ranker's score, not another ranker.
+/**
+ * HOME-only bounded preference; the shared My Plan engine remains unchanged.
+ * A boost can improve rank among relevant candidates but never bypasses
+ * eligibility, age or date filters, nor guarantees absolute first position.
+ */
+export function personalHomeBoostScore(baseScore: number, level: "NONE" | "FREE" | "PAID"): number {
+  if (level === "PAID") return baseScore + 30;
+  if (level === "FREE") return baseScore + 12;
+  return baseScore;
+}
+
 export type PersonalFamilySelection =
   | { mode: "ALL_FAMILY" }
   | { mode: "CHILD"; selectedChildId: string }
