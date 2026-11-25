@@ -1112,7 +1112,7 @@ export async function getUserInbox(
 
   return prisma.notification.findMany({
     where,
-    orderBy: [{ readAt: { sort: "asc", nulls: "first" } }, ...notificationListOrderBy],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: filters.limit ?? 50,
     skip: filters.offset ?? 0,
   });

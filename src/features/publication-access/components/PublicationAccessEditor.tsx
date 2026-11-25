@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,8 @@ export type PublicationAccessEditorProps = {
   showPreview?: boolean;
   /** Default dates/times for the time-slot editor (e.g. from the event schedule). */
   timeSlotSuggestions?: TimeSlotSuggestions;
+  /** Event-only occupancy controls rendered within the selected timeslots card. */
+  timeSlotsFooter?: ReactNode;
 };
 
 export function PublicationAccessEditor({
@@ -35,6 +38,7 @@ export function PublicationAccessEditor({
   disabled,
   showPreview = true,
   timeSlotSuggestions,
+  timeSlotsFooter,
 }: PublicationAccessEditorProps) {
   const labels = PUBLICATION_ACCESS_LABELS[entityType];
   const methods = allowedMethods ?? DEFAULT_ACCESS_METHODS_BY_ENTITY[entityType];
@@ -198,6 +202,7 @@ export function PublicationAccessEditor({
                   disabled={disabled}
                 />
               ) : null}
+              {method === "timeslots" ? timeSlotsFooter : null}
 
               {method !== "details" ? (
                 <div className="space-y-2">

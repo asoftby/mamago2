@@ -210,6 +210,11 @@ jobs:
       - name: Direct marketplace business write-policy regressions
         run: pnpm exec tsx src/server/services/direct/directBusinessWritePolicy.test.ts
 
+      - name: Direct send privacy and lock-order contracts
+        run: |
+          pnpm exec tsx src/server/services/direct/directMessageDto.test.ts
+          pnpm exec tsx src/server/services/direct/directMessageLock.contract.test.ts
+
       - name: Business booking contact minimization regressions
         run: pnpm exec tsx src/server/services/booking/businessBookingContactProjection.test.ts
 
@@ -489,12 +494,26 @@ jobs:
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
 
+      - name: Direct PostgreSQL moderation/send concurrency
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx --test src/server/services/direct/directPostgresLock.integration.test.ts
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          NODE_OPTIONS: --conditions=react-server
+
       - name: Business identity and payer PostgreSQL regressions
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
         run: |
           pnpm exec prisma migrate deploy
           pnpm test:business-identity
+
+      - name: Notification bell lifecycle PostgreSQL regressions
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          NODE_OPTIONS: --conditions=react-server
+        run: pnpm exec tsx --test src/server/services/notificationBell.postgres.integration.test.ts
 
       - name: Business contact SMS shared-budget PostgreSQL integration
         env:
@@ -592,6 +611,16 @@ jobs:
           pnpm exec tsx src/server/services/direct/directBookingThread.postgres.integration.test.ts
           pnpm exec tsx src/server/services/direct/directComplaint.postgres.integration.test.ts
           pnpm exec tsx src/app/api/business/events/organizer-from-verified-business/route.postgres.integration.test.ts
+
+      - name: Booking reoffer consent and atomic seat allocation PostgreSQL regressions
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          NODE_OPTIONS: --conditions=react-server
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/services/telegram/bookingReofferTelegram.test.ts
+          pnpm exec tsx src/server/services/booking/bookingReoffer.postgres.integration.test.ts
+          pnpm exec tsx src/server/services/booking/bookingReofferApi.postgres.integration.test.ts
 
       - name: Business support PostgreSQL isolation
         env:

@@ -97,6 +97,8 @@ interface Activity {
   boostDisabled?: boolean;
   boostNextFreeAt?: string | null;
   promotionPerformance?: ActivityPromotionPerformance | null;
+  /** Historical EVENT bookings, including cancelled/rejected ones. */
+  hasBookingHistory?: boolean;
   metrics?: {
     views: number;
     saves: number;
@@ -303,13 +305,15 @@ export function EventCardHorizontal({
         actions={
           <>
             <div className={BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW}>
-              <Link
-                href={`/business/events/${activity.id}/participants`}
-                className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_NEUTRAL)}
-              >
-                <Users className="h-4 w-4 shrink-0" />
-                Участники
-              </Link>
+              {activity.hasBookingHistory ? (
+                <Link
+                  href={`/business/events/${activity.id}/participants`}
+                  className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_NEUTRAL)}
+                >
+                  <Users className="h-4 w-4 shrink-0" />
+                  Участники
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setStatisticsOpen(true)}
