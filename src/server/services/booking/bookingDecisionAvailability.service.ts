@@ -161,8 +161,10 @@ export async function getBusinessBookingDecisionAvailability(
   }
   const active = {
     activityId: request.activityId, publicationType: PublicationType.EVENT,
-    status: { in: [BookingStatus.NEW, BookingStatus.CONFIRMED] },
-    ...where,
+    AND: [where, { OR: [
+      { status: BookingStatus.CONFIRMED },
+      { status: BookingStatus.NEW, OR: [{ holdUntil: null }, { holdUntil: { gt: now } }] },
+    ] }],
   } satisfies Prisma.BookingRequestWhereInput;
   // Include the request itself (NEW): its hold already occupies a place.
   const { _sum } = await db.bookingRequest.aggregate({
