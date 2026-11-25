@@ -56,6 +56,8 @@ jobs:
       - name: Apply migrations to disposable database
         run: pnpm exec prisma migrate deploy
       - name: Run concurrent reservation integration tests
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx src/server/offers/reserveSlot.integration.test.ts
       - name: Atomic multi-resource holds and concurrent bundle reservations
         env:
