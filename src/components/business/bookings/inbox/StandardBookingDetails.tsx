@@ -59,8 +59,8 @@ export function StandardBookingDetails({ id, onClose, onDone }: Props) {
     }
     const updated = (await result.json()) as BusinessBookingItem;
     setItem(updated);
-    const detail = await fetch("/api/business/bookings/" + encodeURIComponent(bookingId), { cache: "no-store" });
-    if (detail.ok) setItem(await detail.json() as BusinessBookingItem);
+    const detail = await fetch("/api/business/bookings/" + encodeURIComponent(bookingId), { cache: "no-store" }).catch(() => null);
+    if (detail?.ok) setItem(await detail.json().catch(() => updated) as BusinessBookingItem);
     toast.success("Статус обновлён");
     onDone();
   };
