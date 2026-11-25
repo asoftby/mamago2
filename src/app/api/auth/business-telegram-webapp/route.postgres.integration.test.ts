@@ -97,7 +97,7 @@ async function main() {
       userId: user.id, businessId: outsider.id, role: "MANAGER", isActive: true,
       createdAt: new Date(Date.now() + 1000),
     } });
-    await rejected(sign(), 403, "BUSINESS_CONTEXT_MISMATCH");
+    assert.equal((await POST(request())).status, 200, "Membership of the connected second business is accepted");
     await db.business.update({ where: { id: business.id }, data: { operationalStatus: "DISABLED" } });
     await db.businessTelegramConnection.update({ where: { id: connection.id }, data: { businessId: business.id } });
     await rejected();

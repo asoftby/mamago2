@@ -41,7 +41,7 @@ export async function reportSmsByFailure(params: {
           audience: "ADMIN",
           type: "SYSTEM",
           title: "Сбой отправки SMS",
-          body: "Код подтверждения не был принят sms.by. Проверьте настройки, баланс провайдера и техническую диагностику.",
+          body: "Приём сообщения провайдером sms.by не подтверждён. Проверьте настройки, баланс провайдера и техническую диагностику.",
           actionMode: "PAGE",
           actionUrl: "/admin/system/notifications",
           metadata: {
