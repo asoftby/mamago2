@@ -45,11 +45,11 @@ export function StandardBookingDetails({ id, onClose, onDone }: Props) {
     return () => controller.abort();
   }, [id]);
 
-  const handleStatusChange = async (bookingId: string, status: BookingStatus, reason?: string) => {
+  const handleStatusChange = async (bookingId: string, status: BookingStatus, reason?: string, comment?: string) => {
     const result = await fetch("/api/business/bookings/" + encodeURIComponent(bookingId) + "/status", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, ...(reason ? { reason } : {}) }),
+      body: JSON.stringify({ status, ...(reason ? { reason, comment } : {}) }),
     });
     if (!result.ok) {
       const body = (await result.json().catch(() => ({}))) as { error?: string };
@@ -59,6 +59,8 @@ export function StandardBookingDetails({ id, onClose, onDone }: Props) {
     }
     const updated = (await result.json()) as BusinessBookingItem;
     setItem(updated);
+    const detail = await fetch("/api/business/bookings/" + encodeURIComponent(bookingId), { cache: "no-store" });
+    if (detail.ok) setItem(await detail.json() as BusinessBookingItem);
     toast.success("Статус обновлён");
     onDone();
   };

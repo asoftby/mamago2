@@ -13,9 +13,9 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const business = await getMyBusiness(user.id);
-  if (!business) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
+  const business = await getMyBusiness(user.id, id);
+  if (!business) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const decision = await getBusinessBookingDecisionAvailability(prisma, id, business.id);
   if (!decision) return NextResponse.json({ error: "Заявка не найдена" }, { status: 404 });
   return NextResponse.json(decision, { headers: { "Cache-Control": "private, no-store" } });

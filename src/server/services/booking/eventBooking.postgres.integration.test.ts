@@ -438,7 +438,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     await assert.rejects(updateBookingStatus(winner.bookingId, "foreign-business", "CONFIRMED"));
     await updateBookingStatus(winner.bookingId, business.id, "CONFIRMED");
     await assert.rejects(submit(calendar.id, 5, first.id), /недостаточно мест/);
-    await updateBookingStatus(winner.bookingId, business.id, "REJECTED");
+    await updateBookingStatus(winner.bookingId, business.id, "CANCELLED");
     const replacement = await submit(calendar.id, 5, first.id);
 
     // Retain the original first occurrence if a duplicate imported row exists.

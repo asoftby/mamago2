@@ -12,7 +12,6 @@
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { NextRequest, NextResponse } from "next/server";
 import { businessBookingDecisionSchema } from "@/lib/booking/businessBookingDecisionSchema";
-import { BookingStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import {
@@ -36,12 +35,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const business = await getMyBusiness(user.id);
+    const { id } = await params;
+    const business = await getMyBusiness(user.id, id);
     if (!business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
-    const { id } = await params;
     const body: unknown = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });

@@ -1,12 +1,16 @@
+import { loadSlotSnapshot } from "@/server/offers/getSlots";
+import { calculateSlots } from "@/server/offers/slotAvailability";
 import { BookingKind, BookingMode, BookingStatus, Prisma, PublicationType } from "@prisma/client";
-import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { formatHHMM } from "@/lib/formatters/date";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { getEventSeatPolicy, calculateEventSeatAvailability, occupiedEventSeats, type EventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
 
-type Db = Pick<Prisma.TransactionClient, "bookingRequest" | "activity">;
+type Db = Prisma.TransactionClient;
 
 export type BookingDecisionAvailability = {
+  requested?: number;
+  occupied?: number;
   canConfirm: boolean;
   code: "AVAILABLE" | "FULL" | "UNLIMITED" | "NOT_APPLICABLE" | "UNAVAILABLE";
   message: string;
@@ -73,6 +77,8 @@ export async function getBusinessBookingDecisionAvailability(
   const request = await db.bookingRequest.findFirst({
     where: { id: bookingId, businessId, kind: BookingKind.STANDARD },
     select: {
+      offerId: true, offerSessionId: true, startsAt: true, endsAt: true, seats: true, classGroupId: true,
+      allocations: { select: { bookingUnitId: true, status: true, expiresAt: true } },
       status: true, activityId: true, publicationType: true, holdUntil: true,
       adultsCount: true, childrenCount: true,
       selectedSessionId: true, requestedDate: true, requestedTime: true,
@@ -83,6 +89,32 @@ export async function getBusinessBookingDecisionAvailability(
   if (request.status !== BookingStatus.NEW) return unavailable("Заявка уже обработана");
   if (request.holdUntil && request.holdUntil.getTime() <= now.getTime()) {
     return unavailable("Срок резервирования истёк. Подтвердить эту заявку нельзя");
+  }
+  if (request.offerId && request.startsAt && request.endsAt) {
+    const query = { offerId: request.offerId, classGroupId: request.classGroupId ?? undefined,
+      from: request.startsAt, to: new Date(request.endsAt.getTime() + 1), requestedSeats: request.seats };
+    const snapshot = await loadSlotSnapshot(query, db, bookingId);
+    if (!snapshot) return unavailable("Расписание больше недоступно");
+    if (snapshot.units.length > 0 && request.allocations.length === 0) {
+      return unavailable("У заявки отсутствует резерв обязательного ресурса");
+    }
+    if (request.allocations.some((a) => !["HELD", "CONFIRMED"].includes(a.status) ||
+      (a.status === "HELD" && a.expiresAt !== null && a.expiresAt <= now))) {
+      return unavailable("Резерв ресурса истёк или освобождён");
+    }
+    // Lead time controls new reservations. This request already holds its slot.
+    const slot = calculateSlots({ ...snapshot, leadTimeHours: 0 }, {
+      ...query, ...(snapshot.scheduleKind === "ON_REQUEST_WINDOWS" ? {
+        requestedDurationMinutes: (request.endsAt.getTime() - request.startsAt.getTime()) / 60_000,
+      } : {}),
+    }, now).find((slot) =>
+      slot.startsAt.getTime() === request.startsAt!.getTime() &&
+      slot.endsAt.getTime() === request.endsAt!.getTime());
+    if (!slot || request.allocations.some((a) => !slot.unitIds.includes(a.bookingUnitId))) {
+      return unavailable("Недостаточно мест или выбранный ресурс недоступен");
+    }
+    return { canConfirm: true, code: "AVAILABLE", message: "Достаточно мест и ресурсов для подтверждения",
+      remaining: slot.remainingSeats, capacity: snapshot.sessions.find((s) => s.id === slot.sessionId)?.capacity ?? snapshot.capacity };
   }
   if (request.publicationType !== PublicationType.EVENT || !request.activityId) {
     return { canConfirm: true, code: "NOT_APPLICABLE", message: "Для этой заявки учёт мест по сеансам не применяется", remaining: null, capacity: null };
@@ -136,9 +168,13 @@ export async function getBusinessBookingDecisionAvailability(
   const { _sum } = await db.bookingRequest.aggregate({
     where: active, _sum: { adultsCount: true, childrenCount: true },
   });
-  return assessCurrentEventBookingCapacity({
+  const assessment = assessCurrentEventBookingCapacity({
     policy: getEventSeatPolicy(activity.scheduleJson), capacity,
     usedAdults: _sum.adultsCount ?? 0, usedChildren: _sum.childrenCount ?? 0,
     requestAdults: request.adultsCount, requestChildren: request.childrenCount,
   });
+  const policy = getEventSeatPolicy(activity.scheduleJson);
+  const requested = occupiedEventSeats(policy.mode, request.adultsCount, request.childrenCount);
+  const occupied = occupiedEventSeats(policy.mode, _sum.adultsCount ?? 0, _sum.childrenCount ?? 0);
+  return { ...assessment, requested, occupied };
 }
