@@ -139,11 +139,9 @@ export function NotificationFeed({
         return;
       }
 
-      if (!notification.actionUrl) return;
-      onClose?.();
-      router.push(notification.actionUrl);
+      await handleRowClick(notification);
     },
-    [handleOnboardingCta, onClose, router],
+    [handleOnboardingCta, handleRowClick],
   );
 
   const handleArchive = useCallback(
