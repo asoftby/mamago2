@@ -10,7 +10,7 @@ import {
   BookingValidationError,
 } from "@/server/services/booking/booking.service";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
-import { BOOKING_MAX_ADULTS, bookingChildrenInputSchema } from "@/lib/booking/bookingParticipants";
+import { BOOKING_MAX_ADULTS, BOOKING_MAX_CHILDREN, bookingChildrenInputSchema } from "@/lib/booking/bookingParticipants";
 
 const createBookingSchema = z.object({
   publicationType: z.nativeEnum(PublicationType),
@@ -28,9 +28,14 @@ const createBookingSchema = z.object({
   children: bookingChildrenInputSchema.optional(),
   planItemId: z.string().min(1).optional(),
 }).superRefine((value, ctx) => {
-  if (value.children === undefined) return;
-  if (value.adultsCount < 1 || value.adultsCount > BOOKING_MAX_ADULTS) {
-    ctx.addIssue({ code: "custom", path: ["adultsCount"], message: `Взрослых должно быть от 1 до ${BOOKING_MAX_ADULTS}` });
+  if (value.publicationType !== PublicationType.EVENT) return;
+  // Backwards-compatible count-only EVENT requests are capped exactly like
+  // the full participant form; omitting children[] must not bypass the cap.
+  if (value.adultsCount > BOOKING_MAX_ADULTS) {
+    ctx.addIssue({ code: "custom", path: ["adultsCount"], message: `Не больше ${BOOKING_MAX_ADULTS} взрослых в одной заявке` });
+  }
+  if (value.childrenCount > BOOKING_MAX_CHILDREN) {
+    ctx.addIssue({ code: "custom", path: ["childrenCount"], message: `Не больше ${BOOKING_MAX_CHILDREN} детей в одной заявке` });
   }
 });
 

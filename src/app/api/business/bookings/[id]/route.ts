@@ -1,13 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { dispatchGuestBookingSms } from "@/server/services/booking/guestBookingSms.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { z } from "zod";
-import { BookingStatus } from "@prisma/client";
+import { businessBookingDecisionSchema } from "@/lib/booking/businessBookingDecisionSchema";
 import {
   updateBookingStatus,
   getBusinessBookingById,
   BookingOwnershipError,
   BookingStatusTransitionError,
+  BookingDecisionCapacityError,
 } from "@/server/services/booking/bookingQuery.service";
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
 import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
@@ -18,13 +20,7 @@ import {
   businessBookingListProjection,
 } from "@/server/services/booking/businessBookingContactProjection";
 
-const updateBookingSchema = z.object({
-  status: z.enum([
-    BookingStatus.CONFIRMED,
-    BookingStatus.REJECTED,
-    BookingStatus.COMPLETED,
-  ]),
-});
+const updateBookingSchema = businessBookingDecisionSchema;
 
 /** Tenant-scoped single STANDARD detail: no 200-row calendar cap. */
 export async function GET(
@@ -33,9 +29,9 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const business = await getMyBusiness(user.id);
-  if (!business) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
+  const business = await getMyBusiness(user.id, id);
+  if (!business) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const item = await getBusinessBookingById(id, business.id);
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await attachDirectAvailabilityToBusinessBookings([item]);
@@ -73,7 +69,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const business = await getMyBusiness(user.id);
+    const { id } = await params;
+    const business = await getMyBusiness(user.id, id);
     
     if (!business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
@@ -81,16 +78,25 @@ export async function PATCH(
 
     const body = await request.json();
     const data = updateBookingSchema.parse(body);
-    const { id } = await params;
 
     const updatedBooking = await updateBookingStatus(id, business.id, data.status, {
       actorId: user.id,
       actorRole: user.role,
+      reason: data.reason ?? null,
       metadata: {
         source: "business_legacy_patch_route",
       },
     });
 
+    if (!updatedBooking.hasCustomerAccount && data.status !== "COMPLETED") {
+      after(async () => {
+        try {
+          await dispatchGuestBookingSms({ bookingId: id, limit: 3 });
+        } catch {
+          console.error("[booking-sms] after-response dispatch failed");
+        }
+      });
+    }
     await attachDirectAvailabilityToBusinessBookings([updatedBooking]);
     // Status-changing responses must not quietly repopulate the bulk list with PII.
     return NextResponse.json(businessBookingListProjection(updatedBooking));
@@ -100,6 +106,9 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 403 });
     }
 
+    if (error instanceof BookingDecisionCapacityError) {
+      return NextResponse.json({ error: error.message, code: "EVENT_CAPACITY_CHANGED" }, { status: 409 });
+    }
     if (error instanceof BookingHoldExpiredError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }

@@ -39,7 +39,7 @@ export function BookingsView() {
             Календарь
           </Link>
         </nav>
-        <Button type="button" className="min-h-11" onClick={() => setManualOpen(true)}>+ Новая запись</Button>
+        <Button variant="business" type="button" className="min-h-11" onClick={() => setManualOpen(true)}>+ Новая запись</Button>
       </div>
       {calendar ? <BookingsPageClient revision={revision} /> : <BookingsInbox />}
       {manualOpen ? <ManualBookingDialog

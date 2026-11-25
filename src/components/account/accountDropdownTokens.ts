@@ -33,3 +33,12 @@ export function isAccountRowActive(
 }
 
 export const accountDropdownIconClass = "h-4 w-4";
+
+/**
+ * Soft sky surface for business chrome — matches BusinessHeader profile
+ * trigger «A» and AccountDropdownContent chromeTone="business".
+ */
+export const BUSINESS_CHROME_SOFT_BG = "bg-sky-100";
+export const BUSINESS_CHROME_SOFT_FG = "text-sky-900";
+export const BUSINESS_CHROME_AVATAR_FALLBACK_INNER =
+  "flex h-full w-full items-center justify-center rounded-full bg-sky-100 text-[11px] font-semibold text-sky-900";

@@ -70,6 +70,8 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
     privacy: "Управляйте данными и удалением аккаунта",
   };
 
+  const iconTone = context.surfaceScope === "BUSINESS" ? "business" : "neutral";
+
   return (
     <div className="space-y-6">
       {visibleGroups.map((group) => (
@@ -89,6 +91,7 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
                     ? "не подтверждён"
                     : undefined
                 }
+                iconTone={iconTone}
               />
             );
           })}
@@ -101,6 +104,7 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
             icon={Shield}
             label="Аккаунт и безопасность"
             description="Имя, вход, пароль, телефон и конфиденциальность"
+            iconTone="business"
           />
         </CardSection>
       ) : null}

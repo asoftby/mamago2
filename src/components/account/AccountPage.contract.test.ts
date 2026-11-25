@@ -7,7 +7,8 @@ const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 // Каркас: контейнер, одна ссылка назад, h1 эталона «Моя семья».
 const shell = read("src/components/account/AccountPage.tsx");
 assert.match(shell, /mx-auto min-h-\[70vh\] w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8/);
-assert.match(shell, /inline-flex min-h-11 items-center text-sm text-neutral-600 hover:text-neutral-900/);
+assert.match(shell, /from "@\/components\/ui\/back-button"/);
+assert.match(shell, /<BackButton\b/);
 assert.match(shell, /text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl/);
 assert.match(shell, /mt-2 max-w-2xl text-neutral-600/);
 assert.doesNotMatch(shell, /font-serif|font-mono|uppercase/, "no editorial serif/mono kicker in the shell");
@@ -21,8 +22,6 @@ const ON_SHELL = [
   "src/app/(public)/me/profile/page.tsx",
   "src/features/me/components/account/AccountDesign.tsx",
   "src/app/(public)/me/bookings/ParentBookingsClient.tsx",
-  "src/app/(public)/me/direct/DirectListClient.tsx",
-  "src/app/(public)/me/direct/[threadId]/DirectThreadClient.tsx",
   "src/features/ideas-collections/IdeasCollections.tsx",
   "src/app/(public)/me/wishlists/page.tsx",
   "src/app/(public)/me/wishlists/[id]/page.tsx",
@@ -50,7 +49,8 @@ for (const file of [
   assert.doesNotMatch(read(file), /<main\b|min-h-screen|<Container\b/, `${file} has no bespoke container`);
 }
 // Исключения: превью, /me/plan, деталь записи-билета (не используется).
-// Бизнес-режим личной переписки не переведён на каркас кабинета.
+// У личной переписки общий layout для списка и выбранного диалога.
+assert.match(read("src/app/(public)/me/direct/layout.tsx"), /<DirectInbox variant="customer"/);
 assert.match(read("src/app/(public)/me/direct/[threadId]/DirectThreadClient.tsx"), /businessPage/);
 // Ссылки «← Мой аккаунт» нет нигде: страницы не ведут назад на корневую /me.
 assert.doesNotMatch(shell, /"← Мой аккаунт"/);

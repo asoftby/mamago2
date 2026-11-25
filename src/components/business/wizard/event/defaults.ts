@@ -103,6 +103,9 @@ export function getDefaultFormData(): EventFormData {
     simpleBookingDate: null,
     simpleBookingTime: null,
     simpleBookingCapacity: null,
+    eventSeatMode: "ALL",
+    adultSeatCapacity: null,
+    childSeatCapacity: null,
     timeSlots: { dates: [] },
     
     // Step 2: Location (EventVenue)

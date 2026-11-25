@@ -883,7 +883,7 @@ export function Step3Media({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
+                    <Button variant="business"
                       type="button"
                       size="sm"
                       disabled={!isEditable || isApplyingImportedCover}
@@ -1085,7 +1085,7 @@ export function Step3Media({
                   }}>
                     Выбрать из медиатеки
                   </Button>
-                  <Button type="button" size="sm" disabled={!isEditable} onClick={(e) => {
+                  <Button variant="business" type="button" size="sm" disabled={!isEditable} onClick={(e) => {
                     e.stopPropagation();
                     openFilePicker();
                   }}>
@@ -1126,7 +1126,7 @@ export function Step3Media({
                   }}>
                     Выбрать из медиатеки
                   </Button>
-                  <Button type="button" size="sm" disabled={!isEditable} onClick={(e) => {
+                  <Button variant="business" type="button" size="sm" disabled={!isEditable} onClick={(e) => {
                     e.stopPropagation();
                     openFilePicker();
                   }}>
@@ -1185,7 +1185,7 @@ export function Step3Media({
                   }}>
                     Из медиатеки
                   </Button>
-                  <Button type="button" size="sm" disabled={!isEditable} onClick={(e) => {
+                  <Button variant="business" type="button" size="sm" disabled={!isEditable} onClick={(e) => {
                     e.stopPropagation();
                     openFilePicker();
                   }}>
@@ -1291,7 +1291,7 @@ export function Step3Media({
             <Button type="button" variant="ghost" onClick={() => setPickerOpen(false)}>
               Отмена
             </Button>
-            <Button type="button" onClick={applyPickerSelection} disabled={pickerSelection.size === 0}>
+            <Button variant="business" type="button" onClick={applyPickerSelection} disabled={pickerSelection.size === 0}>
               Добавить выбранные
             </Button>
           </DialogFooter>

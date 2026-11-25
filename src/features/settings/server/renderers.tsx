@@ -18,10 +18,15 @@ import { PrivacySettingsClient } from "@/app/settings/privacy/PrivacySettingsCli
 import { NotificationSettingsTable } from "@/components/business/notifications/NotificationSettingsTable";
 import { BusinessAccountHub } from "@/components/settings/BusinessAccountHub";
 import { SettingsScaffold } from "@/components/settings/SettingsScaffold";
+import {
+  settingsSectionIconClass,
+  settingsSectionIconTileClass,
+} from "@/components/settings/settingsSectionIconTile";
 import { buildSettingsHomeHref } from "@/lib/settings/registry";
 import { requireSettingsContext } from "@/lib/settings/resolveSettingsContext";
 import type { SettingsScope } from "@/lib/settings/types";
 import { getNotificationSettingsSurfaceData } from "@/server/services/notificationSettings.service";
+import { getBusinessVerificationBadge } from "@/lib/settings/businessVerificationPresentation";
 
 function CompanyInfoRow(props: { label: string; value: string }) {
   return (
@@ -83,7 +88,9 @@ export async function renderEmailSettingsPage(surfaceScope: SettingsScope = "USE
 
   return (
     <SettingsScaffold context={context} title="Email" currentSectionId="email">
-      <EmailSettingsClient />
+      <EmailSettingsClient
+        iconTone={surfaceScope === "BUSINESS" ? "business" : "neutral"}
+      />
     </SettingsScaffold>
   );
 }
@@ -134,6 +141,8 @@ export async function renderCompanySettingsPage(surfaceScope: SettingsScope = "U
   const context = await requireSettingsContext({ requestedScope: surfaceScope });
   const business = context.businessContext;
 
+  const verificationBadge = business ? getBusinessVerificationBadge(business.verificationStatus) : null;
+
   if (!business) {
     return (
       <SettingsScaffold context={context} title="Компания" currentSectionId="company">
@@ -149,15 +158,15 @@ export async function renderCompanySettingsPage(surfaceScope: SettingsScope = "U
       <div className="space-y-4">
         <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100">
-              <FileText className="h-4 w-4 text-neutral-500" />
+            <div className={settingsSectionIconTileClass("business")}>
+              <FileText className={settingsSectionIconClass("business")} />
             </div>
             <div className="space-y-3">
               <p className="text-sm font-medium text-neutral-900">
                 Статус компании
               </p>
-              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
-                Подтвержден
+              <span className={`inline-flex items-center rounded-full border px-3 py-2 text-xs font-medium ${verificationBadge?.toneClass ?? ""}`}>
+                {verificationBadge?.label}
               </span>
               <p className="text-sm text-neutral-600">
                 Текущий статус: {business.verificationStatus}
@@ -168,8 +177,8 @@ export async function renderCompanySettingsPage(surfaceScope: SettingsScope = "U
 
         <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100">
-              <Building2 className="h-4 w-4 text-neutral-500" />
+            <div className={settingsSectionIconTileClass("business")}>
+              <Building2 className={settingsSectionIconClass("business")} />
             </div>
             <div className="flex-1 space-y-5">
               <CompanyInfoRow label="Название компании" value={business.name} />

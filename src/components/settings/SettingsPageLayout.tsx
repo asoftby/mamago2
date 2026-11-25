@@ -14,7 +14,7 @@ export function SettingsPageLayout(props: {
     <AccountPage
       title={props.title}
       backHref={props.backHref === null ? undefined : (props.backHref ?? "/me/settings")}
-      backLabel={props.backLabel ?? "← Настройки"}
+      backLabel={props.backLabel ?? "К настройкам"}
       className={props.maxWidthClassName ?? "max-w-2xl"}
     >
       {props.children}

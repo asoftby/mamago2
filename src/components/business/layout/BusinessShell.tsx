@@ -1,5 +1,6 @@
 import type { AccountMenuUser } from "@/lib/account/types";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
+import { BusinessCabinetNav } from "./BusinessCabinetNav";
 import { BusinessHeader } from "./BusinessHeader";
 import { BusinessSidebar } from "./BusinessSidebar";
 import type { BuildInfo } from "@/lib/system/buildInfo";
@@ -26,6 +27,7 @@ export function BusinessShell({ children, user, buildInfo }: BusinessShellProps)
         {/* Right Content Area */}
         <main className="min-w-0 flex-1 w-full px-4 py-5 sm:px-6 sm:py-6 lg:w-auto lg:px-8">
           <div className="mx-auto w-full min-w-0 max-w-[1380px] space-y-6">
+            <BusinessCabinetNav />
             {children}
           </div>
         </main>

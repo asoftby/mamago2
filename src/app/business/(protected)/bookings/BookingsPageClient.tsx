@@ -1,5 +1,10 @@
 "use client";
 
+import { businessRejectionReasons } from "@/lib/booking/businessBookingDecisionSchema";
+import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
+import type { EventCalendarSummary } from "@/lib/business/eventCalendarSummary";
+
 import { formatChildLabel, formatParticipantsLine } from "@/lib/booking/bookingParticipants";
 import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
@@ -32,6 +37,8 @@ import type {
   BusinessBookingItem,
   BookingStatusCounts,
 } from "@/server/services/booking/bookingQuery.service";
+
+type BookingDecisionPreview = import("@/server/services/booking/bookingDecisionAvailability.service").BookingDecisionAvailability;
 
 type StatusFilter = "all" | BookingStatus;
 type SortMode = "newest" | "oldest";
@@ -419,6 +426,8 @@ function getQuickDateItems(baseDate: Date) {
 
 export function BookingsPageClient({ revision = 0 }: { revision?: number } = {}) {
   const [items, setItems] = useState<BusinessBookingItem[]>([]);
+  const [calendarSummaries, setCalendarSummaries] = useState<EventCalendarSummary[]>([]);
+  const [summaryRefreshRevision, setSummaryRefreshRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<StatusFilter>("all");
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
@@ -498,11 +507,9 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [searchParams]);
 
   useEffect(() => {
-    const idFromUrl = searchParams.get("id");
-    if (idFromUrl && items.length > 0) {
-      setSelectedBookingId(idFromUrl);
-    }
-  }, [searchParams, items]);
+    const idFromUrl = searchParams.get("id") ?? searchParams.get("request");
+    if (idFromUrl) setSelectedBookingId(idFromUrl);
+  }, [searchParams]);
 
   const fetchBookings = useCallback(
     async () => {
@@ -539,6 +546,29 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
     void fetchBookings();
   }, [fetchBookings, revision]);
 
+  // Accurate per-session attendance is aggregated on the server; the generic
+  // bookings inbox is deliberately capped at 200 rows and strips PII.
+  useEffect(() => {
+    const controller = new AbortController();
+    const from = toDateKey(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1));
+    const to = toDateKey(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1));
+    void fetch("/api/business/bookings/calendar-summary?from=" + from + "&to=" + to, {
+      credentials: "include", cache: "no-store", signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json() as Promise<{ slots: EventCalendarSummary[] }>;
+      })
+      .then((body) => { if (!controller.signal.aborted) setCalendarSummaries(body.slots ?? []); })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.error("[BookingsPageClient] calendar event summary", error);
+          setCalendarSummaries([]);
+        }
+      });
+    return () => controller.abort();
+  }, [monthAnchor, revision, summaryRefreshRevision]);
+
   // The bulk API deliberately excludes contacts and child names. Fetch just
   // the one selected order after a deliberate click; the detail API audits
   // any active customer-contact disclosure before returning it.
@@ -564,7 +594,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [selectedBookingId, detailRefreshRevision]);
 
   const handleStatusChange = useCallback(
-    async (id: string, status: BookingStatus) => {
+    async (id: string, status: BookingStatus, reason?: string, comment?: string) => {
       setItems((prev) => prev.map((booking) => (booking.id === id ? { ...booking, status } : booking)));
 
       try {
@@ -572,7 +602,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status, ...(reason ? { reason, comment } : {}) }),
         });
 
         if (!res.ok) {
@@ -586,11 +616,15 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
         setDetailRefreshRevision((version) => version + 1);
         toast.success("Статус обновлён");
 
+        // The calendar aggregate is a separate API from the capped inbox.
+        // After a successful confirmation/rejection, invalidate that query too.
+        setSummaryRefreshRevision((value) => value + 1);
         void fetchBookings();
         void refreshBusinessUnreadOnly({ force: true });
       } catch (err) {
         void fetchBookings();
         toast.error(err instanceof Error ? err.message : "Ошибка обновления");
+        throw err;
       }
     },
     [fetchBookings, refreshBusinessUnreadOnly],
@@ -599,6 +633,10 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   const calendarBuckets = useMemo(() => buildCalendarBuckets(items), [items]);
   const selectedDateKey = toDateKey(selectedDate);
   const selectedDayBucket = calendarBuckets.get(selectedDateKey) ?? null;
+  const selectedDaySummaries = useMemo(
+    () => calendarSummaries.filter((item) => item.date === selectedDateKey),
+    [calendarSummaries, selectedDateKey],
+  );
   const monthGrid = useMemo(() => getMonthGrid(monthAnchor), [monthAnchor]);
 
   const counts = useMemo<BookingStatusCounts>(() => {
@@ -631,10 +669,13 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [activeListDate, items, sortMode, tab]);
 
   useEffect(() => {
-    if (selectedBookingId && !visibleItems.some((item) => item.id === selectedBookingId)) {
+    if (selectedBookingId &&
+        !visibleItems.some((item) => item.id === selectedBookingId) &&
+        (searchParams.get("id") ?? searchParams.get("request")) !== selectedBookingId &&
+        selectedBookingDetail?.id !== selectedBookingId) {
       setSelectedBookingId(null);
     }
-  }, [selectedBookingId, visibleItems]);
+  }, [selectedBookingId, visibleItems, searchParams, selectedBookingDetail]);
 
   const selectedBooking = useMemo(
     () => selectedBookingDetail?.id === selectedBookingId
@@ -745,6 +786,8 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
         monthAnchor={monthAnchor}
         selectedDate={selectedDate}
         selectedDayBucket={selectedDayBucket}
+        sessionSummaries={selectedDaySummaries}
+        monthSummaries={calendarSummaries}
         monthGrid={monthGrid}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -917,6 +960,8 @@ function BookingsCalendarOverview({
   monthAnchor,
   selectedDate,
   selectedDayBucket,
+  sessionSummaries,
+  monthSummaries,
   monthGrid,
   viewMode,
   onViewModeChange,
@@ -930,6 +975,8 @@ function BookingsCalendarOverview({
   monthAnchor: Date;
   selectedDate: Date;
   selectedDayBucket: CalendarBookingBucket | null;
+  sessionSummaries: EventCalendarSummary[];
+  monthSummaries: EventCalendarSummary[];
   monthGrid: CalendarCell[];
   viewMode: CalendarViewMode;
   onViewModeChange: (mode: CalendarViewMode) => void;
@@ -957,6 +1004,7 @@ function BookingsCalendarOverview({
             monthAnchor={monthAnchor}
             selectedDate={selectedDate}
             calendarBuckets={calendarBuckets}
+            monthSummaries={monthSummaries}
             onSelectDate={onSelectDate}
           />
         </div>
@@ -965,6 +1013,7 @@ function BookingsCalendarOverview({
           <BookingCalendarDayPanel
             selectedDate={selectedDate}
             bucket={selectedDayBucket}
+            sessionSummaries={sessionSummaries}
             onViewAll={() => onViewAllForDate(selectedDate)}
           />
         </div>
@@ -1053,12 +1102,14 @@ function BookingMonthGrid({
   monthAnchor,
   selectedDate,
   calendarBuckets,
+  monthSummaries,
   onSelectDate,
 }: {
   cells: CalendarCell[];
   monthAnchor: Date;
   selectedDate: Date;
   calendarBuckets: Map<string, CalendarBookingBucket>;
+  monthSummaries: EventCalendarSummary[];
   onSelectDate: (date: Date) => void;
 }) {
   const selectedKey = toDateKey(selectedDate);
@@ -1066,6 +1117,13 @@ function BookingMonthGrid({
   const mobileCells = cells.filter((cell) => cell.date.getMonth() === monthAnchor.getMonth());
   const selectedMobileDayRef = useRef<HTMLButtonElement | null>(null);
   const visibleMonthKey = `${monthAnchor.getFullYear()}-${monthAnchor.getMonth()}`;
+  const participantsByDay = useMemo(() => {
+    const result = new Map<string, number>();
+    for (const entry of monthSummaries) {
+      result.set(entry.date, (result.get(entry.date) ?? 0) + entry.adults + entry.children);
+    }
+    return result;
+  }, [monthSummaries]);
 
   useEffect(() => {
     selectedMobileDayRef.current?.scrollIntoView({
@@ -1096,7 +1154,9 @@ function BookingMonthGrid({
               >
                 <span className="text-[11px] uppercase text-stone-400">{CALENDAR_WEEKDAYS[(cell.date.getDay() + 6) % 7]}</span>
                 <span className={cn("mt-1 font-semibold", isTodayCell && "text-sky-600")}>{cell.date.getDate()}</span>
-                <span className="mt-1 text-[10px] text-stone-400">{bucket?.total ? formatBookingsCount(bucket.total) : "—"}</span>
+                <span className="mt-1 text-[10px] text-stone-600">
+                  {participantsByDay.get(cell.key) ? participantsByDay.get(cell.key) + " чел." : bucket?.total ? formatBookingsCount(bucket.total) : "—"}
+                </span>
               </button>
             );
           })}
@@ -1122,6 +1182,7 @@ function BookingMonthGrid({
               key={cell.key}
               cell={cell}
               bucket={bucket}
+              eventPeople={participantsByDay.get(cell.key) ?? 0}
               isSelected={isSelected}
               isToday={isTodayCell}
               onClick={() => onSelectDate(cell.date)}
@@ -1138,6 +1199,7 @@ function BookingMonthGrid({
 function BookingCalendarDayCell({
   cell,
   bucket,
+  eventPeople,
   isSelected,
   isToday,
   isCurrentMonth,
@@ -1145,6 +1207,7 @@ function BookingCalendarDayCell({
 }: {
   cell: CalendarCell;
   bucket: CalendarBookingBucket | undefined;
+  eventPeople: number;
   isSelected: boolean;
   isToday: boolean;
   isCurrentMonth: boolean;
@@ -1173,10 +1236,11 @@ function BookingCalendarDayCell({
       </span>
 
       <div className="w-full space-y-2">
-        {bucket ? (
+        {bucket || eventPeople ? (
           <>
+            {eventPeople > 0 ? <p className="text-xs font-semibold text-sky-800">{eventPeople} участников</p> : null}
             <div className="flex flex-wrap items-center gap-1.5">
-              {bucket.statusDots.slice(0, 3).map((status) => (
+              {(bucket?.statusDots ?? []).slice(0, 3).map((status) => (
                 <span
                   key={`${cell.key}-${status}`}
                   className={cn("h-2.5 w-2.5 rounded-full", STATUS_META[status].dotClass)}
@@ -1186,7 +1250,7 @@ function BookingCalendarDayCell({
                 <span className="text-[11px] font-medium text-stone-400">+{extraCount}</span>
               ) : null}
             </div>
-            <div className="text-xs text-stone-400">{formatBookingsCount(bucket.total)}</div>
+            {bucket?.total ? <div className="text-xs text-stone-400">{formatBookingsCount(bucket.total)}</div> : null}
           </>
         ) : (
           <div className="text-xs text-stone-300">Нет записей</div>
@@ -1199,15 +1263,19 @@ function BookingCalendarDayCell({
 function BookingCalendarDayPanel({
   selectedDate,
   bucket,
+  sessionSummaries,
   onViewAll,
 }: {
   selectedDate: Date;
   bucket: CalendarBookingBucket | null;
+  sessionSummaries: EventCalendarSummary[];
   onViewAll: () => void;
 }) {
   const bookings = bucket?.bookings ?? [];
   const visible = bookings.slice(0, 5);
-  const label = bookings.length === 0 ? "Нет записей" : formatBookingsCount(bookings.length);
+  const eventBookings = sessionSummaries.reduce((sum, item) => sum + item.bookings, 0);
+  const totalPeople = sessionSummaries.reduce((sum, item) => sum + item.adults + item.children, 0);
+  const label = Math.max(bookings.length, eventBookings) === 0 ? "Нет записей" : formatBookingsCount(Math.max(bookings.length, eventBookings));
 
   return (
     <div className="flex h-full min-h-[320px] flex-col p-4 sm:min-h-[580px] sm:p-6">
@@ -1215,13 +1283,18 @@ function BookingCalendarDayPanel({
         <div>
           <h3 className="text-lg font-semibold text-stone-950">{formatCalendarHeaderDate(selectedDate)}</h3>
           <p className="mt-1 text-sm text-stone-500">Записи выбранного дня</p>
+          {sessionSummaries.length ? (
+            <p className="mt-1 text-sm font-semibold text-stone-800">
+              События: {eventBookings} заявок · {totalPeople} участников
+            </p>
+          ) : null}
         </div>
         <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
           {label}
         </span>
       </div>
 
-      {bookings.length === 0 ? (
+      {bookings.length === 0 && sessionSummaries.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <CalendarDays className="h-10 w-10 text-stone-300" />
           <div className="mt-4 text-base font-semibold text-stone-700">На эту дату записей нет</div>
@@ -1230,6 +1303,29 @@ function BookingCalendarDayPanel({
       ) : (
         <>
           <div className="mt-4 flex-1 space-y-3">
+            {sessionSummaries.length > 0 ? (
+              <div className="space-y-2 rounded-2xl border border-sky-100 bg-sky-50/70 p-3">
+                <h4 className="text-sm font-semibold text-stone-900">События и участники</h4>
+                {sessionSummaries.map((session) => (
+                  <div key={session.activityId + "|" + session.date + "|" + session.time} className="rounded-xl bg-white p-3">
+                    <div className="text-sm font-semibold text-stone-900">
+                      {session.time ? session.time + " · " : ""}{session.title}
+                    </div>
+                    <p className="mt-1 text-sm text-stone-600">
+                      {session.bookings} заявок · {session.adults} взрослых · {session.children} детей
+                    </p>
+                    <p className="mt-1 text-xs text-stone-500">
+                      {session.confirmedCount} подтверждено · {session.newCount} ожидают
+                    </p>
+                    <Link
+                      href={"/business/events/" + encodeURIComponent(session.activityId) + "/participants?" +
+                        (session.sessionId ? "sessionId=" + encodeURIComponent(session.sessionId) : "date=" + encodeURIComponent(session.date))}
+                      className="mt-2 inline-flex min-h-9 items-center rounded-full border border-stone-200 px-3 text-xs font-semibold text-stone-800"
+                    >Все участники</Link>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {visible.map((booking) => (
               <div key={booking.id} className="rounded-[22px] border border-stone-200 bg-stone-50/70 p-4">
                 <div className="flex items-start gap-3">
@@ -1245,7 +1341,7 @@ function BookingCalendarDayPanel({
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-stone-500">
-                      {booking.customerName}{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
+                      {booking.customerName} · {booking.adultsCount} взрослых · {booking.childrenCount} детей{booking.source === "MANUAL" ? " · Добавлено вручную" : ""}
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", STATUS_META[booking.status].chipClass)}>
@@ -1509,9 +1605,42 @@ export function BookingDetailsDrawer({
   onOpenChange: (open: boolean) => void;
   onSelectPrev: () => void;
   onSelectNext: () => void;
-  onStatusChange: (id: string, status: BookingStatus) => Promise<void>;
+  onStatusChange: (id: string, status: BookingStatus, reason?: string, comment?: string) => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionComment, setRejectionComment] = useState("");
+  const [decision, setDecision] = useState<BookingDecisionPreview | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionRevision, setDecisionRevision] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDecision(null);
+    setDecisionError(null);
+    if (!open || !booking?.id || booking.status !== BookingStatus.NEW) {
+      return () => controller.abort();
+    }
+    // A Telegram Mini App link opens this same authorized booking detail.
+    void fetch("/api/business/bookings/" + encodeURIComponent(booking.id) + "/decision", {
+      cache: "no-store", credentials: "include", signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok) throw new Error("Не удалось проверить места");
+      return res.json() as Promise<BookingDecisionPreview>;
+    }).then((result) => {
+      if (!controller.signal.aborted) setDecision(result);
+    }).catch(() => {
+      if (!controller.signal.aborted) setDecisionError("Не удалось проверить места. Обновите заявку.");
+    });
+    return () => controller.abort();
+  }, [open, booking?.id, booking?.status, booking?.publicationType, decisionRevision]);
+
+  useEffect(() => {
+    setRejectOpen(false);
+    setRejectionReason("");
+    setRejectionComment("");
+  }, [booking?.id]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chat, setChat] = useState<{ bookingId: string; open: boolean }>({ bookingId: "", open: false });
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -1526,7 +1655,7 @@ export function BookingDetailsDrawer({
   const price = formatPriceLabel(booking);
   const isNew = booking.status === BookingStatus.NEW;
   const isConfirmed = booking.status === BookingStatus.CONFIRMED;
-  const canConfirm = isNew;
+  const canConfirm = isNew && decision?.canConfirm === true;
   const canReject = isNew || isConfirmed;
   const canComplete = isConfirmed;
   const history = buildHistoryEntries(booking);
@@ -1536,7 +1665,16 @@ export function BookingDetailsDrawer({
   const handleAction = async (status: BookingStatus) => {
     setUpdating(status);
     try {
-      await onStatusChange(booking.id, status);
+      await onStatusChange(booking.id, status,
+        status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED ? rejectionReason : undefined, rejectionComment);
+      if (status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED) {
+        setRejectOpen(false);
+        setRejectionReason("");
+        setRejectionComment("");
+      }
+    } catch {
+      setDecisionRevision((revision) => revision + 1);
+      // The caller displays the API error. Keep the rejection reason for retry.
     } finally {
       setUpdating(null);
     }
@@ -1663,6 +1801,12 @@ export function BookingDetailsDrawer({
             ) : null}
           </div>
 
+          {(booking.status === BookingStatus.REJECTED || booking.status === BookingStatus.CANCELLED) && booking.rejectionReason ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-semibold">Причина отказа</p>
+              <p className="mt-1 whitespace-pre-wrap">{booking.rejectionReason}</p>
+            </div>
+          ) : null}
           {isConfirmed ? (
             <div className="mt-5 flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3.5 text-[15px] leading-snug text-emerald-800">
               <Check className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1748,23 +1892,74 @@ export function BookingDetailsDrawer({
         </div>
 
         <div className="shrink-0 border-t border-stone-200 bg-white px-5 pb-5 pt-4 sm:px-6">
-          {canConfirm ? (
+          {isNew ? (
+            <p role="status" className={cn(
+              "mb-3 rounded-xl border px-3 py-2 text-sm",
+              decision?.canConfirm ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900",
+            )}>
+              {decisionError ?? decision?.message ?? "Проверяем свободные места для этой заявки…"}
+              {decision?.capacity != null ? ` · Всего мест: ${decision.capacity}` : ""}
+              {decision?.occupied != null ? ` · Занято: ${decision.occupied}` : ""}
+              {decision?.requested != null ? ` · Запрошено: ${decision.requested}` : ""}
+              {decision?.remaining !== null && decision?.remaining !== undefined
+                ? ` · Свободно: ${decision.remaining}` : ""}
+              {decision?.resourceLimits?.map((resource) => (
+                <span key={resource.id} className="mt-1 block">
+                  {resource.name}
+                  {resource.capacity === null ? " · Без ограничения вместимости" :
+                    resource.capacity !== undefined ? ` · Вместимость: ${resource.capacity}` : ""}
+                  {` · Запрошено: ${resource.requested} · ${resource.available ? "Доступен" : "Недоступен"}`}
+                </span>
+              ))}
+            </p>
+          ) : null}
+          {rejectOpen && canReject ? (
+            <div className="space-y-3">
+              <label htmlFor="business-booking-rejection-reason" className="block text-sm font-semibold text-stone-900">
+                Причина отказа — обязательна
+              </label>
+              <select id="business-booking-rejection-reason" value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base">
+                <option value="">Выберите причину</option>
+                {businessRejectionReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+              </select>
+              <label htmlFor="business-booking-rejection-comment" className="block text-sm">
+                Пояснение{rejectionReason === "Другая причина" ? " — обязательно" : " (необязательно)"}
+              </label>
+              <Textarea id="business-booking-rejection-comment" maxLength={500} rows={3}
+                value={rejectionComment} required={rejectionReason === "Другая причина"}
+                onChange={(e) => setRejectionComment(e.target.value)} />
+              <div className="flex gap-2">
+                <button type="button" disabled={updating !== null}
+                  className="h-11 flex-1 rounded-xl border px-4 text-sm font-semibold"
+                  onClick={() => setRejectOpen(false)}>Назад</button>
+                <button type="button"
+                  disabled={updating !== null || !rejectionReason || (rejectionReason === "Другая причина" && !rejectionComment.trim())}
+                  className="h-11 flex-1 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  onClick={() => void handleAction(isConfirmed ? BookingStatus.CANCELLED : BookingStatus.REJECTED)}>
+                  {updating ? "Сохраняем…" : isConfirmed ? "Отменить запись" : "Отклонить заявку"}
+                </button>
+              </div>
+            </div>
+          ) : isNew ? (
             <div className="flex flex-col gap-1 md:flex-row-reverse md:items-center md:gap-4">
               <button
                 type="button"
-                onClick={() => handleAction(BookingStatus.CONFIRMED)}
-                disabled={updating !== null}
+                onClick={() => void handleAction(BookingStatus.CONFIRMED)}
+                disabled={updating !== null || !canConfirm}
                 className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-stone-950 px-6 text-base font-semibold text-white transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70 md:flex-1"
               >
                 {updating === BookingStatus.CONFIRMED ? "Сохраняем..." : "Подтвердить заявку"}
               </button>
               <button
                 type="button"
-                onClick={() => handleAction(BookingStatus.REJECTED)}
+                onClick={() => setRejectOpen(true)}
                 disabled={updating !== null}
                 className="inline-flex h-12 w-full items-center justify-center rounded-2xl px-6 text-base font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70 md:w-auto"
               >
-                {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+                {updating ? "Сохраняем..." : isConfirmed ? "Отменить запись" : "Отклонить"}
               </button>
             </div>
           ) : canComplete || canReject ? (
@@ -1774,7 +1969,7 @@ export function BookingDetailsDrawer({
                   {canComplete ? (
                     <button
                       type="button"
-                      onClick={() => handleAction(BookingStatus.COMPLETED)}
+                      onClick={() => void handleAction(BookingStatus.COMPLETED)}
                       disabled={updating !== null}
                       className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-100 disabled:cursor-wait disabled:opacity-70"
                     >
@@ -1784,11 +1979,11 @@ export function BookingDetailsDrawer({
                   {canReject ? (
                     <button
                       type="button"
-                      onClick={() => handleAction(BookingStatus.REJECTED)}
+                      onClick={() => setRejectOpen(true)}
                       disabled={updating !== null}
                       className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70"
                     >
-                      {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+                      {updating ? "Сохраняем..." : isConfirmed ? "Отменить запись" : "Отклонить"}
                     </button>
                   ) : null}
                 </div>

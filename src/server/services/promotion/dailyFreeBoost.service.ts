@@ -17,6 +17,7 @@ export type FreeBoostPublicationType = "EVENT" | "OFFER";
 export type FreeBoostCandidate = {
   id: string;
   title: string;
+  coverImageUrl: string | null;
   publicationType: FreeBoostPublicationType;
   activeBoostUntil: string | null;
   /** Active FREE Boost on this specific publication, not a business-wide quota. */
@@ -77,6 +78,7 @@ export async function getFreeBoostCandidates(params: {
         title: true,
         status: true,
         updatedAt: true,
+        coverImage: { select: { publicUrl: true } },
         boosts: {
           where: { startAt: { lte: now }, endAt: { gt: now } },
           orderBy: { endAt: "desc" },
@@ -92,6 +94,7 @@ export async function getFreeBoostCandidates(params: {
         id: true,
         title: true,
         status: true,
+        coverImage: true,
         kind: true,
         productType: true,
         archivedAt: true,
@@ -127,6 +130,7 @@ export async function getFreeBoostCandidates(params: {
         id: event.id,
         title: event.title,
         publicationType: "EVENT" as const,
+        coverImageUrl: event.coverImage?.publicUrl ?? null,
         activeBoostUntil: event.boosts[0]?.endAt.toISOString() ?? null,
         activeFreeBoostUntil: event.boosts[0]?.isFreeDaily && event.boosts[0]?.businessId === params.businessId
           ? event.boosts[0].endAt.toISOString() : null,
@@ -144,6 +148,7 @@ export async function getFreeBoostCandidates(params: {
         id: offer.id,
         title: offer.title,
         publicationType: "OFFER" as const,
+        coverImageUrl: offer.coverImage ?? null,
         activeBoostUntil: offer.boosts[0]?.endAt.toISOString() ?? null,
         activeFreeBoostUntil: offer.boosts[0]?.isFreeDaily && offer.boosts[0]?.businessId === params.businessId
           ? offer.boosts[0].endAt.toISOString() : null,

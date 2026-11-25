@@ -33,6 +33,8 @@ import {
   BUSINESS_PUBLICATION_ACTION_DANGER_ICON,
   BUSINESS_PUBLICATION_ACTION_ICON,
   BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+  BUSINESS_PUBLICATION_ACTIONS_ICON_ROW,
+  BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW,
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 
@@ -276,82 +278,86 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
         footnote={revisionFootnote}
         actions={
           <>
-            {place.archivedAt ? (
-              <span className="inline-flex h-10 shrink-0 items-center rounded-2xl bg-stone-100 px-3 text-xs font-medium text-stone-500">
-                Архив
-              </span>
-            ) : null}
+            <div className={BUSINESS_PUBLICATION_ACTIONS_PRIMARY_ROW}>
+              {place.archivedAt ? (
+                <span className="inline-flex h-10 shrink-0 items-center rounded-2xl bg-stone-100 px-3 text-xs font-medium text-stone-500">
+                  Архив
+                </span>
+              ) : null}
 
-            <button
-              type="button"
-              onClick={() => setStatisticsOpen(true)}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
-              )}
-            >
-              <BarChart3 className="h-4 w-4 shrink-0" />
-              Статистика
-            </button>
+              <button
+                type="button"
+                onClick={() => setStatisticsOpen(true)}
+                className={cn(
+                  BUSINESS_PUBLICATION_ACTION_BUTTON,
+                  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+                )}
+              >
+                <BarChart3 className="h-4 w-4 shrink-0" />
+                Статистика
+              </button>
+            </div>
 
-            <Link
-              href={viewPlaceHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={BUSINESS_PUBLICATION_ACTION_ICON}
-              title="Просмотр"
-              aria-label="Просмотр"
-            >
-              <Eye className="h-4 w-4" />
-            </Link>
-
-            {!place.archivedAt && displayStatus !== "PENDING" ? (
+            <div className={BUSINESS_PUBLICATION_ACTIONS_ICON_ROW}>
               <Link
-                href={`/business/places/${place.id}/edit`}
+                href={viewPlaceHref}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={BUSINESS_PUBLICATION_ACTION_ICON}
-                title="Редактировать"
-                aria-label="Редактировать"
+                title="Просмотр"
+                aria-label="Просмотр"
               >
-                <Pencil className="h-4 w-4" />
+                <Eye className="h-4 w-4" />
               </Link>
-            ) : null}
 
-            {place.archivedAt && onUnarchive ? (
-              <Button
-                variant="ghost"
-                onClick={handleUnarchive}
-                disabled={isArchiving}
-                className={BUSINESS_PUBLICATION_ACTION_ICON}
-                title="Восстановить"
-                aria-label="Восстановить"
-              >
-                <ArchiveRestore className="h-4 w-4" />
-              </Button>
-            ) : null}
+              {!place.archivedAt && displayStatus !== "PENDING" ? (
+                <Link
+                  href={`/business/places/${place.id}/edit`}
+                  className={BUSINESS_PUBLICATION_ACTION_ICON}
+                  title="Редактировать"
+                  aria-label="Редактировать"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Link>
+              ) : null}
 
-            {!place.archivedAt && onArchive && place.status !== "DRAFT" ? (
-              <Button
-                variant="ghost"
-                onClick={() => setShowArchiveDialog(true)}
-                className={BUSINESS_PUBLICATION_ACTION_ICON}
-                title="В архив"
-                aria-label="В архив"
-              >
-                <Archive className="h-4 w-4" />
-              </Button>
-            ) : null}
+              {place.archivedAt && onUnarchive ? (
+                <Button
+                  variant="ghost"
+                  onClick={handleUnarchive}
+                  disabled={isArchiving}
+                  className={BUSINESS_PUBLICATION_ACTION_ICON}
+                  title="Восстановить"
+                  aria-label="Восстановить"
+                >
+                  <ArchiveRestore className="h-4 w-4" />
+                </Button>
+              ) : null}
 
-            {place.status === "DRAFT" && onDelete && !place.archivedAt ? (
-              <Button
-                variant="ghost"
-                onClick={() => onDelete(place.id)}
-                className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
-                title="Удалить черновик"
-                aria-label="Удалить черновик"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            ) : null}
+              {!place.archivedAt && onArchive && place.status !== "DRAFT" ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowArchiveDialog(true)}
+                  className={BUSINESS_PUBLICATION_ACTION_ICON}
+                  title="В архив"
+                  aria-label="В архив"
+                >
+                  <Archive className="h-4 w-4" />
+                </Button>
+              ) : null}
+
+              {place.status === "DRAFT" && onDelete && !place.archivedAt ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => onDelete(place.id)}
+                  className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
+                  title="Удалить черновик"
+                  aria-label="Удалить черновик"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ) : null}
+            </div>
           </>
         }
       />

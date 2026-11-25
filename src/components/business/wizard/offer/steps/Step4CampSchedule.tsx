@@ -99,7 +99,7 @@ export function Step4CampSchedule({ data, onChange, isEditable, v2 = false }: St
             Родителям проще доверять программе, когда видны конкретные даты, возраст и
             вместимость каждой смены.
           </p>
-          <Button
+          <Button variant="business"
             type="button"
             size="lg"
             className="w-full sm:w-auto min-w-[220px] rounded-xl"

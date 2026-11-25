@@ -347,7 +347,7 @@ export default function BusinessReviewsPage() {
                 {review.source === "MAMAGO" && review.status === "PUBLISHED" && (
                   <>
                     {!review.ownerReplyText ? (
-                      <Button
+                      <Button variant="business"
                         onClick={() => openReplyModal(review)}
                         disabled={actionLoading === review.id}
                         size="sm"
@@ -466,7 +466,7 @@ export default function BusinessReviewsPage() {
                 >
                   Отмена
                 </Button>
-                <Button
+                <Button variant="business"
                   onClick={handleSaveReply}
                   disabled={replyLoading || !replyText.trim()}
                 >

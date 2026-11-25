@@ -229,3 +229,33 @@ test("manual resource availability honors one-off open overrides and 24:00", () 
     unit, new Date("2026-03-23T20:00:00Z"), new Date("2026-03-23T21:01:00Z"), now,
   ), false);
 });
+
+test("business preview can inspect full group quotas while public slots stay filtered", () => {
+  const startAt = new Date("2026-03-23T07:00:00Z");
+  const endAt = new Date("2026-03-23T08:00:00Z");
+  const snapshot = base({
+    scheduleKind: "DATED_SESSIONS",
+    sessions: [{ id: "quota-session", startAt, endAt, capacity: 1, isCancelled: false }],
+    requests: [{ offerSessionId: "quota-session", startsAt: null, seats: 1, status: "CONFIRMED", holdUntil: null }],
+  });
+  const query = { from: startAt, to: endAt, requestedSeats: 1 };
+  assert.deepEqual(calculateSlots(snapshot, query, now), []);
+  const preview = calculateSlots(snapshot, query, now, { includeUnavailable: true });
+  assert.equal(preview[0]?.capacity, 1);
+  assert.equal(preview[0]?.occupiedSeats, 1);
+  assert.equal(preview[0]?.remainingSeats, 0);
+  snapshot.sessions[0].capacity = 0;
+  assert.deepEqual(calculateSlots(snapshot, query, now), []);
+  assert.equal(calculateSlots(snapshot, query, now, { includeUnavailable: true })[0]?.capacity, 0);
+});
+
+test("ordinary available public slots keep their existing payload", () => {
+  const startAt = new Date("2026-03-23T07:00:00Z");
+  const endAt = new Date("2026-03-23T08:00:00Z");
+  const snapshot = base({
+    scheduleKind: "DATED_SESSIONS",
+    sessions: [{ id: "ordinary-session", startAt, endAt, capacity: 2, isCancelled: false }],
+  });
+  const result = calculateSlots(snapshot, { from: startAt, to: endAt }, now);
+  assert.deepEqual(result, [{ startsAt: startAt, endsAt: endAt, remainingSeats: 2, sessionId: "ordinary-session", unitIds: [] }]);
+});

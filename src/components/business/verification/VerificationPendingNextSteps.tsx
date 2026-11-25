@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { BookOpen, ChartNoAxesCombined, MessageCircle } from "lucide-react";
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { Button } from "@/components/ui/button";
 import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 const features = [
@@ -30,13 +30,14 @@ export function VerificationPendingNextSteps() {
         ))}
       </div>
       <div className="mt-6">
-        <PrimaryButton
+        <Button
           type="button"
-          className="w-full sm:w-auto"
+          variant="business"
+          className="h-auto w-full rounded-[16px] px-4 py-[14px] text-[16px] font-semibold sm:w-auto"
           onClick={() => navigateToSurface(router, { targetSurface: "public", targetPath: "/" })}
         >
           Посмотреть mamaGo как пользователь
-        </PrimaryButton>
+        </Button>
       </div>
     </section>
   );

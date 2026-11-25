@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import { resolveStandardSlotStart, standardResponseDeadline } from "@/lib/booking/standardResponseDeadline";
 import prisma from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { getEventSeatPolicy, calculateEventSeatAvailability, getEventSeatError } from "@/lib/booking/eventSeatPolicy";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { formatHHMM } from "@/lib/formatters/date";
 import { reserveSlot, SlotReservationError } from "@/server/offers/reserveSlot";
@@ -21,8 +22,11 @@ import {
   expireBookingUnitHolds, isAllocationOverlapError, lockBookingUnits,
 } from "@/server/services/booking/resourceAllocation";
 import { childScopeFor } from "@/server/family/familyAccess";
+import { businessNotificationRecipients } from "./businessNotificationRecipients";
 import {
   BookingParticipantsError,
+  BOOKING_MAX_ADULTS,
+  BOOKING_MAX_CHILDREN,
   requestedProfileChildIds,
   resolveParticipants,
   type BookingChildInput,
@@ -104,6 +108,7 @@ interface BookingSideEffectsContext {
   entityTitle: string | null;
   cityId: string | null;
   ownerUserId: string | null;
+  businessId: string | null;
   customerName: string;
   childName?: string | null;
   childAge?: number | null;
@@ -264,10 +269,32 @@ async function triggerBookingCreatedSideEffects(context: BookingSideEffectsConte
   }).catch((err) => console.error("[booking.service] analytics failed:", err));
 
   const promises: Promise<unknown>[] = [];
-  if (context.ownerUserId) promises.push(notifyBookingCreated({
-    ownerUserId: context.ownerUserId,
+  // Authorized staff may have connected the Business Bot instead of the owner.
+  // Notify active OWNER/MANAGER members too, with per-user dedup by bookingId.
+  const members = context.businessId ? await prisma.businessMember.findMany({
+    where: {
+      businessId: context.businessId,
+      isActive: true,
+      role: { in: ["OWNER", "MANAGER"] },
+      business: { operationalStatus: "ACTIVE" },
+    },
+    select: { userId: true },
+  }).catch((error) => {
+    console.error("[booking.service] business recipients lookup failed:", {
+      bookingId: context.bookingId, error,
+    });
+    return [] as Array<{ userId: string }>;
+  }) : [];
+  const recipients = businessNotificationRecipients(context.ownerUserId, members);
+  if (recipients.length === 0) {
+    console.error("[booking.service] no business notification recipient:", {
+      bookingId: context.bookingId, businessId: context.businessId,
+    });
+  }
+  for (const recipientUserId of recipients) promises.push(notifyBookingCreated({
+    ownerUserId: recipientUserId,
     bookingId: context.bookingId,
-    waitForDelivery: context.entityType === "EVENT",
+    waitForDelivery: true,
     offerId: context.offerId ?? null,
     offerTitle: context.offerTitle ?? null,
     activityId: context.activityId ?? null,
@@ -424,7 +451,7 @@ export async function createPublicClassSlotBooking(input: {
   });
 
   if (!result.replayed) {
-    triggerBookingCreatedSideEffects({
+    await triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
@@ -433,6 +460,7 @@ export async function createPublicClassSlotBooking(input: {
     entityTitle: offer.title,
     cityId: offer.place.cityId ?? null,
     ownerUserId: offer.place.ownerBusiness?.ownerUserId ?? null,
+    businessId: offer.place.ownerBusinessId,
     customerName,
     childName: child?.name?.trim() || null,
     childAge,
@@ -666,6 +694,16 @@ async function createPublicationBooking(
   if (adultsCount + childrenCount < 1) {
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
+  // Public EVENT bookings always obey the family-size limit, including the
+  // legacy count-only API payload. Manual bookings retain business controls.
+  if (!manual && input.publicationType === PublicationType.EVENT) {
+    if (!Number.isSafeInteger(adultsCount) || adultsCount > BOOKING_MAX_ADULTS) {
+      throw new BookingValidationError("adultsCount", `Не больше ${BOOKING_MAX_ADULTS} взрослых в одной заявке`);
+    }
+    if (!Number.isSafeInteger(childrenCount) || childrenCount > BOOKING_MAX_CHILDREN) {
+      throw new BookingValidationError("childrenCount", `Не больше ${BOOKING_MAX_CHILDREN} детей в одной заявке`);
+    }
+  }
 
   // Event occurrences are auto-linked only after locking the Activity and
   // resolving the persisted session date/time. An early day-only match would
@@ -745,7 +783,7 @@ async function createPublicationBooking(
           throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
         }
         date = new Date(dateKey);
-        capacity = day.capacity;
+        capacity = day.capacity ?? activity.bookingCapacityPerSlot ?? undefined;
       } else if (manual && activity.bookingMode === BookingMode.USE_PUBLICATION_DATES) {
         const dateKey = date?.toISOString().slice(0, 10) ?? "";
         if (!dateKey || dateKey < getLocalDateKey() || input.selectedSessionId || time) {
@@ -759,6 +797,7 @@ async function createPublicationBooking(
           select: { id: true },
         });
         if (!session) throw new BookingValidationError("requestedDate", "Дата недоступна для записи");
+        capacity = activity.bookingCapacityPerSlot ?? undefined;
       } else if (input.selectedSessionId) {
         const session = await tx.activitySession.findFirst({
           where: {
@@ -804,14 +843,22 @@ async function createPublicationBooking(
       if (duplicate) {
         throw new BookingValidationError("customerPhone", "Заявка на эту запись уже существует");
       }
-      if (capacity !== undefined) {
+      const seatPolicy = getEventSeatPolicy(activity.scheduleJson);
+      if (capacity !== undefined || seatPolicy.mode === "SEPARATE") {
         const { _sum } = await tx.bookingRequest.aggregate({
           where: active,
           _sum: { adultsCount: true, childrenCount: true },
         });
-        if ((_sum.adultsCount ?? 0) + (_sum.childrenCount ?? 0) + adultsCount + childrenCount > capacity) {
-          throw new BookingValidationError("selectedSessionId", "На выбранное время недостаточно мест");
-        }
+        const availability = calculateEventSeatAvailability({
+          policy: seatPolicy, capacity,
+          usedAdults: _sum.adultsCount ?? 0,
+          usedChildren: _sum.childrenCount ?? 0,
+        });
+        const error = getEventSeatError(availability, adultsCount, childrenCount, seatPolicy.mode);
+        if (error) throw new BookingValidationError("participants", error);
+      } else {
+        const error = getEventSeatError(null, adultsCount, childrenCount, seatPolicy.mode);
+        if (error) throw new BookingValidationError("participants", error);
       }
 
       const linkedPlanItemId = manual ? null : await ensureEventBookingPlanItem(tx, {
@@ -863,6 +910,7 @@ async function createPublicationBooking(
       entityTitle: activity.title,
       cityId: activity.cityId ?? null,
       ownerUserId: activity.business?.ownerUserId ?? null,
+      businessId: activity.businessId,
       customerName,
       activityId: activity.id,
       activityTitle: activity.title,
@@ -960,7 +1008,7 @@ async function createPublicationBooking(
     }, manual?.tx, manual?.actorId);
     if (manual) return result;
 
-    triggerBookingCreatedSideEffects({
+    await triggerBookingCreatedSideEffects({
       planItemId: planLink.planItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
@@ -969,6 +1017,7 @@ async function createPublicationBooking(
       entityTitle: offer.title,
       cityId: offer.place.cityId ?? null,
       ownerUserId: offer.place.ownerBusiness?.ownerUserId ?? null,
+      businessId: offer.place.ownerBusinessId,
       customerName,
       offerId: offer.id,
       offerTitle: offer.title,
@@ -1049,7 +1098,7 @@ async function createPublicationBooking(
   }, manual?.tx, manual?.actorId);
   if (manual) return result;
 
-  triggerBookingCreatedSideEffects({
+  await triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
@@ -1058,6 +1107,7 @@ async function createPublicationBooking(
     entityTitle: place.title,
     cityId: place.cityId ?? null,
     ownerUserId: place.ownerBusiness?.ownerUserId ?? null,
+    businessId: place.ownerBusinessId,
     customerName,
     placeId: place.id,
     placeTitle: place.title,
@@ -1176,7 +1226,7 @@ export async function createCampShiftBooking(
     status: BookingStatus.NEW,
   });
 
-  triggerBookingCreatedSideEffects({
+  await triggerBookingCreatedSideEffects({
     bookingId: result.bookingId,
     userId: input.userId ?? null,
     entityType: "OFFER",
@@ -1184,6 +1234,7 @@ export async function createCampShiftBooking(
     entityTitle: offer.title ?? null,
     cityId: offer.place?.cityId ?? null,
     ownerUserId: offer.place?.ownerBusiness?.ownerUserId ?? null,
+    businessId: offer.place?.ownerBusinessId ?? null,
     customerName,
     childName: normalizeOptionalString(input.childName),
     childAge: input.childAge ?? null,

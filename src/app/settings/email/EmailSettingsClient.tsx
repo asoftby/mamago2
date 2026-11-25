@@ -4,10 +4,19 @@ import { toast } from "@/lib/toast";
 import { Mail } from "lucide-react";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { useResendVerificationEmail } from "@/features/email-verification/hooks/useResendVerificationEmail";
+import {
+  settingsSectionIconClass,
+  settingsSectionIconTileClass,
+  type SettingsIconTileTone,
+} from "@/components/settings/settingsSectionIconTile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-export function EmailSettingsClient() {
+export function EmailSettingsClient({
+  iconTone = "neutral",
+}: {
+  iconTone?: SettingsIconTileTone;
+} = {}) {
   const { user, isLoading, isEmailVerified, refetch } = useAuthMe();
   const { resend, loading, messages } = useResendVerificationEmail();
 
@@ -46,8 +55,8 @@ export function EmailSettingsClient() {
   return (
     <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
       <div className="flex items-start gap-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100">
-          <Mail className="h-4 w-4 text-neutral-500" />
+        <div className={settingsSectionIconTileClass(iconTone)}>
+          <Mail className={settingsSectionIconClass(iconTone)} />
         </div>
         <div className="min-w-0 flex-1 space-y-4">
           <div className="space-y-1">

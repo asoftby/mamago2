@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import Link from "next/link";
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { Button } from "@/components/ui/button";
 import { VerificationPendingNextSteps } from "@/components/business/verification/VerificationPendingNextSteps";
 import { UnpVerificationNotice } from "@/components/business/verification/UnpVerificationNotice";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
@@ -178,17 +178,17 @@ export default async function BusinessVerificationPage() {
               </p>
             </div>
 
-            <Link
-              href={buildSurfaceRedirectDestination({
-                targetSurface: "business",
-                targetPath: "/onboarding",
-                ...routing,
-              })}
-            >
-              <PrimaryButton className="w-full">
+            <Button variant="business" asChild className="h-auto w-full rounded-[16px] px-4 py-[14px] text-[16px] font-semibold">
+              <Link
+                href={buildSurfaceRedirectDestination({
+                  targetSurface: "business",
+                  targetPath: "/onboarding",
+                  ...routing,
+                })}
+              >
                 Исправить данные и отправить снова
-              </PrimaryButton>
-            </Link>
+              </Link>
+            </Button>
           </>
         )}
 
@@ -236,17 +236,17 @@ export default async function BusinessVerificationPage() {
               </p>
             </div>
 
-            <Link
-              href={buildSurfaceRedirectDestination({
-                targetSurface: "business",
-                targetPath: "/onboarding",
-                ...routing,
-              })}
-            >
-              <PrimaryButton className="w-full">
+            <Button variant="business" asChild className="h-auto w-full rounded-[16px] px-4 py-[14px] text-[16px] font-semibold">
+              <Link
+                href={buildSurfaceRedirectDestination({
+                  targetSurface: "business",
+                  targetPath: "/onboarding",
+                  ...routing,
+                })}
+              >
                 Исправить данные
-              </PrimaryButton>
-            </Link>
+              </Link>
+            </Button>
           </>
         )}
 

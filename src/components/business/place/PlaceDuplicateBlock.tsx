@@ -43,7 +43,7 @@ export function PlaceDuplicateBlock({
       </div>
 
       <div className="space-y-2">
-        <Button
+        <Button variant="business"
           onClick={onClaimAccess}
           disabled={isLoading}
           className="w-full"

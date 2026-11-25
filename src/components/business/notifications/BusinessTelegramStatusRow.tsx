@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Info, Send, Settings } from "lucide-react";
+import { CheckCircle2, Info, Settings } from "lucide-react";
+import { TelegramIcon } from "@/components/icons/TelegramIcon";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 
@@ -115,7 +116,7 @@ export function BusinessTelegramStatusRow({
     >
       <div className="flex items-start gap-3 sm:gap-4">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-50 text-stone-900" aria-hidden="true">
-          <Send className="h-5 w-5" />
+          <TelegramIcon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -148,7 +149,8 @@ export function BusinessTelegramStatusRow({
           ) : (
             <Button
               type="button"
-              className="w-full rounded-xl bg-stone-900 text-white hover:bg-stone-800 sm:w-auto"
+              variant="business"
+              className="w-full rounded-xl sm:w-auto"
               onClick={() => void connect()}
               disabled={busy || loading || !status?.configured}
             >

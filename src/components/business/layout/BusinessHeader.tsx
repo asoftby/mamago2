@@ -9,6 +9,7 @@ import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicatio
 import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
 import type { AccountMenuUser } from "@/lib/account/types";
+import { BUSINESS_CHROME_AVATAR_FALLBACK_INNER } from "@/components/account/accountDropdownTokens";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { cn } from "@/lib/utils";
@@ -54,7 +55,7 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
       aria-haspopup="dialog"
       aria-expanded={menuOpen}
     >
-      <span className="flex h-full w-full items-center justify-center rounded-full bg-sky-100 text-[11px] font-semibold text-sky-900">
+      <span className={BUSINESS_CHROME_AVATAR_FALLBACK_INNER}>
         {triggerLetter}
       </span>
     </Button>

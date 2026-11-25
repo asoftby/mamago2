@@ -34,6 +34,8 @@ interface Offer {
   };
   updatedAt: Date;
   createdAt: Date;
+  isPromoted?: boolean;
+  boostEndsAt?: Date | string | null;
   metrics: {
     views: number;
     saves: number;

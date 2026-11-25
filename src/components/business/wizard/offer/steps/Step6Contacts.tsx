@@ -305,7 +305,7 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
 
               <div className="flex flex-wrap gap-2">
                 {data.contactSource !== "place" && isEditable ? (
-                  <Button
+                  <Button variant="business"
                     type="button"
                     size="sm"
                     className="bg-[#EF8759] text-white hover:bg-[#e37443]"
@@ -350,7 +350,7 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
               </div>
             </div>
             {isEditable ? (
-              <Button
+              <Button variant="business"
                 type="button"
                 className="bg-[#EF8759] text-white hover:bg-[#e37443]"
                 onClick={() => setIsPickerOpen((prev) => !prev)}

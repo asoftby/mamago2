@@ -95,7 +95,7 @@ export function BusinessInviteStatusCard({
 
             <div className="space-y-4">
               {primaryAction.type === "link" ? (
-                <Button
+                <Button variant="business"
                   asChild
                   size="lg"
                   className="h-12 w-full rounded-full bg-[#EF8759] px-6 text-base font-semibold text-white shadow-[0_14px_34px_rgba(239,135,89,0.28)] hover:bg-[#E7794A] sm:h-[52px]"
@@ -107,7 +107,7 @@ export function BusinessInviteStatusCard({
                 </Button>
               ) : (
                 <form action={primaryAction.action} method="POST">
-                  <Button
+                  <Button variant="business"
                     type="submit"
                     size="lg"
                     className="h-12 w-full rounded-full bg-[#EF8759] px-6 text-base font-semibold text-white shadow-[0_14px_34px_rgba(239,135,89,0.28)] hover:bg-[#E7794A] sm:h-[52px]"

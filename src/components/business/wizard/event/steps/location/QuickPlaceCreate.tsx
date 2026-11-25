@@ -371,7 +371,7 @@ export function QuickPlaceCreate({
 
         {/* Actions */}
         <div className="flex gap-2 pt-2">
-          <Button
+          <Button variant="business"
             type="button"
             onClick={handleCreate}
             disabled={!canSave || isSaving}

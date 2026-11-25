@@ -65,7 +65,7 @@ export function BusinessTelegramOpenClient({ destination }: { destination: strin
           <>
             <p role="alert" className="mt-3 text-sm leading-6 text-muted-foreground">{error}</p>
             <button
-              className="mt-5 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
+              className="mt-5 rounded-xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800"
               onClick={() => { setError(null); void authenticate(); }}
             >Повторить попытку</button>
           </>

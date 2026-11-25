@@ -10,7 +10,11 @@ import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { deriveEventRequestBookingColumns } from "@/lib/event/eventRequestBookingColumns";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
 import { createManualBooking, createPublicBooking } from "./booking.service";
+import { getEventSlotAvailability } from "./eventSlotAvailability";
+import { getBusinessBookingDecisionAvailability } from "./bookingDecisionAvailability.service";
+import { BookingDecisionCapacityError, getBusinessBookingById } from "./bookingQuery.service";
 import { getBusinessBookings, updateBookingStatus } from "./bookingQuery.service";
+import { eventRosterWhere } from "@/lib/business/eventRosterScope";
 import { getBusinessInbox } from "./businessInbox.service";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -57,6 +61,17 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       participationMode: "time-slots",
       timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "09:00", capacity: 5 }] }] },
     });
+    // A legacy count-only public request must not bypass the UI's max group
+    // size by omitting the children[] array.
+    const overLimit = {
+      publicationType: "EVENT" as const,
+      publicationId: planEvent.id,
+      selectedSessionId: planEvent.sessions[0]!.id,
+      customerName: "Oversized guest",
+      customerPhone: "+375291110050",
+    };
+    await assert.rejects(createPublicBooking({ ...overLimit, adultsCount: 11 }), /Не больше 10 взрослых/);
+    await assert.rejects(createPublicBooking({ ...overLimit, adultsCount: 1, childrenCount: 11 }), /Не больше 10 детей/);
     const savedOccurrence = await prisma.planItem.create({
       data: {
         userId: owner.id,
@@ -230,6 +245,69 @@ test("event booking uses persisted sessions, serializes requests and appears in 
       }] },
     });
 
+    // Both capacity-by-policy modes enforce the same transaction lock as
+    // legacy ALL. A non-seat-taking accompanying adult remains visible.
+    const childrenOnly = await makeEvent({
+      participationMode: "time-slots", eventSeatMode: "CHILDREN",
+      timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "16:00", capacity: 2 }] }] },
+    });
+    const kidsGroup = await createPublicBooking({
+      publicationType: "EVENT", publicationId: childrenOnly.id,
+      selectedSessionId: childrenOnly.sessions[0]!.id,
+      customerName: "Accompanying parent", customerPhone: "+375291110080",
+      adultsCount: 1, childrenCount: 2, children: [{ age: 6 }, { age: 8 }],
+    });
+    assert.ok(kidsGroup.bookingId);
+    assert.equal((await getEventSlotAvailability(childrenOnly.id))?.[childrenOnly.sessions[0]!.id]?.remaining, 0,
+      "public availability must use children-only quota after group booking");
+    // A NEW request already occupies the last two child places. Remaining
+    // zero must not disable its confirmation in the business Mini App.
+    const decisionBefore = await getBusinessBookingDecisionAvailability(prisma, kidsGroup.bookingId, business.id);
+    assert.equal(decisionBefore?.remaining, 0);
+    assert.equal(decisionBefore?.canConfirm, true);
+    const shrunkSchedule = {
+      participationMode: "time-slots", eventSeatMode: "CHILDREN",
+      timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "16:00", capacity: 1 }] }] },
+    };
+    await prisma.activity.update({ where: { id: childrenOnly.id }, data: { scheduleJson: shrunkSchedule } });
+    assert.equal((await getBusinessBookingDecisionAvailability(prisma, kidsGroup.bookingId, business.id))?.canConfirm, false);
+    await assert.rejects(updateBookingStatus(kidsGroup.bookingId, business.id, "CONFIRMED"),
+      (err: unknown) => err instanceof BookingDecisionCapacityError,
+      "server confirmation rechecks changed capacity transactionally");
+    await prisma.activity.update({ where: { id: childrenOnly.id }, data: { scheduleJson: childrenOnly.scheduleJson! } });
+    await updateBookingStatus(kidsGroup.bookingId, business.id, "CONFIRMED");
+    assert.equal((await prisma.bookingRequest.findUniqueOrThrow({ where: { id: kidsGroup.bookingId } })).status, "CONFIRMED");
+    await assert.rejects(createPublicBooking({
+      publicationType: "EVENT", publicationId: childrenOnly.id,
+      selectedSessionId: childrenOnly.sessions[0]!.id,
+      customerName: "Late family", customerPhone: "+375291110081",
+      adultsCount: 1, childrenCount: 1, children: [{ age: 7 }],
+    }), /недостаточно мест/);
+    await assert.rejects(createPublicBooking({
+      publicationType: "EVENT", publicationId: childrenOnly.id,
+      selectedSessionId: childrenOnly.sessions[0]!.id,
+      customerName: "Adults only", customerPhone: "+375291110082",
+      adultsCount: 1,
+    }), /Добавьте хотя бы одного ребёнка/);
+
+    const separate = await makeEvent({
+      participationMode: "time-slots", eventSeatMode: "SEPARATE",
+      adultSeatCapacity: 1, childSeatCapacity: 2,
+      timeSlots: { dates: [{ isoDate: date, slots: [{ startTime: "17:00", capacity: 1 }] }] },
+    });
+    const contenders = await Promise.allSettled([91, 92].map((suffix) => createPublicBooking({
+      publicationType: "EVENT", publicationId: separate.id,
+      selectedSessionId: separate.sessions[0]!.id,
+      customerName: "Competing family", customerPhone: `+3752911100${suffix}`,
+      adultsCount: 1, childrenCount: 2, children: [{ age: 5 }, { age: 9 }],
+    })));
+    assert.equal(contenders.filter((entry) => entry.status === "fulfilled").length, 1,
+      "separate quotas must be enforced by the activity row lock");
+    assert.match(String(contenders.find((entry) => entry.status === "rejected")?.reason), /Недостаточно взрослых мест/);
+    const separateRemaining = (await getEventSlotAvailability(separate.id))?.[separate.sessions[0]!.id];
+    assert.equal(separateRemaining?.adultsRemaining, 0);
+    assert.equal(separateRemaining?.childrenRemaining, 0);
+
     const today = getLocalDateKey();
     const dateOnly = await makeEvent({
       participationMode: "time-slots", dates: [today], startTime: "00:01",
@@ -260,6 +338,25 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     const dayRow = await prisma.bookingRequest.findUniqueOrThrow({ where: { id: dayBooking.bookingId } });
     assert.equal(dayRow.requestedTime, null);
     assert.equal(dayRow.selectedSessionId, null);
+
+    const fallbackDay = addDaysLocal(today, 1);
+    const dateWithFallback = await makeEvent({
+      participationMode: "time-slots", dates: [fallbackDay],
+      timeSlots: { dates: [{ isoDate: fallbackDay, slots: [{ startTime: "" }] }] },
+    });
+    await prisma.activity.update({
+      where: { id: dateWithFallback.id }, data: { bookingCapacityPerSlot: 1 },
+    });
+    const fallbackInput = {
+      publicationType: "EVENT" as const, publicationId: dateWithFallback.id, requestedDate: fallbackDay,
+      customerName: "First family", customerPhone: "+375291110083",
+    };
+    await createPublicBooking(fallbackInput);
+    assert.equal((await getEventSlotAvailability(dateWithFallback.id))?.[fallbackDay]?.remaining, 0,
+      "date-only availability must honor the event-wide fallback limit");
+    await assert.rejects(createPublicBooking({
+      ...fallbackInput, customerPhone: "+375291110084",
+    }), /недостаточно мест/, "date-only slots must enforce event fallback quota");
 
     const submit = (publicationId: string, phoneSuffix: number, selectedSessionId?: string, requestedTime?: string) =>
       createPublicBooking({
@@ -310,6 +407,19 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     const rejected = raced.find((entry) => entry.status === "rejected");
     assert.match(String(rejected?.reason), /недостаточно мест/);
     const winner = successes[0]!;
+    const rosterCount = await prisma.bookingRequest.count({
+      where: eventRosterWhere({
+        businessId: business.id, activityId: calendar.id,
+        sessionStartsAt: first.startsAt, bookingMode: calendar.bookingMode,
+      }),
+    });
+    assert.equal(rosterCount, 1, "roster must count aliases by timestamp, not session ID");
+    assert.equal(await prisma.bookingRequest.count({
+      where: eventRosterWhere({
+        businessId: "foreign-business", activityId: calendar.id,
+        sessionStartsAt: first.startsAt, bookingMode: calendar.bookingMode,
+      }),
+    }), 0, "another tenant must never see this session");
 
     const duplicateRace = await Promise.allSettled([submit(calendar.id, 4, second.id), submit(calendar.id, 4, second.id)]);
     assert.equal(duplicateRace.filter((entry) => entry.status === "fulfilled").length, 1);
@@ -328,7 +438,7 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     await assert.rejects(updateBookingStatus(winner.bookingId, "foreign-business", "CONFIRMED"));
     await updateBookingStatus(winner.bookingId, business.id, "CONFIRMED");
     await assert.rejects(submit(calendar.id, 5, first.id), /недостаточно мест/);
-    await updateBookingStatus(winner.bookingId, business.id, "REJECTED");
+    await updateBookingStatus(winner.bookingId, business.id, "CANCELLED");
     const replacement = await submit(calendar.id, 5, first.id);
 
     // Retain the original first occurrence if a duplicate imported row exists.
@@ -381,11 +491,22 @@ test("event booking uses persisted sessions, serializes requests and appears in 
     assert.ok((await getBusinessBookings({ businessId: business.id, date: new Date(date) }))
       .items.some((item) => item.id === manualSlot.bookingId && item.source === "MANUAL"));
     await assert.rejects(book({ publicationId: dateOnly.id, requestedDate: today }), /недостаточно мест/);
-    await updateBookingStatus(dayBooking.bookingId, business.id, "REJECTED");
+    await updateBookingStatus(dayBooking.bookingId, business.id, "REJECTED", {
+      actorId: owner.id, actorRole: "BUSINESS_OWNER", reason: "Нет мест на выбранную дату",
+    });
+    const rejectedBookingDetail = await getBusinessBookingById(dayBooking.bookingId, business.id);
+    assert.equal(rejectedBookingDetail?.rejectionReason, "Нет мест на выбранную дату",
+      "rejection reason persisted before transaction commits");
     const manualDate = await book({ publicationId: dateOnly.id, requestedDate: today });
     const manualDateRow = await prisma.bookingRequest.findUniqueOrThrow({ where: { id: manualDate.bookingId } });
     assert.equal(manualDateRow.requestedDate?.toISOString(), new Date(today).toISOString());
     assert.equal(manualDateRow.requestedTime, null);
+
+    const orphan = await prisma.bookingRequest.create({ data: {
+      businessId: business.id, publicationType: "EVENT", customerName: "Orphan event test", customerPhone: "+375291112233",
+    } });
+    assert.equal((await getBusinessBookingDecisionAvailability(prisma, orphan.id, business.id))?.canConfirm, false);
+    await assert.rejects(updateBookingStatus(orphan.id, business.id, "CONFIRMED"), BookingDecisionCapacityError);
 
   } finally {
     await prisma.bookingRequest.deleteMany({ where: { businessId: business.id } });

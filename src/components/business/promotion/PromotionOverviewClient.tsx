@@ -317,7 +317,7 @@ export function PromotionOverviewClient(props: {
                     </Button>
                   ) : null}
                   {promotion.status === PromotionStatus.PAUSED ? (
-                    <Button
+                    <Button variant="business"
                       type="button"
                       className="rounded-2xl bg-stone-900"
                       disabled={isPending}

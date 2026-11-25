@@ -10,6 +10,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary-hover",
+        /** Solid dark CTA for business cabinet; public/event orange stays on `default`. */
+        business: "bg-stone-900 text-white hover:bg-stone-800",
         destructive:
           "bg-danger text-white hover:bg-danger-hover focus-visible:ring-danger/20 dark:focus-visible:ring-danger/40",
         outline:

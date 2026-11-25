@@ -284,7 +284,7 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
               </p>
             </div>
             {isEditable ? (
-              <Button type="button" size="sm" onClick={handleApplyImportContacts}>
+              <Button variant="business" type="button" size="sm" onClick={handleApplyImportContacts}>
                 Применить контакты
               </Button>
             ) : null}
@@ -317,7 +317,7 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
               </p>
             </div>
             {isEditable ? (
-              <Button
+              <Button variant="business"
                 type="button"
                 size="sm"
                 onClick={() => onChange({ contactMode: "override" })}

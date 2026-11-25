@@ -1,3 +1,5 @@
+import { getBusinessBookingDecisionAvailability } from "@/server/services/booking/bookingDecisionAvailability.service";
+import { updateBookingStatus, getBusinessBookingById } from "@/server/services/booking/bookingQuery.service";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
@@ -232,4 +234,78 @@ test("manual calendar block racing a standard reservation cannot both claim the 
     (error: unknown) => error instanceof SlotReservationError && error.code === "SLOT_UNAVAILABLE");
   assert.equal(await db.calendarBlock.count({ where: { bookingUnitId: unit.id } }), 1);
   assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: unit.id, status: "HELD" } }), 0);
+});
+
+
+test("group decision excludes its own hold and confirmation serializes repeated requests", async () => {
+  const { offerId, startAt, endAt } = await groupOffer();
+  const booking = await reserveSlot({ offerId, startsAt: startAt, endsAt: endAt, ...contact });
+  const decision = await getBusinessBookingDecisionAvailability(db, booking.bookingId, businessId);
+  assert.equal(decision?.canConfirm, true, JSON.stringify(decision));
+  assert.equal(decision.capacity, 1);
+  assert.equal(decision.requested, 1);
+  assert.equal(decision.occupied, 1);
+  assert.equal(decision.remaining, 0, "The request owns the held final seat");
+  const outcomes = await Promise.allSettled([
+    updateBookingStatus(booking.bookingId, businessId, "CONFIRMED"),
+    updateBookingStatus(booking.bookingId, businessId, "CONFIRMED"),
+  ]);
+  assert.equal(outcomes.filter((r) => r.status === "fulfilled").length, 1);
+  await updateBookingStatus(booking.bookingId, businessId, "CANCELLED", {
+    actorId: ownerId, actorRole: "BUSINESS", reason: "Мероприятие отменено",
+  });
+  const detail = await getBusinessBookingById(booking.bookingId, businessId);
+  assert.equal(detail?.cancellationActor, "BUSINESS");
+  assert.equal(detail?.rejectionReason, "Мероприятие отменено");
+});
+
+test("group decision and transactional confirmation reject reduced capacity", async () => {
+  const { offerId, startAt, endAt } = await groupOffer();
+  const booking = await reserveSlot({ offerId, startsAt: startAt, endsAt: endAt, ...contact });
+  await db.offerSession.updateMany({ where: { offerId }, data: { capacity: 0 } });
+  const preview = await getBusinessBookingDecisionAvailability(db, booking.bookingId, businessId);
+  assert.equal(preview?.canConfirm, false);
+  assert.equal(preview?.capacity, 0);
+  assert.equal(preview?.occupied, 1);
+  assert.equal(preview?.requested, 1);
+  assert.equal(preview?.remaining, 0);
+  await assert.rejects(updateBookingStatus(booking.bookingId, businessId, "CONFIRMED"));
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: booking.bookingId } })).status, "NEW");
+});
+
+
+test("legacy session references resolve exact times and unheld confirmations serialize", async () => {
+  const { offerId, startAt, endAt } = await groupOffer();
+  const first = await reserveSlot({ offerId, startsAt: startAt, endsAt: endAt, ...contact });
+  await db.bookingRequest.update({ where: { id: first.bookingId }, data: { startsAt: null, endsAt: null } });
+  assert.equal((await getBusinessBookingDecisionAvailability(db, first.bookingId, businessId))?.canConfirm, true);
+  await updateBookingStatus(first.bookingId, businessId, "REJECTED");
+  const makeLegacy = () => db.bookingRequest.create({ data: {
+    businessId, publicationType: "OFFER", offerId, startsAt: startAt, endsAt: endAt, seats: 1,
+    status: "NEW", holdUntil: null, ...contact,
+  } });
+  const [left, right] = await Promise.all([makeLegacy(), makeLegacy()]);
+  const results = await Promise.allSettled([
+    updateBookingStatus(left.id, businessId, "CONFIRMED"),
+    updateBookingStatus(right.id, businessId, "CONFIRMED"),
+  ]);
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(await db.bookingRequest.count({ where: { offerId, status: "CONFIRMED" } }), 1);
+});
+
+test("a structured legacy request without a resolvable window fails closed", async () => {
+  const { offerId } = await groupOffer();
+  const row = await db.bookingRequest.create({ data: {
+    businessId, publicationType: "OFFER", offerId, status: "NEW", ...contact,
+  } });
+  assert.equal((await getBusinessBookingDecisionAvailability(db, row.id, businessId))?.canConfirm, false);
+  await assert.rejects(updateBookingStatus(row.id, businessId, "CONFIRMED"));
+});
+
+test("a withdrawn class group cannot be confirmed through an old request", async () => {
+  const { offerId, startAt, endAt } = await groupOffer();
+  const result = await reserveSlot({ offerId, startsAt: startAt, endsAt: endAt, ...contact });
+  await db.bookingRequest.update({ where: { id: result.bookingId }, data: { classGroupId: "withdrawn-group" } });
+  assert.equal((await getBusinessBookingDecisionAvailability(db, result.bookingId, businessId))?.canConfirm, false);
+  await assert.rejects(updateBookingStatus(result.bookingId, businessId, "CONFIRMED"));
 });

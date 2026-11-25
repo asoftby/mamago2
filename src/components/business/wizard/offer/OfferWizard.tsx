@@ -924,7 +924,7 @@ export function OfferWizard({
                         После сохранения вы вернётесь к этому шагу.
                       </p>
                       {formData.placeId ? (
-                        <Button type="button" disabled={isSaving || isSubmitting} onClick={() => void handleSaveDraft(true)}>
+                        <Button variant="business" type="button" disabled={isSaving || isSubmitting} onClick={() => void handleSaveDraft(true)}>
                           {isSaving ? "Сохраняем…" : "Сохранить черновик и продолжить"}
                         </Button>
                       ) : (
@@ -1012,7 +1012,7 @@ export function OfferWizard({
                       Чтобы настроить свободное время, сохраните черновик. Вы вернётесь к расписанию.
                     </p>
                     {formData.placeId ? (
-                      <Button type="button" disabled={isSaving || isSubmitting} onClick={() => void handleSaveDraft(true)}>
+                      <Button variant="business" type="button" disabled={isSaving || isSubmitting} onClick={() => void handleSaveDraft(true)}>
                         {isSaving ? "Сохраняем…" : "Сохранить черновик и продолжить"}
                       </Button>
                     ) : (
@@ -1156,7 +1156,7 @@ export function OfferWizard({
                   ? "Взять актуальную версию"
                   : "Начать заново"}
               </Button>
-              <Button size="sm" onClick={handleRestoreDraft}>
+              <Button variant="business" size="sm" onClick={handleRestoreDraft}>
                 {draftConflictsWithEntity ? "Применить черновик" : "Продолжить"}
               </Button>
             </div>

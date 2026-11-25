@@ -8,6 +8,7 @@ const dateKey = (date: Date) => date.toISOString().slice(0, 10);
 export async function loadSlotSnapshot(
   input: GetSlotsInput,
   db: Prisma.TransactionClient = prisma,
+  excludeBookingRequestId?: string,
 ): Promise<SlotSnapshot | null> {
   const offer = await db.offer.findUnique({
     where: { id: input.offerId },
@@ -28,6 +29,8 @@ export async function loadSlotSnapshot(
   if (!offer?.bookingEnabled || !booking ||
       (offer.bookingMode !== "USE_PUBLICATION_DATES" && offer.bookingMode !== "USE_PUBLICATION_SLOTS")) return null;
 
+  if (input.classGroupId && !offer.classGroups.some((group) => group.id === input.classGroupId)) return null;
+
   const openingHoursId = offer.inheritPlaceOpeningHours
     ? offer.place?.openingHoursId
     : offer.openingHoursId;
@@ -37,7 +40,14 @@ export async function loadSlotSnapshot(
       select: { id: true, startAt: true, endAt: true, capacity: true, isCancelled: true },
     }),
     db.bookingRequest.findMany({
-      where: { offerId: input.offerId, ...(input.classGroupId ? { OR: [{ classGroupId: input.classGroupId }, { classGroupId: null }] } : {}), status: { in: ["NEW", "CONFIRMED"] } },
+      where: { ...(excludeBookingRequestId ? {
+        id: { not: excludeBookingRequestId },
+        AND: [{ OR: [
+          { startsAt: { gte: input.from, lt: input.to } },
+          { offerSession: { startAt: { gte: input.from, lt: input.to } } },
+          { campShiftDateFrom: { gte: input.from, lt: input.to } },
+        ] }],
+      } : {}), offerId: input.offerId, ...(input.classGroupId ? { OR: [{ classGroupId: input.classGroupId }, { classGroupId: null }] } : {}), status: { in: ["NEW", "CONFIRMED"] } },
       select: {
         offerSessionId: true, startsAt: true, seats: true, status: true, holdUntil: true,
         campShiftDateFrom: true, campShiftDateTo: true, childrenCount: true,
@@ -51,7 +61,7 @@ export async function loadSlotSnapshot(
             rules: true,
             exceptions: true,
             blocks: true,
-            allocations: { where: { status: { in: ["HELD", "CONFIRMED"] } } },
+            allocations: { where: { ...(excludeBookingRequestId ? { OR: [{ bookingRequestId: null }, { bookingRequestId: { not: excludeBookingRequestId } }] } : {}), status: { in: ["HELD", "CONFIRMED"] } } },
           },
         },
       },
@@ -106,6 +116,8 @@ export async function loadSlotSnapshot(
     } : null,
     units: links.map(({ bookingUnit: unit }) => ({
       id: unit.id,
+      name: unit.name,
+      capacity: unit.capacity,
       timezone: unit.timezone,
       prepMinutes: unit.prepMinutes,
       cleanupMinutes: unit.cleanupMinutes,
