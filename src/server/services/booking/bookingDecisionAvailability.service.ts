@@ -3,6 +3,7 @@ import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/l
 import { formatHHMM } from "@/lib/formatters/date";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { getEventSeatPolicy, calculateEventSeatAvailability, occupiedEventSeats, type EventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
+import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
 
 type Db = Pick<Prisma.TransactionClient, "bookingRequest" | "activity">;
 
@@ -92,7 +93,7 @@ export async function getBusinessBookingDecisionAvailability(
       : { canConfirm: true, code: "NOT_APPLICABLE", message: "Для этой заявки учёт мест по сеансам не применяется", remaining: null, capacity: null };
   }
   const activity = await db.activity.findFirst({
-    where: { id: request.activityId, businessId, type: "EVENT" },
+    where: { ...(options.reoffer ? getPublicActivityDetailWhere() : {}), id: request.activityId, businessId, type: "EVENT" },
     select: { bookingEnabled: true, bookingMode: true, scheduleJson: true, bookingCapacityPerSlot: true },
   });
   if (!activity) return unavailable("Событие не найдено");
