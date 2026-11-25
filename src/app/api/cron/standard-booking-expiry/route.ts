@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeCronRequest } from "@/server/cron/authorizeCron";
+import { dispatchGuestBookingSms } from "@/server/services/booking/guestBookingSms.service";
 import { expireStandardRequests } from "@/server/services/booking/standardRequestExpiry.service";
 
 export const runtime = "nodejs";
@@ -15,7 +16,8 @@ export async function GET(request: NextRequest) {
   if (rejected) return rejected;
   try {
     const result = await expireStandardRequests();
-    return NextResponse.json({ ok: true, ...result }, {
+    const sms = await dispatchGuestBookingSms();
+    return NextResponse.json({ ok: true, ...result, sms }, {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch {

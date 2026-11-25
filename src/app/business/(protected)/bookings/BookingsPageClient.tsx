@@ -1,5 +1,7 @@
 "use client";
 
+import { businessRejectionReasons } from "@/lib/booking/businessBookingDecisionSchema";
+import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import type { EventCalendarSummary } from "@/lib/business/eventCalendarSummary";
 
@@ -35,6 +37,8 @@ import type {
   BusinessBookingItem,
   BookingStatusCounts,
 } from "@/server/services/booking/bookingQuery.service";
+
+type BookingDecisionPreview = import("@/server/services/booking/bookingDecisionAvailability.service").BookingDecisionAvailability;
 
 type StatusFilter = "all" | BookingStatus;
 type SortMode = "newest" | "oldest";
@@ -503,7 +507,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [searchParams]);
 
   useEffect(() => {
-    const idFromUrl = searchParams.get("id");
+    const idFromUrl = searchParams.get("id") ?? searchParams.get("request");
     if (idFromUrl) setSelectedBookingId(idFromUrl);
   }, [searchParams]);
 
@@ -590,7 +594,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   }, [selectedBookingId, detailRefreshRevision]);
 
   const handleStatusChange = useCallback(
-    async (id: string, status: BookingStatus) => {
+    async (id: string, status: BookingStatus, reason?: string, comment?: string) => {
       setItems((prev) => prev.map((booking) => (booking.id === id ? { ...booking, status } : booking)));
 
       try {
@@ -598,7 +602,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status, ...(reason ? { reason, comment } : {}) }),
         });
 
         if (!res.ok) {
@@ -620,6 +624,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
       } catch (err) {
         void fetchBookings();
         toast.error(err instanceof Error ? err.message : "Ошибка обновления");
+        throw err;
       }
     },
     [fetchBookings, refreshBusinessUnreadOnly],
@@ -666,7 +671,7 @@ export function BookingsPageClient({ revision = 0 }: { revision?: number } = {})
   useEffect(() => {
     if (selectedBookingId &&
         !visibleItems.some((item) => item.id === selectedBookingId) &&
-        searchParams.get("id") !== selectedBookingId &&
+        (searchParams.get("id") ?? searchParams.get("request")) !== selectedBookingId &&
         selectedBookingDetail?.id !== selectedBookingId) {
       setSelectedBookingId(null);
     }
@@ -1600,9 +1605,42 @@ export function BookingDetailsDrawer({
   onOpenChange: (open: boolean) => void;
   onSelectPrev: () => void;
   onSelectNext: () => void;
-  onStatusChange: (id: string, status: BookingStatus) => Promise<void>;
+  onStatusChange: (id: string, status: BookingStatus, reason?: string, comment?: string) => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionComment, setRejectionComment] = useState("");
+  const [decision, setDecision] = useState<BookingDecisionPreview | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionRevision, setDecisionRevision] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDecision(null);
+    setDecisionError(null);
+    if (!open || !booking?.id || booking.status !== BookingStatus.NEW) {
+      return () => controller.abort();
+    }
+    // A Telegram Mini App link opens this same authorized booking detail.
+    void fetch("/api/business/bookings/" + encodeURIComponent(booking.id) + "/decision", {
+      cache: "no-store", credentials: "include", signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok) throw new Error("Не удалось проверить места");
+      return res.json() as Promise<BookingDecisionPreview>;
+    }).then((result) => {
+      if (!controller.signal.aborted) setDecision(result);
+    }).catch(() => {
+      if (!controller.signal.aborted) setDecisionError("Не удалось проверить места. Обновите заявку.");
+    });
+    return () => controller.abort();
+  }, [open, booking?.id, booking?.status, booking?.publicationType, decisionRevision]);
+
+  useEffect(() => {
+    setRejectOpen(false);
+    setRejectionReason("");
+    setRejectionComment("");
+  }, [booking?.id]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chat, setChat] = useState<{ bookingId: string; open: boolean }>({ bookingId: "", open: false });
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -1617,7 +1655,7 @@ export function BookingDetailsDrawer({
   const price = formatPriceLabel(booking);
   const isNew = booking.status === BookingStatus.NEW;
   const isConfirmed = booking.status === BookingStatus.CONFIRMED;
-  const canConfirm = isNew;
+  const canConfirm = isNew && decision?.canConfirm === true;
   const canReject = isNew || isConfirmed;
   const canComplete = isConfirmed;
   const history = buildHistoryEntries(booking);
@@ -1627,7 +1665,16 @@ export function BookingDetailsDrawer({
   const handleAction = async (status: BookingStatus) => {
     setUpdating(status);
     try {
-      await onStatusChange(booking.id, status);
+      await onStatusChange(booking.id, status,
+        status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED ? rejectionReason : undefined, rejectionComment);
+      if (status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED) {
+        setRejectOpen(false);
+        setRejectionReason("");
+        setRejectionComment("");
+      }
+    } catch {
+      setDecisionRevision((revision) => revision + 1);
+      // The caller displays the API error. Keep the rejection reason for retry.
     } finally {
       setUpdating(null);
     }
@@ -1754,6 +1801,12 @@ export function BookingDetailsDrawer({
             ) : null}
           </div>
 
+          {(booking.status === BookingStatus.REJECTED || booking.status === BookingStatus.CANCELLED) && booking.rejectionReason ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-semibold">Причина отказа</p>
+              <p className="mt-1 whitespace-pre-wrap">{booking.rejectionReason}</p>
+            </div>
+          ) : null}
           {isConfirmed ? (
             <div className="mt-5 flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3.5 text-[15px] leading-snug text-emerald-800">
               <Check className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1839,23 +1892,74 @@ export function BookingDetailsDrawer({
         </div>
 
         <div className="shrink-0 border-t border-stone-200 bg-white px-5 pb-5 pt-4 sm:px-6">
-          {canConfirm ? (
+          {isNew ? (
+            <p role="status" className={cn(
+              "mb-3 rounded-xl border px-3 py-2 text-sm",
+              decision?.canConfirm ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900",
+            )}>
+              {decisionError ?? decision?.message ?? "Проверяем свободные места для этой заявки…"}
+              {decision?.capacity != null ? ` · Всего мест: ${decision.capacity}` : ""}
+              {decision?.occupied != null ? ` · Занято: ${decision.occupied}` : ""}
+              {decision?.requested != null ? ` · Запрошено: ${decision.requested}` : ""}
+              {decision?.remaining !== null && decision?.remaining !== undefined
+                ? ` · Свободно: ${decision.remaining}` : ""}
+              {decision?.resourceLimits?.map((resource) => (
+                <span key={resource.id} className="mt-1 block">
+                  {resource.name}
+                  {resource.capacity === null ? " · Без ограничения вместимости" :
+                    resource.capacity !== undefined ? ` · Вместимость: ${resource.capacity}` : ""}
+                  {` · Запрошено: ${resource.requested} · ${resource.available ? "Доступен" : "Недоступен"}`}
+                </span>
+              ))}
+            </p>
+          ) : null}
+          {rejectOpen && canReject ? (
+            <div className="space-y-3">
+              <label htmlFor="business-booking-rejection-reason" className="block text-sm font-semibold text-stone-900">
+                Причина отказа — обязательна
+              </label>
+              <select id="business-booking-rejection-reason" value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base">
+                <option value="">Выберите причину</option>
+                {businessRejectionReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+              </select>
+              <label htmlFor="business-booking-rejection-comment" className="block text-sm">
+                Пояснение{rejectionReason === "Другая причина" ? " — обязательно" : " (необязательно)"}
+              </label>
+              <Textarea id="business-booking-rejection-comment" maxLength={500} rows={3}
+                value={rejectionComment} required={rejectionReason === "Другая причина"}
+                onChange={(e) => setRejectionComment(e.target.value)} />
+              <div className="flex gap-2">
+                <button type="button" disabled={updating !== null}
+                  className="h-11 flex-1 rounded-xl border px-4 text-sm font-semibold"
+                  onClick={() => setRejectOpen(false)}>Назад</button>
+                <button type="button"
+                  disabled={updating !== null || !rejectionReason || (rejectionReason === "Другая причина" && !rejectionComment.trim())}
+                  className="h-11 flex-1 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  onClick={() => void handleAction(isConfirmed ? BookingStatus.CANCELLED : BookingStatus.REJECTED)}>
+                  {updating ? "Сохраняем…" : isConfirmed ? "Отменить запись" : "Отклонить заявку"}
+                </button>
+              </div>
+            </div>
+          ) : isNew ? (
             <div className="flex flex-col gap-1 md:flex-row-reverse md:items-center md:gap-4">
               <button
                 type="button"
-                onClick={() => handleAction(BookingStatus.CONFIRMED)}
-                disabled={updating !== null}
+                onClick={() => void handleAction(BookingStatus.CONFIRMED)}
+                disabled={updating !== null || !canConfirm}
                 className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-stone-950 px-6 text-base font-semibold text-white transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70 md:flex-1"
               >
                 {updating === BookingStatus.CONFIRMED ? "Сохраняем..." : "Подтвердить заявку"}
               </button>
               <button
                 type="button"
-                onClick={() => handleAction(BookingStatus.REJECTED)}
+                onClick={() => setRejectOpen(true)}
                 disabled={updating !== null}
                 className="inline-flex h-12 w-full items-center justify-center rounded-2xl px-6 text-base font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70 md:w-auto"
               >
-                {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+                {updating ? "Сохраняем..." : isConfirmed ? "Отменить запись" : "Отклонить"}
               </button>
             </div>
           ) : canComplete || canReject ? (
@@ -1865,7 +1969,7 @@ export function BookingDetailsDrawer({
                   {canComplete ? (
                     <button
                       type="button"
-                      onClick={() => handleAction(BookingStatus.COMPLETED)}
+                      onClick={() => void handleAction(BookingStatus.COMPLETED)}
                       disabled={updating !== null}
                       className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-stone-950 transition hover:bg-stone-100 disabled:cursor-wait disabled:opacity-70"
                     >
@@ -1875,11 +1979,11 @@ export function BookingDetailsDrawer({
                   {canReject ? (
                     <button
                       type="button"
-                      onClick={() => handleAction(BookingStatus.REJECTED)}
+                      onClick={() => setRejectOpen(true)}
                       disabled={updating !== null}
                       className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-70"
                     >
-                      {updating === BookingStatus.REJECTED ? "Сохраняем..." : "Отклонить"}
+                      {updating ? "Сохраняем..." : isConfirmed ? "Отменить запись" : "Отклонить"}
                     </button>
                   ) : null}
                 </div>

@@ -18,6 +18,8 @@ export type Slot = {
   startsAt: Date;
   endsAt: Date;
   remainingSeats: number | null;
+  capacity?: number;
+  occupiedSeats?: number;
   unitIds: string[];
   sessionId?: string;
 };
@@ -91,6 +93,8 @@ export type SlotSnapshot = {
   } | null;
   units: Array<{
     id: string;
+    name?: string;
+    capacity?: number | null;
     timezone: string;
     prepMinutes: number;
     cleanupMinutes: number;
@@ -235,14 +239,16 @@ function putGroupSlot(
   upper: Date,
   requestedSeats: number,
   now: Date,
+  includeUnavailable: boolean,
 ) {
-  if (start < lower || start >= upper || end <= start || capacity == null || capacity <= 0) return;
-  const remaining = capacity - occupiedSeats(snapshot, sessionId, start, end, now);
-  if (remaining < requestedSeats) return;
+  if (start < lower || start >= upper || end <= start || capacity == null || capacity < 0 || (capacity === 0 && !includeUnavailable)) return;
+  const occupied = occupiedSeats(snapshot, sessionId, start, end, now);
+  const remaining = capacity - occupied;
+  if (remaining < requestedSeats && !includeUnavailable) return;
   const key = `${start.toISOString()}|${end.toISOString()}`;
   const existing = slots.get(key);
   if (!existing || (existing.remainingSeats ?? Infinity) > remaining) {
-    slots.set(key, { startsAt: start, endsAt: end, remainingSeats: remaining, unitIds: [], ...(sessionId ? { sessionId } : {}) });
+    slots.set(key, { startsAt: start, endsAt: end, remainingSeats: remaining, ...(includeUnavailable ? { capacity, occupiedSeats: occupied } : {}), unitIds: [], ...(sessionId ? { sessionId } : {}) });
   }
 }
 
@@ -304,8 +310,10 @@ export function calculateSlots(
   snapshot: SlotSnapshot,
   input: Pick<GetSlotsInput, "from" | "to" | "requestedSeats" | "requestedDurationMinutes">,
   now = new Date(),
+  options: { includeUnavailable?: boolean } = {},
 ): Slot[] {
   const requestedSeats = input.requestedSeats ?? 1;
+  const includeUnavailable = options.includeUnavailable === true;
   if (!Number.isInteger(requestedSeats) || requestedSeats < 1) throw new RangeError("requestedSeats must be positive");
   if (!(input.from instanceof Date) || !(input.to instanceof Date) ||
       !Number.isFinite(input.from.getTime()) || !Number.isFinite(input.to.getTime()) || input.from >= input.to) {
@@ -335,7 +343,7 @@ export function calculateSlots(
     for (const session of snapshot.sessions) {
       if (session.isCancelled || closedDates.has(dateKeyInZone(session.startAt, snapshot.timezone))) continue;
       putGroupSlot(slots, snapshot, session.startAt, session.endAt,
-        session.capacity ?? snapshot.capacity, session.id, lower, upper, requestedSeats, now);
+        session.capacity ?? snapshot.capacity, session.id, lower, upper, requestedSeats, now, includeUnavailable);
     }
   } else if (snapshot.scheduleKind === "RECURRING_SESSIONS") {
     for (let date = firstDate; date <= lastDate; date = shiftDateKey(date, 1)) {
@@ -352,7 +360,7 @@ export function calculateSlots(
         if (existing?.isCancelled) continue;
         putGroupSlot(slots, snapshot, start, existing?.endAt ?? end,
           existing?.capacity ?? rule.capacity ?? snapshot.capacity,
-          existing?.id, lower, upper, requestedSeats, now);
+          existing?.id, lower, upper, requestedSeats, now, includeUnavailable);
       }
     }
   } else if (snapshot.scheduleKind === "OPENING_HOURS") {
@@ -375,13 +383,14 @@ export function calculateSlots(
         const existing = sessionsByStart.get(startMs);
         if (existing?.isCancelled) continue;
         putGroupSlot(slots, snapshot, start, existing?.endAt ?? new Date(startMs + duration * MINUTE_MS),
-          existing?.capacity ?? snapshot.capacity, existing?.id, lower, upper, requestedSeats, now);
+          existing?.capacity ?? snapshot.capacity, existing?.id, lower, upper, requestedSeats, now, includeUnavailable);
       }
     }
   } else if (snapshot.scheduleKind === "ON_REQUEST_WINDOWS") {
     const duration = input.requestedDurationMinutes ?? snapshot.durationMin;
     if (!duration || duration <= 0) return [];
     for (const unit of snapshot.units) {
+      if (unit.capacity != null && unit.capacity < requestedSeats) continue;
       if (unit.minDurationMinutes != null && duration < unit.minDurationMinutes) continue;
       const seenLocal = new Set<string>();
       const windows: UtcInterval[] = [];

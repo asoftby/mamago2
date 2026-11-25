@@ -1,3 +1,4 @@
+import { getBusinessBookingDecisionAvailability } from "@/server/services/booking/bookingDecisionAvailability.service";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
@@ -215,7 +216,7 @@ test("unavailable selected option resource creates no partial booking or price s
   assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: room } }), 0);
 });
 
-test("business confirmation and rejection transition ALL held bundle resources", async () => {
+test("business confirmation and cancellation transition ALL held bundle resources", async () => {
   const room = await unit("Transition room");
   const equipment = await unit("Transition equipment");
   const offerId = await offer([room, equipment]);
@@ -226,11 +227,11 @@ test("business confirmation and rejection transition ALL held bundle resources",
   const confirmed = await db.bookingAllocation.findMany({ where: { bookingRequestId: bookingId } });
   assert.equal(confirmed.length, 2);
   assert.ok(confirmed.every(a => a.status === "CONFIRMED" && a.expiresAt === null));
-  await updateBookingStatus(bookingId, businessId, BookingStatus.REJECTED);
+  await updateBookingStatus(bookingId, businessId, BookingStatus.CANCELLED);
   const released = await db.bookingAllocation.findMany({ where: { bookingRequestId: bookingId } });
   assert.equal(released.length, 2);
   assert.ok(released.every(a => a.status === "RELEASED" && a.expiresAt === null));
-  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: bookingId } })).status, "REJECTED");
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: bookingId } })).status, "CANCELLED");
 });
 
 test("an occupied required resource rejects the bundle without booking or partial hold", async () => {
@@ -511,6 +512,32 @@ test("manual confirmation shares resource exclusion and releases the same alloca
   assert.equal(row.allocations[0]?.status, "CONFIRMED");
   assert.equal(row.allocations[0]?.expiresAt, null);
   await assert.rejects(reserveSlot({ offerId, startsAt: start, endsAt: end, unitId: room, ...contact }), SlotReservationError);
-  await updateBookingStatus(row.id, businessId, "REJECTED");
+  await updateBookingStatus(row.id, businessId, "CANCELLED");
   await reserveSlot({ offerId, startsAt: start, endsAt: end, unitId: room, ...contact });
+});
+
+
+test("all selected resource capacities appear in the decision and are rechecked on confirmation", async () => {
+  const room = await unit("Capacity room");
+  const equipment = await unit("Capacity equipment");
+  await db.bookingUnit.update({ where: { id: room }, data: { capacity: 4 } });
+  await db.bookingUnit.update({ where: { id: equipment }, data: { capacity: 2 } });
+  const offerId = await offer([room, equipment]);
+  const input = { offerId, startsAt: start, endsAt: end, unitIds: [room, equipment], seats: 3, ...contact };
+  await assert.rejects(reserveSlot(input), SlotReservationError);
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
+  await db.bookingUnit.update({ where: { id: equipment }, data: { capacity: 3 } });
+  const result = await reserveSlot(input);
+  const preview = await getBusinessBookingDecisionAvailability(db, result.bookingId, businessId);
+  assert.equal(preview?.canConfirm, true);
+  assert.equal(preview?.requested, 3);
+  assert.equal(preview?.resourceLimits?.length, 2);
+  assert.equal(preview?.resourceLimits?.find((limit) => limit.id === room)?.capacity, 4);
+  await db.bookingUnit.update({ where: { id: equipment }, data: { capacity: 2 } });
+  const changed = await getBusinessBookingDecisionAvailability(db, result.bookingId, businessId);
+  assert.equal(changed?.canConfirm, false);
+  assert.equal(changed?.resourceLimits?.find((limit) => limit.id === equipment)?.available, false);
+  await assert.rejects(updateBookingStatus(result.bookingId, businessId, "CONFIRMED"));
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: result.bookingId } })).status, "NEW");
+  assert.ok((await db.bookingAllocation.findMany({ where: { bookingRequestId: result.bookingId } })).every((allocation) => allocation.status === "HELD"));
 });

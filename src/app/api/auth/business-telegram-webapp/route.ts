@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaBase } from "@/lib/prisma";
-import { getPartnerCabinetBusiness } from "@/server/permissions/business-permissions";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getCurrentUser } from "@/lib/auth/server";
 import { verifyTelegramWebAppInitData } from "@/lib/telegram/verifyWebAppInitData";
@@ -68,10 +67,12 @@ export async function POST(request: NextRequest) {
   });
   if (!connection) return reject("TELEGRAM_NOT_LINKED");
 
-  // The protected cabinet uses this same canonical active membership.
-  // A valid connection to another represented business must not authenticate
-  // into the wrong inbox. Business switching is not implemented by this route.
-  const business = await getPartnerCabinetBusiness(connection.userId);
+  // Authorize the connected business, including users representing several businesses.
+  const membership = await prismaBase.businessMember.findFirst({
+    where: { userId: connection.userId, businessId: connection.businessId, isActive: true,
+      role: { in: ["OWNER", "MANAGER"] } }, include: { business: true },
+  });
+  const business = membership?.business;
   if (!business || business.operationalStatus !== "ACTIVE") return reject("TELEGRAM_NOT_LINKED");
   if (business.id !== connection.businessId) return reject("BUSINESS_CONTEXT_MISMATCH");
 
