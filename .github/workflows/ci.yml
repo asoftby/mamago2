@@ -216,9 +216,12 @@ jobs:
           pnpm exec tsx src/server/services/direct/directMessageLock.contract.test.ts
 
       - name: Direct PostgreSQL moderation/send concurrency
-        run: pnpm exec tsx src/server/services/direct/directPostgresLock.integration.test.ts
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx --test src/server/services/direct/directPostgresLock.integration.test.ts
         env:
-          DIRECT_LOCK_TEST_DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@localhost:5432/seo_redirect_test
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          NODE_OPTIONS: --conditions=react-server
 
       - name: Business booking contact minimization regressions
         run: pnpm exec tsx src/server/services/booking/businessBookingContactProjection.test.ts
