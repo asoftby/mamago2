@@ -600,6 +600,7 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/services/booking/bookingReoffer.postgres.integration.test.ts
+          pnpm exec tsx src/server/services/booking/bookingReofferApi.postgres.integration.test.ts
 
       - name: Business support PostgreSQL isolation
         env:

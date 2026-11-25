@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { EventCalendarSummary } from "@/lib/business/eventCalendarSummary";
 
 import { formatChildLabel, formatParticipantsLine } from "@/lib/booking/bookingParticipants";
+import { Button } from "@/components/ui/button";
 import { BookingChatButton, BookingChatComposer } from "@/components/business/bookings/BookingChatButton";
 import type { ReactNode } from "react";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
@@ -1615,6 +1616,11 @@ export function BookingDetailsDrawer({
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [reoffer, setReoffer] = useState<{ eligible: boolean; reason: string | null; invitation: { status: string; expiresAt: string } | null } | null>(null);
   const [sendingReoffer, setSendingReoffer] = useState(false);
+  const reofferBookingRef = useRef(booking?.id);
+  useEffect(() => {
+    reofferBookingRef.current = booking?.id;
+    setSendingReoffer(false);
+  }, [booking?.id]);
   const [decisionRevision, setDecisionRevision] = useState(0);
 
   useEffect(() => {
@@ -1699,19 +1705,21 @@ export function BookingDetailsDrawer({
 
   const sendReoffer = async () => {
     if (!booking || sendingReoffer) return;
+    const requestedBookingId = booking.id;
     setSendingReoffer(true);
     try {
       const response = await fetch(`/api/business/bookings/${encodeURIComponent(booking.id)}/reoffer`, {
         method: "POST", credentials: "include",
       });
       const next = (await response.json()) as { error?: string; status?: string; expiresAt?: string };
+      if (reofferBookingRef.current !== requestedBookingId) return;
       if (!response.ok) throw new Error(next.error ?? "Не удалось отправить предложение");
       setReoffer({ eligible: false, reason: null, invitation: { status: next.status ?? "OFFERED", expiresAt: next.expiresAt ?? "" } });
       toast.success("Предложение создано. Клиент сможет ответить в mamaGo.");
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Ошибка соединения");
+      if (reofferBookingRef.current === requestedBookingId) toast.error(cause instanceof Error ? cause.message : "Ошибка соединения");
     } finally {
-      setSendingReoffer(false);
+      if (reofferBookingRef.current === requestedBookingId) setSendingReoffer(false);
     }
   };
 
@@ -1954,10 +1962,10 @@ export function BookingDetailsDrawer({
               {reoffer?.invitation ? (
                 <p>Повторное предложение: {reoffer.invitation.status === "OFFERED" ? "ожидает ответа клиента" : reoffer.invitation.status}</p>
               ) : reoffer?.eligible ? (
-                <button type="button" disabled={sendingReoffer} onClick={() => void sendReoffer()}
-                  className="w-full rounded-xl bg-stone-950 px-4 py-3 font-semibold text-white disabled:opacity-50">
+                <Button type="button" variant="business" disabled={sendingReoffer} onClick={() => void sendReoffer()}
+                  className="min-h-11 w-full">
                   {sendingReoffer ? "Отправляем…" : "Предложить освободившееся место"}
-                </button>
+                </Button>
               ) : <p>{reoffer?.reason ?? "Проверяем возможность повторной записи…"}</p>}
             </div>
           ) : null}

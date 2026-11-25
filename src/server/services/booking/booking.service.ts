@@ -874,6 +874,16 @@ async function createPublicationBooking(
         throw new BookingValidationError("customerPhone", "Заявка на эту запись уже существует");
       }
       const seatPolicy = getEventSeatPolicy(activity.scheduleJson);
+      // Reoffers promise an existing, measurable event slot. The ordinary
+      // command also supports unlimited/undated enquiries, so constrain this
+      // consent path using the configuration already read under Activity lock.
+      if (input.reofferId && (
+        (activity.bookingMode !== BookingMode.USE_PUBLICATION_DATES && activity.bookingMode !== BookingMode.USE_PUBLICATION_SLOTS) ||
+        (capacity == null && seatPolicy.mode !== "SEPARATE")
+      )) {
+        throw new BookingValidationError("reofferId", "Для повторной записи больше нельзя проверить свободное место");
+      }
+
       if (capacity !== undefined || seatPolicy.mode === "SEPARATE") {
         const { _sum } = await tx.bookingRequest.aggregate({
           where: active,

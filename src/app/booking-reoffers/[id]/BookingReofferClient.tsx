@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 type Offer = {
   id: string;
@@ -39,7 +40,7 @@ export function BookingReofferClient({ id }: { id: string }) {
   }, [id]);
 
   async function decide(action: "ACCEPT" | "DECLINE") {
-    if (acting) return;
+    if (acting || offer?.id !== id || !offer.canAccept) return;
     setActing(true);
     setError(null);
     try {
@@ -84,19 +85,21 @@ export function BookingReofferClient({ id }: { id: string }) {
               <p className="text-sm text-stone-500">
                 Ответьте до {new Date(offer.expiresAt).toLocaleString("ru-BY")}.
               </p>
-              <button type="button" disabled={acting} onClick={() => void decide("ACCEPT")}
-                className="w-full rounded-xl bg-stone-950 px-5 py-3 font-semibold text-white disabled:opacity-50">
+              <Button type="button" disabled={acting} onClick={() => void decide("ACCEPT")}
+                className="min-h-11 w-full">
                 {acting ? "Проверяем места…" : "Да, записаться"}
-              </button>
-              <button type="button" disabled={acting} onClick={() => void decide("DECLINE")}
-                className="w-full rounded-xl border border-stone-300 px-5 py-3 font-semibold disabled:opacity-50">
+              </Button>
+              <Button type="button" variant="outline" disabled={acting} onClick={() => void decide("DECLINE")}
+                className="min-h-11 w-full">
                 Не подходит
-              </button>
+              </Button>
             </>
           ) : offer.status === "ACCEPTED" ? (
             <p className="text-emerald-800">Новая заявка создана и ожидает ответа организатора.</p>
+          ) : offer.status === "OFFERED" ? (
+            <p className="text-stone-700">Сейчас повторная запись недоступна. Места или условия события изменились.</p>
           ) : (
-            <p className="text-stone-700">Предложение больше не действует ({offer.status}).</p>
+            <p className="text-stone-700">Предложение больше не действует.</p>
           )}
           <Link href="/me/bookings" className="inline-block text-sm font-semibold underline">
             Мои записи

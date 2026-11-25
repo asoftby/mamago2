@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
-import { createPublicBooking, BookingValidationError } from "@/server/services/booking/booking.service";
+import { createPublicBooking, BookingValidationError, BookingNotFoundError } from "@/server/services/booking/booking.service";
 import { BookingStatus, PublicationType } from "@prisma/client";
 import { getBusinessBookingDecisionAvailability } from "@/server/services/booking/bookingDecisionAvailability.service";
 import { isSameSiteBrowserOrigin } from "@/lib/security/isSameSiteBrowserOrigin";
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (latest?.status === "ACCEPTED" && latest.newBookingId) {
       return NextResponse.json({ status: "ACCEPTED", bookingId: latest.newBookingId });
     }
-    if (error instanceof BookingValidationError) {
+    if (error instanceof BookingValidationError || error instanceof BookingNotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     console.error("[booking-reoffer] acceptance failed", { invitationId: id });
