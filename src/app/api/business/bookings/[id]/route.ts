@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { dispatchGuestBookingSms } from "@/server/services/booking/guestBookingSms.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { z } from "zod";
@@ -87,6 +88,15 @@ export async function PATCH(
       },
     });
 
+    if (!updatedBooking.hasCustomerAccount && data.status !== "COMPLETED") {
+      after(async () => {
+        try {
+          await dispatchGuestBookingSms({ bookingId: id, limit: 3 });
+        } catch {
+          console.error("[booking-sms] after-response dispatch failed");
+        }
+      });
+    }
     await attachDirectAvailabilityToBusinessBookings([updatedBooking]);
     // Status-changing responses must not quietly repopulate the bulk list with PII.
     return NextResponse.json(businessBookingListProjection(updatedBooking));

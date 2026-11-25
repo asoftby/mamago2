@@ -91,3 +91,8 @@ jobs:
         env:
           NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx --test src/server/services/booking/eventBooking.postgres.integration.test.ts
+
+      - name: Guest decision SMS queue, concurrency, safe retry and mock provider
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm test:guest-booking-sms

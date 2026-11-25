@@ -4,13 +4,14 @@
  * Обновляет статус заявки.
  * Допустимые переходы:
  *   NEW → CONFIRMED | REJECTED
- *   CONFIRMED → COMPLETED | REJECTED
+ *   CONFIRMED → COMPLETED | CANCELLED
  *
- * Body: { status: "CONFIRMED" | "REJECTED" | "COMPLETED" }
+ * Reasons and comments are validated by businessBookingDecisionSchema.
  */
 
 import { attachDirectAvailabilityToBusinessBookings } from "@/server/services/direct/directBookingThread.service";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { dispatchGuestBookingSms } from "@/server/services/booking/guestBookingSms.service";
 import { businessBookingDecisionSchema } from "@/lib/booking/businessBookingDecisionSchema";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
@@ -62,6 +63,15 @@ export async function PATCH(
         source: "business_status_endpoint",
       },
     });
+    if (!updated.hasCustomerAccount && parsed.data.status !== "COMPLETED") {
+      after(async () => {
+        try {
+          await dispatchGuestBookingSms({ bookingId: id, limit: 3 });
+        } catch {
+          console.error("[booking-sms] after-response dispatch failed");
+        }
+      });
+    }
     await attachDirectAvailabilityToBusinessBookings([updated]);
     return NextResponse.json(businessBookingListProjection(updated));
   } catch (err) {

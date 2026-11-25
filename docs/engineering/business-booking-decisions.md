@@ -17,3 +17,18 @@ Use test users and synthetic contact details. Open a Telegram notification for o
 Confirm a held final seat, reduce capacity before confirmation and race confirmations. Check group lessons, exclusive resources, manual allocations and existing party confirmation. After business cancellation verify the reason and contact in the selected detail. Repeat after customer cancellation, visit completion, expiry and membership revocation. Check inbox, calendar, participants, user bookings and My Plan after each action.
 
 “Предложить запись повторно” remains backlog. A future proposal must go through mamaGo and require customer acceptance.
+
+
+## Guest SMS decisions
+
+Guest STANDARD decisions enqueue a BookingSmsDelivery in the same PostgreSQL transaction as the status and decision activity. Registered users retain their existing notification channels. The delivery queue references the existing booking/history and stores no recipient phone, message text or raw provider response. BookingSmsAttempt records each bounded dispatch attempt.
+
+The existing SMS.by sendQuickSms integration sends after the API response. The existing authenticated standard-booking-expiry cron drains pending and retryable work, up to ten rows per run. No extra deployment scheduler is required. Known provider refusal and missing configuration are retried at most three times, with five- and ten-minute delays. Accepted deliveries are not sent again. A timed-out request, malformed response, HTTP ambiguity or interrupted worker is quarantined as UNCERTAIN. The provider API documents no idempotency key for sendQuickSms, so ambiguous attempts require provider-side reconciliation before any resend. ACCEPTED means gateway acceptance, with the provider status and message ID recorded. It does not claim delivery to the handset.
+
+A later business cancellation supersedes an unsent confirmation. Cleared/anonymized source phones and bookings linked to an account are skipped. Provider failure leaves the business decision committed. Atomic CAS claims prevent concurrent dispatchers from buying the same SMS twice.
+
+Russian templates use Unicode SMS. Confirmation and each standard reason without an extra comment fit one segment with the visit date/time. Whitespace and redundant reason labels are removed. Custom explanations are preserved, with up to nine segments for the current 500-character comment limit. Estimated and provider-reported segment counts are recorded separately.
+
+The public SMS.by SMS page lists 0.028 BYN per message for the lowest-volume bracket, while its tariff page displays 0.046 BYN for Belarusian operators. These pages differ, and the account-specific contracted rate has not been confirmed. A planning range is 0.028–0.046 BYN for a one-segment notification and 0.252–0.414 BYN for nine segments. These estimates cover Belarusian numbers. International destinations have different provider tariffs. Actual billing depends on the account tariff and provider-reported parts. Sources checked on 2026-11-25. [SMS.by SMS pricing](https://sms.by/sending-sms), [SMS.by tariffs](https://sms.by/tariffs), [SMS.by API](https://sms.by/api-docs/sms-messages/).
+
+The additive 20261125143000_guest_booking_decision_sms migration creates delivery and attempt tables with unique decision and attempt keys. Existing data and notification records are retained. Apply migrations before the new app version. Tests use injected/mock SMS providers and disposable PostgreSQL, with no real SMS sent.
