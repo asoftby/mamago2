@@ -79,6 +79,7 @@ test("real reoffer API enforces consent, expiry, tenant isolation and transactio
       assert.deepEqual(responses.map((r) => r.status).sort(), [201, 409]);
       assert.equal(notificationCalls - before, 1);
       const invitation = await prisma.bookingReoffer.findUniqueOrThrow({ where: { originalBookingId: f.original.id } });
+      assert.deepEqual((await prisma.notification.findFirstOrThrow({ where: { userId: client.id, ctaAction: "/booking-reoffers/" + invitation.id } })).metadata, { source: "BOOKING_REOFFER" });
       assert.equal((await call(other.id, () => customerRoute.GET(req(), ctx(invitation.id)))).status, 404);
       assert.equal((await reply(invitation.id, "ACCEPT", other.id)).status, 404);
       const detail = await call(client.id, () => customerRoute.GET(req(), ctx(invitation.id)));
