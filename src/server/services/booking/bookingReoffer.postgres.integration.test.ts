@@ -50,6 +50,19 @@ test("reoffer creates only one new booking after consent, preserving rejected re
     await updateBookingStatus(initial.bookingId, business.id, "REJECTED", {
       actorId: owner.id, actorRole: "BUSINESS", reason: "Больше нет свободных мест",
     });
+    // A rejected booking does not hold capacity. Another NEW request must block
+    // sending an invitation until it too releases the single seat.
+    const competing = await createPublicBooking({
+      publicationType: "EVENT", publicationId: activity.id, selectedSessionId: session.id,
+      customerName: "Competing client", customerPhone: "+375291111198",
+    });
+    const full = await getBusinessBookingDecisionAvailability(
+      prisma, initial.bookingId, business.id, new Date(), { reoffer: true },
+    );
+    assert.equal(full?.canConfirm, false);
+    await updateBookingStatus(competing.bookingId, business.id, "REJECTED", {
+      actorId: owner.id, actorRole: "BUSINESS", reason: "Освободили место повторно",
+    });
     const available = await getBusinessBookingDecisionAvailability(
       prisma, initial.bookingId, business.id, new Date(), { reoffer: true },
     );
@@ -71,6 +84,13 @@ test("reoffer creates only one new booking after consent, preserving rejected re
       customerName: original.customerName!, customerPhone: original.customerPhone!,
       adultsCount: original.adultsCount, childrenCount: original.childrenCount,
     });
+    await assert.rejects(createPublicBooking({
+      reofferId: invitation.id, publicationType: "EVENT", publicationId: activity.id,
+      selectedSessionId: original.selectedSessionId, requestedDate: original.requestedDate,
+      requestedTime: original.requestedTime, userId: owner.id,
+      customerName: original.customerName!, customerPhone: original.customerPhone!,
+      adultsCount: original.adultsCount, childrenCount: original.childrenCount,
+    }), /недоступно/, "a different user must never redeem customer consent");
     const results = await Promise.allSettled([attempt(), attempt()]);
     assert.equal(results.filter((result) => result.status === "fulfilled").length, 1,
       "row locking must permit only one accepted invitation");
