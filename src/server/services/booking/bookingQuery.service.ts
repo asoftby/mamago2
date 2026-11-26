@@ -37,6 +37,7 @@ import {
 
 export interface BusinessBookingItem {
   id: string;
+  requestNumber: number;
   source?: "MANUAL" | null;
   status: BookingStatus;
   publicationType: string;
@@ -154,6 +155,7 @@ export interface GetBusinessBookingsResult {
 
 const BOOKING_SELECT = {
   id: true,
+  requestNumber: true,
   userId: true,
   status: true,
   source: true,
@@ -235,6 +237,7 @@ function computeStale(
 function mapBooking(raw: {
   source: "MANUAL" | null;
   id: string;
+  requestNumber: number;
   userId: string | null;
   status: BookingStatus;
   publicationType: string;
@@ -329,6 +332,7 @@ function mapBooking(raw: {
 
   return {
     id: raw.id,
+    requestNumber: raw.requestNumber,
     status: raw.status,
     source: raw.source,
     publicationType: raw.publicationType,
