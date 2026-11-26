@@ -26,6 +26,7 @@ export type NotificationsPanelProps = {
   /** Вызывается при закрытии popover/sheet (кнопка X и т.д.) */
   onClose: () => void;
   stream?: "user" | "business";
+  pageHref?: string;
   onNotificationRead?: () => void;
   /** Родительское открытие — при закрытии сбрасываем list/settings */
   open?: boolean;
@@ -36,6 +37,7 @@ export type NotificationsPanelProps = {
 export function NotificationsPanel({
   onClose,
   stream = "user",
+  pageHref,
   onNotificationRead,
   open = true,
   showHeaderClose = true,
@@ -65,7 +67,7 @@ export function NotificationsPanel({
     }
   }, [open]);
 
-  const notificationsPageHref = stream === "business" ? "/business/notifications" : "/notifications";
+  const notificationsPageHref = pageHref ?? (stream === "business" ? "/business/notifications" : "/notifications");
 
   const refreshCounts = useCallback(async () => {
     if (onNotificationRead) {
