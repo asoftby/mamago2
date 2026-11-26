@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { formatHHMM } from "@/lib/formatters/date";
 import { buildManualPlaceReservation, manualPlaceDurationChoices } from "./manualPlaceReservation";
@@ -226,14 +226,14 @@ export function ManualBookingDialog({ onClose, onCreated }: {
   }
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !inFlight.current) onClose(); }}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto p-4 sm:max-w-xl sm:p-6" dismissible={!busy} showCloseButton={!busy}>
-        <DialogHeader className="pr-10 text-left">
-          <DialogTitle>Новая запись</DialogTitle>
-          <DialogDescription>
+    <Sheet open onOpenChange={(open) => { if (!open && !inFlight.current) onClose(); }}>
+      <SheetContent side="right" className="h-dvh w-full !max-w-[min(100vw,680px)] gap-3 overflow-y-auto p-4 sm:p-6" dismissible={!busy} showCloseButton={!busy}>
+        <SheetHeader className="pr-10 text-left">
+          <SheetTitle>Новая запись</SheetTitle>
+          <SheetDescription>
             Выберите публикацию и укажите клиента. Запись с датой будет видна и в календаре.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
         <form onSubmit={submit}>
           <fieldset disabled={busy} className="grid gap-4">
             <h3 className="text-sm font-semibold text-stone-950">1. Что бронируем</h3>
@@ -434,7 +434,7 @@ export function ManualBookingDialog({ onClose, onCreated }: {
             </Button>
           </fieldset>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
