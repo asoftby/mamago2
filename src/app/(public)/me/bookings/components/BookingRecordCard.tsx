@@ -89,7 +89,7 @@ export function BookingRecordCard({ booking }: Props) {
 
         {/* Тело */}
         <div className={styles.recBody}>
-          <span className={styles.recKicker}>{display.typeLabel}</span>
+          <span className={styles.recKicker}>{display.typeLabel} · Заявка № {booking.requestNumber}</span>
           {publicHref ? (
             <Link href={publicHref} className={styles.recTitle}>
               {display.title}
