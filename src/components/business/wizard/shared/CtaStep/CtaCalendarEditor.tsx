@@ -20,15 +20,16 @@ type CtaCalendarEditorProps = {
   days: CtaStepCalendarDay[];
   mode: CtaStepCalendarMode;
   disabled?: boolean;
+  requireCapacity?: boolean;
   onModeChange: (mode: CtaStepCalendarMode) => void;
   onChange: (days: CtaStepCalendarDay[]) => void;
 };
 
-function parseOptionalPositiveNumber(value: string): number | null {
+function parseCapacity(value: string, requireCapacity: boolean): number | null {
   if (!value.trim()) return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
-  return parsed;
+  return requireCapacity ? parsed : parsed > 0 ? Math.floor(parsed) : null;
 }
 
 function ensureDays(days: CtaStepCalendarDay[]): CtaStepCalendarDay[] {
@@ -39,6 +40,7 @@ export function CtaCalendarEditor({
   days,
   mode,
   disabled,
+  requireCapacity = false,
   onModeChange,
   onChange,
 }: CtaCalendarEditorProps) {
@@ -118,7 +120,9 @@ export function CtaCalendarEditor({
                   <CardTitle className="text-sm">День {dayIndex + 1}</CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {mode === "DATE_ONLY"
-                      ? "Добавьте дату и обязательную вместимость (чел.)."
+                      ? requireCapacity
+                        ? "Добавьте дату и обязательную вместимость (чел.)."
+                        : "Добавьте дату и, при необходимости, лимит мест."
                       : "Добавьте дату и доступные временные слоты."}
                   </p>
                 </div>
@@ -154,15 +158,15 @@ export function CtaCalendarEditor({
 
                 {mode === "DATE_ONLY" ? (
                   <div className="space-y-2">
-                    <Label htmlFor={`cta-day-capacity-${day.id}`}>Вместимость на дату (чел.) *</Label>
+                    <Label htmlFor={`cta-day-capacity-${day.id}`}>{requireCapacity ? "Вместимость на дату (чел.) *" : "Мест на дату"}</Label>
                     <Input
                       id={`cta-day-capacity-${day.id}`}
                       type="number"
                       min={1}
                       step={1}
-                      required
-                      aria-required="true"
-                      aria-invalid={Boolean(day.date && (!Number.isSafeInteger(day.capacity) || (day.capacity ?? 0) <= 0))}
+                      required={requireCapacity}
+                      aria-required={requireCapacity || undefined}
+                      aria-invalid={requireCapacity ? Boolean(day.date && (!Number.isSafeInteger(day.capacity) || (day.capacity ?? 0) <= 0)) : undefined}
                       inputMode="numeric"
                       value={day.capacity ?? ""}
                       placeholder="Например, 10"
@@ -170,12 +174,12 @@ export function CtaCalendarEditor({
                       onChange={(event) =>
                         patchDay(day.id, (currentDay) => ({
                           ...currentDay,
-                          capacity: parseOptionalPositiveNumber(event.target.value),
+                          capacity: parseCapacity(event.target.value, requireCapacity),
                         }))
                       }
                     />
-                    {day.date && (!Number.isSafeInteger(day.capacity) || (day.capacity ?? 0) <= 0) ? (
-                      <p className="text-xs text-red-700" role="alert">Укажите вместимость (чел.) — целое число от 1</p>
+                    {requireCapacity && day.date && (!Number.isSafeInteger(day.capacity) || (day.capacity ?? 0) <= 0) ? (
+                      <p className="text-xs text-danger" role="alert">Укажите вместимость (чел.) — целое число от 1</p>
                     ) : null}
                   </div>
                 ) : null}
@@ -243,15 +247,15 @@ export function CtaCalendarEditor({
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor={`cta-slot-capacity-${slot.id}`}>Вместимость (чел.) *</Label>
+                          <Label htmlFor={`cta-slot-capacity-${slot.id}`}>{requireCapacity ? "Вместимость (чел.) *" : "Мест"}</Label>
                           <Input
                             id={`cta-slot-capacity-${slot.id}`}
                             type="number"
                             min={1}
                             step={1}
-                            required
-                            aria-required="true"
-                            aria-invalid={Boolean((slot.startTime || slot.endTime) && (!Number.isSafeInteger(slot.capacity) || (slot.capacity ?? 0) <= 0))}
+                            required={requireCapacity}
+                            aria-required={requireCapacity || undefined}
+                            aria-invalid={requireCapacity ? Boolean((slot.startTime || slot.endTime) && (!Number.isSafeInteger(slot.capacity) || (slot.capacity ?? 0) <= 0)) : undefined}
                             inputMode="numeric"
                             value={slot.capacity ?? ""}
                             placeholder="5"
@@ -263,15 +267,15 @@ export function CtaCalendarEditor({
                                   currentSlot.id === slot.id
                                     ? {
                                         ...currentSlot,
-                                        capacity: parseOptionalPositiveNumber(event.target.value),
+                                        capacity: parseCapacity(event.target.value, requireCapacity),
                                       }
                                     : currentSlot,
                                 ),
                               }))
                             }
                           />
-                          {(slot.startTime || slot.endTime) && (!Number.isSafeInteger(slot.capacity) || (slot.capacity ?? 0) <= 0) ? (
-                            <p className="text-xs text-red-700" role="alert">Укажите вместимость (чел.) — целое число от 1</p>
+                          {requireCapacity && (slot.startTime || slot.endTime) && (!Number.isSafeInteger(slot.capacity) || (slot.capacity ?? 0) <= 0) ? (
+                            <p className="text-xs text-danger" role="alert">Укажите вместимость (чел.) — целое число от 1</p>
                           ) : null}
                         </div>
                       </div>

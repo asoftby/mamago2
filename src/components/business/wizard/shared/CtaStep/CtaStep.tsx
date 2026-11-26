@@ -141,6 +141,7 @@ export function CtaStep({
                       <CtaCalendarEditor
                         days={value.calendarDays}
                         mode={value.calendarMode ?? "DATE_ONLY"}
+                        requireCapacity={source.sourceEntityType === "EVENT"}
                         disabled={disabled}
                         onModeChange={(calendarMode) =>
                           patchValue(value, onChange, { calendarMode })

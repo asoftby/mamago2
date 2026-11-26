@@ -21,6 +21,7 @@ for (const mode of ["DATE_ONLY", "DATE_AND_TIME"] as const) {
     <CtaCalendarEditor
       days={[day]}
       mode={mode}
+      requireCapacity
       onChange={onChange}
       onModeChange={onModeChange}
     />,
@@ -29,6 +30,11 @@ for (const mode of ["DATE_ONLY", "DATE_AND_TIME"] as const) {
   assert.ok(html.includes("Укажите вместимость (чел.)"), "required-field error is visible");
   assert.ok(html.includes('aria-required="true"'), "capacity is marked as mandatory");
   assert.ok(html.includes('aria-invalid="true"'), "invalid capacity is announced to assistive technology");
+
+  const optional = renderToStaticMarkup(
+    <CtaCalendarEditor days={[day]} mode={mode} onChange={onChange} onModeChange={onModeChange} />,
+  );
+  assert.ok(!optional.includes('aria-required="true"'), "other publication calendars keep optional capacity");
 }
 
 console.log("CtaCalendarEditor.capacity.test.tsx: OK");
