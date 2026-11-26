@@ -10,10 +10,21 @@ test("only staff roles may represent the platform support team", () => {
   assert.equal(isSupportStaff(actor("MODERATOR")), true);
   assert.equal(isSupportStaff(null), false);
 });
-test("business cannot impersonate support staff and staff cannot impersonate business", () => {
-  assert.doesNotThrow(() => requireSupportMessageActor(actor("USER"), "BUSINESS"));
-  assert.doesNotThrow(() => requireSupportMessageActor(actor("ADMIN"), "STAFF"));
-  assert.doesNotThrow(() => requireSupportMessageActor(actor("MODERATOR"), "STAFF"));
-  assert.throws(() => requireSupportMessageActor(actor("USER"), "STAFF"), SupportAccessError);
-  assert.throws(() => requireSupportMessageActor(actor("ADMIN"), "BUSINESS"), SupportAccessError);
+test("only active business members may send business messages, including admins in the business cabinet", () => {
+  for (const role of ["USER", "ADMIN", "MODERATOR"] as const) {
+    assert.doesNotThrow(() => requireSupportMessageActor(actor(role), "BUSINESS", true));
+    assert.throws(
+      () => requireSupportMessageActor(actor(role), "BUSINESS", false),
+      (error: unknown) => error instanceof SupportAccessError && error.status === 404,
+    );
+  }
+});
+
+test("only platform staff may send staff replies", () => {
+  assert.doesNotThrow(() => requireSupportMessageActor(actor("ADMIN"), "STAFF", false));
+  assert.doesNotThrow(() => requireSupportMessageActor(actor("MODERATOR"), "STAFF", false));
+  assert.throws(
+    () => requireSupportMessageActor(actor("USER"), "STAFF", true),
+    (error: unknown) => error instanceof SupportAccessError && error.status === 403,
+  );
 });
