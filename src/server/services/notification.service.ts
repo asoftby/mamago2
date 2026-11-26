@@ -1466,6 +1466,7 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     "BOOKING_CREATED",
     "BOOKING",
     params.bookingId,
+    "BUSINESS",
   );
   if (dedup.isDuplicate) {
     console.warn("[notification] BOOKING_CREATED deduplicated:", params.bookingId);

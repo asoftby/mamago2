@@ -43,6 +43,9 @@ export function NotificationsPanel({
   showHeaderClose = true,
 }: NotificationsPanelProps) {
   const router = useRouter();
+  // Admin bell is an action inbox: items remain here until explicitly opened.
+  // Full notification history remains available on /admin/notifications.
+  const isAdminBell = pageHref === "/admin/notifications";
   const unreadCount = useNotificationStore((s) =>
     stream === "business" ? s.businessUnreadCount : s.unreadCount,
   );
@@ -84,7 +87,7 @@ export function NotificationsPanel({
   const refreshRecent = useCallback(async () => {
     setLoading(true);
     try {
-      const page = await fetchNotificationsPageApi(0, 7, stream, "inbox");
+      const page = await fetchNotificationsPageApi(0, 7, stream, isAdminBell ? "unread" : "inbox");
       setItems(page.notifications);
     } catch (error) {
       console.error(error);
@@ -92,7 +95,7 @@ export function NotificationsPanel({
     } finally {
       setLoading(false);
     }
-  }, [stream]);
+  }, [stream, isAdminBell]);
 
   useEffect(() => {
     if (!open) return;
@@ -116,7 +119,7 @@ export function NotificationsPanel({
   const markItemAsReadLocally = useCallback(
     async (notificationId: string) => {
       setItems((current) =>
-        current.map((notification) =>
+        isAdminBell ? current.filter((notification) => notification.id !== notificationId) : current.map((notification) =>
           notification.id === notificationId
             ? {
                 ...notification,
@@ -128,7 +131,7 @@ export function NotificationsPanel({
       );
       await refreshCounts();
     },
-    [refreshCounts],
+    [refreshCounts, isAdminBell],
   );
 
   const refreshPanel = useCallback(async () => {
@@ -159,11 +162,27 @@ export function NotificationsPanel({
         return;
       }
 
+      if (isAdminBell) {
+        try {
+          // Resolve the action and mark read BEFORE navigation (including CTA).
+          await handleNotificationClick({
+            notification,
+            router,
+            onAfterRead: (id) => { void markItemAsReadLocally(id); },
+            onModal: setDetailAction,
+            onClose,
+          });
+        } catch (error) {
+          console.error(error);
+          toast.error("Не удалось открыть уведомление");
+        }
+        return;
+      }
       if (!notification.actionUrl) return;
       onClose();
       router.push(notification.actionUrl);
     },
-    [handleOnboardingCta, onClose, router],
+    [handleOnboardingCta, isAdminBell, markItemAsReadLocally, onClose, router],
   );
 
   const handleRowClick = useCallback(
@@ -293,7 +312,7 @@ export function NotificationsPanel({
             </div>
 
             <div className="flex shrink-0 flex-col gap-2 border-t border-neutral-200/90 bg-white px-4 py-3 sm:px-5">
-              {hasUnread && unreadCount > 0 ? (
+              {!isAdminBell && hasUnread && unreadCount > 0 ? (
                 <Button
                   type="button"
                   variant="outline"

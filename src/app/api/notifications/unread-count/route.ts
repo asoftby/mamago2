@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { reconcileRecentAdminBookingAlerts } from "@/server/services/booking/adminBookingAlerts.service";
 import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
 import { getUnreadCount, getAccessibleSurfacesForUser, reconcileResolvedActionRequiredNotifications } from "@/server/notifications/notification.service";
@@ -34,6 +35,13 @@ export async function GET(request: NextRequest) {
         { error: "Unauthorized" },
         { status: 401 }
       );
+    }
+
+    // Recover missing in-app admin alerts for recent pending orders before counting.
+    if (user.role === "ADMIN") {
+      await reconcileRecentAdminBookingAlerts(user.id).catch((error) => {
+        console.error("[admin-booking-alerts] unread-count reconciliation failed", error);
+      });
     }
 
     const streamParam = request.nextUrl.searchParams.get("stream");
