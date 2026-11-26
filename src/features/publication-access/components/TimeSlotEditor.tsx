@@ -22,6 +22,7 @@ import {
   createEmptyScheduleDay,
   createEmptyScheduleSlot,
   flatSlotsToGroupedDays,
+  groupedDaysToFlatSlots,
   scheduleDaysToPersistedSlots,
 } from "../schedule/mappers";
 import {
@@ -151,12 +152,17 @@ export function TimeSlotEditor({
       const normalizedDays = normalizeEditorDays(sortDays(nextDays));
       setDays(normalizedDays);
 
-      const flat = scheduleDaysToPersistedSlots(normalizedDays);
+      // Preserve incomplete event rows in form state so step validation can
+      // block publication instead of silently discarding a slot without capacity.
+      // Offer editor retains its existing complete-rows-only contract.
+      const flat = entityType === "event"
+        ? groupedDaysToFlatSlots(normalizedDays)
+        : scheduleDaysToPersistedSlots(normalizedDays);
       const key = serializeSlots(flat);
       lastEmitted.current = key;
       onChange(flat);
     },
-    [onChange],
+    [entityType, onChange],
   );
 
   const patchDay = useCallback(
@@ -392,7 +398,7 @@ export function TimeSlotEditor({
                       if (touchedFields.endTime && rawErrors.endTime) {
                         visibleErrors.endTime = rawErrors.endTime;
                       }
-                      if (touchedFields.capacity && rawErrors.capacity) {
+                      if ((touchedFields.capacity || (entityType === "event" && Boolean(day.date && (slot.startTime || slot.endTime)))) && rawErrors.capacity) {
                         visibleErrors.capacity = rawErrors.capacity;
                       }
 
