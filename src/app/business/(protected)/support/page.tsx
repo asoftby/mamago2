@@ -14,7 +14,7 @@ export default async function BusinessSupportPage({ searchParams }: { searchPara
     <div className="space-y-6">
       <BusinessSectionHeader
         eyebrow="КАБИНЕТ"
-        title="Поддержка mamaGo"
+        title="Поддержка"
         description="Обращения в поддержку отдельно от переписки с клиентами."
       />
       <SupportInbox businessId={business.id} initialThreadId={thread} embedded />
