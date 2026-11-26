@@ -167,6 +167,7 @@ export function AdminOrderDetailsDrawer({
                   {order.customerEmail ? <a className="text-blue-700 underline" href={`mailto:${order.customerEmail}`}>{order.customerEmail}</a> : "—"}
                 </InfoRow>
                 <InfoRow label="Публикация">{order.entityTitle || "—"}</InfoRow>
+                <InfoRow label="Источник">{order.sourceChannel || "—"}</InfoRow>
                 <InfoRow label="Срок ответа бизнеса">{dateLabel(order.responseDueAt)}</InfoRow>
               </DetailSection>
 
@@ -278,13 +279,35 @@ export function AdminOrderDetailsDrawer({
                 </Link>
               </DetailSection>
 
+              {order.campShiftSnapshot ? (
+                <DetailSection title="Смена лагеря">
+                  <InfoRow label="Смена">{order.campShiftSnapshot.title || "—"}</InfoRow>
+                  <InfoRow label="Дата начала">{dateLabel(order.campShiftSnapshot.dateFrom)}</InfoRow>
+                  <InfoRow label="Дата окончания">{dateLabel(order.campShiftSnapshot.dateTo)}</InfoRow>
+                </DetailSection>
+              ) : null}
+
               <DetailSection title="Финансы">
                 {order.financials.debit ? (
                   <>
                     <InfoRow label="Сумма">{order.financials.debit.amount} {order.financials.debit.currency}</InfoRow>
                     <InfoRow label="Операция">{order.financials.debit.type}</InfoRow>
                     <InfoRow label="Статус">{order.financials.debit.status}</InfoRow>
-                    <InfoRow label="Возвратов">{order.financials.refunds.length}</InfoRow>
+                    <InfoRow label="Дата">{dateLabel(order.financials.debit.occurredAt)}</InfoRow>
+                    <Link className="inline-block text-sm text-blue-700 underline"
+                      href={adminPath(`/billing/businesses/${order.financials.debit.businessId}/billing`)}>
+                      Открыть биллинг организации
+                    </Link>
+                    {order.financials.refunds.length ? (
+                      <div className="space-y-2 border-t border-stone-100 pt-3">
+                        <h4 className="text-sm font-medium">Возвраты</h4>
+                        {order.financials.refunds.map((refund) => (
+                          <div key={refund.id} className="rounded-lg bg-stone-50 p-2 text-sm">
+                            {refund.amount} {refund.currency} · {refund.status} · {dateLabel(refund.occurredAt)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </>
                 ) : <p className="text-sm text-stone-500">Списания по заявке не найдены.</p>}
               </DetailSection>
