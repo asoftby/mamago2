@@ -260,7 +260,7 @@ export function Step5PricingParticipation({
         </div>
       ) : null}
     </section>
-      ) : null};
+  ) : null;
 
   return (
     <div className="space-y-8">
