@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { adminPath } from "@/lib/routing/surface";
+import { AdminOrderDetailsDrawer } from "./AdminOrderDetailsDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,7 +149,8 @@ function getPublicationHref(order: AdminOrderListItem) {
   return null;
 }
 
-export function AdminOrdersClient() {
+export function AdminOrdersClient({ initialOrderId = null }: { initialOrderId?: string | null } = {}) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | BookingStatus>("all");
   const [businessId, setBusinessId] = useState("all");
@@ -583,6 +587,7 @@ export function AdminOrdersClient() {
           Вперёд
         </Button>
       </div>
+      <AdminOrderDetailsDrawer orderId={initialOrderId} onClose={() => router.replace(adminPath("/orders"))} />
     </div>
   );
 }
