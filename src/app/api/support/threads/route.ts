@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   if (!limit.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   try {
     const input = createInput.parse(await request.json());
-    // Transactional membership guard prevents a deleted membership from being silently accepted.
+    // An active OWNER/MANAGER membership is required, even for a platform admin.
     const membership = await getBusinessMembership(user.id, input.businessId);
     requireSupportMessageActor(user, "BUSINESS", Boolean(membership));
     const requestKey = input.requestKey ?? randomUUID();
