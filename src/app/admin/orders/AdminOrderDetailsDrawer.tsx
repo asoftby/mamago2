@@ -125,6 +125,10 @@ export function AdminOrderDetailsDrawer({
 
   const order = data?.order ?? null;
   const phone = order?.businessContact.phone || order?.businessContact.verifiedContactPhone || null;
+  // Contact the provider directly; do not send customer PII or mutate the order.
+  const reminderEmail = order?.businessContact.ownerEmail && order
+    ? `mailto:${order.businessContact.ownerEmail}?subject=${encodeURIComponent(`mamaGo · заявка № ${order.requestNumber} ждёт подтверждения`)}&body=${encodeURIComponent(`Здравствуйте! На mamaGo ожидает решения заявка № ${order.requestNumber} по публикации «${order.entityTitle || "Ваша публикация"}». Пожалуйста, подтвердите или отклоните её в бизнес-кабинете. Спасибо!`)}`
+    : null;
   return (
     <Sheet open={orderId !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent
@@ -205,7 +209,7 @@ export function AdminOrderDetailsDrawer({
                   ) : null}
                   {order.businessContact.ownerEmail ? (
                     <Button asChild variant="outline" size="sm">
-                      <a href={`mailto:${order.businessContact.ownerEmail}`}>Написать email</a>
+                      <a href={reminderEmail ?? `mailto:${order.businessContact.ownerEmail}`}>Напомнить по email</a>
                     </Button>
                   ) : null}
                 </div>
