@@ -596,7 +596,7 @@ assert.equal(
   }),
   "https://dev.mamago.by/me/direct",
 );
-assert.equal(businessMenuLabels.at(-2), "Поддержка mamaGo");
+assert.equal(businessMenuLabels.at(-2), "Поддержка");
 assert.equal(businessMenuLabels.at(-1), "Настройки");
 assert.equal(businessMenuLabels.includes("Настройки и помощь"), false);
 

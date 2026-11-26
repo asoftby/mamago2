@@ -40,12 +40,19 @@ export async function requireSupportThreadAccess(
   return thread;
 }
 
-/** Staff replies are always branded as STAFF; never impersonate a business. */
+/** Sender identity is authorized by staff role or active business membership. */
 export function requireSupportMessageActor(
-  actor: AuthActor,
+  actor: Pick<AuthActor, "role">,
   requested: "BUSINESS" | "STAFF",
+  hasActiveBusinessMembership: boolean,
 ): void {
-  if (isSupportStaff(actor) !== (requested === "STAFF")) {
-    throw new SupportAccessError(403, "Invalid support sender");
+  if (requested === "STAFF") {
+    if (!isSupportStaff(actor)) throw new SupportAccessError(403, "Invalid support sender");
+    return;
+  }
+  // Staff accounts may also be business members, but cannot impersonate
+  // an unrelated business without an active membership.
+  if (!hasActiveBusinessMembership) {
+    throw new SupportAccessError(404, "Support conversation not found");
   }
 }

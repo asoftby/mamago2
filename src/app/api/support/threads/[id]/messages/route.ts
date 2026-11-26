@@ -5,9 +5,10 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { notifySupportMessage } from "@/server/support/supportNotifications";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/security/rateLimit";
-import { requireSupportThreadAccess, isSupportStaff, SupportAccessError } from "@/server/support/supportAccess";
+import { requireSupportThreadAccess, requireSupportMessageActor, isSupportStaff, SupportAccessError } from "@/server/support/supportAccess";
+import { getBusinessMembership } from "@/server/permissions/business-permissions";
 
-const bodyInput = z.object({ body: z.string().trim().min(1).max(3000), requestKey: z.string().uuid().optional() });
+const bodyInput = z.object({ body: z.string().trim().min(1).max(3000), requestKey: z.string().uuid().optional(), actor: z.enum(["BUSINESS", "STAFF"]).optional() });
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -16,14 +17,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { id } = await params;
     const thread = await requireSupportThreadAccess(user, id);
-    const { body, requestKey: requestedKey } = bodyInput.parse(await request.json());
+    const { body, requestKey: requestedKey, actor: requestedActor } = bodyInput.parse(await request.json());
+    // Business-cabinet members may also have a platform staff role.
+    // Validate the chosen sender against active membership or staff role.
+    const messageActor = requestedActor ?? (isSupportStaff(user) ? "STAFF" : "BUSINESS");
+    const member = messageActor === "BUSINESS" ? await getBusinessMembership(user.id, thread.businessId) : null;
+    requireSupportMessageActor(user, messageActor, Boolean(member));
     const requestKey = requestedKey ?? randomUUID();
     const message = await prisma.$transaction(async tx => {
       const previous = await tx.supportMessage.findUnique({
         where: { requestKey }, select: { id: true, threadId: true, authorId: true, actor: true, body: true, createdAt: true },
       });
       if (previous) {
-        if (previous.threadId !== id || previous.authorId !== user.id || previous.body !== body) {
+        if (previous.threadId !== id || previous.authorId !== user.id || previous.actor !== messageActor || previous.body !== body) {
           throw new SupportAccessError(409, "Request key already used");
         }
         return previous;
@@ -31,12 +37,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Status is guarded in the DB to prevent writes after concurrent close.
       const updated = await tx.supportThread.updateMany({
         where: { id, status: { not: "CLOSED" } },
-        data: { lastMessageAt: new Date(), ...(isSupportStaff(user) ? { status: "IN_PROGRESS" as const } : {}) },
+        data: { lastMessageAt: new Date(), ...(messageActor === "STAFF" ? { status: "IN_PROGRESS" as const } : {}) },
       });
       if (!updated.count) return null;
       return tx.supportMessage.create({ data: {
         id: randomUUID(), requestKey, threadId: id, authorId: user.id,
-        actor: isSupportStaff(user) ? "STAFF" : "BUSINESS", body,
+        actor: messageActor, body,
       }, select: { id: true, threadId: true, authorId: true, actor: true, body: true, createdAt: true } });
     });
     if (!message) return NextResponse.json({ error: "Conversation closed" }, { status: 409 });
