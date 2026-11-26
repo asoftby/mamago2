@@ -61,6 +61,13 @@ function dateLabel(value: string | null | undefined) {
   });
 }
 
+function dayLabel(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("ru-RU", {
+    timeZone: "Europe/Minsk", day: "2-digit", month: "2-digit", year: "numeric",
+  });
+}
+
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4">
@@ -167,6 +174,8 @@ export function AdminOrderDetailsDrawer({
                   {order.customerEmail ? <a className="text-blue-700 underline" href={`mailto:${order.customerEmail}`}>{order.customerEmail}</a> : "—"}
                 </InfoRow>
                 <InfoRow label="Публикация">{order.entityTitle || "—"}</InfoRow>
+                <InfoRow label="Дата записи">{dayLabel(order.bookingSlot.date)}</InfoRow>
+                <InfoRow label="Время">{order.bookingSlot.time || "—"}</InfoRow>
                 <InfoRow label="Источник">{order.sourceChannel || "—"}</InfoRow>
                 <InfoRow label="Срок ответа бизнеса">{dateLabel(order.responseDueAt)}</InfoRow>
               </DetailSection>
