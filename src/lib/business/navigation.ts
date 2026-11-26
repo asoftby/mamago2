@@ -157,7 +157,7 @@ export const businessNavigation: BusinessNavItem[] = [
     icon: Wallet,
     match: [businessRoute("/billing")],
   },
-  { type: "item", label: "Поддержка mamaGo", href: businessRoute("/support"), icon: CircleHelp },
+  { type: "item", label: "Поддержка", href: businessRoute("/support"), icon: CircleHelp },
   {
     type: "item",
     label: "Настройки",
