@@ -40,7 +40,7 @@ export async function requireSupportThreadAccess(
   return thread;
 }
 
-/** Staff replies are always branded as STAFF; never impersonate a business. */
+/** Sender identity is authorized by staff role or active business membership. */
 export function requireSupportMessageActor(
   actor: Pick<AuthActor, "role">,
   requested: "BUSINESS" | "STAFF",
