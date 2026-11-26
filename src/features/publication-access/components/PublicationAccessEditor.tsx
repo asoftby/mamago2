@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,8 @@ export type PublicationAccessEditorProps = {
   showPreview?: boolean;
   /** Default dates/times for the time-slot editor (e.g. from the event schedule). */
   timeSlotSuggestions?: TimeSlotSuggestions;
+  /** Optional entity-specific settings to place directly above the slots editor. */
+  timeSlotSettings?: ReactNode;
 };
 
 export function PublicationAccessEditor({
@@ -35,6 +38,7 @@ export function PublicationAccessEditor({
   disabled,
   showPreview = true,
   timeSlotSuggestions,
+  timeSlotSettings,
 }: PublicationAccessEditorProps) {
   const labels = PUBLICATION_ACCESS_LABELS[entityType];
   const methods = allowedMethods ?? DEFAULT_ACCESS_METHODS_BY_ENTITY[entityType];
@@ -190,13 +194,16 @@ export function PublicationAccessEditor({
               ) : null}
 
               {config.supportsTimeSlots ? (
-                <TimeSlotEditor
+                <>
+                  {timeSlotSettings}
+                  <TimeSlotEditor
                   entityType={entityType}
                   value={value.timeSlots ?? []}
                   onChange={(timeSlots) => update({ timeSlots })}
                   suggestions={timeSlotSuggestions}
                   disabled={disabled}
-                />
+                  />
+                </>
               ) : null}
 
               {method !== "details" ? (
