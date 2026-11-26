@@ -429,6 +429,10 @@ export async function getAdminOrderById(id: string) {
       select: {
         userId: true,
         responseDueAt: true,
+        requestedDate: true,
+        requestedTime: true,
+        startsAt: true,
+        session: { select: { startsAt: true } },
         business: {
           select: {
             id: true, name: true, phone: true, legalName: true,
@@ -486,6 +490,10 @@ export async function getAdminOrderById(id: string) {
     ...mapAdminOrder(booking),
     financials,
     responseDueAt: context.responseDueAt?.toISOString() ?? null,
+    bookingSlot: {
+      date: (context.requestedDate ?? context.session?.startsAt ?? context.startsAt)?.toISOString() ?? null,
+      time: context.requestedTime ?? null,
+    },
     businessContact: {
       name: context.business.name,
       legalName: context.business.legalName,
