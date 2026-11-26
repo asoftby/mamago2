@@ -33,6 +33,7 @@ import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLa
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import { evaluateEventStepNavigation, formatEventStepNavigationIssues } from "./navigation";
+import { getEventBookingCapacityIssues } from "./eventBookingCapacityValidation";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
@@ -701,6 +702,19 @@ function EventWizardInner({
         reason: "validation",
         message: draftCheck.errors[0] ?? "Заполните обязательные поля",
       };
+    }
+
+    // Drafts may remain incomplete. An already active event cannot silently
+    // lose its booking action when a changed slot has no capacity.
+    if (event && EVENT_SUBMITTED_OR_LIVE_STATUSES.has(event.status)) {
+      const capacityIssues = getEventBookingCapacityIssues(formData);
+      if (capacityIssues.length > 0) {
+        return {
+          ok: false,
+          reason: "validation",
+          message: capacityIssues[0],
+        };
+      }
     }
 
     const payload = buildDraftPersistPayload(formData, mode, baselineFormDataRef.current);
