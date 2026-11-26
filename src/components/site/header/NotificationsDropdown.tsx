@@ -15,6 +15,7 @@ import { useNotificationStore } from "@/features/notifications/store";
 import type { HeaderChromeContext } from "@/lib/header/chromeContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { adminPath } from "@/lib/routing/surface";
 
 export type NotificationsDropdownProps = {
   /** Публичный сайт / админка → лента user; кабинет партнёра (режим business) → stream business в настройках */
@@ -31,6 +32,7 @@ export function NotificationsDropdown({
   triggerClassName,
 }: NotificationsDropdownProps) {
   const stream = context === "business" ? "business" : "user";
+  const pageHref = context === "admin" ? adminPath("/notifications") : undefined;
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const isUserStream = stream === "user";
 
@@ -56,6 +58,7 @@ export function NotificationsDropdown({
   const panelProps = {
     open,
     stream: stream as "user" | "business",
+    pageHref,
     showHeaderClose: true as const,
     onNotificationRead: refreshUnread,
     onClose: () => handleOpenChange(false),
@@ -122,6 +125,7 @@ export function NotificationsDropdown({
         open={open}
         onOpenChange={handleOpenChange}
         stream={stream}
+        pageHref={pageHref}
         onNotificationRead={panelProps.onNotificationRead}
       />
     </div>
@@ -141,6 +145,7 @@ function UserNotificationsDropdown({
   panelProps: {
     open: boolean;
     stream: "user" | "business";
+    pageHref?: string;
     showHeaderClose: true;
     onNotificationRead: () => Promise<void>;
     onClose: () => void;
@@ -206,6 +211,7 @@ function UserNotificationsDropdown({
         open={open}
         onOpenChange={handleOpenChange}
         stream="user"
+        pageHref={panelProps.pageHref}
         onNotificationRead={resolvedPanelProps.onNotificationRead}
       />
     </div>

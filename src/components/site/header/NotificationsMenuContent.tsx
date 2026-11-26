@@ -5,6 +5,7 @@ import { NotificationsPanel } from "@/components/business/notifications/Notifica
 export type NotificationsMenuContentProps = {
   open: boolean;
   stream?: "user" | "business";
+  pageHref?: string;
   showHeaderClose?: boolean;
   onNotificationRead?: () => void | Promise<void>;
   onClose: () => void;
@@ -13,6 +14,7 @@ export type NotificationsMenuContentProps = {
 export function NotificationsMenuContent({
   open,
   stream = "user",
+  pageHref,
   showHeaderClose = true,
   onNotificationRead,
   onClose,
@@ -21,6 +23,7 @@ export function NotificationsMenuContent({
     <NotificationsPanel
       open={open}
       stream={stream}
+      pageHref={pageHref}
       showHeaderClose={showHeaderClose}
       onNotificationRead={onNotificationRead}
       onClose={onClose}
