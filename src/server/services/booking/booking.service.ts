@@ -23,6 +23,7 @@ import {
 } from "@/server/services/booking/resourceAllocation";
 import { childScopeFor } from "@/server/family/familyAccess";
 import { businessNotificationRecipients } from "./businessNotificationRecipients";
+import { notifyAdminsBookingCreated } from "./adminBookingAlerts.service";
 import {
   BookingParticipantsError,
   BOOKING_MAX_ADULTS,
@@ -310,6 +311,16 @@ async function triggerBookingCreatedSideEffects(context: BookingSideEffectsConte
     childAge: context.childAge ?? null,
   }).catch((err) => {
     console.error("[booking.service] notifyBookingCreated failed:", { bookingId: context.bookingId, error: err });
+  }));
+
+  // Platform staff monitors all client bookings, irrespective of business access.
+  // An admin alert is in-app only and never changes the booking's status.
+  if (context.businessId) promises.push(notifyAdminsBookingCreated({
+    bookingId: context.bookingId,
+    businessId: context.businessId,
+    publicationTitle: context.entityTitle,
+  }).catch((error) => {
+    console.error("[booking.service] admin booking alert failed:", { bookingId: context.bookingId, error });
   }));
 
   if (context.userId) promises.push(notifyUserBookingSubmitted({
