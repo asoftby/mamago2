@@ -19,6 +19,7 @@ import { resolvePendingCampContacts } from "./pendingCampContacts";
 
 export interface ParentBookingItem {
   id: string;
+  requestNumber: number;
   status: BookingStatus;
   createdAt: string;
   display: BookingDisplay;
@@ -98,6 +99,7 @@ export interface ParentBookingsResult {
 
 export const PARENT_BOOKING_SELECT = {
   id: true,
+  requestNumber: true,
   status: true,
   createdAt: true,
   completedAt: true,
@@ -223,6 +225,7 @@ function toParentPrice(snapshot: Prisma.JsonValue | null, totalByn: Prisma.Decim
 
 export function mapParentBookingRow(raw: {
   id: string;
+  requestNumber: number;
   status: BookingStatus;
   createdAt: Date;
   completedAt: Date | null;
@@ -463,6 +466,7 @@ export function mapParentBookingRow(raw: {
 
   return {
     id: raw.id,
+    requestNumber: raw.requestNumber,
     status: raw.status,
     createdAt: raw.createdAt.toISOString(),
     completedAt: raw.completedAt?.toISOString() ?? null,
