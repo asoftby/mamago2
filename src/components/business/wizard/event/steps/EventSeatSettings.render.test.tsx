@@ -46,7 +46,7 @@ const restored = mapEventToFormData({
   ageTags: [],
   scheduleJson: saved.scheduleJson,
   format: getDefaultFormData().format,
-} as ActivityWithRelations);
+} as unknown as ActivityWithRelations);
 
 for (const ctaStepEnabled of [false, true]) {
   const editor = ctaStepEnabled ? "shared" : "legacy";
