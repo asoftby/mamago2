@@ -105,6 +105,7 @@ export function BookingCard({ booking, onStatusChange }: BookingCardProps) {
             <BusinessChip tone={STATUS_TONE[booking.status]} size="compact">
               {STATUS_LABEL[booking.status]}
             </BusinessChip>
+            <span className="text-xs font-semibold tabular-nums text-stone-500">№ {booking.requestNumber}</span>
             {/* Type label from display — extensible for any source type */}
             <BusinessChip tone="warning" size="compact">
               {display.typeLabel}

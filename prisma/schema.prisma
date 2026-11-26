@@ -6346,7 +6346,9 @@ enum BookingSource {
 }
 
 model BookingRequest {
-  id         String  @id @default(cuid())
+  id            String @id @default(cuid())
+  /// Public numeric reference; never use for authentication or foreign keys.
+  requestNumber Int    @unique @default(autoincrement())
   businessId String
   userId     String?
   source BookingSource?

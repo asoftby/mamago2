@@ -80,6 +80,7 @@ export interface BookingCustomer {
  */
 export interface NormalizedBooking {
   id: string;
+  requestNumber: number;
   status: BookingStatus;
   createdAt: string;
   display: BookingDisplay;

@@ -1498,7 +1498,7 @@ function BookingListItem({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-stone-500">{formatShortSchedule(booking)}</div>
+          <div className="text-sm font-medium text-stone-500">{formatShortSchedule(booking)} · Заявка № {booking.requestNumber}</div>
           <div className="mt-1 line-clamp-2 text-[1.4rem] font-semibold leading-tight tracking-tight text-stone-950 sm:text-[2rem]">
             {booking.display.title}
           </div>
@@ -1793,6 +1793,7 @@ export function BookingDetailsDrawer({
             <span className="text-[15px] text-stone-700">{booking.display.typeLabel}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-stone-500">
+            <span>Заявка № {booking.requestNumber}</span>
             <span>{formatReceivedLabel(booking.createdAt)}</span>
             {action?.label === "Нужно выбрать время" ? (
               <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", action.className)}>

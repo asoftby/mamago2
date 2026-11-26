@@ -22,6 +22,7 @@ type EntityTypeFilter = "all" | "CAMP_SHIFT" | "EVENT" | "OFFER" | "PLACE";
 
 interface AdminOrderListItem {
   id: string;
+  requestNumber: number;
   createdAt: string;
   updatedAt: string;
   status: BookingStatus;
@@ -297,7 +298,7 @@ export function AdminOrdersClient() {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Input
-            placeholder="Поиск по имени, телефону, email"
+            placeholder="Номер заявки, имя, телефон, email"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
@@ -425,7 +426,7 @@ export function AdminOrdersClient() {
                       <tr key={order.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 align-top text-gray-700">
                           <div className="font-medium text-gray-900">{formatDateTime(order.createdAt)}</div>
-                          <div className="text-xs text-gray-500">{order.id}</div>
+                          <div className="text-xs text-gray-500">Заявка № {order.requestNumber}</div>
                         </td>
                         <td className="px-4 py-3 align-top">
                           <div className="font-medium text-gray-900">{order.customerName}</div>
@@ -517,6 +518,7 @@ export function AdminOrdersClient() {
                     }
                   />
                   <DataCardBody>
+                    <DataCardRow label="Номер заявки" value={String(order.requestNumber)} />
                     <DataCardRow label="Телефон" value={order.customerPhone} />
                     <DataCardRow label="Email" value={order.customerEmail || undefined} />
                     <DataCardRow

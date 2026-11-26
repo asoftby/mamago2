@@ -1475,6 +1475,11 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
   // Shared by in-app, email and Telegram: never persist or send customer
   // names, children's names or ages outside the authorized order detail.
   const { body, templatePayload } = buildPrivateBusinessBookingNotification(params);
+  const bookingReference = await prisma.bookingRequest.findUnique({
+    where: { id: params.bookingId },
+    select: { requestNumber: true },
+  });
+  const requestNumber = bookingReference?.requestNumber ?? null;
 
   const rendered = await renderNotificationTemplate("BOOKING_CREATED", "IN_APP", templatePayload);
 
@@ -1482,13 +1487,13 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     userId: params.ownerUserId,
     audience: "BUSINESS",
     type: "BOOKING_CREATED",
-    title: rendered?.subject ?? "Новая заявка",
+    title: requestNumber ? `Новая заявка № ${requestNumber}` : (rendered?.subject ?? "Новая заявка"),
     body: rendered?.body ?? body,
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Открыть заявку",
     ctaAction: `/business/bookings?id=${encodeURIComponent(params.bookingId)}`,
-    metadata: { templatePayload },
+    metadata: { templatePayload, ...(requestNumber !== null ? { requestNumber } : {}) },
     waitForDelivery: params.waitForDelivery ?? false,
   });
 }
@@ -1520,12 +1525,17 @@ export async function notifyUserBookingSubmitted(params: NotifyUserBookingParams
   if (dedup.isDuplicate) return null;
 
   const title = params.publicationTitle?.trim() || "событие";
+  const bookingReference = await prisma.bookingRequest.findUnique({
+    where: { id: params.bookingId },
+    select: { requestNumber: true },
+  });
+  const referenceLabel = bookingReference ? `№ ${bookingReference.requestNumber} ` : "";
   return createNotification({
     userId: params.userId,
     audience: "USER",
     type: "BOOKING_SUBMITTED",
     title: "Заявка получена",
-    body: `Заявка на «${title}» получена и ожидает подтверждения организатора.`,
+    body: `Заявка ${referenceLabel}на «${title}» получена и ожидает подтверждения организатора.`,
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Мои записи",

@@ -126,7 +126,19 @@ export function businessBookingDeliveryProjection<T extends {
   };
   const message = safe[notice.type];
   if (!message) return notice;
+  // A numeric public reference is not PII; preserve it without exposing
+  // historic or current potentially sensitive template payloads.
+  const numberValue = meta && typeof meta === "object" && !Array.isArray(meta) &&
+    "requestNumber" in meta ? meta.requestNumber : null;
+  const number = typeof numberValue === "number" && Number.isSafeInteger(numberValue) &&
+    numberValue > 0 ? numberValue : null;
+  const reference = notice.type === "BOOKING_CREATED" && number !== null ? ` № ${number}` : "";
   // There is deliberately no legacy metadata.templatePayload here:
   // it may include customerName, childName and other free-form personal data.
-  return { ...notice, title: message.title, body: message.body, metadata: null };
+  return {
+    ...notice,
+    title: `${message.title}${reference}`,
+    body: message.body,
+    metadata: null,
+  };
 }
