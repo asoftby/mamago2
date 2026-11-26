@@ -26,6 +26,7 @@ export interface AdminOrderActivitySummary {
 
 export interface AdminOrderItem {
   id: string;
+  requestNumber: number;
   createdAt: string;
   updatedAt: string;
   status: BookingStatus;
@@ -209,8 +210,11 @@ function buildOrdersWhere(filters: Omit<AdminOrdersFilters, "page" | "limit" | "
 
   const trimmedSearch = filters.search?.trim();
   if (trimmedSearch) {
+    const numericReference = /^\d{1,9}$/.test(trimmedSearch) ? Number(trimmedSearch) : null;
     and.push({
       OR: [
+        ...(numericReference !== null ? [{ requestNumber: numericReference }] : []),
+        { id: trimmedSearch },
         { customerName: { contains: trimmedSearch, mode: "insensitive" } },
         { customerPhone: { contains: trimmedSearch, mode: "insensitive" } },
         { customerEmail: { contains: trimmedSearch, mode: "insensitive" } },
@@ -242,6 +246,7 @@ function mapAdminOrder(
 
   return {
     id: booking.id,
+    requestNumber: booking.requestNumber,
     createdAt: booking.createdAt.toISOString(),
     updatedAt: booking.updatedAt.toISOString(),
     status: booking.status,
@@ -291,6 +296,7 @@ function fetchAdminOrdersRows(args: {
     take: args.take,
     select: {
       id: true,
+      requestNumber: true,
       activityId: true,
       offerId: true,
       placeId: true,
