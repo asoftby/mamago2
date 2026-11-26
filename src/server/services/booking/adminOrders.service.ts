@@ -416,14 +416,107 @@ export async function getAdminOrders(
   };
 }
 
+/**
+ * Private admin-only order detail. Do not add these contacts, delivery states,
+ * or message snippets to the paginated order list or public booking responses.
+ */
 export async function getAdminOrderById(id: string) {
-  const [rows, financials] = await Promise.all([
+  const [rows, financials, context, notifications] = await Promise.all([
     fetchAdminOrdersRows({ where: { id }, take: 1 }),
     getOrderFinancials(id),
+    prisma.bookingRequest.findUnique({
+      where: { id },
+      select: {
+        userId: true,
+        responseDueAt: true,
+        business: {
+          select: {
+            id: true, name: true, phone: true, legalName: true,
+            contactPhoneVerifiedAt: true,
+            owner: {
+              select: {
+                displayName: true, email: true,
+                businessContactVerifiedPhoneE164: true,
+                businessContactPhoneVerifiedAt: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.notification.findMany({
+      where: {
+        audience: "BUSINESS",
+        type: "BOOKING_CREATED",
+        entityType: "BOOKING",
+        entityId: id,
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true, createdAt: true,
+        user: { select: { email: true } },
+        deliveries: {
+          where: { channel: "TELEGRAM" },
+          select: { status: true, attemptCount: true, sentAt: true, updatedAt: true },
+        },
+      },
+    }),
   ]);
 
   const booking = rows[0];
-  if (!booking) return null;
+  if (!booking || !context) return null;
 
-  return { ...mapAdminOrder(booking), financials };
+  // A booking-linked thread and other conversations of the same customer with
+  // the same business all belong to the unified Direct communications system.
+  const threads = context.userId ? await prisma.directThread.findMany({
+    where: { businessId: context.business.id, customerUserId: context.userId },
+    orderBy: { lastMessageAt: "desc" },
+    take: 10,
+    select: {
+      id: true, threadNumber: true, status: true, bookingRequestId: true,
+      lastMessageAt: true,
+      messages: {
+        orderBy: { createdAt: "desc" }, take: 3,
+        select: { id: true, senderType: true, body: true, hiddenAt: true, createdAt: true },
+      },
+    },
+  }) : [];
+
+  return {
+    ...mapAdminOrder(booking),
+    financials,
+    responseDueAt: context.responseDueAt?.toISOString() ?? null,
+    businessContact: {
+      name: context.business.name,
+      legalName: context.business.legalName,
+      phone: context.business.phone,
+      phoneVerified: context.business.contactPhoneVerifiedAt !== null,
+      ownerName: context.business.owner.displayName,
+      ownerEmail: context.business.owner.email,
+      verifiedContactPhone: context.business.owner.businessContactPhoneVerifiedAt
+        ? context.business.owner.businessContactVerifiedPhoneE164 : null,
+    },
+    telegramDeliveries: notifications.map((notification) => ({
+      notificationId: notification.id,
+      recipientEmail: notification.user.email,
+      createdAt: notification.createdAt.toISOString(),
+      status: notification.deliveries[0]?.status ?? "NOT_CREATED",
+      attemptCount: notification.deliveries[0]?.attemptCount ?? 0,
+      sentAt: notification.deliveries[0]?.sentAt?.toISOString() ?? null,
+      updatedAt: notification.deliveries[0]?.updatedAt?.toISOString() ?? null,
+    })),
+    directConversations: threads.map((thread) => ({
+      id: thread.id,
+      threadNumber: thread.threadNumber,
+      status: thread.status,
+      linkedToOrder: thread.bookingRequestId === id,
+      lastMessageAt: thread.lastMessageAt.toISOString(),
+      messages: [...thread.messages].reverse().map((message) => ({
+        id: message.id,
+        senderType: message.senderType,
+        body: message.hiddenAt ? "Сообщение скрыто модератором" : message.body,
+        createdAt: message.createdAt.toISOString(),
+      })),
+    })),
+  };
 }
