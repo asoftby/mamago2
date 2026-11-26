@@ -1,0 +1,171 @@
+name: Build isolated mamaGo DEV UAT image
+on:
+  push:
+    branches:
+      - codex/uat-image-20261126-37dc217faf28
+    paths:
+      - .github/workflows/uat-image-20261126-p2.yml
+
+concurrency:
+  group: uat-20261126-37dc217faf28
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
+jobs:
+  build-smoke-publish:
+    if: github.repository == 'asoftby/mamago2' && github.ref == 'refs/heads/codex/uat-image-20261126-37dc217faf28'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      SOURCE_SHA: 37dc217faf28e20d09ba2689e43243d5eb78019a
+      BUILD_ID: uat-20261126-37dc217faf28
+      CANDIDATE_IMAGE: ghcr.io/asoftby/mamago2:uat-20261126-37dc217faf28
+    steps:
+      - name: Verify runner memory and platform
+        shell: bash
+        run: |
+          free -h
+          df -h .
+          test "$(uname -m)" = x86_64
+          awk '/^MemTotal:/ { print "MemTotal KiB=" $2; exit ($2 < 14680064) }' /proc/meminfo
+
+      - name: Check out verified application SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 37dc217faf28e20d09ba2689e43243d5eb78019a
+          persist-credentials: false
+
+      - name: Build exact SHA using the production Dockerfile
+        shell: bash
+        env:
+          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+          NEXT_PUBLIC_GOOGLE_MAP_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAP_ID }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain)"
+          docker buildx build --load --platform linux/amd64 --progress plain \
+            --tag "$CANDIDATE_IMAGE" \
+            --label "org.opencontainers.image.revision=$SOURCE_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/asoftby/mamago2" \
+            --build-arg "GIT_COMMIT_SHA=$SOURCE_SHA" --build-arg "BUILD_ID=$BUILD_ID" \
+            --build-arg REDIRECT_MANIFEST_MIN_ROWS=850 \
+            --build-arg NEXT_PUBLIC_GOOGLE_MAPS_API_KEY \
+            --build-arg NEXT_PUBLIC_GOOGLE_MAP_ID \
+            --metadata-file "$RUNNER_TEMP/uat-build-metadata.json" .
+          test "$(docker image inspect "$CANDIDATE_IMAGE" --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
+
+      - name: Run app and worker on an isolated PostgreSQL network
+        shell: bash
+        run: |
+          docker pull postgres:16
+          docker network create --internal candidate-smoke
+          docker run -d --name candidate-db --network candidate-smoke \
+            -e POSTGRES_USER=uat -e POSTGRES_PASSWORD=synthetic_only -e POSTGRES_DB=uat postgres:16
+          for i in {1..30}; do
+            if docker exec candidate-db pg_isready -h 127.0.0.1 -U uat -d uat; then break; fi
+            sleep 2
+          done
+          docker exec candidate-db pg_isready -h 127.0.0.1 -U uat -d uat
+          db_url=postgresql://uat:synthetic_only@candidate-db:5432/uat
+          docker run --rm --network candidate-smoke -e DATABASE_URL="$db_url" \
+            --entrypoint node "$CANDIDATE_IMAGE" node_modules/prisma/build/index.js migrate deploy
+          docker run -d --name candidate-web --network candidate-smoke \
+            -e DATABASE_URL="$db_url" -e APP_ENV=test -e HOSTNAME=0.0.0.0 "$CANDIDATE_IMAGE"
+          for i in {1..30}; do
+            if docker exec candidate-web curl -fsS http://127.0.0.1:3000/api/health > "$RUNNER_TEMP/uat-health.json"; then break; fi
+            sleep 2
+          done
+          jq -e --arg sha "$SOURCE_SHA" --arg build "$BUILD_ID" \
+            '.status == "ok" and .db == "ok" and .gitSha == $sha and .buildId == $build' "$RUNNER_TEMP/uat-health.json"
+          cat "$RUNNER_TEMP/uat-health.json"
+          docker run -d --name candidate-worker --network candidate-smoke \
+            -e DATABASE_URL="$db_url" -e APP_ENV=test \
+            -e OPS_HEALTHCHECK_URL=http://candidate-web:3000/api/health \
+            --entrypoint node "$CANDIDATE_IMAGE" dist/worker/index.js
+          for i in {1..20}; do
+            if docker logs candidate-worker 2>&1 | grep -F '[worker] started'; then break; fi
+            sleep 2
+          done
+          test "$(docker inspect candidate-worker --format '{{.State.Running}}')" = true
+          docker logs candidate-worker > "$RUNNER_TEMP/uat-worker.log" 2>&1
+          grep -F '[worker] started' "$RUNNER_TEMP/uat-worker.log"
+
+      - name: Require successful CI on the exact application SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..20}; do
+            result="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SOURCE_SHA&event=pull_request&per_page=5" \
+              --jq '.workflow_runs[0] // {} | [.status // "pending", .conclusion // "-", .html_url // "-"] | @tsv')" || result="pending"
+            read -r status conclusion run_url <<< "$result"
+            if [[ "$status" == completed ]]; then
+              echo "CI on $SOURCE_SHA: $conclusion $run_url"
+              test "$conclusion" = success
+              exit
+            fi
+            sleep 45
+          done
+          echo "::error::No successful CI on the verified source SHA within the publication window."
+          exit 1
+
+      - name: Publish only the verified UAT tag and confirm registry digest
+        shell: bash
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          if docker manifest inspect "$CANDIDATE_IMAGE" > "$RUNNER_TEMP/uat-registry-check.log" 2>&1; then
+            echo "::error::UAT tag already exists. Refusing to overwrite it."
+            exit 1
+          fi
+          grep -Eqi 'manifest unknown|no such manifest' "$RUNNER_TEMP/uat-registry-check.log" || {
+            cat "$RUNNER_TEMP/uat-registry-check.log"
+            exit 1
+          }
+          docker push "$CANDIDATE_IMAGE" | tee "$RUNNER_TEMP/uat-push.log"
+          digest="$(sed -nE 's/.*digest: (sha256:[[:xdigit:]]{64}) .*/\1/p' "$RUNNER_TEMP/uat-push.log" | tail -1)"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          published_digest="$(docker buildx imagetools inspect "$CANDIDATE_IMAGE" --format '{{.Manifest.Digest}}')"
+          test "$digest" = "$published_digest"
+          local_id="$(docker image inspect "$CANDIDATE_IMAGE" --format '{{.Id}}')"
+          immutable_image="${CANDIDATE_IMAGE%:*}@$digest"
+          docker pull --platform linux/amd64 "$immutable_image"
+          test "$local_id" = "$(docker image inspect "$immutable_image" --format '{{.Id}}')"
+          {
+            printf 'Source SHA: %s\n\n' "$SOURCE_SHA"
+            printf 'Build ID: %s\n\n' "$BUILD_ID"
+            printf 'Tag: %s\n\n' "$CANDIDATE_IMAGE"
+            printf 'Immutable image: %s\n\n' "$immutable_image"
+            printf 'Platform: linux/amd64\n\nApp health, worker startup, and registry image identity: PASS\n'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Save smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: uat-20261126-37dc217faf28-evidence
+          path: |
+            ${{ runner.temp }}/uat-build-metadata.json
+            ${{ runner.temp }}/uat-health.json
+            ${{ runner.temp }}/uat-worker.log
+            ${{ runner.temp }}/uat-push.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Show errors and clean up isolated containers
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ job.status }}" != success ]; then
+            for container in candidate-web candidate-worker; do
+              docker logs --tail 60 "$container" 2>&1 || true
+            done
+          fi
+          docker rm -f candidate-web candidate-worker candidate-db 2>/dev/null || true
+          docker network rm candidate-smoke 2>/dev/null || true
+          docker logout ghcr.io 2>/dev/null || true
