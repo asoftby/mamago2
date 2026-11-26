@@ -104,8 +104,8 @@ function buildSlotErrors(slot: ScheduleSlot): SlotErrors {
   if (slot.startTime && slot.endTime && slot.endTime <= slot.startTime) {
     errors.endTime = "Окончание должно быть позже начала";
   }
-  if (slot.capacity == null || slot.capacity <= 0) {
-    errors.capacity = "Введите число больше 0";
+  if (slot.capacity == null || !Number.isSafeInteger(slot.capacity) || slot.capacity <= 0) {
+    errors.capacity = "Укажите вместимость (целое число от 1)";
   }
   return errors;
 }
