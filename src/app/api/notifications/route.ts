@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import { getCurrentUser } from "@/lib/auth/server";
+import { reconcileRecentAdminBookingAlerts } from "@/server/services/booking/adminBookingAlerts.service";
 import { shouldShowTelegramPrompt } from "@/lib/user/shouldShowTelegramPrompt";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
@@ -44,6 +45,13 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Idempotently surface recent pending bookings missed before this feature.
+    if (user.role === "ADMIN") {
+      await reconcileRecentAdminBookingAlerts(user.id).catch((error) => {
+        console.error("[admin-booking-alerts] feed reconciliation failed", error);
+      });
     }
 
     const telegramStatus = await getTelegramLinkStatus({ userId: user.id });
