@@ -74,7 +74,7 @@ function buildEventTimeSlots(
       id: slot.id,
       startTime: slot.startTime,
       endTime: slot.endTime ?? slot.startTime,
-      capacity: slot.capacity ?? 1,
+      capacity: slot.capacity ?? null,
     };
 
     if (existing) {
@@ -371,7 +371,7 @@ export function Step5PricingParticipation({
           }}
           disabled={!isEditable}
           onChange={handleCtaStepChange}
-          calendarFooter={seatModeFields}
+          calendarSettings={seatModeFields}
         />
       ) : (
         <PublicationAccessEditor
@@ -380,7 +380,7 @@ export function Step5PricingParticipation({
           onChange={(value) => onChange(buildEventAccessPatch(value))}
           allowedMethods={["details", "ticket", "timeslots", "prebooking", "request"]}
           timeSlotSuggestions={timeSlotSuggestions}
-          timeSlotsFooter={seatModeFields}
+          timeSlotSettings={seatModeFields}
           disabled={!isEditable}
         />
       )}

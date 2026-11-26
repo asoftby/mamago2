@@ -27,7 +27,7 @@ export type PublicationAccessEditorProps = {
   /** Default dates/times for the time-slot editor (e.g. from the event schedule). */
   timeSlotSuggestions?: TimeSlotSuggestions;
   /** Event-only occupancy controls rendered within the selected timeslots card. */
-  timeSlotsFooter?: ReactNode;
+  timeSlotSettings?: ReactNode;
 };
 
 export function PublicationAccessEditor({
@@ -38,7 +38,7 @@ export function PublicationAccessEditor({
   disabled,
   showPreview = true,
   timeSlotSuggestions,
-  timeSlotsFooter,
+  timeSlotSettings,
 }: PublicationAccessEditorProps) {
   const labels = PUBLICATION_ACCESS_LABELS[entityType];
   const methods = allowedMethods ?? DEFAULT_ACCESS_METHODS_BY_ENTITY[entityType];
@@ -193,16 +193,19 @@ export function PublicationAccessEditor({
                 </div>
               ) : null}
 
+              {method === "timeslots" ? timeSlotSettings : null}
               {config.supportsTimeSlots ? (
-                <TimeSlotEditor
-                  entityType={entityType}
-                  value={value.timeSlots ?? []}
-                  onChange={(timeSlots) => update({ timeSlots })}
-                  suggestions={timeSlotSuggestions}
-                  disabled={disabled}
-                />
+                <>
+                  {timeSlotSettings}
+                  <TimeSlotEditor
+                    entityType={entityType}
+                    value={value.timeSlots ?? []}
+                    onChange={(timeSlots) => update({ timeSlots })}
+                    suggestions={timeSlotSuggestions}
+                    disabled={disabled}
+                  />
+                </>
               ) : null}
-              {method === "timeslots" ? timeSlotsFooter : null}
 
               {method !== "details" ? (
                 <div className="space-y-2">

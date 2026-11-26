@@ -189,11 +189,7 @@ jobs:
       - name: Event wizard occasion hydration regressions
         run: |
           pnpm test:event-wizard-update-loop
-          pnpm exec tsx src/lib/booking/eventSeatPolicy.test.ts
-          pnpm exec tsx src/lib/business/eventCalendarSummary.test.ts
-          pnpm exec tsx src/lib/business/eventRosterScope.test.ts
-          pnpm exec tsx src/lib/booking/bookingParticipants.test.ts
-          NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/booking/eventSlotAvailability.test.ts
+          pnpm test:event-seat-policy
           pnpm exec tsx src/components/business/wizard/event/steps/organizer/organizerSelection.contract.test.ts
           pnpm exec tsx src/components/business/wizard/event/steps/Step1Basics.interests.contract.test.ts
           pnpm exec tsx src/components/business/wizard/event/nativePrebooking.validation.test.ts

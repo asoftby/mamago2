@@ -168,7 +168,7 @@ export interface EventFormData {
         id: string;
         startTime: string;
         endTime: string;
-        capacity: number;
+        capacity: number | null;
       }>;
     }>;
   };

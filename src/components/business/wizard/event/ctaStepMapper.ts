@@ -133,7 +133,7 @@ function buildEventTimeSlotsFromPublicationAccess(
       id: slot.id,
       startTime: slot.startTime,
       endTime: slot.endTime ?? slot.startTime,
-      capacity: slot.capacity ?? 1,
+      capacity: slot.capacity ?? null,
     };
 
     if (existing) {
@@ -174,14 +174,14 @@ function buildLegacyTimeSlotsFromCtaStep(
                 id: slot.id,
                 startTime: trim(slot.startTime),
                 endTime: trim(slot.endTime) || trim(slot.startTime),
-                capacity: slot.capacity ?? 1,
+                capacity: slot.capacity ?? null,
               }))
         : [
               {
                 id: `${day.id}-date-only`,
                 startTime: "",
                 endTime: "",
-                capacity: day.capacity ?? 1,
+                capacity: day.capacity ?? null,
               },
             ];
 

@@ -26,7 +26,7 @@ type CtaStepProps = {
   disabled?: boolean;
   onChange: (value: CtaStepFormValue) => void;
   /** Event-only occupancy controls rendered inside the selected calendar booking. */
-  calendarFooter?: ReactNode;
+  calendarSettings?: ReactNode;
 };
 
 function patchValue(
@@ -42,7 +42,7 @@ export function CtaStep({
   source,
   disabled,
   onChange,
-  calendarFooter,
+  calendarSettings,
 }: CtaStepProps) {
   const derived = useMemo(
     () => deriveCtaStepState(source, value),
@@ -133,20 +133,22 @@ export function CtaStep({
                     ]}
                   />
 
+                  {requestSettings}
+
                   {value.requestMode === "CALENDAR" ? (
                     <>
-                    <CtaCalendarEditor
-                      days={value.calendarDays}
-                      mode={value.calendarMode ?? "DATE_ONLY"}
-                      disabled={disabled}
-                      onModeChange={(calendarMode) =>
-                        patchValue(value, onChange, { calendarMode })
-                      }
-                      onChange={(calendarDays) =>
-                        patchValue(value, onChange, { calendarDays })
-                      }
-                    />
-                    {calendarFooter}
+                      {calendarSettings}
+                      <CtaCalendarEditor
+                        days={value.calendarDays}
+                        mode={value.calendarMode ?? "DATE_ONLY"}
+                        disabled={disabled}
+                        onModeChange={(calendarMode) =>
+                          patchValue(value, onChange, { calendarMode })
+                        }
+                        onChange={(calendarDays) =>
+                          patchValue(value, onChange, { calendarDays })
+                        }
+                      />
                     </>
                   ) : null}
                 </section>

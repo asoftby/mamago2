@@ -33,6 +33,7 @@ import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLa
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import { evaluateEventStepNavigation, formatEventStepNavigationIssues } from "./navigation";
+import { getEventBookingCapacityIssues } from "./eventBookingCapacityValidation";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
@@ -703,6 +704,19 @@ function EventWizardInner({
       };
     }
 
+    // Drafts may remain incomplete. An already active event cannot silently
+    // lose its booking action when a changed slot has no capacity.
+    if (event && EVENT_SUBMITTED_OR_LIVE_STATUSES.has(event.status)) {
+      const capacityIssues = getEventBookingCapacityIssues(formData);
+      if (capacityIssues.length > 0) {
+        return {
+          ok: false,
+          reason: "validation",
+          message: capacityIssues[0],
+        };
+      }
+    }
+
     const payload = buildDraftPersistPayload(formData, mode, baselineFormDataRef.current);
     const tid = eventId ?? (mode === "edit" && event ? event.id : null);
 
@@ -996,7 +1010,7 @@ function EventWizardInner({
     const validation = validateForSubmit(formData, validationContext);
     if (!validation.isValid) {
       setSubmitStatus("error");
-      toast.error("Заполните все обязательные поля");
+      toast.error(validation.errors.find((error) => error.includes("вместимость")) ?? "Заполните все обязательные поля");
       return;
     }
 
@@ -1089,7 +1103,7 @@ function EventWizardInner({
 
     if (!validation.isValid) {
       setSubmitStatus("error");
-      toast.error("Заполните все обязательные поля");
+      toast.error(validation.errors.find((error) => error.includes("вместимость")) ?? "Заполните все обязательные поля");
       console.error("Validation errors:", validation.errors);
       return;
     }
