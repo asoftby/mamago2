@@ -3,6 +3,12 @@
 import { Eye, Heart, MousePointerClick, Zap } from "lucide-react";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { BoostLauncher } from "@/components/business/promotion/BoostLauncher";
+import { cn } from "@/lib/utils";
+import {
+  BUSINESS_PUBLICATION_ACTION_BUTTON,
+  BUSINESS_PUBLICATION_ACTION_PROMOTE,
+} from "@/components/business/shared/BusinessPublicationCard";
+import { PublicationBoostActiveButton } from "@/components/business/shared/PublicationBoostActiveUi";
 import type { DashboardData } from "./DashboardClient";
 
 type Props = {
@@ -85,14 +91,26 @@ export function DailyFreeBoostCard({ data, initialTarget }: Props) {
         </div>
       )}
 
-      <BoostLauncher
-        target={target}
-        disabled={disabled}
-        cooldownUntil={selectedCandidate?.activeFreeBoostUntil ?? null}
-        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-semibold text-stone-800 transition hover:bg-stone-100"
-      >
-        Продвигать
-      </BoostLauncher>
+      {data.boost ? (
+        <PublicationBoostActiveButton
+          endsAt={data.boost.endAt}
+          className="w-full sm:w-full"
+        />
+      ) : (
+        <BoostLauncher
+          target={target}
+          disabled={disabled}
+          cooldownUntil={selectedCandidate?.activeFreeBoostUntil ?? null}
+          className={cn(
+            BUSINESS_PUBLICATION_ACTION_BUTTON,
+            BUSINESS_PUBLICATION_ACTION_PROMOTE,
+            "w-full sm:w-full",
+          )}
+        >
+          <Zap className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Продвигать
+        </BoostLauncher>
+      )}
       {data.candidates.length > 0 && (
         <p className="text-xs text-stone-500">
           Доступно для Boost: {eligibleCount} из {data.candidates.length}.
