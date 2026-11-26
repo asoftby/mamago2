@@ -1699,13 +1699,13 @@ export function BookingDetailsDrawer({
       }}
     >
       <SheetContent
-        side={isDesktop ? "right" : "bottom"}
+        side="right"
         overlayClassName="bg-black/20 backdrop-blur-sm"
         className={cn(
           "gap-0 overflow-hidden border-0 bg-white p-0",
           isDesktop
             ? "inset-y-3 right-3 h-auto w-[calc(100%-1.5rem)] sm:max-w-[580px] rounded-[28px] shadow-[0_24px_70px_rgba(15,23,42,0.18)]"
-            : "max-h-[92dvh] w-full rounded-t-[28px]",
+            : "h-dvh w-full !max-w-full rounded-none",
           "data-[state=open]:duration-300 data-[state=closed]:duration-200",
         )}
         showCloseButton={false}
