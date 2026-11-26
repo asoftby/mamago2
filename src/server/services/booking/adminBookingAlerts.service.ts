@@ -23,7 +23,7 @@ async function ensureAdminBookingAlert(adminUserId: string, input: AdminBookingA
   // reconciliation simultaneously. Serialize exact user+booking pairs.
   return prisma.$transaction(async (tx) => {
     const lockKey = `admin-booking-alert:${adminUserId}:${input.bookingId}`;
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+    await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
     const existing = await tx.notification.findFirst({
       where: {
         userId: adminUserId,
