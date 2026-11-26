@@ -33,6 +33,7 @@ import {
   type BookingChildInput,
   type ResolvedParticipants,
   type StoredBookingChild,
+  parseStoredChildren,
 } from "@/lib/booking/bookingParticipants";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import {
@@ -77,6 +78,8 @@ export interface CreateCampShiftBookingInput {
 }
 
 export interface CreatePublicBookingInput {
+  /** Internal consent workflow only; never trust it without transactional ownership checks. */
+  reofferId?: string;
   publicationType: PublicationType;
   publicationId: string;
   selectedSessionId?: string | null;
@@ -732,6 +735,10 @@ async function createPublicationBooking(
     throw new BookingValidationError("planItemId", "Запись плана недоступна");
   }
 
+  if (input.reofferId && (manual || input.publicationType !== PublicationType.EVENT || !input.userId)) {
+    throw new BookingValidationError("reofferId", "Повторное предложение недоступно");
+  }
+
   if (input.selectedSessionId && input.publicationType !== PublicationType.EVENT) {
     throw new BookingValidationError(
       "selectedSessionId",
@@ -763,6 +770,29 @@ async function createPublicationBooking(
       });
 
       if (!activity) throw new BookingNotFoundError("Событие недоступно для записи");
+      // The event is locked first; reoffer is locked second. This preserves the
+      // same lock order as capacity changes and makes consent+creation atomic.
+      if (input.reofferId) {
+        await tx.$queryRaw`SELECT "id" FROM "BookingReoffer" WHERE "id" = ${input.reofferId} FOR UPDATE`;
+        const invitation = await tx.bookingReoffer.findUnique({
+          where: { id: input.reofferId },
+          include: { originalBooking: true },
+        });
+        const original = invitation?.originalBooking;
+        if (!invitation || !original || invitation.status !== "OFFERED" ||
+            invitation.expiresAt <= new Date() || invitation.customerUserId !== input.userId ||
+            invitation.activityId !== activity.id || invitation.businessId !== activity.businessId ||
+            original.status !== BookingStatus.REJECTED || original.userId !== input.userId ||
+            original.businessId !== activity.businessId || original.activityId !== activity.id ||
+            original.customerName !== customerName || original.customerPhone !== customerPhone ||
+            original.adultsCount !== adultsCount || original.childrenCount !== childrenCount ||
+            original.selectedSessionId !== (input.selectedSessionId ?? null) ||
+            (original.requestedDate?.toISOString().slice(0, 10) ?? null) !== (requestedDate?.toISOString().slice(0, 10) ?? null) ||
+            (original.requestedTime ?? null) !== (requestedTime ?? null)) {
+          throw new BookingValidationError("reofferId", "Предложение истекло или недоступно");
+        }
+        participantChildren = parseStoredChildren(original.participantChildren);
+      }
       if (!activity.bookingEnabled || !activity.businessId) {
         throw new BookingValidationError("publicationId", "Запись недоступна для этого события");
       }
@@ -855,6 +885,16 @@ async function createPublicationBooking(
         throw new BookingValidationError("customerPhone", "Заявка на эту запись уже существует");
       }
       const seatPolicy = getEventSeatPolicy(activity.scheduleJson);
+      // Reoffers promise an existing, measurable event slot. The ordinary
+      // command also supports unlimited/undated enquiries, so constrain this
+      // consent path using the configuration already read under Activity lock.
+      if (input.reofferId && (
+        (activity.bookingMode !== BookingMode.USE_PUBLICATION_DATES && activity.bookingMode !== BookingMode.USE_PUBLICATION_SLOTS) ||
+        (capacity == null && seatPolicy.mode !== "SEPARATE")
+      )) {
+        throw new BookingValidationError("reofferId", "Для повторной записи больше нельзя проверить свободное место");
+      }
+
       if (capacity !== undefined || seatPolicy.mode === "SEPARATE") {
         const { _sum } = await tx.bookingRequest.aggregate({
           where: active,
@@ -907,6 +947,12 @@ async function createPublicationBooking(
         status,
         ...source,
       }, tx, manual?.actorId);
+      if (input.reofferId) {
+        await tx.bookingReoffer.update({
+          where: { id: input.reofferId },
+          data: { status: "ACCEPTED", acceptedAt: new Date(), newBookingId: result.bookingId },
+        });
+      }
       return { activity: { ...activity, businessId: activity.businessId }, result, linkedPlanItemId };
     }
     const { activity, result, linkedPlanItemId } = manual ? await createEvent(manual.tx) : await prisma.$transaction(createEvent);
