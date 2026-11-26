@@ -95,13 +95,13 @@ export function SupportInbox({ businessId, staff = false, initialThreadId, embed
 
   const active = threads.find(t => t.id === selected);
   return <section className={embedded ? "space-y-5" : "mx-auto max-w-5xl space-y-5 px-4 py-8"}>
-    {!embedded && <header><h1 className="text-2xl font-semibold">Поддержка mamaGo</h1>
+    {!embedded && <header><h1 className="text-2xl font-semibold">Поддержка</h1>
       <p className="mt-1 text-sm text-stone-500">Обращения в поддержку отдельно от переписки с клиентами.</p></header>}
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!staff && businessId && <form className="space-y-3 rounded-xl border p-4" onSubmit={e => { e.preventDefault(); void post("/api/support/threads", { businessId, subject, body: draft }, () => { setSubject(""); setDraft(""); }); }}>
       <h2 className="font-semibold">Новое обращение</h2>
-      <input required minLength={3} maxLength={160} className="w-full rounded-lg border p-3" placeholder="Тема обращения" value={subject} onChange={e => setSubject(e.target.value)}/>
-      <textarea required maxLength={3000} className="w-full rounded-lg border p-3" placeholder="Опишите вопрос" value={draft} onChange={e => setDraft(e.target.value)}/>
+      <input required minLength={3} maxLength={160} className="w-full rounded-lg border bg-white p-3 text-stone-900" placeholder="Тема обращения" value={subject} onChange={e => setSubject(e.target.value)}/>
+      <textarea required maxLength={3000} className="w-full rounded-lg border bg-white p-3 text-stone-900" placeholder="Опишите вопрос" value={draft} onChange={e => setDraft(e.target.value)}/>
       <button disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">Отправить обращение</button>
     </form>}
     <button type="button" onClick={() => { void loadThreads().catch(e => setError(String(e))); if (selected) void loadMessages(selected).catch(e => setError(String(e))); }} className="rounded-lg border px-3 py-2 text-sm">Обновить переписку</button>
@@ -133,7 +133,7 @@ export function SupportInbox({ businessId, staff = false, initialThreadId, embed
               <p className="whitespace-pre-wrap">{m.body}</p>
             </div>)}
           </div>
-          {active.status !== "CLOSED" && <form onSubmit={e => { e.preventDefault(); void post("/api/support/threads/" + encodeURIComponent(active.id) + "/messages", { body: reply }, () => setReply("")); }} className="space-y-2">
+          {active.status !== "CLOSED" && <form onSubmit={e => { e.preventDefault(); void post("/api/support/threads/" + encodeURIComponent(active.id) + "/messages", { body: reply, actor: staff ? "STAFF" : "BUSINESS" }, () => setReply("")); }} className="space-y-2">
             <textarea required maxLength={3000} value={reply} onChange={e => setReply(e.target.value)} className="w-full rounded-lg border p-3" placeholder="Ваш ответ"/>
             <button disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">Отправить ответ</button>
           </form>}
