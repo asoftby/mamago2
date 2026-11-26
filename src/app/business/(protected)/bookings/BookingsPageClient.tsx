@@ -1717,12 +1717,6 @@ export function BookingDetailsDrawer({
         }}
       >
         <SheetTitle className="sr-only">Детали заявки</SheetTitle>
-        {!isDesktop ? (
-          <div className="flex shrink-0 justify-center pt-2.5" aria-hidden="true">
-            <span className="h-1 w-10 rounded-full bg-stone-300" />
-          </div>
-        ) : null}
-
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div
             className={cn(
