@@ -22,7 +22,7 @@ const sharedCalendar = shared.indexOf("<CtaCalendarEditor");
 assert.ok(sharedMethod !== -1 && sharedMethod < sharedSettings && sharedSettings < sharedCalendar);
 
 const legacyMethod = legacy.indexOf("<AccessMethodCard");
-const legacySettings = legacy.indexOf("{timeSlotSettings}");
+const legacySettings = legacy.indexOf('{method === "timeslots" ? timeSlotSettings : null}');
 const legacySlots = legacy.indexOf("<TimeSlotEditor");
 assert.ok(legacyMethod !== -1 && legacyMethod < legacySettings && legacySettings < legacySlots);
 

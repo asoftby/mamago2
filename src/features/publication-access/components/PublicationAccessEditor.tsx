@@ -193,10 +193,9 @@ export function PublicationAccessEditor({
                 </div>
               ) : null}
 
-              {method === "timeslots" ? timeSlotSettings : null}
               {config.supportsTimeSlots ? (
                 <>
-                  {timeSlotSettings}
+                  {method === "timeslots" ? timeSlotSettings : null}
                   <TimeSlotEditor
                     entityType={entityType}
                     value={value.timeSlots ?? []}
