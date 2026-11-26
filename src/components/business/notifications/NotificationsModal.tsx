@@ -13,6 +13,7 @@ export type NotificationsModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stream?: "user" | "business";
+  pageHref?: string;
   onNotificationRead?: () => void;
 };
 
@@ -24,6 +25,7 @@ export function NotificationsModal({
   open,
   onOpenChange,
   stream = "user",
+  pageHref,
   onNotificationRead,
 }: NotificationsModalProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -44,6 +46,7 @@ export function NotificationsModal({
         <NotificationsMenuContent
           open={open}
           stream={stream}
+          pageHref={pageHref}
           onNotificationRead={onNotificationRead}
           onClose={() => onOpenChange(false)}
         />
