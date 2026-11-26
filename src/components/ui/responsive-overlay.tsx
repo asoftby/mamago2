@@ -37,6 +37,8 @@ export type ResponsiveOverlayProps = {
   /** Заголовок для скринридеров; при visibleTitle=false остаётся sr-only */
   a11yTitle: string;
   variant?: ResponsiveOverlayVariant;
+  /** Booking/admin work panels can opt into a right-side drawer on every viewport. */
+  placement?: "responsive" | "right";
   /** Показать визуальный заголовок (framed) */
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -68,6 +70,7 @@ export function ResponsiveOverlay({
   onOpenChange,
   a11yTitle,
   variant = "framed",
+  placement = "responsive",
   title,
   subtitle,
   children,
@@ -140,6 +143,31 @@ export function ResponsiveOverlay({
         {footer}
       </div>
     ) : null;
+
+  if (placement === "right") {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          dismissible={dismissible}
+          onInteractOutside={onInteractOutside}
+          showCloseButton={false}
+          className={cn(
+            "h-dvh w-full !max-w-[min(100vw,680px)] gap-0 overflow-hidden border-l border-neutral-200 bg-white p-0",
+            sheetContentClassName,
+            className,
+          )}
+        >
+          <SheetHeader className="sr-only"><SheetTitle>{a11yTitle}</SheetTitle></SheetHeader>
+          {variant === "framed" ? framedHeader : null}
+          <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", bodyClassName)}>
+            {children}
+          </div>
+          {footerEl}
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   if (isDesktop) {
     return (

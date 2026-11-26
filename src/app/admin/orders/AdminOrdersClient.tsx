@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { adminPath } from "@/lib/routing/surface";
+import { AdminOrderDetailsDrawer } from "./AdminOrderDetailsDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,7 +149,9 @@ function getPublicationHref(order: AdminOrderListItem) {
   return null;
 }
 
-export function AdminOrdersClient() {
+export function AdminOrdersClient({ initialOrderId = null }: { initialOrderId?: string | null } = {}) {
+  const router = useRouter();
+  const [openOrderId, setOpenOrderId] = useState<string | null>(initialOrderId);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | BookingStatus>("all");
   const [businessId, setBusinessId] = useState("all");
@@ -487,12 +492,13 @@ export function AdminOrdersClient() {
                           )}
                         </td>
                         <td className="px-4 py-3 align-top text-right">
-                          <Link
-                            href={`/admin/orders/${order.id}`}
+                          <button
+                            type="button"
+                            onClick={() => setOpenOrderId(order.id)}
                             className="text-sm font-medium text-blue-600 hover:text-blue-700"
                           >
                             Открыть детали
-                          </Link>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -552,11 +558,9 @@ export function AdminOrdersClient() {
                     )}
                   </DataCardBody>
                   <DataCardActions>
-                    <Link href={`/admin/orders/${order.id}`} className="w-full">
-                      <Button variant="outline" size="sm" className="w-full">
-                        Открыть детали
-                      </Button>
-                    </Link>
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => setOpenOrderId(order.id)}>
+                      Открыть детали
+                    </Button>
                   </DataCardActions>
                 </DataCard>
               );
@@ -583,6 +587,13 @@ export function AdminOrdersClient() {
           Вперёд
         </Button>
       </div>
+      <AdminOrderDetailsDrawer
+        orderId={openOrderId}
+        onClose={() => {
+          setOpenOrderId(null);
+          if (initialOrderId) router.replace(adminPath("/orders"));
+        }}
+      />
     </div>
   );
 }

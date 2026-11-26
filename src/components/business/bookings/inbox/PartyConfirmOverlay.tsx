@@ -25,6 +25,7 @@ interface Props {
 export function PartyConfirmOverlay({ item, onClose, onDone }: Props) {
   return (
     <ResponsiveOverlay
+      placement="right"
       open={Boolean(item)}
       onOpenChange={(open) => { if (!open) onClose(); }}
       a11yTitle="Подтверждение заказа"

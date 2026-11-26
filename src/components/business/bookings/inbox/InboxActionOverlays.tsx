@@ -38,6 +38,7 @@ const DECLINE_REASONS: Array<{ value: string; label: string }> = [
 export function PartyReplyOverlay({ item, onClose, onDone }: OverlayProps) {
   return (
     <ResponsiveOverlay
+      placement="right"
       open={Boolean(item)}
       onOpenChange={(open) => { if (!open) onClose(); }}
       a11yTitle="Ответ на заявку на праздник"
@@ -205,6 +206,7 @@ function PartyReplyForm({ item, onClose, onDone }: { item: InboxItem; onClose: (
 export function PartyResolveOverlay({ item, onClose, onDone }: OverlayProps) {
   return (
     <ResponsiveOverlay
+      placement="right"
       open={Boolean(item)}
       onOpenChange={(open) => { if (!open) onClose(); }}
       a11yTitle="Предложение истекло"
@@ -318,6 +320,7 @@ export function VisitOutcomeOverlay({ item, onClose, onDone }: OverlayProps) {
 
   return (
     <ResponsiveOverlay
+      placement="right"
       open={Boolean(item)}
       onOpenChange={(open) => { if (!open) { setError(null); onClose(); } }}
       a11yTitle="Итог визита"

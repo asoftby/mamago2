@@ -20,7 +20,8 @@ assert.match(bookings, /selectedMobileDayRef\.current\?\.scrollIntoView/, "Selec
 assert.match(bookings, /inline:\s*"center"/, "Selected mobile booking day should be centered in the rail");
 assert.match(bookings, /hidden overflow-hidden[^\n]*sm:block/, "The dense seven-column month grid must be tablet/desktop only");
 assert.match(bookings, /min-h-11 shrink-0 snap-start/, "Booking filter rails must keep 44px snap targets");
-assert.match(bookings, /h-\[92dvh\]/, "Booking detail sheet must use dynamic viewport height");
+assert.match(bookings, /side="right"/, "Booking detail sheet must open from the right on every viewport");
+assert.match(bookings, /h-dvh w-full !max-w-full/, "Booking detail drawer must use full dynamic viewport height on mobile");
 assert.match(bookings, /flex flex-col gap-1 md:flex-row-reverse/, "Booking detail actions must stack on phones");
 assert.match(balance, /break-words text-3xl[^\n]*sm:text-5xl/, "Long balance values must wrap and scale on phones");
 assert.match(history, /divide-y divide-stone-100 md:hidden/, "Billing history must use operational cards on phones");
