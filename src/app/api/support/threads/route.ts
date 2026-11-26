@@ -6,7 +6,7 @@ import { notifySupportMessage } from "@/server/support/supportNotifications";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { getBusinessMembership } from "@/server/permissions/business-permissions";
-import { isSupportStaff, requireSupportBusinessAccess, SupportAccessError } from "@/server/support/supportAccess";
+import { isSupportStaff, requireSupportBusinessAccess, requireSupportMessageActor, SupportAccessError } from "@/server/support/supportAccess";
 
 const createInput = z.object({
   businessId: z.string().min(1),
@@ -42,14 +42,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  if (isSupportStaff(user)) return NextResponse.json({ error: "Staff must reply to an existing thread" }, { status: 403 });
   const limit = await checkRateLimit(`support_create:${user.id}`, 5, 60 * 1000);
   if (!limit.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   try {
     const input = createInput.parse(await request.json());
     // Transactional membership guard prevents a deleted membership from being silently accepted.
     const membership = await getBusinessMembership(user.id, input.businessId);
-    if (!membership) throw new SupportAccessError(404, "Business not found");
+    requireSupportMessageActor(user, "BUSINESS", Boolean(membership));
     const requestKey = input.requestKey ?? randomUUID();
     const select = {
       id: true, businessId: true, createdById: true, subject: true, status: true,
