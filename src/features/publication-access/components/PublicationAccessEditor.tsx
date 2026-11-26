@@ -197,11 +197,11 @@ export function PublicationAccessEditor({
                 <>
                   {timeSlotSettings}
                   <TimeSlotEditor
-                  entityType={entityType}
-                  value={value.timeSlots ?? []}
-                  onChange={(timeSlots) => update({ timeSlots })}
-                  suggestions={timeSlotSuggestions}
-                  disabled={disabled}
+                    entityType={entityType}
+                    value={value.timeSlots ?? []}
+                    onChange={(timeSlots) => update({ timeSlots })}
+                    suggestions={timeSlotSuggestions}
+                    disabled={disabled}
                   />
                 </>
               ) : null}
