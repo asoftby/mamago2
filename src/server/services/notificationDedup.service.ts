@@ -48,7 +48,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { NotificationType, type NotificationEntityType } from "@prisma/client";
+import { NotificationType, type NotificationAudience, type NotificationEntityType } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,6 +173,7 @@ export async function checkNotificationDedup(
   type: NotificationType,
   entityType?: NotificationEntityType | null,
   entityId?: string | null,
+  audience?: NotificationAudience,
 ): Promise<DedupCheckResult> {
   const dedupWindow = DEDUP_WINDOWS[type];
 
@@ -191,6 +192,7 @@ export async function checkNotificationDedup(
         type,
         entityType,
         entityId,
+        ...(audience ? { audience } : {}),
         createdAt: { gte: since },
       },
       select: { id: true, createdAt: true },
@@ -216,6 +218,7 @@ export async function checkNotificationDedup(
       type,
       entityType,
       entityId,
+      ...(audience ? { audience } : {}),
     },
     select: { id: true, createdAt: true },
     orderBy: { createdAt: "desc" },
