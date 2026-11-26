@@ -74,7 +74,7 @@ function buildEventTimeSlots(
       id: slot.id,
       startTime: slot.startTime,
       endTime: slot.endTime ?? slot.startTime,
-      capacity: slot.capacity ?? 1,
+      capacity: slot.capacity ?? null,
     };
 
     if (existing) {
