@@ -1010,7 +1010,7 @@ function EventWizardInner({
     const validation = validateForSubmit(formData, validationContext);
     if (!validation.isValid) {
       setSubmitStatus("error");
-      toast.error("Заполните все обязательные поля");
+      toast.error(validation.errors.find((error) => error.includes("вместимость")) ?? "Заполните все обязательные поля");
       return;
     }
 
@@ -1103,7 +1103,7 @@ function EventWizardInner({
 
     if (!validation.isValid) {
       setSubmitStatus("error");
-      toast.error("Заполните все обязательные поля");
+      toast.error(validation.errors.find((error) => error.includes("вместимость")) ?? "Заполните все обязательные поля");
       console.error("Validation errors:", validation.errors);
       return;
     }
