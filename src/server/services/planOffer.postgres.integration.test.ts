@@ -25,17 +25,24 @@ async function main() {
     ],
   });
 
+  // Eligible first-PROD offer fixtures need a published parent Place and
+  // PLACE_VISIT type. Keep draft exclusion and plan ACL assertions unchanged.
+  const place = await prisma.place.create({
+    data: { title: "Offer plan integration place", shortDesc: "Isolated place fixture",
+      status: "PUBLISHED", createdByUserId: owner.id },
+  });
   const sharedOffer = await prisma.offer.create({
-    data: { title: "Семейный мастер-класс", kind: "SERVICE", status: "PUBLISHED", coverImage: "https://example.com/photo.jpg" },
+    data: { title: "Семейный мастер-класс", kind: "SERVICE", productType: "PLACE_VISIT",
+      placeId: place.id, status: "PUBLISHED", coverImage: "https://example.com/photo.jpg" },
   });
   const privateOffer = await prisma.offer.create({
-    data: { title: "Персональное занятие", kind: "SERVICE", status: "PUBLISHED" },
+    data: { title: "Персональное занятие", kind: "SERVICE", productType: "PLACE_VISIT", placeId: place.id, status: "PUBLISHED" },
   });
   const duplicateOffer = await prisma.offer.create({
-    data: { title: "Параллельное сохранение", kind: "SERVICE", status: "PUBLISHED" },
+    data: { title: "Параллельное сохранение", kind: "SERVICE", productType: "PLACE_VISIT", placeId: place.id, status: "PUBLISHED" },
   });
   const draftOffer = await prisma.offer.create({
-    data: { title: "Черновик", kind: "SERVICE", status: "DRAFT" },
+    data: { title: "Черновик", kind: "SERVICE", productType: "PLACE_VISIT", placeId: place.id, status: "DRAFT" },
   });
 
   const first = await addOfferPlanItem(owner.id, sharedOffer.id, "2026-11-02");
