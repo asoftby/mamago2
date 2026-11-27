@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -9,6 +10,8 @@ const bodySchema = z.object({ version: z.number().int().min(0) }).strict();
 
 /** Parent cancels a party while no performer has confirmed anything (#818 D1). */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });

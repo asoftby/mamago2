@@ -1,3 +1,4 @@
+import { isOfferPublicInRelease } from "@/lib/release/publicReleaseScope";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
@@ -38,12 +39,13 @@ export async function POST(request: NextRequest, { params }: {
       bookingEnabled: true, bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] } },
     select: {
       id: true, currency: true, priceItems: true,
+      productType: true, campProgramType: true,
       place: { select: { ownerBusinessId: true } },
       classGroups: { include: { tariffs: true } },
       offerBooking: { select: { basePriceByn: true, options: true, durationMin: true, scheduleKind: true, maxExtensionHours: true, extensionHourPriceByn: true, extensionDiscountPercent: true } },
     },
   });
-  if (!offer?.place?.ownerBusinessId || !offer.offerBooking) {
+  if (!offer?.place?.ownerBusinessId || !offer.offerBooking || !isOfferPublicInRelease(offer)) {
     return NextResponse.json({ error: "Предложение недоступно" }, { status: 404 });
   }
   if (offer.offerBooking.scheduleKind === "ON_REQUEST_WINDOWS") {
@@ -129,7 +131,7 @@ export async function GET(_request: NextRequest, { params }: {
   const offer = await prisma.offer.findFirst({
     where: { id, ...getPublicPublishedOfferWhere(), bookingEnabled: true,
       bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] } },
-    select: { currency: true, place: { select: { ownerBusinessId: true } },
+    select: { currency: true, productType: true, campProgramType: true, place: { select: { ownerBusinessId: true } },
       classGroups: { where: { active: true }, select: { id: true } },
       offerBooking: { select: {
         durationMin: true, maxExtensionHours: true, extensionHourPriceByn: true,
@@ -140,7 +142,7 @@ export async function GET(_request: NextRequest, { params }: {
         } } } },
     },
   });
-  if (!offer?.place?.ownerBusinessId || !offer.offerBooking) {
+  if (!offer?.place?.ownerBusinessId || !offer.offerBooking || !isOfferPublicInRelease(offer)) {
     return NextResponse.json({ error: "Предложение недоступно" }, { status: 404 });
   }
   // A group session has capacity seats, not an exclusive resource slot.

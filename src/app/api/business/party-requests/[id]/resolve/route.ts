@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -17,6 +18,8 @@ const schema = z.discriminatedUnion("action", [
   }).strict(),
 ]);
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });

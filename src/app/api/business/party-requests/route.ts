@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
@@ -5,6 +6,8 @@ import { listBusinessPartyRequests } from "@/server/birthday/partyBusiness.servi
 import { privatePartyResponse } from "@/server/birthday/partyRouteResponses";
 
 export async function GET(request: Request) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });

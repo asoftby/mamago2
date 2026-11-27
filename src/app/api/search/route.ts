@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { isOfferSectionPublic } from "@/lib/release/publicReleaseScope";
-import { getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
+import { isOfferPublicInRelease } from "@/lib/release/publicReleaseScope";
 import { swapKeyboardLayout } from "@/lib/search/keyboardLayout";
 import { getPublicActivityDetailWhere, getPublicPublishedPlaceWhere, getPublicPublishedOfferWhere, getPublicPublishedArticleWhere, getPublicRouteIndexWhere } from "@/server/public/publicContentVisibility";
 import prisma from "@/lib/prisma";
@@ -114,7 +113,7 @@ export async function GET(request: Request) {
           await Promise.all([
             tx.activity.findMany({ where: { id: { in: ids("activity") }, ...getPublicActivityDetailWhere() }, select: selectId }),
             tx.place.findMany({ where: { id: { in: ids("place") }, ...getPublicPublishedPlaceWhere() }, select: selectId }),
-            tx.offer.findMany({ where: { id: { in: ids("offer") }, ...getPublicPublishedOfferWhere() }, select: { id: true, kind: true, campProgramType: true } }),
+            tx.offer.findMany({ where: { id: { in: ids("offer") }, ...getPublicPublishedOfferWhere() }, select: { id: true, productType: true, campProgramType: true } }),
             tx.article.findMany({ where: { id: { in: ids("article") }, slug: { not: null }, ...getPublicPublishedArticleWhere() }, select: selectId }),
             tx.route.findMany({ where: { id: { in: ids("route") }, ...getPublicRouteIndexWhere() }, select: selectId }),
           ]);
@@ -123,7 +122,7 @@ export async function GET(request: Request) {
           ...activities.map(x => `activity:${x.id}`),
           ...places.map(x => `place:${x.id}`),
           // AUDIT-XR-19: class/party offers outside the release scope are not searchable.
-          ...offers.filter(x => isOfferSectionPublic(getOfferPublicSection(x))).map(x => `offer:${x.id}`),
+          ...offers.filter(x => isOfferPublicInRelease(x)).map(x => `offer:${x.id}`),
           ...articles.map(x => `article:${x.id}`),
           ...routes.map(x => `route:${x.id}`),
         ]);

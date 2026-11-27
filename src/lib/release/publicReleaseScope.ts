@@ -62,13 +62,29 @@ export function releaseScopeNotFoundHtml(): string {
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Страница не найдена — mamaGo</title></head><body><main style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem"><h1>Страница не найдена</h1><p>Этот раздел пока недоступен.</p><p><a href="/">На главную</a></p></main></body></html>';
 }
 
+export type PublicReleaseOffer = {
+  productType?: string | null;
+  campProgramType?: string | null;
+};
+
+const OFFER_PRODUCT_FEATURE: Record<string, PublicReleaseFeature> = {
+  ONE_TIME_ACTIVITY: "classes",
+  REGULAR_ACTIVITY: "classes",
+  PARTY_SERVICE: "birthday",
+  PARTY_PACKAGE: "birthday",
+};
+
 /**
- * Offer detail/sitemap gate by public section: «Занятия» (programs) and
- * «Праздники» (birthday) offers are withheld while their feature is off.
- * Camps, services and single events stay public.
+ * Which excluded feature an offer belongs to, by its product type. Camps,
+ * place visits and legacy offers without a product type stay public.
+ * `Offer.kind` is deliberately ignored: every service offer is `SERVICE`.
  */
-export function isOfferSectionPublic(section: string, env: Env = process.env): boolean {
-  if (section === "programs") return isPublicReleaseFeatureEnabled("classes", env);
-  if (section === "birthday") return isPublicReleaseFeatureEnabled("birthday", env);
-  return true;
+export function offerReleaseFeature(offer: PublicReleaseOffer): PublicReleaseFeature | null {
+  if (offer.campProgramType) return null;
+  return (offer.productType && OFFER_PRODUCT_FEATURE[offer.productType]) || null;
+}
+
+export function isOfferPublicInRelease(offer: PublicReleaseOffer, env: Env = process.env): boolean {
+  const feature = offerReleaseFeature(offer);
+  return !feature || isPublicReleaseFeatureEnabled(feature, env);
 }

@@ -10,6 +10,7 @@ import {
   BookingValidationError,
 } from "@/server/services/booking/booking.service";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
+import { isOfferPublicInRelease } from "@/lib/release/publicReleaseScope";
 import { BOOKING_MAX_ADULTS, BOOKING_MAX_CHILDREN, bookingChildrenInputSchema } from "@/lib/booking/bookingParticipants";
 
 const createBookingSchema = z.object({
@@ -51,6 +52,17 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json();
     const data = createBookingSchema.parse(body);
+
+    // AUDIT-XR-28: offers outside the release scope cannot be booked directly.
+    if (data.publicationType === PublicationType.OFFER) {
+      const offer = await prisma.offer.findUnique({
+        where: { id: data.publicationId },
+        select: { productType: true, campProgramType: true },
+      });
+      if (offer && !isOfferPublicInRelease(offer)) {
+        return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+      }
+    }
 
     const result = await createPublicBooking({
       publicationType: data.publicationType,
