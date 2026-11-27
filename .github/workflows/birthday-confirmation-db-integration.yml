@@ -2,7 +2,7 @@ name: Birthday confirmation DB integration
 
 on:
   pull_request:
-    branches: [dev, "feat/birthday-package-business-rules-*"]
+    branches: [dev, "feat/birthday-package-business-rules-*", "test/birthday-complete-demo-catalog-*", "feat/birthday-final-scenario-family-*"]
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
@@ -16,6 +16,8 @@ on:
       - "src/app/api/business/party-requests/**"
       - "src/server/public/publicContentVisibility.ts"
       - "src/server/geo/findCityBySlug.ts"
+      - "scripts/it/birthdayDemo/**"
+      - "scripts/it/birthday-demo*.ts"
       - "prisma/**"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -32,6 +34,8 @@ on:
       - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
+      - "scripts/it/birthdayDemo/**"
+      - "scripts/it/birthday-demo*.ts"
       - "prisma/**"
   workflow_dispatch:
 
@@ -170,3 +174,10 @@ jobs:
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyInviteDispatch.postgres.integration.test.ts
       - name: Verify package-change notification failure and recovery with fake transport
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyPackageNotifications.integration.test.ts
+      - name: Verify isolated manual catalogue seed, replay, snapshots and cleanup
+        env:
+          APP_ENV: local
+          BIRTHDAY_DEMO_LOCAL: "1"
+        run: |
+          pnpm test:birthday-demo
+          pnpm test:birthday-demo:integration

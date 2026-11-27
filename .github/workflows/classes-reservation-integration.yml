@@ -2,7 +2,7 @@ name: Classes reservation DB integration
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "test/birthday-complete-demo-catalog-*", "feat/birthday-final-scenario-family-*"]
     paths:
       - ".github/workflows/classes-reservation-integration.yml"
       - "src/server/offers/**"
