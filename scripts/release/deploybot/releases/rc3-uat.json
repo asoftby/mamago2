@@ -1,0 +1,17 @@
+{
+  "id": "rc3-uat",
+  "environments": ["dev"],
+  "mode": "uat",
+  "image_tag": "uat-20261127-f79cffbb5808",
+  "image_digest": "sha256:23d222316c45376f20f7ff17090905ff8fd956961de8dd373f6993e16cde3e84",
+  "config_digest": "sha256:a8c5cc0147067d75e2d5809d0471cf2033d98aa3dd221555aa78be04b56a5ecf",
+  "source_sha": "f79cffbb5808c808bd7e0b09544b20c1f1961ed3",
+  "build_id": "uat-20261127-f79cffbb5808",
+  "migrations_file": "rc3-uat.migrations",
+  "expected_pending": ["20261126144500_booking_request_reference_number"],
+  "seed": false,
+  "rollback_compatible": true,
+  "require_attestation": true,
+  "forbidden_true_env": ["ENABLE_PUBLIC_CLASSES", "ENABLE_PUBLIC_BIRTHDAY", "ENABLE_PUBLIC_PLACES_CATALOG"],
+  "required_nonempty_env": ["BOOST_PRICE_1D_BYN", "BOOST_PRICE_3D_BYN", "BOOST_PRICE_7D_BYN"]
+}

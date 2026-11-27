@@ -1,0 +1,4 @@
+#!/bin/sh
+# Installed as /opt/mamago-deploy/gate. Referenced by authorized_keys and sudoers.
+cd /opt/mamago-deploy || exit 2
+exec /usr/bin/python3 -E -s -B -m mamago_deploy.gate "$@"
