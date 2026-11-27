@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import { randomUUID, randomInt, createHmac } from "node:crypto";
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { hashCode } from "@/lib/otp/otp";
+import { POST } from "@/app/api/auth/phone/verify-otp/route";
+
+async function main() {
+  assert.equal(process.env.APP_ENV, "test");
+  assert.ok(process.env.DATABASE_URL?.includes("/seo_redirect_test"));
+  const secret = process.env.OTP_SECRET;
+  assert.ok(secret);
+  const phoneE164 = "+1202555" + randomInt(1000, 10000);
+  const user = await prisma.user.create({ data: {
+    email: `otp-${randomUUID()}@example.invalid`, phoneE164, status: "ACTIVE",
+  } });
+  process.env.TRUST_PROXY_HEADERS = "false";
+  const key = "otp_verify:v2:" + createHmac("sha256", secret).update(JSON.stringify(["unknown", phoneE164])).digest("hex");
+  const where = { userId: user.id, phoneE164, purpose: "LOGIN" as const };
+  const request = (code: string) => POST(new NextRequest("http://localhost/api/auth/phone/verify-otp", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ phone: phoneE164, code, purpose: "LOGIN" }),
+  }));
+  const seed = async () => {
+    await prisma.phoneOtp.deleteMany({ where });
+    await prisma.rateLimitEntry.deleteMany({ where: { key } });
+    await prisma.phoneOtp.create({ data: { ...where, codeHash: hashCode("0123"),
+      expiresAt: new Date(Date.now() + 60000), lastSentAt: new Date(), attempts: 0 } });
+  };
+  try {
+    await seed();
+    const wrong = await Promise.all(Array.from({ length: 3 }, () => request("9999")));
+    assert.ok(wrong.every(r => r.status === 400));
+    assert.equal((await prisma.phoneOtp.findFirstOrThrow({ where })).attempts, 3);
+    assert.equal((await request("0123")).status, 400);
+    await seed();
+    const correct = await Promise.all([request("0123"), request("0123")]);
+    assert.deepEqual(correct.map(r => r.status).sort(), [200, 400]);
+    assert.equal(await prisma.session.count({ where: { userId: user.id } }), 1);
+    assert.equal(await prisma.phoneOtp.count({ where }), 0);
+  } finally {
+    await prisma.rateLimitEntry.deleteMany({ where: { key } });
+    await prisma.phoneOtp.deleteMany({ where });
+    await prisma.session.deleteMany({ where: { userId: user.id } });
+    await prisma.user.delete({ where: { id: user.id } });
+  }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());
