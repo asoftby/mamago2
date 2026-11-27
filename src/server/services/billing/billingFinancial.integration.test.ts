@@ -24,7 +24,7 @@ import {
 } from "./boostPurchase.service";
 import { reconcileBillingAccounts } from "./billingReconciliation.service";
 import { purchaseEventBoost } from "./eventBoostPurchase.service";
-import { PaidBoostOwnerRequiredError } from "./paidBoostAuthorization";
+import { PaidBoostMembershipRequiredError } from "./paidBoostAuthorization";
 import { registerPromotionActionFromUserEvent } from "../promotion/promotion.service";
 
 const prefix = `task13-${Date.now()}`;
@@ -263,7 +263,7 @@ test("Boost rejects insufficient funds, foreign ownership and concurrent active 
 
   await assert.rejects(
     purchaseOfferBoost({ businessId: "foreign-business", actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:foreign` }),
-    PaidBoostOwnerRequiredError,
+    PaidBoostMembershipRequiredError,
   );
 
   await resetFinancialState("100.00");
@@ -332,35 +332,61 @@ test("fractional partial refunds exhaust the original debit exactly", async () =
   assert.equal(result.refundSummaryAfter.canRefund, false);
 });
 
-test("paid Boost is owner-only on the server, including replay and direct service calls", async () => {
+test("paid Boost allows active OWNER and MANAGER, but rejects inactive or cross-business actors", async () => {
   await resetFinancialState("100.00");
   const ownerKey = `${prefix}:owner-paid`;
   await purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: ownerKey });
-  // MANAGER cannot replay the owner's key (no disclosure) or start a new paid purchase.
-  await assert.rejects(
-    purchaseOfferBoost({ businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY", requestKey: ownerKey }),
-    PaidBoostOwnerRequiredError,
-  );
+  // Same-business MANAGER may replay a valid key without an additional debit.
+  const replay = await purchaseOfferBoost({
+    businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY", requestKey: ownerKey,
+  });
+  assert.equal(replay.idempotentReplay, true);
+  assert.equal(await prisma.billingTransaction.count({
+    where: { billingAccountId: accountId, type: "FEATURE_CHARGE" },
+  }), 1);
+
   await prisma.boost.deleteMany({ where: { offerId } });
+  // An active MANAGER can also perform a new paid purchase through the service.
+  const managerPurchase = await purchaseOfferBoost({
+    businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY",
+    requestKey: `${prefix}:manager-offer`,
+  });
+  assert.equal(managerPurchase.idempotentReplay, false);
+  // A member of another business cannot spend this deposit or replay its key.
   await assert.rejects(
-    purchaseOfferBoost({ businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:manager-offer` }),
-    PaidBoostOwnerRequiredError,
+    purchaseOfferBoost({
+      businessId, actorUserId: foreignOwnerId, offerId, optionId: "BOOST_1_DAY",
+      requestKey: `${prefix}:manager-offer`,
+    }),
+    PaidBoostMembershipRequiredError,
   );
-  await assert.rejects(
-    purchaseEventBoost({ businessId, ownerUserId: managerId, activityId: "any-event", optionId: "BOOST_1_DAY", requestKey: `${prefix}:manager-event`, targetRegionIds: [] }),
-    PaidBoostOwnerRequiredError,
-  );
-  // An owner whose OWNER membership is inactive loses spending rights too.
+  await prisma.businessMember.updateMany({ where: { businessId, userId: managerId }, data: { isActive: false } });
+  try {
+    await assert.rejects(
+      purchaseOfferBoost({
+        businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY",
+        requestKey: `${prefix}:manager-offer`,
+      }),
+      PaidBoostMembershipRequiredError,
+    );
+  } finally {
+    await prisma.businessMember.updateMany({ where: { businessId, userId: managerId }, data: { isActive: true } });
+  }
   await prisma.businessMember.updateMany({ where: { businessId, userId }, data: { isActive: false } });
   try {
     await assert.rejects(
-      purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:inactive-owner` }),
-      PaidBoostOwnerRequiredError,
+      purchaseOfferBoost({
+        businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY",
+        requestKey: `${prefix}:inactive-owner`,
+      }),
+      PaidBoostMembershipRequiredError,
     );
   } finally {
     await prisma.businessMember.updateMany({ where: { businessId, userId }, data: { isActive: true } });
   }
-  assert.equal(await prisma.boost.count({ where: { offerId } }), 0);
-  assert.equal(await prisma.billingTransaction.count({ where: { billingAccountId: accountId, type: "FEATURE_CHARGE" } }), 1);
-  assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "95.00");
+  assert.equal(await prisma.boost.count({ where: { offerId } }), 1);
+  assert.equal(await prisma.billingTransaction.count({
+    where: { billingAccountId: accountId, type: "FEATURE_CHARGE" },
+  }), 2);
+  assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "90.00");
 });
