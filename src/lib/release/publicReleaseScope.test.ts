@@ -72,4 +72,5 @@ test("gate is wired into proxy, public APIs, sitemap, home and offer page", () =
   assert.match(sitemap, /isOfferSectionPublic\(getOfferPublicSection\(offer\)\)/);
   assert.match(src("src/features/city-home/config/homeSectionAvailability.ts"), /isPublicReleaseFeatureEnabled\("classes", env\)/);
   assert.match(src("src/app/(public)/[city]/offers/[slug]/page.tsx"), /isOfferSectionPublic\(getOfferPublicSection\(offer\)\)\) notFound\(\)/);
+  assert.match(src("src/app/api/search/route.ts"), /offers\.filter\(x => isOfferSectionPublic\(getOfferPublicSection\(x\)\)\)/);
 });
