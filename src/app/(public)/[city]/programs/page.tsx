@@ -1,3 +1,4 @@
+import { isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -15,6 +16,9 @@ interface ProgramsPageProps {
 }
 
 export async function generateMetadata({ params }: ProgramsPageProps): Promise<Metadata> {
+  if (!isDeferredPublicFeatureEnabled("classes")) {
+    return { title: "Страница не найдена", robots: { index: false, follow: false } };
+  }
   const { city } = await params;
 
   // Find city
@@ -45,6 +49,9 @@ export async function generateMetadata({ params }: ProgramsPageProps): Promise<M
 }
 
 export default async function ProgramsPage({ params }: ProgramsPageProps) {
+  if (!isDeferredPublicFeatureEnabled("classes")) {
+    notFound();
+  }
   const { city } = await params;
 
   // Find city
