@@ -22,8 +22,8 @@ test("billing entry points require active owner membership", () => {
   }
 });
 
-test("paid promotion requires an active billing OWNER and an ACTIVE business, no platform bypass", () => {
-  // Owner decision 2026-11-27 (AUDIT-XR-02): only OWNER may buy paid promotion; MANAGER keeps free Boost.
+test("paid promotion requires active OWNER or MANAGER membership and an ACTIVE business, no platform bypass", () => {
+  // Latest policy: both OWNER and MANAGER may purchase; billing statement access remains OWNER-only.
   for (const path of [
     "src/app/business/(protected)/offers/[id]/boost/actions.ts",
     "src/app/business/(protected)/events/[id]/boost/actions.ts",
@@ -35,12 +35,18 @@ test("paid promotion requires an active billing OWNER and an ACTIVE business, no
     assert.match(code, /business\.operationalStatus !== "ACTIVE" \|\| !\(await canPurchasePaidBoost\(user\.id, business\.id\)\)/, path);
     assert.doesNotMatch(code, /getBusinessMembership\(/, path);
   }
+  const authorization = source("src/server/services/billing/paidBoostAuthorization.ts");
+  assert.match(authorization, /operationalStatus: "ACTIVE"/);
+  assert.match(authorization, /role: \\{ in: \\["OWNER", "MANAGER"\\] \\}/);
+  assert.match(authorization, /isActive: true/);
+  assert.doesNotMatch(authorization, /ownerUserId:/);
+  assert.match(authorization, /id: businessId/);
   for (const path of [
     "src/server/services/billing/boostPurchase.service.ts",
     "src/server/services/billing/eventBoostPurchase.service.ts",
   ]) {
     const code = source(path);
-    const guard = code.indexOf("await assertPaidBoostOwnerInTx(tx,");
+    const guard = code.indexOf("await assertPaidBoostPurchaserInTx(tx,");
     assert.ok(guard > 0, path);
     assert.ok(guard < code.indexOf("purchaseRequestKey: params.requestKey"), `${path}: guard must precede replay lookup`);
   }
