@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizePhoneToE164 } from "@/lib/phone/phoneNormalize";
 import { hashCode, safeEq } from "@/lib/otp/otp";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
-import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
+import { resetRateLimit } from "@/lib/security/rateLimit";
+import { checkActivationRateLimit } from "@/server/auth/activationRateLimit";
+import { createHmac } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { completeOnboardingNotification } from "@/server/services/notification.service";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
@@ -11,7 +13,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Некорректный запрос" }, { status: 400 });
+    }
     const { phone, code, purpose } = body;
 
     if (!phone || !code) {
@@ -26,15 +31,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Неверный формат телефона" }, { status: 400 });
     }
 
-    const codeStr = String(code).replace(/\D/g, "");
-    if (codeStr.length !== 4) {
+    const codeStr = typeof code === "string" ? code : "";
+    if (!/^\d{4}$/.test(codeStr)) {
       return NextResponse.json({ error: "Код должен быть 4 цифры" }, { status: 400 });
     }
 
     // Rate limit check: 5 attempts per 10 minutes per IP + Phone
     const ip = getTrustedClientIp(request) ?? "unknown";
-    const rateLimitKey = `otp_verify:${ip}:${phoneE164}`;
-    const rl = await checkRateLimit(rateLimitKey, 5, 10 * 60 * 1000);
+    const secret = process.env.OTP_SECRET;
+    if (!secret || secret === "YOUR_SECRET_HERE") throw new Error("OTP_SECRET is not configured");
+    const rateLimitKey = `otp_verify:v2:${createHmac("sha256", secret).update(JSON.stringify([ip, phoneE164])).digest("hex")}`;
+    const rl = await checkActivationRateLimit({ key: rateLimitKey, limit: 5, windowMs: 10 * 60 * 1000 });
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Слишком много попыток. Попробуйте позже." },
@@ -59,43 +66,50 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
+    // Compare-and-swap against the exact OTP snapshot, including resend state.
+    const snapshot = {
+      id: otpRecord.id,
+      codeHash: otpRecord.codeHash,
+      lastSentAt: otpRecord.lastSentAt,
+      expiresAt: otpRecord.expiresAt,
+      attempts: otpRecord.attempts,
+    };
+    const staleResponse = () => NextResponse.json(
+      { error: "Код изменился. Повторите попытку или запросите новый код" },
+      { status: 400 }
+    );
 
-    if (otpRecord.expiresAt < now) {
-      await prisma.phoneOtp.delete({ where: { id: otpRecord.id } });
-      return NextResponse.json({ error: "Код истёк. Запросите новый" }, { status: 400 });
+    if (otpRecord.expiresAt <= now || otpRecord.attempts >= 3) {
+      await prisma.phoneOtp.deleteMany({ where: snapshot });
+      return NextResponse.json({ error: "Код недействителен. Запросите новый" }, { status: 400 });
     }
 
-    if (otpRecord.attempts >= 3) {
-      await prisma.phoneOtp.delete({ where: { id: otpRecord.id } });
-      return NextResponse.json({ error: "Превышено количество попыток. Запросите новый код" }, { status: 400 });
-    }
-
-    const inputHash = hashCode(codeStr);
-    const isValid = safeEq(inputHash, otpRecord.codeHash);
-
-    if (!isValid) {
-      const newAttempts = otpRecord.attempts + 1;
-      await prisma.phoneOtp.update({
-        where: { id: otpRecord.id },
-        data: { attempts: newAttempts },
+    if (!safeEq(hashCode(codeStr), otpRecord.codeHash)) {
+      const updated = await prisma.phoneOtp.updateMany({
+        where: { ...snapshot, attempts: { lt: 3 }, expiresAt: { equals: otpRecord.expiresAt, gt: new Date() } },
+        data: { attempts: { increment: 1 } },
       });
+      if (updated.count !== 1) return staleResponse();
       return NextResponse.json(
-        { error: `Неверный код. Осталось попыток: ${3 - newAttempts}` },
+        { error: "Неверный код" },
         { status: 400 }
       );
     }
 
-    // Code correct — finalize based on purpose
     const isStub = user.email?.endsWith("@pending.mamago.by") ?? false;
-
-    await prisma.$transaction(async (tx) => {
-      const updateData: Record<string, unknown> = { phoneVerifiedAt: now };
-      if (purpose === "REGISTER" && isStub) {
-        updateData.status = "ACTIVE";
-      }
-      await tx.user.update({ where: { id: user.id }, data: updateData });
-      await tx.phoneOtp.delete({ where: { id: otpRecord.id } });
+    const consumed = await prisma.$transaction(async (tx) => {
+      const deleted = await tx.phoneOtp.deleteMany({
+        where: { ...snapshot, expiresAt: { equals: otpRecord.expiresAt, gt: new Date() } },
+      });
+      if (deleted.count !== 1) return false;
+      const activate = purpose === "REGISTER" && isStub && user.status === "PENDING_ACTIVATION";
+      const updated = await tx.user.updateMany({
+        where: { id: user.id, phoneE164, deletedAt: null, status: activate ? "PENDING_ACTIVATION" : { in: ["ACTIVE", "LIMITED"] } },
+        data: { phoneVerifiedAt: now, ...(activate ? { status: "ACTIVE" as const } : {}) },
+      });
+      return updated.count === 1;
     });
+    if (!consumed) return staleResponse();
 
     // Reset rate limiter on successful verification
     await resetRateLimit(rateLimitKey);

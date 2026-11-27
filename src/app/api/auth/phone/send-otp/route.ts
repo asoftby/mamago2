@@ -15,7 +15,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Некорректный запрос" }, { status: 400 });
+    }
     const { phone, purpose } = body;
 
     if (!phone) {
