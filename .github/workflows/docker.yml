@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   build-and-push:
+    if: github.repository == 'asoftby/mamago2' && github.ref == 'refs/heads/dev'
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     runs-on: ubuntu-latest
@@ -94,7 +95,7 @@ jobs:
     if: ${{ github.ref == 'refs/heads/dev' && vars.MAMAGO_AUTO_DEPLOY_DEV == 'true' && !contains(github.event.head_commit.message, '[build-only]') }}
     needs: build-and-push
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 55
     environment: dev-auto-deploy
     concurrency:
       group: mamago-dev-auto-deploy
@@ -102,6 +103,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      actions: read
     env:
       TAG: dev-${{ github.run_number }}
       EXPECTED_SHA: ${{ github.sha }}
@@ -125,6 +127,22 @@ jobs:
             exit 1
           }
           [[ "$TAG" =~ ^dev-[0-9]+$ && "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ && "$EXPECTED_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+      - name: Require successful CI for exact DEV SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            runs="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" -f head_sha="$EXPECTED_SHA" -f branch=dev -f event=push -f per_page=100)"
+            state="$(jq -r --arg sha "$EXPECTED_SHA" '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == "dev" and .event == "push")] | sort_by(.created_at) | last | if . == null then "missing" elif .status != "completed" then "pending" else .conclusion end' <<< "$runs")"
+            case "$state" in
+              success) exit 0 ;;
+              missing|pending) sleep 15 ;;
+              *) echo "::error::CI did not succeed: $state"; exit 1 ;;
+            esac
+          done
+          echo "::error::Timed out waiting for exact SHA CI"
+          exit 1
       - name: Configure pinned SSH identity
         env:
           SSH_HOST: ${{ secrets.MAMAGO_DEV_SSH_HOST }}
