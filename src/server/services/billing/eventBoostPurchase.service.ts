@@ -6,7 +6,7 @@ import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurcha
 import { debitBusinessDepositInTx } from "@/server/services/billing/billingAccount.service";
 import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
-import { assertPaidBoostOwnerInTx } from "@/server/services/billing/paidBoostAuthorization";
+import { assertPaidBoostPurchaserInTx } from "@/server/services/billing/paidBoostAuthorization";
 
 export async function purchaseEventBoost(params: {
   businessId: string;
@@ -22,7 +22,7 @@ export async function purchaseEventBoost(params: {
 
   return prisma.$transaction(async (tx) => {
     // Paid Boost spends money: authorize before replay disclosure or any debit.
-    await assertPaidBoostOwnerInTx(tx, params.businessId, params.ownerUserId);
+    await assertPaidBoostPurchaserInTx(tx, params.businessId, params.ownerUserId);
     const replay = await tx.boost.findUnique({
       where: { purchaseRequestKey: params.requestKey },
       include: { billingTransaction: { select: { billingAccount: { select: { businessId: true } } } } },
