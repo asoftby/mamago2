@@ -98,7 +98,7 @@ export async function GET(request: Request) {
       prisma.article.findMany({ where: { id: { in: ids("article") }, slug: { not: null }, ...getPublicPublishedArticleWhere() }, select: selectId }),
       prisma.route.findMany({ where: { id: { in: ids("route") }, ...getPublicRouteIndexWhere() }, select: selectId }),
     ]);
-    const visible = { OR: [
+    const visible: import("@prisma/client").Prisma.SearchDocumentWhereInput = { OR: [
       { entityType: "activity", entityId: { in: activities.map(x => x.id) } },
       { entityType: "place", entityId: { in: places.map(x => x.id) } },
       { entityType: "offer", entityId: { in: offers.map(x => x.id) } },
