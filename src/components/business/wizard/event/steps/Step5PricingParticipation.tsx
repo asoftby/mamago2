@@ -74,7 +74,7 @@ function buildEventTimeSlots(
       id: slot.id,
       startTime: slot.startTime,
       endTime: slot.endTime ?? slot.startTime,
-      capacity: slot.capacity ?? 1,
+      capacity: slot.capacity ?? null,
     };
 
     if (existing) {
@@ -226,6 +226,40 @@ export function Step5PricingParticipation({
     );
   };
 
+  // Seat occupancy belongs to the selected booking method, not a
+  // standalone wizard section above the action selector.
+  const seatModeFields = (
+    <section className="space-y-3 rounded-2xl border border-stone-200 bg-stone-50 p-4" aria-labelledby="event-seat-mode-title">
+          <h3 id="event-seat-mode-title" className="text-base font-semibold text-stone-900">Кто занимает место?</h3>
+          <p className="text-sm text-stone-600">Выберите, чьё участие уменьшает число свободных мест в каждом сеансе. Контактное лицо само по себе не считается участником.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {EVENT_SEAT_MODES.map((mode) => {
+              const labels: Record<EventSeatMode, string> = {
+                ALL: "Все: взрослые и дети",
+                CHILDREN: "Только дети",
+                ADULTS: "Только взрослые",
+                SEPARATE: "Отдельные лимиты",
+              };
+              return <label key={mode} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 text-sm">
+                <input type="radio" name="eventSeatMode" value={mode} checked={data.eventSeatMode === mode} disabled={!isEditable} onChange={() => onChange({ eventSeatMode: mode })} />
+                <span>{labels[mode]}</span>
+              </label>;
+            })}
+          </div>
+          {data.eventSeatMode === "SEPARATE" ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm font-medium">Мест для взрослых
+                <Input type="number" min={0} max={10000} required disabled={!isEditable} value={data.adultSeatCapacity ?? ""} onChange={(e) => onChange({ adultSeatCapacity: e.target.value === "" ? null : Number(e.target.value) })} />
+              </label>
+              <label className="space-y-1 text-sm font-medium">Мест для детей
+                <Input type="number" min={0} max={10000} required disabled={!isEditable} value={data.childSeatCapacity ?? ""} onChange={(e) => onChange({ childSeatCapacity: e.target.value === "" ? null : Number(e.target.value) })} />
+              </label>
+              <p className="sm:col-span-2 text-xs text-stone-600">Эти квоты действуют для каждого сеанса и заменяют общий лимит слота. Учитывайте физическую вместимость помещения.</p>
+            </div>
+          ) : null}
+        </section>
+  );
+
   return (
     <div className="space-y-8">
       <div>
@@ -328,38 +362,6 @@ export function Step5PricingParticipation({
         </div>
       )}
 
-      {(data.participationMode === "time-slots" || data.participationMode === "simple-booking" || data.publicationAccess?.method === "timeslots") ? (
-        <section className="space-y-3 rounded-2xl border border-stone-200 bg-stone-50 p-4" aria-labelledby="event-seat-mode-title">
-          <h3 id="event-seat-mode-title" className="text-base font-semibold text-stone-900">Кто занимает место?</h3>
-          <p className="text-sm text-stone-600">Выберите, чьё участие уменьшает число свободных мест в каждом сеансе. Контактное лицо само по себе не считается участником.</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {EVENT_SEAT_MODES.map((mode) => {
-              const labels: Record<EventSeatMode, string> = {
-                ALL: "Все: взрослые и дети",
-                CHILDREN: "Только дети",
-                ADULTS: "Только взрослые",
-                SEPARATE: "Отдельные лимиты",
-              };
-              return <label key={mode} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 text-sm">
-                <input type="radio" name="eventSeatMode" value={mode} checked={data.eventSeatMode === mode} disabled={!isEditable} onChange={() => onChange({ eventSeatMode: mode })} />
-                <span>{labels[mode]}</span>
-              </label>;
-            })}
-          </div>
-          {data.eventSeatMode === "SEPARATE" ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm font-medium">Мест для взрослых
-                <Input type="number" min={0} max={10000} required disabled={!isEditable} value={data.adultSeatCapacity ?? ""} onChange={(e) => onChange({ adultSeatCapacity: e.target.value === "" ? null : Number(e.target.value) })} />
-              </label>
-              <label className="space-y-1 text-sm font-medium">Мест для детей
-                <Input type="number" min={0} max={10000} required disabled={!isEditable} value={data.childSeatCapacity ?? ""} onChange={(e) => onChange({ childSeatCapacity: e.target.value === "" ? null : Number(e.target.value) })} />
-              </label>
-              <p className="sm:col-span-2 text-xs text-stone-600">Эти квоты действуют для каждого сеанса и заменяют общий лимит слота. Учитывайте физическую вместимость помещения.</p>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
       {ctaRenderMode === "shared" ? (
         <CtaStep
           value={ctaStepValue}
@@ -369,6 +371,7 @@ export function Step5PricingParticipation({
           }}
           disabled={!isEditable}
           onChange={handleCtaStepChange}
+          calendarSettings={seatModeFields}
         />
       ) : (
         <PublicationAccessEditor
@@ -377,6 +380,7 @@ export function Step5PricingParticipation({
           onChange={(value) => onChange(buildEventAccessPatch(value))}
           allowedMethods={["details", "ticket", "timeslots", "prebooking", "request"]}
           timeSlotSuggestions={timeSlotSuggestions}
+          timeSlotSettings={seatModeFields}
           disabled={!isEditable}
         />
       )}

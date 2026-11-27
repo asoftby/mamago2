@@ -91,4 +91,20 @@ function labelledField(html: string): string {
   assert.equal(labelledField(a), labelledField(b), "date field id is stable across renders");
 }
 
+
+// 6. A scheduled event slot without capacity must show an explicit required
+// field error; it must not look like a complete slot that can be saved.
+{
+  const html = renderToStaticMarkup(
+    <TimeSlotEditor
+      entityType="event"
+      value={[{ ...savedSlot, capacity: null }]}
+      onChange={noop}
+    />,
+  );
+  assert.ok(html.includes("Вместимость (чел.) *"), "capacity field is visibly required");
+  assert.ok(html.includes("Укажите вместимость"), "missing capacity is explained immediately");
+  assert.ok(html.includes('aria-required="true"'), "capacity is required for accessibility");
+}
+
 console.log("TimeSlotEditor.slotDate.test.tsx: OK");

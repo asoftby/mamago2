@@ -22,6 +22,7 @@ import {
   createEmptyScheduleDay,
   createEmptyScheduleSlot,
   flatSlotsToGroupedDays,
+  groupedDaysToFlatSlots,
   scheduleDaysToPersistedSlots,
 } from "../schedule/mappers";
 import {
@@ -103,8 +104,8 @@ function buildSlotErrors(slot: ScheduleSlot): SlotErrors {
   if (slot.startTime && slot.endTime && slot.endTime <= slot.startTime) {
     errors.endTime = "Окончание должно быть позже начала";
   }
-  if (slot.capacity == null || slot.capacity <= 0) {
-    errors.capacity = "Введите число больше 0";
+  if (slot.capacity == null || !Number.isSafeInteger(slot.capacity) || slot.capacity <= 0) {
+    errors.capacity = "Укажите вместимость (целое число от 1)";
   }
   return errors;
 }
@@ -151,12 +152,17 @@ export function TimeSlotEditor({
       const normalizedDays = normalizeEditorDays(sortDays(nextDays));
       setDays(normalizedDays);
 
-      const flat = scheduleDaysToPersistedSlots(normalizedDays);
+      // Preserve incomplete event rows in form state so step validation can
+      // block publication instead of silently discarding a slot without capacity.
+      // Offer editor retains its existing complete-rows-only contract.
+      const flat = entityType === "event"
+        ? groupedDaysToFlatSlots(normalizedDays)
+        : scheduleDaysToPersistedSlots(normalizedDays);
       const key = serializeSlots(flat);
       lastEmitted.current = key;
       onChange(flat);
     },
-    [onChange],
+    [entityType, onChange],
   );
 
   const patchDay = useCallback(
@@ -392,7 +398,7 @@ export function TimeSlotEditor({
                       if (touchedFields.endTime && rawErrors.endTime) {
                         visibleErrors.endTime = rawErrors.endTime;
                       }
-                      if (touchedFields.capacity && rawErrors.capacity) {
+                      if ((touchedFields.capacity || (entityType === "event" && Boolean(day.date && (slot.startTime || slot.endTime)))) && rawErrors.capacity) {
                         visibleErrors.capacity = rawErrors.capacity;
                       }
 
