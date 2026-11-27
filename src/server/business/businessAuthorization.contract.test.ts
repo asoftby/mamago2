@@ -21,3 +21,19 @@ test("billing entry points require active owner membership", () => {
     assert.match(code, /ownerUserId: user\.id, members: \{ some: \{ userId: user\.id, isActive: true, role: "OWNER" \} \}/, path);
   }
 });
+
+test("paid promotion allows active OWNER and MANAGER membership without platform bypass", () => {
+  const permissions = source("src/server/permissions/business-permissions.ts");
+  const membership = permissions.split("export async function getBusinessMembership(")[1].split("export async function")[0];
+  assert.match(membership, /userId,\s*businessId,\s*isActive: true/);
+  assert.match(membership, /BusinessMemberRole\.OWNER, BusinessMemberRole\.MANAGER/);
+  for (const path of [
+    "src/app/business/(protected)/offers/[id]/boost/actions.ts",
+    "src/app/business/(protected)/promotion/actions.ts",
+  ]) {
+    const code = source(path);
+    assert.match(code, /getCurrentUser\(\)/);
+    assert.match(code, /getMyBusiness\(user\.id\)/);
+    assert.match(code, /business\.operationalStatus !== "ACTIVE" \|\| !\(await getBusinessMembership\(user\.id, business\.id\)\)/);
+  }
+});
