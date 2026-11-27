@@ -17,6 +17,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { findPlaceBySlug } from "@/lib/slug/placeSlugService";
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 
 interface LegacyPlacePageProps {
@@ -33,8 +34,8 @@ export default async function LegacyPlaceRedirectPage({ params }: LegacyPlacePag
 
   if (!placeId) notFound();
 
-  const place = await prisma.place.findUnique({
-    where: { id: placeId },
+  const place = await prisma.place.findFirst({
+    where: { id: placeId, ...getPublicPublishedPlaceWhere() },
     select: { slug: true, id: true, city: { select: { slug: true } } },
   });
   if (!place) notFound();
