@@ -52,9 +52,9 @@ export async function purchaseOfferBoost(params: {
   requestKey: string;
   targetRegionIds?: string[];
 }) {
-  const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
-  if (!option) {
-    throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
+  const definition = BOOST_OPTION_DEFINITIONS.find((item) => item.id === params.optionId);
+  if (!definition) {
+    throw new BoostPricingUnavailableError("Unknown Boost option");
   }
 
   const targetRegionIds = await validateBoostTargetRegions(params.targetRegionIds ?? []);
@@ -70,14 +70,20 @@ export async function purchaseOfferBoost(params: {
       if (
         replay.billingTransaction?.billingAccount.businessId !== params.businessId ||
         replay.offerId !== params.offerId ||
-        replay.durationDays !== option.durationDays ||
-        !replay.price?.equals(option.price) ||
+        replay.durationDays !== definition.durationDays ||
         JSON.stringify([...replay.targetRegionIds].sort()) !== JSON.stringify([...targetRegionIds].sort())
       ) {
         throw new BoostPurchaseNotAllowedError("Request key was used for another Boost purchase");
       }
       const { billingAccount: _billingAccount, ...transaction } = replay.billingTransaction!;
       return { boost: { ...replay, billingTransaction: transaction }, transaction, idempotentReplay: true };
+    }
+
+    // A legitimate replay is independent of later price edits or option disablement.
+    // A new purchase must still use an enabled, server-configured price.
+    const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
+    if (!option) {
+      throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
     }
 
     // Serializes eligibility and active-Boost decisions for this Offer.

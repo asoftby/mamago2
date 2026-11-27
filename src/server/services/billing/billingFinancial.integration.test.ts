@@ -331,6 +331,42 @@ test("fractional partial refunds exhaust the original debit exactly", async () =
   assert.equal(result.refundSummaryAfter.canRefund, false);
 });
 
+test("paid Boost replay remains idempotent after server price changes or disablement", async () => {
+  await resetFinancialState("100.00");
+  const key = `${prefix}:historic-price-replay`;
+  const originalPrice = process.env.BOOST_PRICE_1D_BYN;
+  try {
+    const created = await purchaseOfferBoost({
+      businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+    });
+    process.env.BOOST_PRICE_1D_BYN = "9.00";
+    const changed = await purchaseOfferBoost({
+      businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+    });
+    assert.equal(changed.idempotentReplay, true);
+    assert.equal(changed.boost.id, created.boost.id);
+    delete process.env.BOOST_PRICE_1D_BYN;
+    const disabled = await purchaseOfferBoost({
+      businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+    });
+    assert.equal(disabled.idempotentReplay, true);
+    await assert.rejects(
+      purchaseOfferBoost({
+        businessId, actorUserId: foreignOwnerId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+      }),
+      PaidBoostMembershipRequiredError,
+    );
+    assert.equal(await prisma.boost.count({ where: { offerId } }), 1);
+    assert.equal(await prisma.billingTransaction.count({
+      where: { billingAccountId: accountId, type: "FEATURE_CHARGE" },
+    }), 1);
+    assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "95.00");
+  } finally {
+    if (originalPrice === undefined) delete process.env.BOOST_PRICE_1D_BYN;
+    else process.env.BOOST_PRICE_1D_BYN = originalPrice;
+  }
+});
+
 test("paid Boost allows active OWNER and MANAGER, but rejects inactive or cross-business actors", async () => {
   await resetFinancialState("100.00");
   const ownerKey = `${prefix}:owner-paid`;
