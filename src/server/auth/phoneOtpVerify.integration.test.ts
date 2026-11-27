@@ -49,6 +49,34 @@ async function main() {
     assert.equal((await prisma.phoneOtp.findFirstOrThrow({ where })).codeHash, hashCode("4567"));
     assert.equal((await request("4567")).status, 200);
 
+    // Pause verification immediately after its real database read.
+    // The replacement commits before the stale verifier can mutate the row.
+    await seed();
+    const delegate = prisma.phoneOtp;
+    const originalFind = delegate.findUnique;
+    let replaced = false;
+    delegate.findUnique = (async (...args: Parameters<typeof originalFind>) => {
+      const record = await originalFind.apply(delegate, args);
+      if (record && !replaced) {
+        replaced = true;
+        await delegate.updateMany({ where, data: {
+          codeHash: hashCode("4567"), lastSentAt: new Date(Date.now() + 1000),
+          expiresAt: new Date(Date.now() + 61000), attempts: 0,
+        } });
+      }
+      return record;
+    }) as typeof originalFind;
+    try {
+      assert.equal((await request("0123")).status, 400);
+      assert.equal(replaced, true);
+      const replacement = await delegate.findFirstOrThrow({ where });
+      assert.equal(replacement.codeHash, hashCode("4567"));
+      assert.equal(replacement.attempts, 0);
+      assert.equal(await prisma.session.count({ where: { userId: user.id } }), 2);
+    } finally {
+      delegate.findUnique = originalFind;
+    }
+
     await seed();
     await prisma.user.update({ where: { id: user.id }, data: { status: "BANNED", phoneVerifiedAt: null } });
     assert.equal((await request("0123")).status, 400);
