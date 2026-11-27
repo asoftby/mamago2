@@ -71,8 +71,12 @@ elif argv[:2] == ["image", "inspect"]:
     else:
         print(f"linux/amd64 {state['pulled_revision']} PATH=/bin\nBUILD_ID={state['pulled_build_id']}\n")
 elif argv[0] == "ps":
-    project = argv[-1].split("=")[-1]
-    print("\n".join(c["Id"] for c in state["containers"].values() if c["Project"] == project))
+    filters = [argv[i + 1] for i, a in enumerate(argv) if a == "--filter"]
+    project = filters[0].split("=")[-1]
+    if any("compose.oneoff=True" in f for f in filters):
+        print("\n".join(state.get("oneoff", {}).get(project, [])))
+    else:
+        print("\n".join(c["Id"] for c in state["containers"].values() if c["Project"] == project))
 elif argv[0] == "info":
     print("/")
 elif argv[0] == "buildx":
@@ -99,6 +103,11 @@ elif argv[0] == "exec":
         image = state["containers"][f"{project}-app-1"]["Image"]
         print(json.dumps(state["health"].get(image, {"status": "error"})), end="")
     elif "pg_dump" in argv[-1]:
+        if state.get("dump_hangs"):
+            fcntl.flock(guard, fcntl.LOCK_UN)
+            print("-- partial data", flush=True)
+            time.sleep(state["dump_hangs"])
+            sys.exit(0)
         print("partial" if state.get("dump_fails") else "-- data\n-- PostgreSQL database dump complete\n--")
     else:
         if state.get("db_query_fails"):

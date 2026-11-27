@@ -6,8 +6,11 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import fcntl
 import hashlib
 import json
+import logging
+import os
 import secrets
 import time
 from dataclasses import dataclass, replace
@@ -17,6 +20,10 @@ from .common import OPID, Refused, redact
 from .config import Registry
 from .transport import PREFLIGHT_TIMEOUT, Transport, TransportError
 
+log = logging.getLogger("mamago-deploy")
+
+# How many times in a row a host must not know a lost request before it counts as never accepted.
+ABSENT_CONFIRMATIONS = 3
 NORMAL_TTL = 300
 STRICT_TTL = 120
 
@@ -101,34 +108,58 @@ class Confirmations:
 
 
 class Audit:
-    """Append-only JSON lines, each carrying the hash of the previous one."""
+    """JSON lines, each carrying the hash of the previous one.
+
+    The chain shows editing and damage. It cannot show a rewrite or a cut tail by
+    someone who owns the file, so every hash also goes to the service log, which
+    the bot's user cannot rewrite.
+    """
 
     def __init__(self, path: Path):
         self.path = path
 
-    def _last_hash(self) -> str:
-        try:
-            lines = self.path.read_text().splitlines()
-            return json.loads(lines[-1])["hash"] if lines else "0" * 64
-        except (OSError, ValueError, KeyError):
-            return "0" * 64
-
     def write(self, **event):
-        record = {"ts": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                  **{k: redact(v) if isinstance(v, str) else v for k, v in event.items()}, "prev": self._last_hash()}
-        record["hash"] = hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a") as stream:
-            stream.write(json.dumps(record, sort_keys=True) + "\n")
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        handle = os.open(self.path, os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(handle, "rb+", buffering=0) as stream:
+            fcntl.flock(stream, fcntl.LOCK_EX)  # reading the last hash and appending are one step
+            data = stream.read()
+            previous, damaged = "0" * 64, False
+            if data:
+                last = data.rstrip(b"\n").rsplit(b"\n", 1)[-1]
+                try:
+                    previous = json.loads(last)["hash"]
+                except (ValueError, KeyError, TypeError):
+                    previous, damaged = hashlib.sha256(last).hexdigest(), True
+                damaged = damaged or not data.endswith(b"\n")
+            record = {"ts": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                      **{k: redact(v) if isinstance(v, str) else v for k, v in event.items()}, "prev": previous}
+            if damaged:
+                record["damaged_previous"] = True
+                log.error("audit log was damaged before this record")
+            record["hash"] = hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest()
+            line = (json.dumps(record, sort_keys=True) + "\n").encode()
+            if data and not data.endswith(b"\n"):
+                line = b"\n" + line
+            while line:
+                line = line[stream.write(line):]
+            os.fsync(stream.fileno())
+        log.info("audit event=%s opid=%s hash=%s", record.get("event"), record.get("opid", "-"), record["hash"])
 
     def verify(self) -> bool:
+        """False for any damage; a missing file is an empty, valid log."""
         previous = "0" * 64
-        for line in self.path.read_text().splitlines():
-            record = json.loads(line)
-            claimed = record.pop("hash")
-            if record["prev"] != previous or hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest() != claimed:
-                return False
-            previous = claimed
+        try:
+            for line in self.path.read_text().splitlines():
+                record = json.loads(line)
+                claimed = record.pop("hash")
+                if record["prev"] != previous or hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest() != claimed:
+                    return False
+                previous = claimed
+        except FileNotFoundError:
+            return True
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return False
         return True
 
 
@@ -185,18 +216,28 @@ class Orchestrator:
                   "ref": pending.ref, "opid": opid}
         self.last_operation[pending.env] = opid
         try:
-            self.audit.write(event="start", **record)
+            try:
+                self.audit.write(event="start", **record)
+            except OSError:
+                raise Refused("the audit log cannot be written; nothing was started") from None
             words = (["submit-deploy", pending.ref, pending.fingerprint, opid, actor] if pending.action == "deploy"
                      else ["submit-rollback", pending.fingerprint, opid, actor])
             try:
                 answer = await self.ask(pending.env, pending.action, words, timeout=120)
-                if not answer.get("ok") and "state" not in answer:
+                error = str(answer.get("error", ""))
+                if error.startswith("internal error"):  # it may have failed after accepting
+                    outcome = await self.follow(pending.env, pending.action, opid, submitted=False, cause=error)
+                elif not answer.get("ok") and "state" not in answer:
                     outcome = Outcome("refused", answer.get("report", []), opid)
                 else:
                     outcome = await self.follow(pending.env, pending.action, opid, submitted=True)
             except TransportError as error:
                 outcome = await self.follow(pending.env, pending.action, opid, submitted=False, cause=str(error))
-            self.audit.write(event="end", outcome=outcome.state, **record)
+            try:
+                self.audit.write(event="end", outcome=outcome.state, **record)
+            except OSError:
+                log.error("audit end record lost opid=%s outcome=%s", opid, outcome.state)
+                outcome = replace(outcome, report=[*outcome.report, "RISK the result could not be written to the audit log"])
             return outcome
         finally:
             self._busy.discard(pending.env)
@@ -204,7 +245,7 @@ class Orchestrator:
     async def follow(self, env: str, operation: str, opid: str, submitted: bool, cause: str = "") -> Outcome:
         if not OPID.fullmatch(opid):
             raise Refused("invalid operation id")
-        started = time.monotonic()
+        started, absent = time.monotonic(), 0
         while True:
             try:
                 answer = await self.ask(env, operation, ["result", opid], timeout=60)
@@ -212,11 +253,16 @@ class Orchestrator:
                 if state in ("succeeded", "failed", "unknown"):
                     return Outcome(state, answer.get("report", []), opid)
                 if state == "absent" and not submitted:
-                    return Outcome("not_started", [f"The host never accepted the operation ({cause}). Nothing was started."], opid)
-                if state != "running":
+                    # The host may still be handling a request whose connection dropped.
+                    absent += 1
+                    if absent >= ABSENT_CONFIRMATIONS:
+                        return Outcome("not_started", [f"The host never accepted the operation ({cause}). Nothing was started."], opid)
+                elif state != "running":
                     return Outcome("unknown", answer.get("report", []) or ["The host does not know the operation."], opid)
             except TransportError as error:
-                cause = str(error)
+                cause, absent = str(error), 0
+            except Refused as refusal:  # the host or registry changed under a running operation
+                return Outcome("unknown", [f"Cannot ask the host for the result: {refusal}. It may be running."], opid)
             if time.monotonic() - started >= self._deadline:
                 return Outcome("unknown", [f"No verdict from the host ({cause or 'still running'}). It may still be running; "
                                            "do not repeat it. Check /result and status."], opid)

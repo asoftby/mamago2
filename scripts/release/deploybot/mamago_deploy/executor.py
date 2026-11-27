@@ -15,11 +15,14 @@ import gzip
 import hashlib
 import json
 import os
-import shutil
+import signal
+import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import zlib
 from pathlib import Path
 
 from .common import ACTOR, BUILD_TAG, COMMIT, DIGEST, FINGERPRINT, OPID, RELEASE_ID, SERVICE, Refused, redact
@@ -27,6 +30,12 @@ from .config import HostConfig, load_release
 
 DEFAULT_CONFIG = "/etc/mamago-deploy/host.json"
 LOG_TAIL = 200
+DUMP_TIMEOUT = 1800
+# A worker that has not claimed its operation by then must never run it; the
+# longer limit is when readers start calling such an operation unknown.
+CLAIM_DEADLINE = 20
+CLAIM_GRACE = 30
+DUMP_MARKER = b"PostgreSQL database dump complete"
 AUTO_LOADED = ("docker-compose.override.yml", "compose.override.yaml", "compose.override.yml", "compose.yaml", "compose.yml")
 STRIPPED_ENV = ("APP_VERSION", "COMPOSE_FILE", "COMPOSE_PROJECT_NAME", "COMPOSE_PROFILES", "COMPOSE_ENV_FILES", "DOCKER_HOST", "DOCKER_CONTEXT")
 
@@ -35,15 +44,27 @@ def now() -> str:
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def kill_group(process: subprocess.Popen):
+    """The command and everything it started (docker compose runs plugins)."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(process.pid, signal.SIGKILL)
+
+
 def sh(argv: list[str], timeout: int = 900, env: dict | None = None, **kwargs) -> subprocess.CompletedProcess:
     base = {k: v for k, v in os.environ.items() if k not in STRIPPED_ENV}
     try:
-        return subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=timeout,
-                              stdin=subprocess.DEVNULL, env={**base, **(env or {})}, **kwargs)
-    except subprocess.TimeoutExpired:
-        return subprocess.CompletedProcess(argv, 124, "", "timeout")
+        process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True, errors="replace", env={**base, **(env or {})}, start_new_session=True, **kwargs)
     except OSError as error:
         return subprocess.CompletedProcess(argv, 127, "", type(error).__name__)
+    try:
+        out, err = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        kill_group(process)
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            process.communicate(timeout=10)
+        return subprocess.CompletedProcess(argv, 124, "", "timeout")
+    return subprocess.CompletedProcess(argv, process.returncode, out, err)
 
 
 class Report:
@@ -221,7 +242,27 @@ def compose_config(env: Environment, override: Path | None = None) -> dict | Non
         return None
 
 
+def check_trusted_paths(env: Environment, report: Report):
+    """Whoever can write these files decides what the Docker daemon runs."""
+    open_paths = []
+    for path in (env.dir, env.base_file, env.dir / ".env"):
+        with contextlib.suppress(FileNotFoundError):
+            if path.stat().st_mode & stat.S_IWOTH:
+                open_paths.append(path.name)
+    report.check(not open_paths, "Compose directory and files are not writable by every user",
+                 f"writable by every user: {', '.join(open_paths)}")
+
+
+def check_no_leftovers(env: Environment, report: Report):
+    """A migration or seed container outlives a killed or timed-out command."""
+    listed = sh(["docker", "ps", "-q", "--filter", f"label=com.docker.compose.project={env.project}",
+                 "--filter", "label=com.docker.compose.oneoff=True"], timeout=60)
+    report.check(listed.returncode == 0 and not listed.stdout.split(), "no one-off container (migration or seed) is running",
+                 "a one-off container (migration or seed) is still running, or Docker cannot tell")
+
+
 def check_layout_and_compose(env: Environment, report: Report, image: str) -> dict | None:
+    check_trusted_paths(env, report)
     report.check(env.base_file.is_file() and not any((env.dir / n).exists() for n in AUTO_LOADED),
                  "Compose layout as expected", "Compose file missing or an unexpected auto-loaded file exists")
     base = compose_config(env)
@@ -341,13 +382,13 @@ def check_attestation(env: Environment, report: Report, target: dict):
     if not (manifest.is_file() and signature.is_file() and os.path.isfile(signers)):
         report.fail("signed backup attestation is missing")
         return
-    with manifest.open("rb") as stream:
-        verified = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", signers, "-I", "uat-backup", "-n", "mamago-uat-backup",
-                                   "-s", str(signature)], stdin=stream, capture_output=True, timeout=30)
+    body = manifest.read_bytes()[:65536]  # verify exactly the bytes that are parsed
+    verified = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", signers, "-I", "uat-backup", "-n", "mamago-uat-backup",
+                               "-s", str(signature)], input=body, capture_output=True, timeout=30)
     if verified.returncode:
         report.fail("backup attestation signature is invalid")
         return
-    data = dict(line.split("=", 1) for line in manifest.read_text().splitlines() if "=" in line)
+    data = dict(line.split("=", 1) for line in body.decode("utf-8", "replace").splitlines() if "=" in line)
     problems = []
     for key in ("db_sha256", "media_sha256"):
         if len(data.get(key, "")) != 64:
@@ -389,6 +430,7 @@ def fingerprint(env: Environment, action: str, target: dict | None) -> str:
         digest.update(b"\0")
     if target:
         digest.update(target["raw"])
+        digest.update("\n".join(target.get("migrations") or []).encode())
     return digest.hexdigest()[:16]
 
 
@@ -397,6 +439,7 @@ def preflight(env: Environment, ref: str) -> tuple[Report, dict, dict]:
     target = resolve_target(env, ref)
     app, worker = env.current()
     check_db(env, report)
+    check_no_leftovers(env, report)
     report.check(bool(app) and app == worker, "app and worker run the same image", "app and worker are missing or differ")
     report.check(app not in accepted_ids(target), "target differs from the running image", "this release is already running")
     config = check_layout_and_compose(env, report, f"{env.repo}@{target['image_digest']}")
@@ -428,6 +471,7 @@ def rollback_preflight(env: Environment) -> tuple[Report, dict, dict]:
         report.fail("no deployment recorded by this system; nothing to roll back")
         return report, {}, {}
     check_db(env, report)
+    check_no_leftovers(env, report)
     app, worker = env.current()
     report.check(not (app == worker == previous["image_id"]), "running image differs from the rollback image",
                  "nothing to roll back: the previous image is already running")
@@ -446,19 +490,57 @@ def rollback_preflight(env: Environment) -> tuple[Report, dict, dict]:
 
 
 # --- operations --------------------------------------------------------------
+def verify_dump(path: Path) -> bool:
+    """Reads the archive back: gzip CRC and length, and pg_dump's closing marker."""
+    tail = b""
+    try:
+        with gzip.open(path, "rb") as stream:
+            for chunk in iter(lambda: stream.read(1 << 20), b""):
+                tail = (tail + chunk)[-400:]
+    except (OSError, EOFError, zlib.error):
+        return False
+    return DUMP_MARKER in tail
+
+
 def local_dump(env: Environment, report: Report, opid: str) -> bool:
+    """One deadline for the whole stream. Only a verified dump gets a .sql.gz name."""
     target = env.state / "backups" / f"{now().replace(':', '')}-{opid[:8]}.sql.gz"
     target.parent.mkdir(parents=True, exist_ok=True)
-    process = subprocess.Popen(["docker", "exec", env.cfg["db_container"], "sh", "-c", 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],
-                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
-    tail = b""
-    with gzip.open(target, "wb") as stream:
-        for chunk in iter(lambda: process.stdout.read(1 << 20), b""):
-            stream.write(chunk)
-            tail = (tail + chunk)[-400:]
-    ok = process.wait(timeout=1800) == 0 and b"PostgreSQL database dump complete" in tail
-    os.chmod(target, 0o600)
-    return report.check(ok, f"database dump written and complete ({target.name}, same host)", "database dump failed; nothing switched")
+    partial = target.with_name(target.name + ".partial")
+    limit = env.host.data.get("dump_timeout", DUMP_TIMEOUT)
+    # `timeout` runs inside the container: killing the docker client would leave pg_dump there.
+    script = f'exec timeout {limit} pg_dump --lock-wait-timeout=60000 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+    ok, expired = False, threading.Event()
+    process = timer = None
+    try:
+        handle = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(handle, "wb") as raw:
+            process = subprocess.Popen(["docker", "exec", env.cfg["db_container"], "sh", "-c", script],
+                                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                                       start_new_session=True)
+            timer = threading.Timer(limit, lambda: (expired.set(), kill_group(process)))
+            timer.start()
+            with gzip.GzipFile(fileobj=raw, mode="wb") as stream:
+                for chunk in iter(lambda: process.stdout.read(1 << 20), b""):
+                    stream.write(chunk)
+            raw.flush()
+            os.fsync(raw.fileno())
+        ok = process.wait(timeout=60) == 0 and not expired.is_set() and verify_dump(partial)
+        if ok:
+            os.replace(partial, target)
+    except (OSError, subprocess.TimeoutExpired):
+        ok = False
+    finally:
+        if timer:
+            timer.cancel()
+        if process:
+            if process.poll() is None:
+                kill_group(process)
+                process.wait()
+            process.stdout.close()
+        partial.unlink(missing_ok=True)
+    reason = f"database dump exceeded {limit} s" if expired.is_set() else "database dump failed"
+    return report.check(ok, f"database dump written and verified ({target.name}, same host)", f"{reason}; nothing switched")
 
 
 def set_app_version(env: Environment, tag: str) -> bool:
@@ -511,18 +593,22 @@ def run_deploy(env: Environment, ref: str, confirmed: str, opid: str, report: Re
     env.state.mkdir(parents=True, exist_ok=True)
     if env.image_id(ref_before) != app_before:
         ref_before = app_before
-    (env.state / "previous.json").write_text(json.dumps({
-        "image_ref": ref_before, "image_id": app_before, "build_id": health_before.get("buildId"),
-        "source_sha": health_before.get("gitSha"), "rollback_compatible": target["rollback_compatible"],
-        "replaced_by": target["build_id"], "recorded": now()}))
+    recorded = env.state / "previous.json"
+    earlier = recorded.read_bytes() if recorded.exists() else None
     if env.cfg["local_dump"] and not local_dump(env, report, opid):
         return
     override = env.state / "override.yml"
     env.write_override(override, pinned)
 
     report.note("Running migrations...")
-    if env.compose("run", "--pull", "never", "--rm", "--no-deps", "-T", "migrate", override=override, timeout=1500).returncode:
-        report.fail("migration failed; app and worker were NOT switched. Inspect migration state before any retry")
+    # Until the switch, `previous.json` still describes the earlier deploy. If this
+    # release is not rollback compatible, its migrations must not allow that older rollback.
+    if earlier and target["rollback_compatible"] is False:
+        write_atomic(recorded, json.dumps({**json.loads(earlier), "rollback_compatible": False}))
+    migration = env.compose("run", "--pull", "never", "--rm", "--no-deps", "-T", "migrate", override=override, timeout=1500)
+    if migration.returncode:
+        report.fail("migration failed; app and worker were NOT switched. Inspect migration state before any retry"
+                    + (" (timed out: it may still be running)" if migration.returncode == 124 else ""))
         return
     migrated = Report()
     check_migrations(env, migrated, target, complete=target["migrations"] is not None)
@@ -537,8 +623,15 @@ def run_deploy(env: Environment, ref: str, confirmed: str, opid: str, report: Re
         report.ok("system seed applied as declared by the release")
 
     report.note("Switching app and worker...")
+    older = recorded.read_bytes() if recorded.exists() else None
+    write_atomic(recorded, json.dumps({
+        "image_ref": ref_before, "image_id": app_before, "build_id": health_before.get("buildId"),
+        "source_sha": health_before.get("gitSha"), "rollback_compatible": target["rollback_compatible"],
+        "replaced_by": target["build_id"], "recorded": now()}))
     if env.compose("up", "-d", "--pull", "never", "--no-deps", "--force-recreate", "app", "worker", override=override).returncode:
         report.fail("container switch failed")
+        if env.current() == (app_before, app_before):  # nothing was replaced
+            write_atomic(recorded, older.decode()) if older else recorded.unlink()
     else:
         env.verify_fleet(report, allowed, target["source_sha"], target["build_id"])
     verify_neighbours(env, report, db_before, others_before)
@@ -584,9 +677,9 @@ def host_lock(path: str):
     """Shared with the legacy deploy.sh. Opened without O_CREAT when present
     because Ubuntu's protected_regular forbids O_CREAT on another user's file in /tmp."""
     try:
-        handle = os.open(path, os.O_RDONLY)
+        handle = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     except FileNotFoundError:
-        handle = os.open(path, os.O_RDONLY | os.O_CREAT, 0o644)
+        handle = os.open(path, os.O_RDONLY | os.O_CREAT | os.O_NOFOLLOW, 0o644)
     try:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -603,10 +696,25 @@ def op_path(env: Environment, opid: str) -> Path:
     return env.state / "ops" / f"{opid}.json"
 
 
+def write_atomic(path: Path, text: str, exclusive: bool = False):
+    """Readers see the whole file or the old one. exclusive: never replace."""
+    handle, temporary = tempfile.mkstemp(dir=path.parent, prefix=".tmp-")
+    try:
+        with os.fdopen(handle, "w") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if exclusive:
+            os.link(temporary, path)
+        else:
+            os.replace(temporary, path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporary)
+
+
 def save_op(path: Path, record: dict):
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(record))
-    os.replace(temporary, path)
+    write_atomic(path, json.dumps(record))
 
 
 def journal(env: Environment, text: str):
@@ -625,54 +733,136 @@ def process_alive(pid) -> bool:
     except PermissionError:
         return True
     with contextlib.suppress(OSError, IndexError):
-        # A killed, not yet reaped worker still answers signals: it is not alive.
+        # A killed, not yet reaped process still answers signals: it is not alive.
         return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
     return True
 
 
-def read_op(env: Environment, opid: str) -> dict:
+def claim(path: Path) -> int | None:
+    """One worker per operation. The worker holds this lock for as long as it
+    lives, so its death is visible without trusting a (reusable) process id."""
+    handle, temporary = tempfile.mkstemp(dir=path.parent, prefix=".tmp-")
     try:
-        record = json.loads(op_path(env, opid).read_text())
-    except (OSError, ValueError):
+        fcntl.flock(handle, fcntl.LOCK_EX)  # locked before it becomes visible
+        os.link(temporary, path.with_suffix(".claim"))
+    except FileExistsError:
+        os.close(handle)
+        return None
+    finally:
+        os.unlink(temporary)
+    return handle
+
+
+def claim_held(path: Path) -> bool | None:
+    """None: never claimed."""
+    try:
+        handle = os.open(path.with_suffix(".claim"), os.O_RDONLY)
+    except FileNotFoundError:
+        return None
+    try:
+        fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        return False
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(handle)
+
+
+def read_record(path: Path) -> dict:
+    try:
+        record = json.loads(path.read_text())
+        if record["state"] != "running":
+            return record
+        held = claim_held(path)
+        dead = held is False or (held is None and time.time() - record.get("queued", 0) > CLAIM_GRACE)
+        if dead:
+            # The worker may have saved its verdict between the two reads.
+            record = json.loads(path.read_text())
+            if record["state"] == "running":
+                record["state"] = "unknown"  # no verdict: never report success
+        return record
+    except FileNotFoundError:
         return {"state": "absent", "report": []}
-    if record["state"] == "running" and not process_alive(record.get("pid")):
-        # The worker vanished (or never started) without a verdict: never report success.
-        if record.get("pid") or time.time() - record.get("queued", 0) > 30:
-            record["state"] = "unknown"
-    return record
+    except (OSError, ValueError, KeyError, TypeError):
+        return {"state": "unknown", "report": ["FAIL the operation record is damaged"]}
+
+
+def read_op(env: Environment, opid: str) -> dict:
+    return read_record(op_path(env, opid))
+
+
+def unfinished_operation(host: HostConfig) -> str | None:
+    for path in Path(host.data["state_dir"]).glob("*/ops/*.json"):
+        if read_record(path)["state"] == "running":
+            return path.stem
+    return None
 
 
 def submit(env: Environment, config_path: str, action: str, ref: str, confirmed: str, opid: str, actor: str, detach: bool = True) -> dict:
-    """Accepts an operation once. Repeating the same id only returns its state."""
+    """Accepts an operation once. Repeating the same request only returns its state."""
     path = op_path(env, opid)
     path.parent.mkdir(parents=True, exist_ok=True)
-    record = {"opid": opid, "action": action, "ref": ref, "fingerprint": confirmed, "actor": actor,
-              "state": "running", "queued": time.time(), "started": now(), "report": [], "pid": None}
+    request = {"action": action, "ref": ref, "fingerprint": confirmed}
+    record = {"opid": opid, **request, "actor": actor, "state": "running", "queued": time.time(), "started": now(),
+              "report": [], "pid": None}
+
+    def existing() -> dict:
+        found = read_record(path)
+        if any(k in found and found[k] != v for k, v in request.items()):
+            raise Refused("operation id was already used for another request")
+        return found
+
+    if path.exists():  # before the lock: the operation itself may be holding it
+        return existing()
     with host_lock(env.host.data["lock_file"]):
-        try:
-            with path.open("x") as stream:
-                json.dump(record, stream)
-        except FileExistsError:
-            return read_op(env, opid)
-    journal(env, f"op={opid} actor={actor} accepted {action} {ref}")
-    command = [sys.executable, "-B", "-m", "mamago_deploy.executor", "--config", config_path, "_run", env.name, opid]
-    if detach:
-        # New session: closing the SSH connection or restarting the bot does not stop it.
-        # Only the worker writes the record from here on (it stores its own pid),
-        # so a finished verdict can never be overwritten.
-        subprocess.Popen(command, start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, cwd=str(Path(__file__).resolve().parent.parent))
-    return read_op(env, opid)
+        if path.exists():
+            return existing()
+        # The lock is free between acceptance and the worker taking it.
+        if unfinished_operation(env.host):
+            raise Refused("another operation was accepted and has not finished")
+        write_atomic(path, json.dumps(record), exclusive=True)
+        if detach:
+            # New session: closing the SSH connection or restarting the bot does not stop it.
+            # Only the worker writes the record from here on, so a verdict is never overwritten.
+            command = [sys.executable, "-B", "-m", "mamago_deploy.executor", "--config", config_path, "_run", env.name, opid]
+            try:
+                subprocess.Popen(command, start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, cwd=str(Path(__file__).resolve().parent.parent))
+            except OSError as error:
+                save_op(path, {**record, "state": "failed", "finished": now(),
+                               "report": [f"FAIL the worker could not be started ({type(error).__name__}); nothing changed"]})
+    with contextlib.suppress(OSError):  # the operation exists; a full disk must not hide that
+        journal(env, f"op={opid} actor={actor} accepted {action} {ref}")
+    return read_record(path)
 
 
 def run_operation(env: Environment, opid: str) -> dict:
     path = op_path(env, opid)
-    record = json.loads(path.read_text())
-    if record["state"] != "running" or record.get("claimed"):
+    if json.loads(path.read_text())["state"] != "running":
+        return read_record(path)
+    handle = claim(path)
+    if handle is None:
+        return read_record(path)
+    try:
+        record = json.loads(path.read_text())
+        if record["state"] != "running":
+            return record
+        report = Report()
+        if time.time() - record["queued"] > CLAIM_DEADLINE:
+            report.fail("the worker started too late; nothing changed. Confirm the operation again")
+        else:
+            record.update(pid=os.getpid())
+            save_op(path, record)
+            perform(env, record, opid, report)
+        record.update(state="failed" if report.failures else "succeeded", finished=now(), report=report.lines)
+        save_op(path, record)
+        journal(env, f"op={opid} actor={record['actor']} {record['action']} {record['state']}")
         return record
-    record.update(claimed=True, pid=os.getpid())
-    save_op(path, record)
-    report = Report()
+    finally:
+        os.close(handle)
+
+
+def perform(env: Environment, record: dict, opid: str, report: Report):
     try:
         for attempt in range(50):
             try:
@@ -681,7 +871,7 @@ def run_operation(env: Environment, opid: str) -> dict:
                         run_deploy(env, record["ref"], record["fingerprint"], opid, report)
                     else:
                         run_rollback(env, record["fingerprint"], report)
-                break
+                return
             except Refused as refusal:
                 # submit() may still hold the lock for an instant; real contention persists.
                 if "another deploy" in str(refusal) and attempt < 49:
@@ -692,10 +882,6 @@ def run_operation(env: Environment, opid: str) -> dict:
         report.fail(str(refusal))
     except Exception as error:  # report, never leak values from the traceback
         report.fail(f"internal error {type(error).__name__}; state must be checked manually")
-    record.update(state="failed" if report.failures else "succeeded", finished=now(), report=report.lines)
-    save_op(path, record)
-    journal(env, f"op={opid} actor={record['actor']} {record['action']} {record['state']}")
-    return record
 
 
 # --- read-only views ----------------------------------------------------------

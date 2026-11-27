@@ -17,13 +17,17 @@ from .common import BUILD_TAG, COMMIT, DIGEST, ENV_ID, RELEASE_ID, SERVICE, Refu
 OPERATIONS = ("status", "logs", "deploy", "rollback")
 
 
+def require_protected(path: Path):
+    info = os.stat(path)
+    if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise Refused(f"{path.name}: writable by group or others")
+    if info.st_uid not in (0, os.geteuid()):
+        raise Refused(f"{path.name}: unexpected owner")
+
+
 def read_protected_json(path: Path) -> dict:
     try:
-        info = os.stat(path)
-        if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
-            raise Refused(f"{path.name}: writable by group or others")
-        if info.st_uid not in (0, os.geteuid()):
-            raise Refused(f"{path.name}: unexpected owner")
+        require_protected(path)
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise Refused(f"{path.name}: cannot be read as configuration ({type(error).__name__})") from None
@@ -81,6 +85,7 @@ class HostConfig:
             "health_attempts": (int, lambda v: 0 < v <= 600, False),
             "health_delay": (int, lambda v: 0 <= v <= 10, False),
             "settle_seconds": (int, lambda v: 0 <= v <= 120, False),
+            "dump_timeout": (int, lambda v: 0 < v <= 7200, False),
         }, "host config")
         environments = {}
         projects: set[str] = set()
@@ -147,6 +152,7 @@ def load_release(releases_dir: Path, release_id: str) -> dict:
         raise Refused("release: a floating tag cannot identify a release")
     migrations = releases_dir / release["migrations_file"]
     try:
+        require_protected(migrations)
         release["migrations"] = sorted(migrations.read_text(encoding="utf-8").split())
     except OSError:
         raise Refused("release: migration list missing") from None
