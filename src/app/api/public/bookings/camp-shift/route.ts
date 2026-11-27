@@ -1,3 +1,4 @@
+import { isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 /**
  * POST /api/public/bookings/camp-shift
  *
@@ -49,6 +50,12 @@ const campShiftBookingSchema = z.object({
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  if (!isDeferredPublicFeatureEnabled("camps")) {
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
   try {
     // Авторизация опциональна
     const user = await getCurrentUser().catch(() => null);

@@ -8,7 +8,7 @@ import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
-import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
+import { isReleaseScopedOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;
@@ -43,6 +43,7 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
           seoOgImage: true,
           seoRobots: true,
           coverImage: true,
+          productType: true,
           status: true,
           archivedAt: true,
           place: {
@@ -73,6 +74,7 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
             seoOgImage: true,
             seoRobots: true,
             coverImage: true,
+            productType: true,
             status: true,
             archivedAt: true,
             place: {
@@ -87,7 +89,7 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
         });
       })();
 
-  if (!offer || !isOfferPubliclyVisible(offer)) {
+  if (!offer || !isReleaseScopedOfferPubliclyVisible(offer)) {
     return { title: "Offer Not Found" };
   }
 
@@ -124,6 +126,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
     select: {
       id: true,
       slug: true,
+      productType: true,
       status: true,
       archivedAt: true,
       place: {
@@ -137,7 +140,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
     },
   });
 
-  if (!offer || !isOfferPubliclyVisible(offer)) notFound();
+  if (!offer || !isReleaseScopedOfferPubliclyVisible(offer)) notFound();
   if (!offer.place?.city?.slug) notFound();
 
   const canonicalPath = getOfferPublicPath(offer, offer.place.city.slug);

@@ -88,4 +88,52 @@ async function counting() {
   const articleWhere = JSON.stringify(seen.article);
   assert.ok(articleWhere.includes("additionalGeographyTargets") && articleWhere.includes("regionTerritoryId"));
 }
-counting().then(() => console.log("listAvailableTerritories.test: ok"));
+async function countingProduction() {
+  const offerQueries: unknown[] = [];
+  const db = {
+    activity: { count: async () => 2 },
+    place: { count: async () => 3 },
+    offer: {
+      count: async (args: unknown) => {
+        offerQueries.push(args);
+        return 4;
+      },
+    },
+    route: { count: async () => 5 },
+    article: { count: async () => 1 },
+  } as unknown as TerritoryCountsDb;
+
+  const result = await countPublicContentForTerritory("t1", db);
+
+  assert.deepEqual(result, {
+    events: 2,
+    classes: 0,
+    birthday: 0,
+    places: 3,
+    offers: 4,
+    routes: 5,
+    articles: 1,
+  });
+
+  assert.equal(offerQueries.length, 1);
+  assert.ok(JSON.stringify(offerQueries[0]).includes("PLACE_VISIT"));
+}
+
+async function main() {
+  const previous = process.env.APP_ENV;
+  try {
+    process.env.APP_ENV = "dev";
+    await counting();
+    process.env.APP_ENV = "production";
+    await countingProduction();
+    console.log("listAvailableTerritories.test: DEV/PROD OK");
+  } finally {
+    if (previous === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = previous;
+  }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

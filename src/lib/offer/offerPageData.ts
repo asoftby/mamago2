@@ -15,7 +15,7 @@ import { getNormalizedPhones } from "@/lib/phones/normalizePhones";
 import { getNormalizedOfferPhones } from "@/lib/offer/offerPhones";
 import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
-import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { resolveCanonicalCta } from "@/lib/cta-platform";
 
 interface GetOfferPageDataParams {
@@ -219,7 +219,7 @@ export async function getOfferPageData({
     where: {
       AND: [
         offerId ? { id: offerId, slug } : { slug },
-        getPublicPublishedOfferWhere(),
+        getReleaseScopedPublicOfferWhere(),
       ],
     },
     include: offerPageInclude,

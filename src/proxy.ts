@@ -1,3 +1,4 @@
+import { isPublicPathBlockedByReleaseScope } from "@/lib/config/publicReleaseScope";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -163,6 +164,25 @@ export async function proxy(request: NextRequest) {
   }
 
   const surface = resolveSurfaceFromHostAndPathname(host, pathname);
+
+  // Enforce the public release scope before streaming can commit HTTP 200.
+  if (
+    surface === "public" &&
+    isPublicPathBlockedByReleaseScope(pathname)
+  ) {
+    return new NextResponse(
+      request.method === "HEAD" ? null : "Not Found",
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "X-Robots-Tag": "noindex, nofollow",
+        },
+      },
+    );
+  }
+
   const search =
     surface === "admin" ? stripPublicDiscoverySearchParams(url.search) : url.search;
 

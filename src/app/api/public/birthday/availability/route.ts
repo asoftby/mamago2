@@ -1,3 +1,4 @@
+import { isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/security/rateLimit";
@@ -13,6 +14,12 @@ const schema = z.object({
   guestCount: z.coerce.number().int().min(1).max(1000),
 });
 export async function GET(request: NextRequest) {
+  if (!isDeferredPublicFeatureEnabled("birthday")) {
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
   const limit = await checkRateLimit("party_slots:" + (request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous"), 30, 60000);
   if (!limit.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   const parsed = schema.safeParse(Object.fromEntries(request.nextUrl.searchParams));

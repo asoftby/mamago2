@@ -485,10 +485,10 @@ test("catalog offer becomes a gift idea; unpublished or unknown offers are refus
   const placeCreator = await makeUser("placeowner");
   const place = await db.place.create({ data: { title: "Place", shortDesc: "x", createdByUserId: placeCreator, cityId: city.id, status: "PUBLISHED", slug: `p-${run}` } });
   const published = await db.offer.create({
-    data: { title: "Мастер-класс", kind: "EVENT", status: "PUBLISHED", placeId: place.id, slug: `mk-${run}` },
+    data: { title: "Мастер-класс", kind: "SERVICE", productType: "PLACE_VISIT", status: "PUBLISHED", placeId: place.id, slug: `mk-${run}` },
   });
   const draft = await db.offer.create({
-    data: { title: "Черновик", kind: "EVENT", status: "DRAFT", placeId: place.id, slug: `dr-${run}` },
+    data: { title: "Черновик", kind: "SERVICE", productType: "PLACE_VISIT", status: "DRAFT", placeId: place.id, slug: `dr-${run}` },
   });
   catalog.countries.push(country.id);
   catalog.cities.push(city.id);

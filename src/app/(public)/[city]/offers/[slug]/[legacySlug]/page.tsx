@@ -21,7 +21,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { findOfferBySlug } from "@/lib/slug/offerSlugService";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
-import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
+import { isReleaseScopedOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
 
 interface LegacyOfferPageProps {
   params: Promise<{ city: string; slug: string; legacySlug: string }>;
@@ -38,6 +38,7 @@ export default async function LegacySectionOfferRedirectPage({ params }: LegacyO
     select: {
       id: true,
       slug: true,
+      productType: true,
       status: true,
       archivedAt: true,
       place: {
@@ -50,7 +51,7 @@ export default async function LegacySectionOfferRedirectPage({ params }: LegacyO
       },
     },
   });
-  if (!offer || !isOfferPubliclyVisible(offer)) notFound();
+  if (!offer || !isReleaseScopedOfferPubliclyVisible(offer)) notFound();
   if (!offer.place?.city?.slug) notFound();
 
   permanentRedirect(getOfferPublicPath(offer, offer.place.city.slug));

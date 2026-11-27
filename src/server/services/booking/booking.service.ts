@@ -1,3 +1,4 @@
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { createHash } from "node:crypto";
 /**
  * Booking Service
@@ -392,7 +393,7 @@ export async function createPublicClassSlotBooking(input: {
   const offer = await prisma.offer.findFirst({
     where: {
       id: input.offerId,
-      ...getPublicPublishedOfferWhere(),
+      ...getReleaseScopedPublicOfferWhere(),
       productType: { in: ["REGULAR_ACTIVITY", "ONE_TIME_ACTIVITY"] },
       bookingEnabled: true,
       bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] },
@@ -952,7 +953,9 @@ async function createPublicationBooking(
     const offer = await db.offer.findFirst({
       where: {
         id: input.publicationId,
-        ...getPublicPublishedOfferWhere(),
+        ...(manual
+          ? getPublicPublishedOfferWhere()
+          : getReleaseScopedPublicOfferWhere()),
         ...(manual ? {
           place: { ownerBusinessId: manual.businessId },
           ...manualRequestOfferWhere,
@@ -1169,7 +1172,7 @@ export async function createCampShiftBooking(
   const offer = await prisma.offer.findFirst({
     where: {
       id: input.offerId,
-      ...getPublicPublishedOfferWhere(),
+      ...getReleaseScopedPublicOfferWhere(),
     },
     select: {
       id: true,

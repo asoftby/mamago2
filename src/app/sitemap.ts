@@ -1,10 +1,11 @@
+import { isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 import type { MetadataRoute } from "next";
 import prisma from "@/lib/prisma";
 import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
 import { getBaseUrl, buildCityPublicPath } from "@/lib/routing/cityPaths";
 import {
   getPublicPublishedPlaceWhere,
-  getPublicPublishedOfferWhere,
+  getReleaseScopedPublicOfferWhere,
   getPublicActivityDetailWhere,
   getPublicListingActivityWhere,
   getPublicPublishedArticleWhere,
@@ -151,18 +152,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "daily",
         priority: 0.8,
       });
-      entries.push({
-        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "programs" })}`,
-        lastModified: city.updatedAt,
-        changeFrequency: "weekly",
-        priority: 0.6,
-      });
-      entries.push({
-        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "classes" })}`,
-        lastModified: city.updatedAt,
-        changeFrequency: "weekly",
-        priority: 0.5,
-      });
+      if (isDeferredPublicFeatureEnabled("classes")) {
+        entries.push({
+          url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "programs" })}`,
+          lastModified: city.updatedAt,
+          changeFrequency: "weekly",
+          priority: 0.6,
+        });
+      }
+      if (isDeferredPublicFeatureEnabled("classes")) {
+        entries.push({
+          url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "classes" })}`,
+          lastModified: city.updatedAt,
+          changeFrequency: "weekly",
+          priority: 0.5,
+        });
+      }
       entries.push({
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "routes" })}`,
         lastModified: city.updatedAt,
@@ -215,44 +220,46 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.warn("[sitemap] city/tag/category query failed, skipping city discovery hubs:", error);
   }
 
-  // Only publish class category hubs with at least one visible offer.
-  try {
-    const [cities, chips] = await Promise.all([
-      prisma.city.findMany({
-        where: { isActive: true, isLegacyNonCity: false },
-        select: { id: true, slug: true, updatedAt: true },
-        take: 50,
-      }),
-      listDiscoveryClassChips(),
-    ]);
-    const candidates = cities.flatMap((city) =>
-      chips.filter((chip) => chip.isActive && chip.slug !== "all").map((chip) => ({ city, chip })),
-    );
-    // Bound the number of concurrent database queries during sitemap generation.
-    for (let offset = 0; offset < candidates.length; offset += 5) {
-      const batch = candidates.slice(offset, offset + 5);
-      const populated = await Promise.all(batch.map(async ({ city, chip }) => {
-        try {
-          return (await countPublicClassesCategory(city.id, city.slug, chip.slug)) > 0
-            ? { city, chip }
-            : null;
-        } catch (error) {
-          console.warn("[sitemap] class category count failed:", city.slug, chip.slug, error);
-          return null;
+  if (isDeferredPublicFeatureEnabled("classes")) {
+    // Only publish class category hubs with at least one visible offer.
+    try {
+      const [cities, chips] = await Promise.all([
+        prisma.city.findMany({
+          where: { isActive: true, isLegacyNonCity: false },
+          select: { id: true, slug: true, updatedAt: true },
+          take: 50,
+        }),
+        listDiscoveryClassChips(),
+      ]);
+      const candidates = cities.flatMap((city) =>
+        chips.filter((chip) => chip.isActive && chip.slug !== "all").map((chip) => ({ city, chip })),
+      );
+      // Bound the number of concurrent database queries during sitemap generation.
+      for (let offset = 0; offset < candidates.length; offset += 5) {
+        const batch = candidates.slice(offset, offset + 5);
+        const populated = await Promise.all(batch.map(async ({ city, chip }) => {
+          try {
+            return (await countPublicClassesCategory(city.id, city.slug, chip.slug)) > 0
+              ? { city, chip }
+              : null;
+          } catch (error) {
+            console.warn("[sitemap] class category count failed:", city.slug, chip.slug, error);
+            return null;
+          }
+        }));
+        for (const item of populated) {
+          if (!item) continue;
+          entries.push({
+            url: `${baseUrl}/${item.city.slug}/classes/${encodeURIComponent(item.chip.slug)}`,
+            lastModified: item.city.updatedAt,
+            changeFrequency: "weekly",
+            priority: 0.65,
+          });
         }
-      }));
-      for (const item of populated) {
-        if (!item) continue;
-        entries.push({
-          url: `${baseUrl}/${item.city.slug}/classes/${encodeURIComponent(item.chip.slug)}`,
-          lastModified: item.city.updatedAt,
-          changeFrequency: "weekly",
-          priority: 0.65,
-        });
       }
+    } catch (error) {
+      console.warn("[sitemap] classes category sitemap failed:", error);
     }
-  } catch (error) {
-    console.warn("[sitemap] classes category sitemap failed:", error);
   }
 
   try {
@@ -285,7 +292,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const offers = await prisma.offer.findMany({
       where: {
         AND: [
-          getPublicPublishedOfferWhere(),
+          getReleaseScopedPublicOfferWhere(),
           { place: { OR: [{ cityId: null }, { city: { isActive: true } }] } },
         ],
       },
