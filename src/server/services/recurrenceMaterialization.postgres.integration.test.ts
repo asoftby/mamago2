@@ -5,7 +5,7 @@ import { loadFamilyCalendarRange } from "./familyCalendar.service";
 
 // This test creates and modifies data. Refuse to run outside its disposable DB.
 const url = new URL(process.env.DATABASE_URL ?? "http://invalid");
-if (url.hostname !== "127.0.0.1" || url.port !== "55444" ||
+if (url.hostname !== "127.0.0.1" || url.port !== "55445" ||
     url.pathname !== "/mamago_plan_recurrence_it") {
   throw new Error("SAFE ABORT: isolated plan recurrence DB only");
 }

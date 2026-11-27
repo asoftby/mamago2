@@ -5,7 +5,7 @@ import { activePlanScopeFor } from "@/server/family/familyAccess";
 
 // Mutating integration test: only the isolated GitHub Actions PostgreSQL.
 const url = new URL(process.env.DATABASE_URL ?? "http://invalid");
-if (url.hostname !== "127.0.0.1" || url.port !== "55444" ||
+if (url.hostname !== "127.0.0.1" || url.port !== "55445" ||
     url.pathname !== "/mamago_plan_recurrence_it" ||
     process.env.FAMILY_CORE_READS !== "true") {
   throw new Error("SAFE ABORT: isolated Plan DB with family reads required");
