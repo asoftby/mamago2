@@ -9,7 +9,7 @@ test("full search pages use DB skip/take without widening autocomplete", () => {
   assert.match(source, /prisma\.searchDocument\.count\(\{ where: literalWhere \}\)/);
   assert.match(source, /prisma\.searchDocument\.findMany\(\{ where, take, skip,/);
   assert.match(source, /Math\.max\(0, offset - literalCount\)/);
-  assert.match(source, /NOT: buildSearchTextWhere\(q\)/);
+  assert.match(source, /NOT: literalTextWhere/);
   assert.match(source, /full \? \{ results, page, pageSize, total, totalPages \} : \{ results \}/);
   assert.match(source, /Math\.min\(Math\.max\(parseInt\(searchParams\.get\("limit"\)/);
   assert.doesNotMatch(source, /selectedPersonaIds|familyMemberId/);
