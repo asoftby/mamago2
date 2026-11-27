@@ -1,3 +1,4 @@
+import { isOfferTypeInPublicReleaseScope } from "@/lib/config/publicReleaseScope";
 import type { BusinessOperationalStatus, ContentStatus, OfferStatus } from "@prisma/client";
 
 type OfferVisibilityPlace = {
@@ -62,4 +63,17 @@ export function isOfferPubliclyVisible(
   offer: OfferPublicVisibilityInput | null | undefined,
 ): boolean {
   return getOfferHiddenReason(offer) === null;
+}
+
+/** Public release scope without changing internal visibility rules. */
+export function isReleaseScopedOfferPubliclyVisible(
+  offer: (OfferPublicVisibilityInput & {
+    productType: string | null;
+  }) | null | undefined,
+): boolean {
+  return Boolean(
+    offer &&
+    isOfferPubliclyVisible(offer) &&
+    isOfferTypeInPublicReleaseScope(offer.productType)
+  );
 }
