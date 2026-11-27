@@ -14,45 +14,52 @@ ssh HOST 'cd /opt/mamago/scripts && chmod 600 deploy_bot.py deploy_bot.py*bak* d
 
 ## 1. Первичная установка (текущий сервер)
 
-Предусловия: PR влит, CI зелёный, не идёт деплой.
+Предусловия: PR влит, CI зелёный, не идёт деплой. Шаги 1–8 не затрагивают работающий бот и контейнеры.
 
-1. Пользователи (бот без docker и sudo; исполнитель в docker):
-
-```bash
-ssh -t HOST 'sudo useradd --system --home /var/lib/mamago-deploy-bot --shell /usr/sbin/nologin mamago-bot && sudo useradd --system --create-home --shell /bin/sh -G docker mamago-exec'
-```
-
-2. Каталоги и код:
+**Предусловие по правам:** `/opt/mamago/dev` сейчас `777`. Исполнитель отказывается работать с каталогом или файлом Compose, доступным на запись всем: любой локальный пользователь мог бы подменить то, что запускает Docker. Исправление (отдельное разрешение; сначала убедиться, что в каталог никто, кроме `user`, не пишет):
 
 ```bash
-scp -r scripts/release/deploybot HOST:/tmp/deploybot
+ssh -t HOST 'sudo chmod o-w /opt/mamago/dev && find /opt/mamago/dev /opt/mamago/prod -maxdepth 1 -perm -o+w -ls'
 ```
+
+1. Пользователи. Домашний каталог исполнителя принадлежит root, чтобы он не мог переписать свои `authorized_keys`:
 
 ```bash
-ssh -t HOST 'cd /tmp/deploybot && sudo install -d -m 755 /opt/mamago-deploy /etc/mamago-deploy /etc/mamago-deploy/releases && sudo cp -r mamago_deploy /opt/mamago-deploy/ && sudo install -m 755 gate deploy-uat-dev.sh /opt/mamago-deploy/ && sudo install -m 644 releases/* /etc/mamago-deploy/releases/ && sudo install -m 644 examples/host.legacy.json /etc/mamago-deploy/host.json && sudo install -m 644 examples/registry.json /etc/mamago-deploy/registry.json && sudo install -d -o mamago-exec -m 750 /var/lib/mamago-deploy && sudo install -m 644 systemd/tmpfiles-mamago-deploy.conf /etc/tmpfiles.d/mamago-deploy.conf && sudo python3 -m venv /opt/mamago-deploy/venv && sudo /opt/mamago-deploy/venv/bin/pip install -r requirements.txt'
+ssh -t HOST 'sudo useradd --system --home /var/lib/mamago-deploy-bot --shell /usr/sbin/nologin mamago-bot && sudo useradd --system --create-home --shell /bin/sh -G docker mamago-exec && h=$(getent passwd mamago-exec | cut -d: -f6) && sudo chown root:root "$h" && sudo chmod 755 "$h" && sudo install -d -m 755 "$h/.ssh" && sudo install -m 644 /dev/null "$h/.ssh/authorized_keys" && sudo install -d -m 700 -o mamago-exec "$h/.docker"'
 ```
 
-`deploy-uat-dev.sh` лежит рядом с пакетом, поэтому работает из `/opt/mamago-deploy`.
+2. Код в свой домашний каталог, не в `/tmp` (там другой локальный пользователь может заранее создать каталог):
 
-3. Доступ исполнителя к Compose и `.env` (ACL, владелец и режим не меняются):
+```bash
+rsync -a --delete --exclude __pycache__ scripts/release/deploybot/ HOST:deploybot-install/
+```
+
+3. Установка под root. Настроенные файлы повторный запуск не перезаписывает (`cp -n`):
+
+```bash
+ssh -t HOST 'cd deploybot-install && sudo install -d -m 755 /opt/mamago-deploy /etc/mamago-deploy /etc/mamago-deploy/releases && sudo rm -rf /opt/mamago-deploy/mamago_deploy && sudo cp -r mamago_deploy /opt/mamago-deploy/ && sudo install -m 755 gate deploy-uat-dev.sh switch-bot.sh set-secret.sh /opt/mamago-deploy/ && sudo cp -r systemd requirements.txt /opt/mamago-deploy/ && sudo chown -R root:root /opt/mamago-deploy && sudo chmod -R go-w /opt/mamago-deploy && sudo install -m 644 releases/*.migrations /etc/mamago-deploy/releases/ && sudo cp -n examples/host.legacy.json /etc/mamago-deploy/host.json && sudo cp -n examples/registry.json /etc/mamago-deploy/registry.json && sudo chmod 644 /etc/mamago-deploy/*.json && sudo install -d -o mamago-exec -m 750 /var/lib/mamago-deploy && sudo install -m 644 systemd/tmpfiles-mamago-deploy.conf /etc/tmpfiles.d/mamago-deploy.conf && sudo systemd-tmpfiles --create /etc/tmpfiles.d/mamago-deploy.conf && sudo python3 -m venv /opt/mamago-deploy/venv && sudo /opt/mamago-deploy/venv/bin/pip install -r requirements.txt'
+```
+
+Манифесты релизов (`releases/*.json`) намеренно **не** устанавливаются: каждый релиз добавляется отдельно после решения владельца (§8).
+
+4. Доступ исполнителя к Compose и `.env` (ACL, владелец и режим не меняются):
 
 ```bash
 ssh -t HOST 'for e in dev prod; do sudo setfacl -m u:mamago-exec:rx /opt/mamago/$e && sudo setfacl -m u:mamago-exec:r /opt/mamago/$e/docker-compose.yml && sudo setfacl -m u:mamago-exec:rw /opt/mamago/$e/.env; done'
 ```
 
-Для DEV сервис app читает и `.env.dev-cron`: дать на него `r`. Доступ к GHCR: `sudo -u mamago-exec docker login ghcr.io` с отдельным токеном `read:packages`.
+Для DEV сервис app читает и `.env.dev-cron`: дать на него `r`. Если `.env` когда-нибудь пересоздаётся (`sed -i`, копирование), ACL пропадает и preflight это покажет. Доступ к GHCR: `sudo -u mamago-exec docker login ghcr.io` с отдельным токеном `read:packages`.
 **СТОП:** `sudo -u mamago-exec docker compose --project-directory /opt/mamago/dev -f /opt/mamago/dev/docker-compose.yml config -q` завершается ошибкой.
 
-4. Ключи по одному на окружение и закрепление host key:
+5. Ключи по одному на окружение и закрепление host key:
 
 ```bash
 ssh -t HOST 'sudo install -d -m 700 -o mamago-bot /etc/mamago-deploy/keys && for e in dev prod; do sudo -u mamago-bot ssh-keygen -q -t ed25519 -N "" -f /etc/mamago-deploy/keys/legacy-$e; done && echo "127.0.0.1 $(cut -d" " -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)" | sudo tee /etc/mamago-deploy/keys/known_hosts'
 ```
 
-Публичные ключи добавить в `~mamago-exec/.ssh/authorized_keys` по образцу `systemd/authorized_keys.example`.
-**СТОП:** `sudo -u mamago-bot ssh -i …/legacy-dev mamago-exec@127.0.0.1 id` выводит `uid=` — forced command не действует.
+Публичные ключи добавить в `authorized_keys` исполнителя (файл root, `644`) по образцу `systemd/authorized_keys.example`. Если в `sshd_config` есть `AllowUsers`/`AllowGroups`, `mamago-exec` туда нужно добавить (изменение SSH — отдельное разрешение).
 
-5. Ключ подписи бэкапов (на Mac) и `allowed_signers`:
+6. Ключ подписи бэкапов (на Mac) и `allowed_signers`:
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/mamago_uat_backup -C uat-backup
@@ -62,48 +69,56 @@ ssh-keygen -t ed25519 -f ~/.ssh/mamago_uat_backup -C uat-backup
 echo "uat-backup $(cat ~/.ssh/mamago_uat_backup.pub)" | ssh -t HOST 'sudo tee /etc/mamago-deploy/allowed_signers >/dev/null'
 ```
 
-6. `/etc/mamago-deploy/access.json`: `{"owner_ids": [ВАШ_ID]}`, `644`, владелец root.
-7. Секреты — см. §2.
-8. Проверка без бота (ничего не меняет):
+7. `/etc/mamago-deploy/access.json`: `{"owner_ids": [ВАШ_ID]}`, `644`, владелец root.
+8. Секреты (§2), затем проверка исполнителя без бота:
 
 ```bash
 ssh -t HOST 'cd /opt/mamago-deploy && sudo -u mamago-exec python3 -E -s -B -m mamago_deploy.executor identify dev && sudo -u mamago-exec python3 -E -s -B -m mamago_deploy.executor status dev'
 ```
 
 **СТОП:** `host_id` не `legacy` или статус не совпадает с реальностью.
-9. Переключение бота — см. §3.
+9. Переключение бота — §3.
 
 ## 2. Перенос секретов
 
-Секреты вводятся владельцем с клавиатуры на сервере, не через чат, историю или аргументы:
+Вводятся владельцем с клавиатуры на сервере, не через чат, историю или аргументы. Пустое значение не записывается:
 
 ```bash
-ssh -t HOST 'sudo install -d -m 700 /etc/mamago-deploy/secrets && for n in bot_token ghcr_token; do read -rsp "$n: " v; echo; printf %s "$v" | sudo tee /etc/mamago-deploy/secrets/$n >/dev/null; sudo chmod 600 /etc/mamago-deploy/secrets/$n; done'
+ssh -t HOST 'sudo /opt/mamago-deploy/set-secret.sh bot_token'
+```
+
+```bash
+ssh -t HOST 'sudo /opt/mamago-deploy/set-secret.sh ghcr_token'
 ```
 
 ## 3. Переключение на новую версию бота
 
-Предусловия: §1–2 выполнены. Панель недоступна несколько секунд; контейнеры не затрагиваются.
-
 ```bash
-ssh -t HOST 'sudo cp /etc/systemd/system/mamago-bot.service /etc/systemd/system/mamago-bot.service.legacy && sudo install -m 644 /tmp/deploybot/systemd/mamago-bot.service /etc/systemd/system/mamago-bot.service && sudo systemctl daemon-reload && sudo systemctl restart mamago-bot.service && sleep 5 && systemctl is-active mamago-bot.service && sudo journalctl -u mamago-bot -n 20 --no-pager'
+ssh -t HOST 'sudo /opt/mamago-deploy/switch-bot.sh switch'
 ```
 
-Контроль: `/start`, `/uat_status`, статус PROD. **СТОП:** сервис не `active` или в журнале `409 Conflict` → §4.
+Скрипт:
+1. сохраняет действующий unit в `mamago-bot.service.legacy` (новым unit не перезаписывает);
+2. **до остановки бота** запускает самопроверку в той же песочнице systemd, тем же пользователем и с теми же credentials: конфигурация, секреты, ключи, host key, gate каждого окружения;
+3. переключает, ждёт начала polling и проверяет, что сервис не перезапускается, нет `409 Conflict` и старого процесса;
+4. при любой ошибке сам возвращает прежний unit и проверяет, что он поднялся.
+
+Контроль после `SWITCHED`: `/start`, `/uat_status`, статус PROD в Telegram.
+**СТОП:** `pre-check failed` (ничего не изменено) — исправить причину; `CRITICAL: the previous bot did not come back` — `journalctl -u mamago-bot`, затем §4. Прерывание SSH переключению не мешает; после пропажи питания проверить `systemctl status mamago-bot`.
 
 ## 4. Откат бота
 
 ```bash
-ssh -t HOST 'sudo cp /etc/systemd/system/mamago-bot.service.legacy /etc/systemd/system/mamago-bot.service && sudo systemctl daemon-reload && sudo systemctl restart mamago-bot.service && systemctl is-active mamago-bot.service'
+ssh -t HOST 'sudo /opt/mamago-deploy/switch-bot.sh rollback'
 ```
 
-Старые `deploy_bot.py` и `deploy.sh` не менялись. После ротации токена старому боту нужен новый токен в его исходнике — поэтому ротацию делать после подтверждения новой версии.
+Старые `deploy_bot.py` и `deploy.sh` не менялись. После ротации токена старому боту нужен новый токен в его исходнике — поэтому ротацию делать после подтверждения новой версии. Остальные шаги установки (пользователи, файлы, ACL) на работу старого бота не влияют и откатывать их не обязательно.
 
 ## 5. Ротация Telegram-токена
 
 Только после того как новая версия проработала без замечаний. Перерыв — меньше минуты.
 1. BotFather → `/revoke` → новый токен (старый перестаёт работать сразу).
-2. §2 только для `bot_token`; `sudo systemctl restart mamago-bot`.
+2. §2 только для `bot_token`; `sudo systemctl restart mamago-bot`; при перезапуске старые нажатия отбрасываются.
 3. Контроль `/start`. **СТОП:** `401 Unauthorized` в журнале → токен введён с ошибкой, повторить.
 4. Копии со старым токеном остаются до отдельного разрешения на удаление; после отзыва токен в них недействителен.
 
@@ -136,6 +151,8 @@ ID контейнера: `ssh HOST 'docker inspect --format "{{.Id}}" dev-db-1'`
 
 Манифест PROD: копия `releases/rc3-uat.json` со своими `id`, `environments: ["prod"]`, `mode: "standard"`, тегом `prod-N`, digest и списком миграций; кладётся владельцем в `/etc/mamago-deploy/releases/`. RC3 на PROD не разрешён.
 
+**RC3 `f79cffbb` и на DEV не разворачивать без нового решения:** в нём платный Boost только у OWNER, а утверждённая политика — OWNER и MANAGER. Манифест `releases/rc3-uat.json` остаётся в репозитории как образец и тестовые данные, на хост он не устанавливается.
+
 Пока на DEV стоит UAT, не запускать старый `deploy.sh dev` и «последнюю версию».
 Новый образ на хосте имеет ID, равный digest манифеста (хранилище containerd).
 
@@ -163,6 +180,8 @@ ID контейнера: `ssh HOST 'docker inspect --format "{{.Id}}" dev-db-1'`
 | Нет VPN (hoster.by) | консоль провайдера; control plane на хосте продолжает работать | открывать публичные порты |
 | Нет control plane | на хосте: `deploy-uat-dev.sh`, executor, в крайнем случае `deploy.sh` | запускать второй экземпляр бота, не остановив первый |
 | Исполнитель прерван (`unknown`) | `executor.log`, `docker compose ps`, `prisma migrate status` | считать успехом |
+| `a one-off container … is still running` | `docker ps --filter label=com.docker.compose.oneoff=True`; дождаться конца миграции и проверить `prisma migrate status` | убивать контейнер миграции, не зная, что он делает |
+| `the audit log is damaged` | сохранить копию `audit.jsonl`, сравнить хеши с `journalctl -u mamago-bot` | удалять или править журнал |
 
 ## 12. Новый хост и переезд
 
