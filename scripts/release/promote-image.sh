@@ -12,7 +12,11 @@ source_digest=$(inspect "$IMAGE:$DEV_TAG")
 if existing=$(inspect "$IMAGE:$PROD_TAG" 2>&1); then
   [[ "$existing" == "$EXPECTED_DIGEST" ]] || { echo 'Destination digest mismatch; refusing overwrite' >&2; exit 1; }
 else
-  if ! [[ "$existing" =~ ^ERROR:[[:space:]]+.*:[[:space:]]+manifest[[:space:]]unknown$ ]]; then
+  # Buildx/GHCR may return "ERROR: <exact image>:prod-N: not found" for an absent tag.
+  # Accept only a proven missing manifest for the expected repository and tag.
+  # Authorization, transport, DNS and all other inspect failures remain fail-closed.
+  missing_tag_error="^ERROR:[[:space:]]+ghcr[.]io/asoftby/mamago2:${PROD_TAG}:[[:space:]]+not[[:space:]]+found$"
+  if ! [[ "$existing" =~ ^ERROR:[[:space:]]+.*:[[:space:]]+manifest[[:space:]]unknown$ || "$existing" =~ $missing_tag_error ]]; then
     echo 'Cannot establish destination absence; refusing promotion' >&2
     exit 1
   fi
