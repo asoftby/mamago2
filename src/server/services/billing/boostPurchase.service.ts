@@ -1,5 +1,5 @@
 import { BillingReferenceType, BillingTransactionType, Prisma } from "@prisma/client";
-import { assertPaidBoostOwnerInTx } from "@/server/services/billing/paidBoostAuthorization";
+import { assertPaidBoostPurchaserInTx } from "@/server/services/billing/paidBoostAuthorization";
 import prisma from "@/lib/prisma";
 import { BILLING_CURRENCY, normalizeFinancialAmount } from "@/lib/billing/money";
 import {
@@ -45,7 +45,7 @@ export function getConfiguredBoostOptions() {
 
 export async function purchaseOfferBoost(params: {
   businessId: string;
-  /** Authenticated user spending the deposit; must be the active billing owner. */
+  /** Authenticated user spending the deposit; must be an active OWNER or MANAGER of this business. */
   actorUserId: string;
   offerId: string;
   optionId: BoostOptionId;
@@ -61,7 +61,7 @@ export async function purchaseOfferBoost(params: {
 
   return prisma.$transaction(async (tx) => {
     // Paid Boost spends money: authorize before replay disclosure or any debit.
-    await assertPaidBoostOwnerInTx(tx, params.businessId, params.actorUserId);
+    await assertPaidBoostPurchaserInTx(tx, params.businessId, params.actorUserId);
     const replay = await tx.boost.findUnique({
       where: { purchaseRequestKey: params.requestKey },
       include: { billingTransaction: { include: { billingAccount: { select: { businessId: true } } } } },
