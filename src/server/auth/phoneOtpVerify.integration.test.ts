@@ -65,7 +65,7 @@ async function main() {
         } });
       }
       return record;
-    }) as typeof originalFind;
+    }) as unknown as typeof originalFind;
     try {
       assert.equal((await request("0123")).status, 400);
       assert.equal(replaced, true);
