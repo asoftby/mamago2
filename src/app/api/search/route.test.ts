@@ -31,6 +31,12 @@ const FIXTURE_ENTITY_ID = "test-fixture-search-word-order-activity";
 const TELEMETRY_QUERY_PREFIX = "__seo_cityslug_telemetry__";
 
 async function withFixtureDocument<T>(fn: () => Promise<T>): Promise<T> {
+  const owner = await prisma.user.create({ data: { email: `search-audit-${Date.now()}@example.invalid` } });
+  try {
+  await prisma.activity.create({ data: {
+    id: FIXTURE_ENTITY_ID, ownerUserId: owner.id, title: "Search fixture",
+    shortDesc: "Search fixture", ageTags: [], type: "EVENT", scheduleMode: "ALWAYS", status: "PUBLISHED",
+  } });
   await prisma.searchDocument.upsert({
     where: { entityType_entityId: { entityType: "activity", entityId: FIXTURE_ENTITY_ID } },
     create: {
@@ -45,10 +51,11 @@ async function withFixtureDocument<T>(fn: () => Promise<T>): Promise<T> {
     },
     update: {},
   });
-  try {
     return await fn();
   } finally {
     await prisma.searchDocument.deleteMany({ where: { entityId: FIXTURE_ENTITY_ID } });
+    await prisma.activity.deleteMany({ where: { id: FIXTURE_ENTITY_ID } });
+    await prisma.user.delete({ where: { id: owner.id } });
   }
 }
 
@@ -94,6 +101,19 @@ async function testMultiWordQueryRequiresAllTokens() {
       !results.some((r) => r.id === FIXTURE_ENTITY_ID),
       "a token absent from the document must exclude it (AND semantics, not OR)",
     );
+  });
+}
+
+async function testStaleDocumentExcluded() {
+  await withFixtureDocument(async () => {
+    await prisma.activity.update({ where: { id: FIXTURE_ENTITY_ID }, data: { status: "DRAFT" } });
+    for (const mode of ["full", "autocomplete"]) {
+      const params = new URLSearchParams({ q: "поросенка", mode });
+      const res = await GET(new NextRequest(`http://localhost:3000/api/search?${params}`));
+      const body = await res.json();
+      assert.ok(Array.isArray(body.results));
+      assert.ok(!body.results.some((r: { id: string }) => r.id === FIXTURE_ENTITY_ID));
+    }
   });
 }
 
@@ -159,6 +179,7 @@ async function main() {
   await testOutOfOrderMultiWordQueryMatches();
   await testSingleTokenQueryUnaffected();
   await testMultiWordQueryRequiresAllTokens();
+  await testStaleDocumentExcluded();
   await testOversizedQueryDoesNotCrash();
   await testManyTokenQueryDoesNotCrash();
   await testValidCitySlugPopulatesSearchQueryLog();
