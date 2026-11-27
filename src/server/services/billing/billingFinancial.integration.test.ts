@@ -23,7 +23,6 @@ import {
   purchaseOfferBoost,
 } from "./boostPurchase.service";
 import { reconcileBillingAccounts } from "./billingReconciliation.service";
-import { purchaseEventBoost } from "./eventBoostPurchase.service";
 import { PaidBoostMembershipRequiredError } from "./paidBoostAuthorization";
 import { registerPromotionActionFromUserEvent } from "../promotion/promotion.service";
 
