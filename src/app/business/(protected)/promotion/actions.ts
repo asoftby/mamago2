@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getBusinessMembership } from "@/server/permissions/business-permissions";
 import {
   PROMOTION_MAX_BUDGET,
   PROMOTION_MIN_BUDGET,
@@ -60,6 +61,10 @@ export async function createPromotionAction(input: {
       ok: false,
       error: "Бизнес не найден.",
     };
+  }
+
+  if (business.operationalStatus !== "ACTIVE" || !(await getBusinessMembership(user.id, business.id))) {
+    return { ok: false, error: "Нет доступа к платному продвижению." };
   }
 
   const parsed = createPromotionSchema.safeParse(input);
