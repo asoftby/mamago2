@@ -3,12 +3,14 @@ import asyncio
 import json
 import re
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from hostfixture import OLD_ID, RELEASE, ROOT
 from network import Network, orchestrator, write_registry
 from mamago_deploy import gate
+from mamago_deploy.executor import read_record
 from mamago_deploy.common import Refused, redact
 from mamago_deploy.config import Registry
 from mamago_deploy.control import Access, Audit, Busy, Confirmations, Pending
@@ -146,9 +148,16 @@ class MultiHostTests(unittest.IsolatedAsyncioTestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
+        self.addCleanup(self.wait_for_workers)  # runs before the directory is removed
         self.network = Network(self.root)
         self.legacy = self.network.add("legacy", ("dev", "prod"))
         self.hoster = self.network.add("hoster", ("dev",))
+
+    def wait_for_workers(self):
+        for _ in range(600):
+            if not any(read_record(path)["state"] == "running" for path in self.root.glob("*/state/*/ops/*.json")):
+                return
+            time.sleep(0.05)
 
     def setup_control(self, mapping=None, **options):
         self.control, self.registry_path = orchestrator(self.root, self.network, mapping, **options)

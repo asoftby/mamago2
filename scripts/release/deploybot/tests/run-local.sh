@@ -7,6 +7,6 @@ docker run --rm -v "$dir:/src:ro" python:3.12-slim bash -c '
   apt-get update -qq >/dev/null && apt-get install -y -qq openssh-client shellcheck util-linux >/dev/null 2>&1
   pip install -q --root-user-action=ignore -r /src/requirements.txt
   cp -r /src /tmp/deploybot && cd /tmp/deploybot
-  shellcheck gate deploy-uat-dev.sh make-backup-attestation.sh tests/*.sh && echo shellcheck-ok
+  shellcheck gate *.sh tests/*.sh && echo shellcheck-ok
   cd tests && python -B -m unittest discover -s . -p "test_*.py" '"$*"'
 '

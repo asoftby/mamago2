@@ -253,6 +253,33 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(victim.read_text(), "keep\n")
 
 
+class SelfCheckTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reports_every_missing_piece_and_prints_no_value(self):
+        from mamago_deploy import check
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "access.json").write_text('{"owner_ids":[1]}')
+            registry = root / "registry.json"
+            registry.write_text(json.dumps({"hosts": {"legacy": {"type": "local", "gate": "/hosts/legacy/gate"}},
+                                            "environments": {"dev": {"host": "legacy", "operations": ["status"], "strict": False}}}))
+            registry.chmod(0o600)
+            (root / "bot_token").write_text("synthetic-value")
+
+            class Refusing(Network):
+                async def call(self, host, env, words, timeout=0):
+                    raise TransportError("authentication failed")
+
+            with mock.patch.dict(os.environ, {"CREDENTIALS_DIRECTORY": str(root)}):
+                ok, lines = await check.run(root, True, Refusing(root))
+        self.assertFalse(ok)
+        report = "\n".join(lines)
+        self.assertIn("PASS credential bot_token", report)
+        self.assertIn("FAIL credential ghcr_token", report)
+        self.assertIn("FAIL dev: authentication failed", report)
+        self.assertNotIn("synthetic-value", report)
+
+
 class ControlPlaneTests(MultiHostTests):
     """Reuses the multi-host fixture; its own tests are not repeated."""
 

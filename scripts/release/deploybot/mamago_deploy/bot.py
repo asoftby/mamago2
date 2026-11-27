@@ -305,6 +305,8 @@ async def serve(config_dir: Path, state_dir: Path):
     if not Access.load(config_dir / "access.json").owner_ids:
         raise SystemExit("access.json authorizes nobody")
     orchestrator = Orchestrator(lambda: Registry.load(registry_path), Transport(), Audit(state_dir / "audit.jsonl"))
+    if not orchestrator.audit.verify():
+        log.error("the audit log is damaged; keep a copy and investigate")
     bot = Bot(token=read_credential("bot_token"))
     dispatcher = Dispatcher()
     dispatcher.include_router(build_router(config_dir / "access.json", orchestrator, Confirmations(),

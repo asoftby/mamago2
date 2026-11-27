@@ -175,3 +175,6 @@ release badmigration "$(printf 'c%.0s' {1..40})" 1 0 0
 release unhealthy "$(printf 'd%.0s' {1..40})" 0 1 0
 
 python3 -B "$src/tests/e2e_ssh.py" "$root" "$keys" "$USER" "$pending"
+
+step "real systemd: sandbox pre-check, credentials and automatic rollback"
+bash "$src/tests/systemd.sh" "$src" "$keys"

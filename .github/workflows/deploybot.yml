@@ -19,7 +19,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Shellcheck
-        run: cd scripts/release/deploybot && shellcheck gate deploy-uat-dev.sh make-backup-attestation.sh tests/*.sh
+        run: cd scripts/release/deploybot && shellcheck gate *.sh tests/*.sh
       - name: Install pinned bot dependencies
         run: |
           python3 -m venv "$RUNNER_TEMP/venv"
