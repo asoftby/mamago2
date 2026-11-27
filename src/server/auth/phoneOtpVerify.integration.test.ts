@@ -38,6 +38,34 @@ async function main() {
     assert.deepEqual(correct.map(r => r.status).sort(), [200, 400]);
     assert.equal(await prisma.session.count({ where: { userId: user.id } }), 1);
     assert.equal(await prisma.phoneOtp.count({ where }), 0);
+
+    // A replacement code must survive an attempt using the previous code.
+    await seed();
+    await prisma.phoneOtp.updateMany({ where, data: {
+      codeHash: hashCode("4567"), lastSentAt: new Date(Date.now() + 1000),
+      expiresAt: new Date(Date.now() + 61000), attempts: 0,
+    } });
+    assert.equal((await request("0123")).status, 400);
+    assert.equal((await prisma.phoneOtp.findFirstOrThrow({ where })).codeHash, hashCode("4567"));
+    assert.equal((await request("4567")).status, 200);
+
+    await seed();
+    await prisma.user.update({ where: { id: user.id }, data: { status: "BANNED", phoneVerifiedAt: null } });
+    assert.equal((await request("0123")).status, 400);
+    const banned = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    assert.equal(banned.status, "BANNED");
+    assert.equal(banned.phoneVerifiedAt, null);
+    assert.equal(await prisma.session.count({ where: { userId: user.id } }), 2);
+
+    await seed();
+    for (const code of ["12-34", "123", "12345", "abcd"]) {
+      assert.equal((await request(code)).status, 400);
+    }
+    const malformed = await POST(new NextRequest("http://localhost/api/auth/phone/verify-otp", {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{",
+    }));
+    assert.equal(malformed.status, 400);
+    assert.equal((await prisma.phoneOtp.findFirstOrThrow({ where })).attempts, 0);
   } finally {
     await prisma.rateLimitEntry.deleteMany({ where: { key } });
     await prisma.phoneOtp.deleteMany({ where });
