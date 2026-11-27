@@ -1,0 +1,66 @@
+name: Audit RC3 published digest verification (read-only)
+
+# Pulls the already published UAT image by immutable digest, proves it is the
+# exact image that passed smoke, and starts it on an isolated PostgreSQL 16.
+# Read-only registry access: nothing is pushed, retagged or deployed.
+on:
+  push:
+    branches:
+      - audit/rc3-verify-20261127
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  verify:
+    if: github.repository == 'asoftby/mamago2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: f79cffbb5808c808bd7e0b09544b20c1f1961ed3
+      BUILD_ID: uat-20261127-f79cffbb5808
+      TAG: ghcr.io/asoftby/mamago2:uat-20261127-f79cffbb5808
+      DIGEST: sha256:23d222316c45376f20f7ff17090905ff8fd956961de8dd373f6993e16cde3e84
+      TESTED_IMAGE_ID: sha256:a8c5cc0147067d75e2d5809d0471cf2033d98aa3dd221555aa78be04b56a5ecf
+    steps:
+      - name: Log in to GHCR (read)
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - name: Tag resolves to the recorded digest and pull is the tested image
+        shell: bash
+        run: |
+          set -euo pipefail
+          resolved=$(docker buildx imagetools inspect "$TAG" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "tag digest=$resolved"
+          [ "$resolved" = "$DIGEST" ] || exit 1
+          ref="ghcr.io/asoftby/mamago2@$DIGEST"
+          docker pull --platform linux/amd64 "$ref"
+          docker image inspect "$ref" --format 'os/arch={{.Os}}/{{.Architecture}} id={{.Id}} revision={{index .Config.Labels "org.opencontainers.image.revision"}}'
+          [ "$(docker image inspect "$ref" --format '{{.Id}}')" = "$TESTED_IMAGE_ID" ] || { echo "not the tested image"; exit 1; }
+          [ "$(docker image inspect "$ref" --format '{{.Os}}/{{.Architecture}}')" = linux/amd64 ] || exit 1
+          [ "$(docker image inspect "$ref" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$SOURCE_SHA" ] || exit 1
+      - name: Run the pulled digest on an isolated PostgreSQL 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="ghcr.io/asoftby/mamago2@$DIGEST"
+          docker network create --internal v
+          docker run -d --name vdb --network v -e POSTGRES_USER=rc -e POSTGRES_PASSWORD=synthetic_only -e POSTGRES_DB=rc postgres:16
+          for i in $(seq 1 30); do docker exec vdb pg_isready -h 127.0.0.1 -U rc -d rc && break; sleep 2; done
+          url=postgresql://rc:synthetic_only@vdb:5432/rc
+          docker run --rm --network v -e DATABASE_URL="$url" --entrypoint node "$ref" node_modules/prisma/build/index.js migrate deploy | tail -3
+          docker run -d --name vweb --network v -e DATABASE_URL="$url" -e APP_ENV=test -e HOSTNAME=0.0.0.0 -e OTP_SECRET=synthetic "$ref"
+          for i in $(seq 1 45); do docker exec vweb curl -fsS http://127.0.0.1:3000/api/health > health.json 2>/dev/null && break; sleep 2; done
+          cat health.json; echo
+          jq -e --arg sha "$SOURCE_SHA" --arg b "$BUILD_ID" '.status=="ok" and .db=="ok" and .gitSha==$sha and .buildId==$b' health.json
+          for p in /minsk/classes /minsk/birthday /nonexistent-xyz; do
+            code=$(docker exec vweb curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$p"); echo "$code $p"; [ "$code" = 404 ] || exit 1
+          done
+          code=$(docker exec vweb curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:3000/api/parent/parties"); echo "$code parties"; [ "$code" = 404 ] || exit 1
+          echo "DIGEST_VERIFIED $DIGEST"
