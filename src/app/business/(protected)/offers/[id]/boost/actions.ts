@@ -23,7 +23,7 @@ export async function purchaseOfferBoostAction(input: z.input<typeof purchaseSch
   if (!business) return { ok: false as const, error: "Бизнес не найден." };
 
   if (business.operationalStatus !== "ACTIVE" || !(await canPurchasePaidBoost(user.id, business.id))) {
-    return { ok: false as const, error: "Платное продвижение может приобрести только владелец бизнеса." };
+    return { ok: false as const, error: "Платное продвижение доступно только активному владельцу или менеджеру бизнеса." };
   }
 
   const parsed = purchaseSchema.safeParse(input);
