@@ -451,6 +451,8 @@ jobs:
           pnpm exec tsx src/app/robots.test.ts
           pnpm exec tsx src/lib/seo/indexingPolicy.test.ts
           pnpm exec tsx src/server/public/publicContentVisibility.test.ts
+          pnpm exec tsx --test src/lib/release/publicReleaseScope.test.ts
+          pnpm exec tsx src/features/city-home/config/homeSectionAvailability.test.ts
           pnpm exec tsx src/lib/search/builders/buildArticleDocument.test.ts
           pnpm exec tsx src/lib/article/nextArticleInSection.test.ts
           pnpm exec tsx src/app/api/search/searchPagination.contract.test.ts

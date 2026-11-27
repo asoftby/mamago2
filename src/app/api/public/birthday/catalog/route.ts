@@ -1,7 +1,10 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { getPublicBirthdayCatalog } from "@/server/birthday/catalog.service";
 
 export async function GET(request: NextRequest) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   const city = new URL(request.url).searchParams.get("city");
   if (!city || !/^[a-z][a-z0-9-]{0,80}$/.test(city)) {
     return NextResponse.json({ error: "Некорректный город" }, { status: 400 });

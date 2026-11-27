@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -30,6 +31,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const outOfScope = releaseScopeApiGuard("classes");
+  if (outOfScope) return outOfScope;
   const ip = getTrustedClientIp(request) ?? "unknown";
   const limit = await checkRateLimit(`class_reserve:${ip}`, 10, 10 * 60_000);
   if (!limit.allowed) return NextResponse.json({ error: "Слишком много попыток" }, { status: 429 });
