@@ -1,0 +1,157 @@
+name: Audit RC image build and smoke (no publish)
+
+# Builds the exact audit release candidate with the production Dockerfile on a
+# GitHub-hosted linux/amd64 runner and smoke-tests app + worker against an
+# isolated PostgreSQL 16. No registry login and no packages permission: the
+# image cannot be published from this workflow.
+on:
+  push:
+    branches:
+      - audit/rc2-image-20261127
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-rc2-image-20261127
+  cancel-in-progress: false
+
+jobs:
+  build-and-smoke:
+    if: github.repository == 'asoftby/mamago2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      SOURCE_SHA: 8766371f8c6250e49b0aa73091eec76f98461374
+      BUILD_ID: audit-rc2-8766371f8c62
+      IMAGE: mamago2-audit-rc2:8766371f8c62
+    steps:
+      - name: Runner platform and memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -m
+          test "$(uname -m)" = x86_64 || exit 1
+          free -h
+          df -h .
+
+      - name: Check out exact RC SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 8766371f8c6250e49b0aa73091eec76f98461374
+          persist-credentials: false
+
+      - name: Build with production Dockerfile (load only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA" || exit 1
+          test -z "$(git status --porcelain)" || exit 1
+          start=$(date +%s)
+          docker buildx build --load --platform linux/amd64 --progress plain \
+            --tag "$IMAGE" \
+            --label "org.opencontainers.image.revision=$SOURCE_SHA" \
+            --build-arg "GIT_COMMIT_SHA=$SOURCE_SHA" --build-arg "BUILD_ID=$BUILD_ID" \
+            --build-arg REDIRECT_MANIFEST_MIN_ROWS=850 \
+            --metadata-file "$RUNNER_TEMP/build-metadata.json" . 2>&1 | tee "$RUNNER_TEMP/build.log" | tail -40
+          echo "build_seconds=$(( $(date +%s) - start ))" | tee "$RUNNER_TEMP/build-time.txt"
+          docker image inspect "$IMAGE" --format 'os/arch={{.Os}}/{{.Architecture}} id={{.Id}} size={{.Size}} user={{.Config.User}}' | tee "$RUNNER_TEMP/image.txt"
+          test "$(docker image inspect "$IMAGE" --format '{{.Os}}/{{.Architecture}}')" = linux/amd64 || exit 1
+          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$SOURCE_SHA" || exit 1
+
+      - name: Start isolated PostgreSQL 16, migrate, run app and worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create --internal rc-smoke
+          docker run -d --name rc-db --network rc-smoke \
+            -e POSTGRES_USER=rc -e POSTGRES_PASSWORD=synthetic_only -e POSTGRES_DB=rc postgres:16
+          for i in $(seq 1 30); do docker exec rc-db pg_isready -h 127.0.0.1 -U rc -d rc && break; sleep 2; done
+          db_url=postgresql://rc:synthetic_only@rc-db:5432/rc
+          docker run --rm --network rc-smoke -e DATABASE_URL="$db_url" \
+            --entrypoint node "$IMAGE" node_modules/prisma/build/index.js migrate deploy | tail -5
+          docker run --rm --network rc-smoke -e DATABASE_URL="$db_url" \
+            --entrypoint node "$IMAGE" node_modules/prisma/build/index.js migrate status | tail -3
+          docker run -d --name rc-web --network rc-smoke \
+            -e DATABASE_URL="$db_url" -e APP_ENV=test -e HOSTNAME=0.0.0.0 \
+            -e OTP_SECRET=synthetic_smoke_only "$IMAGE"
+          for i in $(seq 1 45); do
+            docker exec rc-web curl -fsS http://127.0.0.1:3000/api/health > "$RUNNER_TEMP/health.json" 2>/dev/null && break
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/health.json"; echo
+          jq -e --arg sha "$SOURCE_SHA" --arg build "$BUILD_ID" \
+            '.status == "ok" and .db == "ok" and .gitSha == $sha and .buildId == $build' "$RUNNER_TEMP/health.json"
+          docker run -d --name rc-worker --network rc-smoke \
+            -e DATABASE_URL="$db_url" -e APP_ENV=test \
+            -e OPS_HEALTHCHECK_URL=http://rc-web:3000/api/health \
+            --entrypoint node "$IMAGE" dist/worker/index.js
+          for i in $(seq 1 30); do docker logs rc-worker 2>&1 | grep -qF '[worker] started' && break; sleep 2; done
+          docker logs rc-worker > "$RUNNER_TEMP/worker.log" 2>&1
+          grep -F '[worker] started' "$RUNNER_TEMP/worker.log"
+          test "$(docker inspect rc-worker --format '{{.State.Running}}')" = true || exit 1
+
+      - name: HTTP smoke matrix (inside the isolated network)
+        shell: bash
+        run: |
+          set -uo pipefail
+          fails=0
+          check() {
+            local expected="$1"; shift
+            local code
+            code=$(docker exec rc-web curl -s -o /dev/null -w '%{http_code}' "$@")
+            local verdict=PASS; [[ " $expected " == *" $code "* ]] || { verdict=FAIL; fails=$((fails+1)); }
+            printf '%s\t%s\texpected=%s\t%s\n' "$verdict" "$code" "$expected" "${*: -1}" | tee -a "$RUNNER_TEMP/smoke.tsv"
+          }
+          H=http://127.0.0.1:3000
+          check "200" "$H/api/health"
+          check "200" "$H/api/search?q=test&mode=autocomplete"
+          check "200" "$H/api/search?q=test&mode=full&page=1"
+          check "200" "$H/robots.txt"
+          check "200" "$H/sitemap.xml"
+          check "301 302 307 308" "$H/"
+          check "401" "$H/api/business/billing"
+          check "401" "$H/api/business/billing/transactions"
+          check "401" "$H/api/notifications"
+          check "401" "$H/api/business/bookings"
+          check "404" "$H/api/booking-reoffers/nonexistent"
+          check "400" -X POST -H 'content-type: application/json' --data '{' "$H/api/auth/phone/verify-otp"
+          check "400" -X POST -H 'content-type: application/json' --data '{"phone":"+375291234567","code":"12-34","purpose":"LOGIN"}' "$H/api/auth/phone/verify-otp"
+          check "400" -X POST -H 'content-type: application/json' --data '[]' "$H/api/auth/phone/send-otp"
+          check "307 302" "$H/business/dashboard"
+          check "307 302" "$H/admin"
+          echo "--- XR-15 real 404 for missing content, XR-19 release scope" | tee -a "$RUNNER_TEMP/smoke.tsv"
+          for path in /places/nonexistent-legacy-id /minsk/events/nonexistent-slug /minsk/places/nonexistent-slug /minsk/blog/nonexistent-slug /nonexistent-page-xyz /minsk/classes /minsk/classes/dance /minsk/programs /minsk/birthday /minsk/birthday/make /me/birthdays; do
+            check "404" "$H$path"
+            check "404" -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" "$H$path"
+          done
+          for path in /api/public/birthday/catalog /api/public/birthday/availability /api/public/party-availability /api/public/discovery/class-chips /api/public/offers/x/slots; do
+            check "404" "$H$path"
+          done
+          check "404" -X POST -H 'content-type: application/json' --data '{}' "$H/api/public/offers/x/reserve"
+          docker logs rc-web > "$RUNNER_TEMP/web.log" 2>&1
+          echo "smoke_failures=$fails"
+          test "$fails" -eq 0
+
+      - name: Save evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: audit-rc-8766371f8c62-evidence
+          path: |
+            ${{ runner.temp }}/build-metadata.json
+            ${{ runner.temp }}/build-time.txt
+            ${{ runner.temp }}/image.txt
+            ${{ runner.temp }}/health.json
+            ${{ runner.temp }}/worker.log
+            ${{ runner.temp }}/web.log
+            ${{ runner.temp }}/smoke.tsv
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Clean up
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f rc-web rc-worker rc-db 2>/dev/null || true
+          docker network rm rc-smoke 2>/dev/null || true
