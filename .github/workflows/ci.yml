@@ -541,6 +541,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/auth/activationEndpoints.integration.test.ts
           pnpm exec tsx src/server/auth/activationRequestFlow.integration.test.ts
+          OTP_SECRET=synthetic_ci_otp_verify_secret_no_real_data pnpm exec tsx src/server/auth/phoneOtpVerify.integration.test.ts
 
       - name: Five-user WordPress recovery atomicity and rerun on PostgreSQL
         env:
