@@ -12,6 +12,8 @@
  * articles, search, B2B); only the catalogue promotion (sitemap) is withheld.
  */
 
+import { hasFullPublicReleaseScope } from "@/lib/config/publicReleaseScope";
+
 export type PublicReleaseFeature = "classes" | "birthday" | "placesCatalog";
 
 const FEATURE_ENV_KEYS = {
@@ -23,7 +25,10 @@ const FEATURE_ENV_KEYS = {
 type Env = Record<string, string | undefined>;
 
 export function isPublicReleaseFeatureEnabled(feature: PublicReleaseFeature, env: Env = process.env): boolean {
-  return env[FEATURE_ENV_KEYS[feature]]?.trim().toLowerCase() === "true";
+  // DEV/test environments keep deferred sections available for UAT; PROD
+  // remains fail-closed unless its feature is explicitly enabled.
+  return hasFullPublicReleaseScope({ APP_ENV: env.APP_ENV }) ||
+    env[FEATURE_ENV_KEYS[feature]]?.trim().toLowerCase() === "true";
 }
 
 /**
