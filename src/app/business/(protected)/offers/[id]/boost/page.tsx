@@ -22,7 +22,7 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
   });
   if (!offer) notFound();
 
-  const [regions, isBillingOwner] = await Promise.all([
+  const [regions, isPaidBoostPurchaser] = await Promise.all([
     listBoostTargetRegions(),
     canPurchasePaidBoost(user.id, business.id),
   ]);
@@ -39,11 +39,11 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
           Boost доступен только для опубликованной активной услуги, которая участвует в каталожной выдаче.
         </div>
       ) : (
-        isBillingOwner ? (
+        isPaidBoostPurchaser ? (
           <BoostPurchaseClient offerId={offer.id} options={getConfiguredBoostOptions()} regions={regions} />
         ) : (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm text-stone-700">
-          Платный Boost может приобрести только владелец бизнеса. Бесплатный ежедневный Boost доступен в разделе «Boost публикаций».
+          Платное продвижение доступно активным владельцам и менеджерам бизнеса. Бесплатный ежедневный Boost доступен в разделе «Boost публикаций».
         </div>
         )
       )}
