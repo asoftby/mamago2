@@ -20,7 +20,7 @@ export default async function EventBoostPage({ params }: { params: Promise<{ id:
     select: { id: true, title: true, status: true },
   });
   if (!event) notFound();
-  const [regions, isBillingOwner] = await Promise.all([
+  const [regions, isPaidBoostPurchaser] = await Promise.all([
     listBoostTargetRegions(),
     canPurchasePaidBoost(user.id, business.id),
   ]);
@@ -33,11 +33,11 @@ export default async function EventBoostPage({ params }: { params: Promise<{ id:
       {event.status !== "PUBLISHED" ? (
         <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Boost доступен только для опубликованного события.</p>
       ) : (
-        isBillingOwner ? (
+        isPaidBoostPurchaser ? (
           <BoostPurchaseClient eventId={event.id} options={getConfiguredBoostOptions()} regions={regions} />
         ) : (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm text-stone-700">
-          Платный Boost может приобрести только владелец бизнеса. Бесплатный ежедневный Boost доступен в разделе «Boost публикаций».
+          Платное продвижение доступно активным владельцам и менеджерам бизнеса. Бесплатный ежедневный Boost доступен в разделе «Boost публикаций».
         </div>
         )
       )}
