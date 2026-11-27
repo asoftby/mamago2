@@ -153,3 +153,30 @@ test("envelope v1 rejects truncated GCM tags instead of downgrading authenticati
     (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "MALFORMED_ENVELOPE",
   );
 });
+
+test("authenticated but invalid identity payloads are rejected", () => {
+  const valid = buildIdentityPayload(user, endedAt);
+  const pub = loadPublicKey(main.publicKey);
+  const priv = loadPrivateKey(main.privateKey, "test-passphrase");
+  const invalid = [
+    { ...valid, schemaVersion: 2 },
+    { ...valid, email: 123 },
+    { ...valid, phoneE164: undefined },
+    { ...valid, accountCreatedAt: "invalid" },
+    { ...valid, emailVerifiedAt: false },
+    { ...valid, displayName: {} },
+  ];
+  for (const payload of invalid) {
+    const sealed = sealIdentityPayload(payload as typeof valid, pub);
+    assert.throws(
+      () => openIdentityEnvelope(sealed.envelope, user.id, priv),
+      (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "MALFORMED_ENVELOPE",
+    );
+  }
+});
+
+test("seal rejects an unusable wrapping key", () => {
+  const payload = buildIdentityPayload(user, endedAt);
+  const ec = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  assert.throws(() => sealIdentityPayload(payload, { key: ec.publicKey, keyId: "invalid" }));
+});
