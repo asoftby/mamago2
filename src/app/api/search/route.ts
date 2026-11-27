@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { swapKeyboardLayout } from "@/lib/search/keyboardLayout";
+import { getPublicActivityDetailWhere, getPublicPublishedPlaceWhere, getPublicPublishedOfferWhere, getPublicPublishedArticleWhere, getPublicRouteIndexWhere } from "@/server/public/publicContentVisibility";
 import prisma from "@/lib/prisma";
 import type { SearchResultItem, SearchResultType } from "@/lib/search/types";
 import { logSearchQuery } from "@/lib/search/logSearchQuery";
@@ -77,11 +78,36 @@ export async function GET(request: Request) {
       entityId: true, entityType: true, title: true, urlPath: true,
       imageUrl: true, summaryLine: true, metaLine: true,
     } as const;
-    const literalWhere = { isPublished: true, ...buildSearchTextWhere(q) };
+    const literalTextWhere = buildSearchTextWhere(q);
     const alternate = swapKeyboardLayout(q);
     // Fallback matches must not repeat literal matches, including across pages.
-    const alternateWhere = alternate && alternate !== q
-      ? { AND: [{ isPublished: true }, buildSearchTextWhere(alternate), { NOT: buildSearchTextWhere(q) }] }
+    const alternateTextWhere = alternate && alternate !== q
+      ? { AND: [buildSearchTextWhere(alternate), { NOT: literalTextWhere }] }
+      : null;
+    // The index is asynchronous; validate source visibility before counting or paging.
+    const candidates = await prisma.searchDocument.findMany({
+      where: { isPublished: true, OR: [literalTextWhere, ...(alternateTextWhere ? [alternateTextWhere] : [])] },
+      select: { entityType: true, entityId: true },
+    });
+    const ids = (type: string) => candidates.filter(d => d.entityType === type).map(d => d.entityId);
+    const selectId = { id: true } as const;
+    const [activities, places, offers, articles, routes] = await Promise.all([
+      prisma.activity.findMany({ where: { id: { in: ids("activity") }, ...getPublicActivityDetailWhere() }, select: selectId }),
+      prisma.place.findMany({ where: { id: { in: ids("place") }, ...getPublicPublishedPlaceWhere() }, select: selectId }),
+      prisma.offer.findMany({ where: { id: { in: ids("offer") }, ...getPublicPublishedOfferWhere() }, select: selectId }),
+      prisma.article.findMany({ where: { id: { in: ids("article") }, slug: { not: null }, ...getPublicPublishedArticleWhere() }, select: selectId }),
+      prisma.route.findMany({ where: { id: { in: ids("route") }, ...getPublicRouteIndexWhere() }, select: selectId }),
+    ]);
+    const visible = { OR: [
+      { entityType: "activity", entityId: { in: activities.map(x => x.id) } },
+      { entityType: "place", entityId: { in: places.map(x => x.id) } },
+      { entityType: "offer", entityId: { in: offers.map(x => x.id) } },
+      { entityType: "article", entityId: { in: articles.map(x => x.id) } },
+      { entityType: "route", entityId: { in: routes.map(x => x.id) } },
+    ] };
+    const literalWhere = { isPublished: true, AND: [visible, literalTextWhere] };
+    const alternateWhere = alternateTextWhere
+      ? { isPublished: true, AND: [visible, alternateTextWhere] }
       : null;
     const findDocs = (where: import("@prisma/client").Prisma.SearchDocumentWhereInput, take: number, skip = 0) =>
       prisma.searchDocument.findMany({ where, take, skip, orderBy: [...orderBy], select });
@@ -108,7 +134,7 @@ export async function GET(request: Request) {
     } else {
       const literalDocs = await findDocs(literalWhere, limit);
       const additionalDocs = alternateWhere && literalDocs.length < limit
-        ? await findDocs({ isPublished: true, ...buildSearchTextWhere(alternate!) }, limit)
+        ? await findDocs(alternateWhere, limit)
         : [];
       const seen = new Set<string>();
       docs = [...literalDocs, ...additionalDocs].filter((doc) => {
