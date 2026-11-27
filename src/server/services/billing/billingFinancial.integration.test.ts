@@ -14,6 +14,7 @@ import {
 import { createRefund, RefundNotAllowedError } from "./billingTransaction.service";
 import {
   BoostAlreadyActiveError,
+  BoostPurchaseNotAllowedError,
   BoostPricingUnavailableError,
   getConfiguredBoostOptions,
   purchaseOfferBoost,
@@ -186,6 +187,10 @@ test("Boost uses server price and atomically links one debit", async () => {
   const key = `${prefix}:boost-success`;
   const purchase = await purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
   const replay = await purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
+  await assert.rejects(
+    purchaseOfferBoost({ businessId: "foreign-business", offerId, optionId: "BOOST_3_DAYS", requestKey: key }),
+    BoostPurchaseNotAllowedError,
+  );
   assert.equal(purchase.boost.id, replay.boost.id);
   assert.equal(purchase.boost.price?.toFixed(2), "12.00");
   assert.equal(purchase.boost.durationDays, 3);
