@@ -1,3 +1,4 @@
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
@@ -224,8 +225,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
   if (isLegacyId) {
     // Legacy ID - find by id and redirect to the canonical slug URL, under
     // the place's own city (never assume it matches the URL's city).
-    const legacyPlace = await prisma.place.findUnique({
-      where: { id: slug },
+    const legacyPlace = await prisma.place.findFirst({
+      where: { id: slug, ...getPublicPublishedPlaceWhere() },
       select: { id: true, slug: true, cityId: true, city: { select: { slug: true } } },
     });
 
@@ -246,7 +247,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     if (slugResult) {
       placeId = slugResult.placeId;
       if (slugResult.isRedirect) {
-        const currentPlace = await prisma.place.findUnique({ where: { id: placeId }, select: { slug: true } });
+        const currentPlace = await prisma.place.findFirst({ where: { id: placeId, ...getPublicPublishedPlaceWhere() }, select: { slug: true } });
         if (!currentPlace?.slug) notFound();
         permanentRedirect(buildCityPublicPath({ citySlug: city.slug, type: "place", slug: currentPlace.slug }));
       }
@@ -257,8 +258,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
       // only ever a redirect or a genuine not-found.
       const globalResult = await findPlaceBySlug(slug);
       if (!globalResult) notFound();
-      const otherPlace = await prisma.place.findUnique({
-        where: { id: globalResult.placeId },
+      const otherPlace = await prisma.place.findFirst({
+        where: { id: globalResult.placeId, ...getPublicPublishedPlaceWhere() },
         select: { slug: true, city: { select: { slug: true } } },
       });
       if (!otherPlace?.slug || !otherPlace.city?.slug) notFound();
