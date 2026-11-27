@@ -6,6 +6,7 @@ import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurcha
 import { debitBusinessDepositInTx } from "@/server/services/billing/billingAccount.service";
 import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
+import { assertPaidBoostOwnerInTx } from "@/server/services/billing/paidBoostAuthorization";
 
 export async function purchaseEventBoost(params: {
   businessId: string;
@@ -20,9 +21,15 @@ export async function purchaseEventBoost(params: {
   const targetRegionIds = await validateBoostTargetRegions(params.targetRegionIds);
 
   return prisma.$transaction(async (tx) => {
-    const replay = await tx.boost.findUnique({ where: { purchaseRequestKey: params.requestKey } });
+    // Paid Boost spends money: authorize before replay disclosure or any debit.
+    await assertPaidBoostOwnerInTx(tx, params.businessId, params.ownerUserId);
+    const replay = await tx.boost.findUnique({
+      where: { purchaseRequestKey: params.requestKey },
+      include: { billingTransaction: { select: { billingAccount: { select: { businessId: true } } } } },
+    });
     if (replay) {
-      if (replay.activityId !== params.activityId || replay.durationDays !== option.durationDays ||
+      if (replay.billingTransaction?.billingAccount.businessId !== params.businessId ||
+          replay.activityId !== params.activityId || replay.durationDays !== option.durationDays ||
           !replay.price?.equals(option.price) ||
           JSON.stringify([...replay.targetRegionIds].sort()) !== JSON.stringify([...targetRegionIds].sort())) {
         throw new Error("Ключ запроса уже использован для другой покупки.");

@@ -22,18 +22,37 @@ test("billing entry points require active owner membership", () => {
   }
 });
 
-test("paid promotion allows active OWNER and MANAGER membership without platform bypass", () => {
-  const permissions = source("src/server/permissions/business-permissions.ts");
-  const membership = permissions.split("export async function getBusinessMembership(")[1].split("export async function")[0];
-  assert.match(membership, /userId,\s*businessId,\s*isActive: true/);
-  assert.match(membership, /BusinessMemberRole\.OWNER, BusinessMemberRole\.MANAGER/);
+test("paid promotion requires an active billing OWNER and an ACTIVE business, no platform bypass", () => {
+  // Owner decision 2026-11-27 (AUDIT-XR-02): only OWNER may buy paid promotion; MANAGER keeps free Boost.
   for (const path of [
     "src/app/business/(protected)/offers/[id]/boost/actions.ts",
+    "src/app/business/(protected)/events/[id]/boost/actions.ts",
     "src/app/business/(protected)/promotion/actions.ts",
   ]) {
     const code = source(path);
-    assert.match(code, /getCurrentUser\(\)/);
-    assert.match(code, /getMyBusiness\(user\.id\)/);
-    assert.match(code, /business\.operationalStatus !== "ACTIVE" \|\| !\(await getBusinessMembership\(user\.id, business\.id\)\)/);
+    assert.match(code, /getCurrentUser\(\)/, path);
+    assert.match(code, /getMyBusiness\(user\.id\)/, path);
+    assert.match(code, /business\.operationalStatus !== "ACTIVE" \|\| !\(await canPurchasePaidBoost\(user\.id, business\.id\)\)/, path);
+    assert.doesNotMatch(code, /getBusinessMembership\(/, path);
   }
+  for (const path of [
+    "src/server/services/billing/boostPurchase.service.ts",
+    "src/server/services/billing/eventBoostPurchase.service.ts",
+  ]) {
+    const code = source(path);
+    const guard = code.indexOf("await assertPaidBoostOwnerInTx(tx,");
+    assert.ok(guard > 0, path);
+    assert.ok(guard < code.indexOf("purchaseRequestKey: params.requestKey"), `${path}: guard must precede replay lookup`);
+  }
+  assert.match(source("src/app/business/(protected)/offers/[id]/boost/actions.ts"), /actorUserId: user\.id/);
+  assert.match(source("src/app/business/(protected)/events/[id]/boost/actions.ts"), /ownerUserId: user\.id/);
+  for (const path of [
+    "src/app/business/(protected)/offers/[id]/boost/page.tsx",
+    "src/app/business/(protected)/events/[id]/boost/page.tsx",
+  ]) {
+    assert.match(source(path), /canPurchasePaidBoost\(user\.id, business\.id\)/, path);
+  }
+  const free = source("src/app/business/(protected)/dashboard/actions.ts");
+  assert.match(free, /getMyBusiness\(user\.id\)/);
+  assert.doesNotMatch(free, /PaidBoost/);
 });

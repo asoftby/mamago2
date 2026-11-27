@@ -6,6 +6,7 @@ import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurcha
 import { listBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 import { BoostPurchaseClient } from "@/app/business/(protected)/offers/[id]/boost/BoostPurchaseClient";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { canPurchasePaidBoost } from "@/server/services/billing/paidBoostAuthorization";
 
 export default async function EventBoostPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -19,7 +20,10 @@ export default async function EventBoostPage({ params }: { params: Promise<{ id:
     select: { id: true, title: true, status: true },
   });
   if (!event) notFound();
-  const regions = await listBoostTargetRegions();
+  const [regions, isBillingOwner] = await Promise.all([
+    listBoostTargetRegions(),
+    canPurchasePaidBoost(user.id, business.id),
+  ]);
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <BusinessSectionHeader
@@ -29,7 +33,13 @@ export default async function EventBoostPage({ params }: { params: Promise<{ id:
       {event.status !== "PUBLISHED" ? (
         <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Boost доступен только для опубликованного события.</p>
       ) : (
-        <BoostPurchaseClient eventId={event.id} options={getConfiguredBoostOptions()} regions={regions} />
+        isBillingOwner ? (
+          <BoostPurchaseClient eventId={event.id} options={getConfiguredBoostOptions()} regions={regions} />
+        ) : (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm text-stone-700">
+          Платный Boost может приобрести только владелец бизнеса. Бесплатный ежедневный Boost доступен в разделе «Boost публикаций».
+        </div>
+        )
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
-import { getBusinessMembership } from "@/server/permissions/business-permissions";
+import { canPurchasePaidBoost } from "@/server/services/billing/paidBoostAuthorization";
 import {
   PROMOTION_MAX_BUDGET,
   PROMOTION_MIN_BUDGET,
@@ -63,8 +63,8 @@ export async function createPromotionAction(input: {
     };
   }
 
-  if (business.operationalStatus !== "ACTIVE" || !(await getBusinessMembership(user.id, business.id))) {
-    return { ok: false, error: "Нет доступа к платному продвижению." };
+  if (business.operationalStatus !== "ACTIVE" || !(await canPurchasePaidBoost(user.id, business.id))) {
+    return { ok: false, error: "Платное продвижение может приобрести только владелец бизнеса." };
   }
 
   const parsed = createPromotionSchema.safeParse(input);
