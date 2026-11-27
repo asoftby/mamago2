@@ -161,9 +161,11 @@ export async function checkSufficientBalance(
 
   const currentBalance = account.depositBalance.toNumber();
   const creditLimit = account.creditLimit.toNumber();
-  const availableBalance = currentBalance + creditLimit;
-  const sufficient = availableBalance >= amount;
-  const shortfall = sufficient ? 0 : amount - availableBalance;
+  const requested = normalizeFinancialAmount(amount);
+  const available = account.depositBalance.plus(account.creditLimit);
+  const availableBalance = available.toNumber();
+  const sufficient = available.gte(requested);
+  const shortfall = sufficient ? 0 : requested.minus(available).toNumber();
 
   return {
     sufficient,
@@ -248,6 +250,8 @@ export async function getBillingAccounts(filters?: {
  */
 export async function recalculateDepositBalance(accountId: string) {
   const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "BillingAccount" WHERE id = ${accountId} FOR UPDATE`;
+    const account = await tx.billingAccount.findUniqueOrThrow({ where: { id: accountId } });
     const transactions = await tx.billingTransaction.findMany({
       where: {
         billingAccountId: accountId,
@@ -259,18 +263,18 @@ export async function recalculateDepositBalance(accountId: string) {
     });
 
     const calculatedBalance = transactions.reduce((sum, txn) => {
-      return sum + txn.amount.toNumber();
-    }, 0);
+      return sum.plus(txn.amount);
+    }, new Prisma.Decimal(0));
 
-    const updatedAccount = await tx.billingAccount.update({
+    await tx.billingAccount.update({
       where: { id: accountId },
       data: { depositBalance: calculatedBalance },
     });
 
     return {
       accountId,
-      previousBalance: updatedAccount.depositBalance.toNumber(),
-      calculatedBalance,
+      previousBalance: account.depositBalance.toNumber(),
+      calculatedBalance: calculatedBalance.toNumber(),
       transactionCount: transactions.length,
     };
   });
@@ -426,17 +430,17 @@ async function debitBusinessDepositInTx(
 
   const currentBalance = account.depositBalance.toNumber();
   const creditLimit = account.creditLimit.toNumber();
-  const availableBalance = currentBalance + creditLimit;
+  const availableBalance = account.depositBalance.plus(account.creditLimit).toNumber();
   const requestedAmount = normalizedAmount.toNumber();
-  const newBalance = currentBalance - requestedAmount;
+  const newBalance = account.depositBalance.minus(normalizedAmount);
 
-  if (!allowNegative && newBalance < -creditLimit) {
+  if (!allowNegative && newBalance.lt(account.creditLimit.negated())) {
     throw new BillingInsufficientFundsError({
       currentBalance,
       creditLimit,
       availableBalance,
       requestedAmount,
-      shortfall: Math.abs(newBalance + creditLimit),
+      shortfall: newBalance.plus(account.creditLimit).abs().toNumber(),
     });
   }
 
