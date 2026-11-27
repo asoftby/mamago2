@@ -2,16 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-test("full search pages use DB skip/take without widening autocomplete", () => {
+test("full search uses bounded batches without widening autocomplete", () => {
   const source = readFileSync("src/app/api/search/route.ts", "utf8");
   assert.match(source, /searchParams\.get\("mode"\) === "full"/);
   assert.match(source, /const pageSize = 24/);
-  assert.match(source, /prisma\.searchDocument\.count\(\{ where: literalWhere \}\)/);
-  assert.match(source, /prisma\.searchDocument\.findMany\(\{ where, take, skip,/);
-  assert.match(source, /Math\.max\(0, offset - literalCount\)/);
+  assert.match(source, /const batchSize = 200/);
+  assert.match(source, /take: batchSize/);
+  assert.match(source, /cursor: \{ id: cursor \}/);
+  assert.match(source, /visibleCount >= offset/);
+  assert.match(source, /!full && docs.length >= target/);
+
   assert.match(source, /NOT: literalTextWhere/);
   assert.match(source, /full \? \{ results, page, pageSize, total, totalPages \} : \{ results \}/);
-  assert.match(source, /Math\.min\(Math\.max\(parseInt\(searchParams\.get\("limit"\)/);
+  assert.match(source, /Number\.isFinite\(rawLimit\)/);
   assert.doesNotMatch(source, /selectedPersonaIds|familyMemberId/);
 });
 

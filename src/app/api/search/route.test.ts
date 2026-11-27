@@ -23,7 +23,7 @@
  */
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { prismaBase as prisma } from "@/lib/prisma";
 import { GET } from "./route";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
@@ -84,6 +84,125 @@ async function testOutOfOrderMultiWordQueryMatches() {
   });
 }
 
+async function testInvalidLimitFallsBackToDefault() {
+  await withFixtureDocument(async () => {
+    const results = await search("поросенка", { limit: "invalid" });
+    assert.ok(
+      results.some((r) => r.id === FIXTURE_ENTITY_ID),
+      "invalid limit must not break search",
+    );
+    assert.ok(results.length <= 8);
+  });
+}
+
+async function testBoundedSearchPagination() {
+  const prefix = `auditbatch${Date.now()}`;
+  const owner = await prisma.user.create({
+    data: { email: `${prefix}@example.invalid` },
+  });
+
+  const fixtures = Array.from({ length: 450 }, (_, i) => ({
+    id: `${prefix}-${String(i).padStart(4, "0")}`,
+    visible: i % 5 !== 0,
+  }));
+
+  try {
+    await prisma.activity.createMany({
+      data: fixtures.map(f => ({
+        id: f.id,
+        ownerUserId: owner.id,
+        title: prefix,
+        shortDesc: prefix,
+        ageTags: [],
+        type: "EVENT",
+        scheduleMode: "ALWAYS",
+        status: f.visible ? "PUBLISHED" : "DRAFT",
+      })),
+    });
+
+    await prisma.searchDocument.createMany({
+      data: fixtures.map(f => ({
+        entityType: "activity",
+        entityId: f.id,
+        title: prefix,
+        searchText: prefix,
+        metaLine: "audit fixture",
+        urlPath: `/minsk/events/${f.id}`,
+        isPublished: true,
+        boost: 1,
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      })),
+    });
+
+    const expected = fixtures
+      .filter(f => f.visible)
+      .map(f => f.id)
+      .sort();
+
+    const collected: string[] = [];
+
+    for (let page = 1; page <= 16; page++) {
+      const started = performance.now();
+
+      const params = new URLSearchParams({
+        q: prefix,
+        mode: "full",
+        page: String(page),
+      });
+
+      const response = await GET(new NextRequest(
+        `http://localhost:3000/api/search?${params}`
+      ));
+
+      assert.equal(response.status, 200);
+
+      const body = await response.json();
+
+      assert.equal(body.total, 360);
+      assert.equal(body.totalPages, 15);
+      assert.equal(body.page, page);
+
+      const ids = body.results.map(
+        (r: { id: string }) => r.id
+      );
+
+      assert.deepEqual(
+        ids,
+        expected.slice((page - 1) * 24, page * 24),
+      );
+
+      collected.push(...ids);
+
+      console.log(
+        `[AUDIT BATCH] page=${page} results=${ids.length} ` +
+        `durationMs=${Math.round(performance.now() - started)}`
+      );
+    }
+
+    assert.deepEqual(collected, expected);
+    assert.equal(new Set(collected).size, 360);
+
+    const autocomplete = await search(prefix, { limit: "20" });
+
+    assert.deepEqual(
+      autocomplete.map(r => r.id),
+      expected.slice(0, 20),
+    );
+
+    console.log("[AUDIT BATCH] PASS: 450 indexed, 360 visible");
+  } finally {
+    await prisma.searchDocument.deleteMany({
+      where: { entityId: { startsWith: prefix } },
+    });
+    await prisma.activity.deleteMany({
+      where: { ownerUserId: owner.id },
+    });
+    await prisma.user.delete({
+      where: { id: owner.id },
+    });
+  }
+}
+
 async function testSingleTokenQueryUnaffected() {
   await withFixtureDocument(async () => {
     const results = await search("поросенка");
@@ -110,10 +229,65 @@ async function testStaleDocumentExcluded() {
     for (const mode of ["full", "autocomplete"]) {
       const params = new URLSearchParams({ q: "поросенка", mode });
       const res = await GET(new NextRequest(`http://localhost:3000/api/search?${params}`));
+      assert.equal(res.status, 200);
       const body = await res.json();
       assert.ok(Array.isArray(body.results));
+
+      if (mode === "full") {
+        assert.equal(typeof body.total, "number");
+        assert.equal(typeof body.totalPages, "number");
+      }
       assert.ok(!body.results.some((r: { id: string }) => r.id === FIXTURE_ENTITY_ID));
     }
+  });
+}
+
+async function testConcurrentVisibilityTransition() {
+  await withFixtureDocument(async () => {
+    const before = await search("поросенка");
+    assert.ok(before.some(r => r.id === FIXTURE_ENTITY_ID));
+
+    const concurrentReads = Promise.all(
+      Array.from({ length: 8 }, () =>
+        search("поросенка", { mode: "full" })
+      )
+    );
+
+    await prisma.activity.update({
+      where: { id: FIXTURE_ENTITY_ID },
+      data: { status: "DRAFT" },
+    });
+
+    await concurrentReads;
+
+    const stale = await prisma.searchDocument.findUnique({
+      where: {
+        entityType_entityId: {
+          entityType: "activity",
+          entityId: FIXTURE_ENTITY_ID,
+        },
+      },
+    });
+
+    assert.equal(stale?.isPublished, true);
+
+    const after = await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        search("поросенка", {
+          mode: i % 2 === 0 ? "full" : "autocomplete",
+        })
+      )
+    );
+
+    for (const results of after) {
+      assert.ok(Array.isArray(results));
+      assert.ok(
+        !results.some(r => r.id === FIXTURE_ENTITY_ID),
+        "Committed unpublication must hide stale search documents",
+      );
+    }
+
+    console.log("[AUDIT CONCURRENCY] PASS");
   });
 }
 
@@ -176,14 +350,47 @@ async function main() {
     console.log("/api/search route.test.ts: SKIP (DATABASE_URL not set)");
     process.exit(0);
   }
+  const country = await prisma.country.findUnique({
+    where: { isoCode: "BY" },
+    select: { id: true },
+  });
+
+  assert.ok(country, "Belarus migration fixture must exist");
+
+  const existingMinsk = await findCityBySlug("minsk", {
+    onlyRealCities: true,
+    select: { id: true },
+  });
+
+  const createdMinsk = existingMinsk ? null : await prisma.city.create({
+    data: {
+      name: "Минск",
+      slug: "minsk",
+      countryId: country.id,
+      isActive: true,
+    },
+  });
+
+  try {
   await testOutOfOrderMultiWordQueryMatches();
   await testSingleTokenQueryUnaffected();
+  await testInvalidLimitFallsBackToDefault();
+  await testBoundedSearchPagination();
   await testMultiWordQueryRequiresAllTokens();
   await testStaleDocumentExcluded();
+  await testConcurrentVisibilityTransition();
   await testOversizedQueryDoesNotCrash();
   await testManyTokenQueryDoesNotCrash();
   await testValidCitySlugPopulatesSearchQueryLog();
   await testUnknownCitySlugLeavesCityIdNull();
+  } finally {
+    if (createdMinsk) {
+      await prisma.city.delete({
+        where: { id: createdMinsk.id },
+      });
+    }
+  }
+
   console.log("/api/search word-order + citySlug telemetry tests: OK");
   process.exit(0);
 }
