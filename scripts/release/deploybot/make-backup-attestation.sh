@@ -14,7 +14,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 [[ "$db_id" =~ ^[0-9a-f]{64}$ ]] || fail "db container id must be the full 64-hex id"
 [[ "$release" =~ ^[a-z0-9][a-z0-9.-]{0,29}$ && "$environment" =~ ^(dev|prod)$ && "$host" =~ ^[a-z0-9][a-z0-9-]{0,30}$ ]] || fail "invalid release, environment or host id"
 gzip -t "$db" || fail "database dump is corrupt"
-gzip -dc "$db" | tail -n 5 | grep -q 'PostgreSQL database dump complete' || fail "database dump is incomplete"
+gzip -dc "$db" | tail -n 20 | grep -q 'PostgreSQL database dump complete' || fail "database dump is incomplete"
 tar -tzf "$media" >/dev/null || fail "media archive is corrupt"
 
 sha() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }

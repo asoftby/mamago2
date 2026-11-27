@@ -1,5 +1,6 @@
 """Drives the real control plane over real SSH. Run only by integration.sh."""
 import asyncio
+import gzip
 import json
 import subprocess
 import sys
@@ -25,6 +26,24 @@ def identity():
 
 def app_ref():
     return sh("docker", "inspect", "--format", "{{.Config.Image}}", "dev-app-1")
+
+
+def attest(release):
+    """A real dump of the DEV database, signed with the shipped script."""
+    work = root / "dev-attestation"
+    tool = root / "tool"
+    work.mkdir(exist_ok=True)
+    (tool / "releases").mkdir(parents=True, exist_ok=True)
+    (tool / "make.sh").write_text((ROOT / "make-backup-attestation.sh").read_text())
+    (tool / "releases" / f"{release}.json").write_text(Path(f"/etc/mamago-deploy/releases/{release}.json").read_text())
+    dump = work / "db.sql.gz"
+    with dump.open("wb") as out:
+        out.write(gzip.compress(subprocess.run(["docker", "exec", "dev-db-1", "pg_dump", "-U", "dev", "-d", "dev"],
+                                               capture_output=True, check=True).stdout))
+    media = work / "media.tar.gz"
+    sh("tar", "-czf", str(media), "-C", str(tool), "make.sh")
+    sh("bash", str(tool / "make.sh"), str(dump), str(media), str(keys / "signer"),
+       sh("docker", "inspect", "--format", "{{.Id}}", "dev-db-1"), release, "dev", "ci-host", "--restore-check-passed")
 
 
 def reset_migration():
@@ -60,6 +79,8 @@ async def main():
 
     async def pending(action, ref):
         words = ["preflight", ref] if action == "deploy" else ["rollback-preflight"]
+        if action == "deploy":
+            attest(ref.removeprefix("rel:"))
         answer = await control.ask("dev", action, words)
         assert answer["ok"], answer["report"]
         return Pending(action, "dev", "ci-host", ref, answer["fingerprint"], 42, 42, 10**12, "dev")
@@ -81,6 +102,10 @@ async def main():
             raise AssertionError("must not connect")
         except TransportError as error:
             assert needle in str(error), error
+
+    print("=== release without a signed backup is refused")
+    answer = await control.ask("dev", "deploy", ["preflight", "rel:good"])
+    assert not answer["ok"] and "FAIL signed backup attestation is missing" in answer["report"], answer["report"]
 
     before = identity()
     print("=== deploy with the connection cut after acceptance")
