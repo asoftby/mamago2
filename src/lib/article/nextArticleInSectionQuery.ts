@@ -1,6 +1,7 @@
 /**
  * Чистые хелперы подбора следующей статьи в разделе (без Prisma / server-only).
  */
+import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import type { GeoScope, Prisma } from "@prisma/client";
 
 export const MAX_NEXT_ARTICLE_EXCLUDE_IDS = 50;
@@ -39,7 +40,7 @@ export function buildNextArticleInSectionWhere(args: {
 }): Prisma.ArticleWhereInput {
   const { sectionId, cityId, geoScope, excludeIds, now } = args;
   return {
-    status: "PUBLISHED",
+    ...getPublicPublishedArticleWhere(),
     categoryId: sectionId,
     geoScope,
     cityId: cityId === null ? null : cityId,
