@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, createCipheriv, randomBytes, publicEncrypt, constants } from "node:crypto";
 import test from "node:test";
 import {
   buildIdentityPayload,
@@ -152,4 +152,69 @@ test("envelope v1 rejects truncated GCM tags instead of downgrading authenticati
     () => openIdentityEnvelope(JSON.stringify(parsed), user.id, loadPrivateKey(main.privateKey, "test-passphrase")),
     (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "MALFORMED_ENVELOPE",
   );
+});
+
+test("authenticated but invalid identity payloads are rejected", () => {
+  const valid = buildIdentityPayload(user, endedAt);
+  const pub = loadPublicKey(main.publicKey);
+  const priv = loadPrivateKey(main.privateKey, "test-passphrase");
+  const invalid = [
+    { ...valid, schemaVersion: 2 },
+    { ...valid, email: 123 },
+    { ...valid, phoneE164: undefined },
+    { ...valid, accountCreatedAt: "invalid" },
+    { ...valid, emailVerifiedAt: false },
+    { ...valid, displayName: {} },
+  ];
+  for (const payload of invalid) {
+    const sealed = sealIdentityPayload(payload as typeof valid, pub);
+    assert.throws(
+      () => openIdentityEnvelope(sealed.envelope, user.id, priv),
+      (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "MALFORMED_ENVELOPE",
+    );
+  }
+});
+
+test("seal rejects an unusable wrapping key", () => {
+  const payload = buildIdentityPayload(user, endedAt);
+  const ec = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  assert.throws(() => sealIdentityPayload(payload, { key: ec.publicKey, keyId: "invalid" }));
+});
+
+test("authenticated malformed JSON and mismatched embedded identity are rejected", () => {
+  const pub = loadPublicKey(main.publicKey);
+  const priv = loadPrivateKey(main.privateKey, "test-passphrase");
+  for (const raw of ["{", "null", "[]", JSON.stringify({ ...buildIdentityPayload(user, endedAt), userId: "other" })]) {
+    const key = randomBytes(32);
+    try {
+      const iv = randomBytes(12);
+      const cipher = createCipheriv("aes-256-gcm", key, iv);
+      cipher.setAAD(Buffer.from("mamago-identity-retention:v1:" + user.id));
+      const ct = Buffer.concat([cipher.update(raw, "utf8"), cipher.final()]);
+      const ek = publicEncrypt({ key: pub.key, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: "sha256" }, key);
+      const envelope = JSON.stringify({ v: 1, alg: "RSA-OAEP-256/A256GCM", kid: pub.keyId,
+        ek: ek.toString("base64"), iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"), ct: ct.toString("base64") });
+      assert.throws(() => openIdentityEnvelope(envelope, user.id, priv),
+        (e: unknown) => e instanceof IdentityRetentionKeyError && e.code === "MALFORMED_ENVELOPE");
+    } finally {
+      key.fill(0);
+    }
+  }
+});
+
+test("sealing clears the data key even when wrapping fails", () => {
+  const ec = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const original = Buffer.prototype.fill;
+  const cleared: Buffer[] = [];
+  const spy = test.mock.method(Buffer.prototype, "fill", function (this: Buffer, ...args: Parameters<typeof original>) {
+    const result = Reflect.apply(original, this, args);
+    if (this.length === 32 && args[0] === 0) cleared.push(Buffer.from(this));
+    return result;
+  });
+  try {
+    assert.throws(() => sealIdentityPayload(buildIdentityPayload(user, endedAt), { key: ec.publicKey, keyId: "invalid" }));
+    assert.ok(cleared.some((key) => key.every((byte) => byte === 0)));
+  } finally {
+    spy.mock.restore();
+  }
 });
