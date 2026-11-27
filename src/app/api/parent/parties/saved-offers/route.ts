@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
@@ -15,6 +16,8 @@ const saveSchema = z.object({
 
 /** Only the party owner may see their scenario choices. */
 export async function GET() {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
@@ -39,6 +42,8 @@ export async function GET() {
 
 /** A save-only reference; never sends a booking request or reserves inventory. */
 export async function POST(request: NextRequest) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });

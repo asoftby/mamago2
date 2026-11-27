@@ -42,8 +42,18 @@ test("auto-deploy is opt-in and never cancels in-flight migrations", () => {
   assert.match(workflow,/Preserve encrypted database backup[\s\S]*?Apply target-image migrations/);
   const host=readFileSync("scripts/release/ci-dev-host-deploy.sh","utf8");
   assert.match(host,/\/opt\/mamago\/dev/);
-  assert.match(host,/docker compose -p dev run --rm --no-deps migrate < \/dev\/null/);
-  assert.match(host,/migrate -c 'pnpm prisma migrate status' < \/dev\/null/);
-  assert.match(host,/docker compose -p dev up -d --no-deps app worker/);
+  assert.match(host,/docker compose -p dev run --pull never --rm --no-deps migrate < \/dev\/null/);
+  assert.match(host,/run --pull never --rm --no-deps --entrypoint sh migrate -c 'pnpm prisma migrate status' < \/dev\/null/);
+  assert.match(host,/docker compose -p dev up --pull never -d --no-deps app worker/);
   assert.doesNotMatch(host,/docker compose.*\bdown\b/);
+});
+
+test("exact SHA CI gate precedes SSH and digest pull precedes migrations", () => {
+  const workflow=readFileSync(".github/workflows/docker.yml","utf8");
+  assert.match(workflow,/Require successful CI for exact DEV SHA[\s\S]*?bash scripts\/release\/require-dev-ci.sh[\s\S]*?Configure pinned SSH identity/);
+  const gate=readFileSync("scripts/release/require-dev-ci.sh","utf8");
+  assert.match(gate,/head_sha="\$EXPECTED_SHA"[\s\S]*?success\) exit 0/);
+  const host=readFileSync("scripts/release/ci-dev-host-deploy.sh","utf8");
+  assert.ok(host.includes('docker pull "ghcr.io/asoftby/mamago2@$digest"'));
+  assert.ok(host.indexOf('docker pull ') < host.indexOf('docker compose -p dev run --pull never'));
 });

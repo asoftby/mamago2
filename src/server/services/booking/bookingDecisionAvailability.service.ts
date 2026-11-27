@@ -5,6 +5,7 @@ import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { formatHHMM } from "@/lib/formatters/date";
 import { eventBookingSlotKey, getEventBookingSchedule } from "@/lib/event/eventBookingSchedule";
 import { getEventSeatPolicy, calculateEventSeatAvailability, occupiedEventSeats, type EventSeatPolicy } from "@/lib/booking/eventSeatPolicy";
+import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
 
 type Db = Prisma.TransactionClient;
 
@@ -74,6 +75,7 @@ const unavailable = (message: string): BookingDecisionAvailability => ({
  */
 export async function getBusinessBookingDecisionAvailability(
   db: Db, bookingId: string, businessId: string, now: Date = new Date(),
+  options: { reoffer?: boolean } = {},
 ): Promise<BookingDecisionAvailability | null> {
   const request = await db.bookingRequest.findFirst({
     where: { id: bookingId, businessId, kind: BookingKind.STANDARD },
@@ -87,8 +89,13 @@ export async function getBusinessBookingDecisionAvailability(
     },
   });
   if (!request) return null;
-  if (request.status !== BookingStatus.NEW) return unavailable("Заявка уже обработана");
-  if (request.holdUntil && request.holdUntil.getTime() <= now.getTime()) {
+  if (options.reoffer && request.publicationType !== PublicationType.EVENT) {
+    return unavailable("Повторное предложение пока доступно только для событий");
+  }
+  if (request.status !== (options.reoffer ? BookingStatus.REJECTED : BookingStatus.NEW)) {
+    return unavailable("Заявка недоступна для выбранного действия");
+  }
+  if (!options.reoffer && request.holdUntil && request.holdUntil.getTime() <= now.getTime()) {
     return unavailable("Срок резервирования истёк. Подтвердить эту заявку нельзя");
   }
   if (request.publicationType === PublicationType.EVENT && !request.activityId) {
@@ -165,16 +172,18 @@ export async function getBusinessBookingDecisionAvailability(
     };
   }
   if (request.publicationType !== PublicationType.EVENT || !request.activityId) {
-    return { canConfirm: true, code: "NOT_APPLICABLE", message: "Для этой заявки учёт мест по сеансам не применяется", remaining: null, capacity: null };
+    return options.reoffer ? unavailable("Повторное предложение пока доступно только для событий")
+      : { canConfirm: true, code: "NOT_APPLICABLE", message: "Для этой заявки учёт мест по сеансам не применяется", remaining: null, capacity: null };
   }
   const activity = await db.activity.findFirst({
-    where: { id: request.activityId, businessId, type: "EVENT" },
+    where: { ...(options.reoffer ? getPublicActivityDetailWhere() : {}), id: request.activityId, businessId, type: "EVENT" },
     select: { bookingEnabled: true, bookingMode: true, scheduleJson: true, bookingCapacityPerSlot: true },
   });
   if (!activity) return unavailable("Событие не найдено");
   if (!activity.bookingEnabled) return unavailable("Запись на событие отключена");
   if (activity.bookingMode === BookingMode.REQUEST_ONLY) {
-    return { canConfirm: true, code: "NOT_APPLICABLE", message: "Это заявка без сеанса: отдельный лимит мест не настроен", remaining: null, capacity: null };
+    return options.reoffer ? unavailable("Для заявки без сеанса нельзя проверить освободившееся место")
+      : { canConfirm: true, code: "NOT_APPLICABLE", message: "Это заявка без сеанса: отдельный лимит мест не настроен", remaining: null, capacity: null };
   }
   if (request.selectedSessionId &&
       (!request.session || request.session.withdrawnAt || request.session.isSaleOpen === false)) {
@@ -218,13 +227,21 @@ export async function getBusinessBookingDecisionAvailability(
   const { _sum } = await db.bookingRequest.aggregate({
     where: active, _sum: { adultsCount: true, childrenCount: true },
   });
+  if (options.reoffer && capacity == null && getEventSeatPolicy(activity.scheduleJson).mode !== "SEPARATE") {
+    return unavailable("Лимит мест не задан: нельзя подтвердить освобождение места");
+  }
   const assessment = assessCurrentEventBookingCapacity({
     policy: getEventSeatPolicy(activity.scheduleJson), capacity,
-    usedAdults: _sum.adultsCount ?? 0, usedChildren: _sum.childrenCount ?? 0,
+    usedAdults: (_sum.adultsCount ?? 0) + (options.reoffer ? request.adultsCount : 0),
+    usedChildren: (_sum.childrenCount ?? 0) + (options.reoffer ? request.childrenCount : 0),
     requestAdults: request.adultsCount, requestChildren: request.childrenCount,
   });
   const policy = getEventSeatPolicy(activity.scheduleJson);
   const requested = occupiedEventSeats(policy.mode, request.adultsCount, request.childrenCount);
   const occupied = occupiedEventSeats(policy.mode, _sum.adultsCount ?? 0, _sum.childrenCount ?? 0);
-  return { ...assessment, requested, occupied };
+  return options.reoffer ? {
+    ...assessment, requested, occupied,
+    remaining: assessment.remaining == null ? null : Math.max(0, assessment.remaining + requested),
+    message: assessment.canConfirm ? "Достаточно мест для новой заявки после согласия клиента" : "Недостаточно мест для повторной записи",
+  } : { ...assessment, requested, occupied };
 }

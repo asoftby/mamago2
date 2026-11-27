@@ -106,11 +106,39 @@ test.before(async () => {
 
 test.after(async () => {
   const activityIds = Object.values(ids);
+  await prisma.bookingRequest.deleteMany({ where: { activityId: { in: activityIds } } });
   await prisma.boost.deleteMany({ where: { businessId: { in: [businessId, foreignBusinessId] } } });
   await prisma.activity.deleteMany({ where: { id: { in: activityIds } } });
   await prisma.business.deleteMany({ where: { id: { in: [businessId, foreignBusinessId] } } });
   await prisma.user.deleteMany({ where: { id: { in: [ownerUserId, foreignUserId] } } });
   await prisma.$disconnect();
+});
+
+test("participants action requires an owned event with at least one historical booking", async () => {
+  const initial = await list();
+  assert.equal(initial.get(ids.past)?.hasBookingHistory, false);
+  assert.equal(initial.get(ids.future)?.hasBookingHistory, false);
+  assert.equal(initial.get(ids.noSessions)?.hasBookingHistory, false);
+
+  await prisma.bookingRequest.create({
+    data: {
+      businessId, activityId: ids.past, publicationType: "EVENT",
+      customerName: "Past attendee", customerPhone: "+375291110000",
+      status: "REJECTED",
+    },
+  });
+  await prisma.bookingRequest.create({
+    data: {
+      businessId: foreignBusinessId, activityId: ids.foreignBusiness, publicationType: "EVENT",
+      customerName: "Foreign attendee", customerPhone: "+375291110001",
+      status: "CONFIRMED",
+    },
+  });
+  const withHistory = await list();
+  assert.equal(withHistory.get(ids.past)?.hasBookingHistory, true, "Past rejected requests preserve the action");
+  assert.equal(withHistory.get(ids.future)?.hasBookingHistory, false);
+  assert.equal(withHistory.get(ids.foreignBusiness)?.hasBookingHistory, false, "Foreign tenant records are excluded even for author-owned event");
+  assert.equal(withHistory.get(ids.noSessions)?.hasBookingHistory, false);
 });
 
 test("pure helpers: fallback chain and temporal state", () => {

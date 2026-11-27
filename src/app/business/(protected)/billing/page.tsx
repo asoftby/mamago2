@@ -21,7 +21,7 @@ export default async function BillingBalancePage() {
 
   // Get user's business
   const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
+    where: { ownerUserId: user.id, members: { some: { userId: user.id, isActive: true, role: "OWNER" } } },
     select: {
       id: true,
       name: true,

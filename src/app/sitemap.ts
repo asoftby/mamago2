@@ -22,6 +22,7 @@ import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
 import { listDiscoveryClassChips } from "@/server/discovery/classChips";
 import { countPublicClassesCategory } from "@/server/discovery/classesCategoryCount";
 import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
+import { isOfferPublicInRelease, isPublicReleaseFeatureEnabled } from "@/lib/release/publicReleaseScope";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (isGlobalNoindexEnabled()) return [];
 
   const baseUrl = getBaseUrl("BY");
+  // AUDIT-XR-19: features outside the first public release are not advertised.
+  const classesPublic = isPublicReleaseFeatureEnabled("classes");
+  const placesCatalogPublic = isPublicReleaseFeatureEnabled("placesCatalog");
   const entries: MetadataRoute.Sitemap = [
     { url: `${baseUrl}/routes`, changeFrequency: "weekly", priority: 0.5 },
     { url: `${baseUrl}/blog`, changeFrequency: "daily", priority: 0.6 },
@@ -151,18 +155,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "daily",
         priority: 0.8,
       });
-      entries.push({
-        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "programs" })}`,
-        lastModified: city.updatedAt,
-        changeFrequency: "weekly",
-        priority: 0.6,
-      });
-      entries.push({
-        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "classes" })}`,
-        lastModified: city.updatedAt,
-        changeFrequency: "weekly",
-        priority: 0.5,
-      });
+      if (classesPublic) {
+        entries.push({
+          url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "programs" })}`,
+          lastModified: city.updatedAt,
+          changeFrequency: "weekly",
+          priority: 0.6,
+        });
+        entries.push({
+          url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "classes" })}`,
+          lastModified: city.updatedAt,
+          changeFrequency: "weekly",
+          priority: 0.5,
+        });
+      }
       entries.push({
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "routes" })}`,
         lastModified: city.updatedAt,
@@ -216,7 +222,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Only publish class category hubs with at least one visible offer.
-  try {
+  if (classesPublic) try {
     const [cities, chips] = await Promise.all([
       prisma.city.findMany({
         where: { isActive: true, isLegacyNonCity: false },
@@ -255,7 +261,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.warn("[sitemap] classes category sitemap failed:", error);
   }
 
-  try {
+  if (placesCatalogPublic) try {
     const places = await prisma.place.findMany({
       where: {
         AND: [getPublicPublishedPlaceWhere(), { OR: [{ cityId: null }, { city: { isActive: true } }] }],
@@ -295,11 +301,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         seoCanonicalUrl: true,
         updatedAt: true,
         seoRobots: true,
+        productType: true,
+        campProgramType: true,
         place: { select: { city: { select: { slug: true } } } },
       },
     });
     for (const offer of offers) {
       if (hasNoindexRobots(offer.seoRobots) || !offer.place?.city?.slug) continue;
+      if (!isOfferPublicInRelease(offer)) continue;
       entries.push({
         url: resolveOfferCanonicalUrl({
           seoCanonicalUrl: offer.seoCanonicalUrl,

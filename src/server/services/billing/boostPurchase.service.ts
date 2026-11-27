@@ -1,4 +1,5 @@
 import { BillingReferenceType, BillingTransactionType, Prisma } from "@prisma/client";
+import { assertPaidBoostOwnerInTx } from "@/server/services/billing/paidBoostAuthorization";
 import prisma from "@/lib/prisma";
 import { BILLING_CURRENCY, normalizeFinancialAmount } from "@/lib/billing/money";
 import {
@@ -44,33 +45,40 @@ export function getConfiguredBoostOptions() {
 
 export async function purchaseOfferBoost(params: {
   businessId: string;
+  /** Authenticated user spending the deposit; must be the active billing owner. */
+  actorUserId: string;
   offerId: string;
   optionId: BoostOptionId;
   requestKey: string;
   targetRegionIds?: string[];
 }) {
-  const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
-  if (!option) {
-    throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
-  }
-
+  const definition = BOOST_OPTION_DEFINITIONS.find((item) => item.id === params.optionId);
+  if (!definition) throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
   const targetRegionIds = await validateBoostTargetRegions(params.targetRegionIds ?? []);
 
   return prisma.$transaction(async (tx) => {
+    // Paid Boost spends money: authorize before replay disclosure or any debit.
+    await assertPaidBoostOwnerInTx(tx, params.businessId, params.actorUserId);
     const replay = await tx.boost.findUnique({
       where: { purchaseRequestKey: params.requestKey },
-      include: { billingTransaction: true },
+      include: { billingTransaction: { include: { billingAccount: { select: { businessId: true } } } } },
     });
     if (replay) {
       if (
+        replay.billingTransaction?.billingAccount.businessId !== params.businessId ||
         replay.offerId !== params.offerId ||
-        replay.durationDays !== option.durationDays ||
-        !replay.price?.equals(option.price) ||
+        replay.durationDays !== definition.durationDays ||
         JSON.stringify([...replay.targetRegionIds].sort()) !== JSON.stringify([...targetRegionIds].sort())
       ) {
         throw new BoostPurchaseNotAllowedError("Request key was used for another Boost purchase");
       }
-      return { boost: replay, transaction: replay.billingTransaction, idempotentReplay: true };
+      const { billingAccount: _billingAccount, ...transaction } = replay.billingTransaction!;
+      return { boost: { ...replay, billingTransaction: transaction }, transaction, idempotentReplay: true };
+    }
+
+    const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
+    if (!option) {
+      throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
     }
 
     // Serializes eligibility and active-Boost decisions for this Offer.

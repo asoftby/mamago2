@@ -20,6 +20,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
 import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
 import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
+import { isOfferPublicInRelease } from "@/lib/release/publicReleaseScope";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
 import { PublicationType } from "@prisma/client";
 
@@ -58,6 +59,8 @@ function parseRobots(s: string | null | undefined): Metadata["robots"] | undefin
 
 const offerMetaSelect = {
   id: true,
+  productType: true,
+  campProgramType: true,
   slug: true,
   title: true,
   description: true,
@@ -93,7 +96,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!resolved) notFound();
 
   const offer = await prisma.offer.findUnique({ where: { id: resolved.offerId }, select: offerMetaSelect });
-  if (!offer || !isOfferPubliclyVisible(offer)) {
+  if (!offer || !isOfferPubliclyVisible(offer) || !isOfferPublicInRelease(offer)) {
     notFound();
   }
 
@@ -145,6 +148,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
       priceText: true,
       coverImage: true,
       kind: true,
+      productType: true,
       campProgramType: true,
       seoJsonLdOverride: true,
       status: true,
@@ -166,6 +170,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
     },
   });
   if (!offer || !isOfferPubliclyVisible(offer)) notFound();
+  if (!isOfferPublicInRelease(offer)) notFound();
 
   const user = await getCurrentUser();
   let canEditOffer = false;
@@ -216,6 +221,8 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
           priceText: true,
           status: true,
           archivedAt: true,
+          productType: true,
+          campProgramType: true,
           place: {
             select: {
               status: true,
@@ -230,7 +237,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
       })
     : [];
   const otherOffers = otherOffersRaw
-    .filter((candidate) => isOfferPubliclyVisible(candidate) && candidate.slug && candidate.place?.city?.slug)
+    .filter((candidate) => isOfferPubliclyVisible(candidate) && isOfferPublicInRelease(candidate) && candidate.slug && candidate.place?.city?.slug)
     .map((candidate) => ({
       id: candidate.id,
       title: candidate.title,

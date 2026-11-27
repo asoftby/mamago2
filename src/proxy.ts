@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { disabledFeatureForPagePath, releaseScopeNotFoundHtml } from "@/lib/release/publicReleaseScope";
 import type { NextRequest } from "next/server";
 import {
   resolveLegacyProdPreviewRedirect,
@@ -96,6 +97,20 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/_next/")
   ) {
     return NextResponse.next();
+  }
+
+  // ── Public release scope (AUDIT-XR-19) ──────────────────────────────────
+  // Features outside the first public release answer a real 404 before any
+  // page renders, so streaming boundaries cannot turn it into a soft 200.
+  if (disabledFeatureForPagePath(pathname)) {
+    return new NextResponse(releaseScopeNotFoundHtml(), {
+      status: 404,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=300",
+        "X-Robots-Tag": "noindex",
+      },
+    });
   }
 
   const host = request.headers.get("host") || "";

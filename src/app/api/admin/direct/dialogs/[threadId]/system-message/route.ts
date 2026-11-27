@@ -1,3 +1,4 @@
+import { toDirectSendMessageDto } from "@/server/services/direct/directMessageDto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
@@ -38,7 +39,7 @@ export async function POST(
       body,
       sentByUserId: auth.id,
     });
-    return NextResponse.json(message);
+    return NextResponse.json(toDirectSendMessageDto(message));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation error", details: error.issues }, { status: 400 });

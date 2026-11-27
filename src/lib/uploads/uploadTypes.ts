@@ -20,7 +20,9 @@ export type UploadErrorCode =
   | "STORAGE_WRITE_FAILED"
   | "IMAGE_PROCESSING_FAILED"
   | "DATABASE_WRITE_FAILED"
-  | "UPLOAD_FAILED";
+  | "UPLOAD_FAILED"
+  | "LENGTH_REQUIRED"
+  | "RATE_LIMITED";
 
 export type UploadSuccessResponse = {
   media: UploadedMedia;

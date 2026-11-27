@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { ActivityType, PromotionPublicationType, PromotionStatus } from "@prisma/client";
+import { ActivityType, PromotionPublicationType, PromotionStatus, PublicationType } from "@prisma/client";
 import {
   businessEventListViewWhere,
   excludeGhostEventDrafts,
@@ -96,6 +96,10 @@ export async function getBusinessEventsList(params: {
   });
 
   const activityIds = activities.map((activity) => activity.id);
+  // Authored events may belong to another business; never expose that
+  // business's bookings in the current tenant's event actions.
+  const ownedActivityIds = activities.filter((activity) => activity.businessId === businessId)
+    .map((activity) => activity.id);
   const sessionWhere = { activityId: { in: activityIds }, withdrawnAt: null };
 
   const [
@@ -105,6 +109,7 @@ export async function getBusinessEventsList(params: {
     lastSessions,
     upcomingSessions,
     freeBoost,
+    bookingHistory,
   ] = await Promise.all([
     getPerformanceMetricsByEntity({
       events: activities.map((activity) => ({
@@ -144,6 +149,19 @@ export async function getBusinessEventsList(params: {
           _min: { startsAt: true },
         }),
     getFreeBoostDialogState({ businessId, userId, now }),
+    // Historical eligibility includes rejected, cancelled and elapsed requests.
+    // One grouped query serves the entire list, never one query per event.
+    ownedActivityIds.length === 0
+      ? Promise.resolve([])
+      : prisma.bookingRequest.groupBy({
+          by: ["activityId"],
+          where: {
+            businessId,
+            publicationType: PublicationType.EVENT,
+            activityId: { in: ownedActivityIds },
+          },
+          _count: { _all: true },
+        }),
   ]);
 
   const lastSessionStartByActivity = new Map(
@@ -155,6 +173,10 @@ export async function getBusinessEventsList(params: {
     upcomingSessions.flatMap((row) =>
       row._min.startsAt ? [[row.activityId, row._min.startsAt] as const] : [],
     ),
+  );
+  const activityIdsWithBookingHistory = new Set(
+    bookingHistory.filter((row) => row.activityId !== null && row._count._all > 0)
+      .map((row) => row.activityId),
   );
   const activePromotionIds = new Set(activePromotions.map((promotion) => promotion.publicationId));
   const boostCandidates = new Map(
@@ -186,6 +208,7 @@ export async function getBusinessEventsList(params: {
           candidate: boostCandidates.get(activity.id),
         }),
         promotionPerformance,
+        hasBookingHistory: activityIdsWithBookingHistory.has(activity.id),
         metrics: {
           ...(metricsByEntity.get(`EVENT:${activity.id}`) ?? {
             views: 0,

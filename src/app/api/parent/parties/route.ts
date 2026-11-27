@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { checkRateLimit } from "@/lib/security/rateLimit";
@@ -6,6 +7,8 @@ import { createPartyDraftSchema } from "@/server/birthday/partyDraft.validation"
 import { partyRouteError, privatePartyResponse } from "@/server/birthday/partyRouteResponses";
 
 export async function POST(request: NextRequest) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });

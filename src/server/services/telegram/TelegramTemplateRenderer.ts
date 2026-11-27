@@ -120,8 +120,18 @@ function buildReplyMarkup(
   // Получаем href из registry
   let href: string | null = null;
   const metadata = notification.metadata;
+  const reoffer = notification.type === "SYSTEM" && notification.audience === "USER" &&
+    metadata && typeof metadata === "object" && !Array.isArray(metadata) && metadata.source === "BOOKING_REOFFER";
+  let label = registryEntry.ctaLabel;
   const partyOutbox = metadata && typeof metadata === "object" && !Array.isArray(metadata) && metadata.source === "PARTY_OUTBOX";
-  if (partyOutbox && notification.actionUrl) {
+  if (reoffer) {
+    // This SYSTEM subtype has an explicit consent destination. Never allow a
+    // stored arbitrary URL to override generic SYSTEM or cross-origin routing.
+    const consentPath = notification.actionUrl ?? notification.ctaAction;
+    if (!consentPath || !/^\/booking-reoffers\/[a-z0-9_-]{1,128}$/iu.test(consentPath)) return undefined;
+    href = consentPath;
+    label = "Ответить";
+  } else if (partyOutbox && notification.actionUrl) {
     href = resolveNotificationPageUrl(notification);
   } else if (registryEntry.resolveHref) {
     try {
@@ -148,7 +158,7 @@ function buildReplyMarkup(
       [
         {
           ...createTelegramLinkButton(
-            registryEntry.ctaLabel,
+            label,
             absoluteUrl,
             getPublicAppBaseUrl(),
             ((notification.audience === "USER" && registryEntry.audience === "USER") ||

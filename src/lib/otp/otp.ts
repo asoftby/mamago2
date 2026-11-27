@@ -3,14 +3,14 @@
  * Uses HMAC-SHA256 for secure code hashing
  */
 
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomInt, timingSafeEqual } from "crypto";
 
 /**
  * Generate a random 4-digit OTP code
  * @returns 4-digit code as string (e.g., "0123", "9876")
  */
 export function genCode4(): string {
-  const code = Math.floor(Math.random() * 10000);
+  const code = randomInt(0, 10000);
   return code.toString().padStart(4, "0");
 }
 

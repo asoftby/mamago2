@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { readPartyOrder, updatePartyDraft } from "@/server/birthday/partyDraft.service";
@@ -7,6 +8,8 @@ import { partyRouteError, privatePartyResponse } from "@/server/birthday/partyRo
 type Context = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: Context) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
@@ -18,6 +21,8 @@ export async function GET(_request: NextRequest, { params }: Context) {
 }
 
 export async function PATCH(request: NextRequest, { params }: Context) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
