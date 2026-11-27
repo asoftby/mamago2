@@ -59,10 +59,11 @@ export async function purchaseOfferBoost(params: {
   return prisma.$transaction(async (tx) => {
     const replay = await tx.boost.findUnique({
       where: { purchaseRequestKey: params.requestKey },
-      include: { billingTransaction: true },
+      include: { billingTransaction: { include: { billingAccount: { select: { businessId: true } } } } },
     });
     if (replay) {
       if (
+        replay.billingTransaction?.billingAccount.businessId !== params.businessId ||
         replay.offerId !== params.offerId ||
         replay.durationDays !== option.durationDays ||
         !replay.price?.equals(option.price) ||
@@ -70,7 +71,8 @@ export async function purchaseOfferBoost(params: {
       ) {
         throw new BoostPurchaseNotAllowedError("Request key was used for another Boost purchase");
       }
-      return { boost: replay, transaction: replay.billingTransaction, idempotentReplay: true };
+      const { billingAccount: _billingAccount, ...transaction } = replay.billingTransaction!;
+      return { boost: { ...replay, billingTransaction: transaction }, transaction, idempotentReplay: true };
     }
 
     // Serializes eligibility and active-Boost decisions for this Offer.
