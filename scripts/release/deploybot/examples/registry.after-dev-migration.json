@@ -1,0 +1,19 @@
+{
+  "hosts": {
+    "legacy": {
+      "type": "ssh", "address": "CHANGE-ME-legacy.internal", "port": 22, "user": "mamago-exec",
+      "identity_files": {"prod": "/etc/mamago-deploy/keys/legacy-prod"},
+      "known_hosts": "/etc/mamago-deploy/keys/known_hosts"
+    },
+    "hoster": {
+      "type": "ssh", "address": "127.0.0.1", "port": 22, "user": "mamago-exec",
+      "identity_files": {"dev": "/etc/mamago-deploy/keys/hoster-dev"},
+      "known_hosts": "/etc/mamago-deploy/keys/known_hosts"
+    }
+  },
+  "environments": {
+    "dev": {"host": "hoster", "operations": ["status", "logs", "deploy", "rollback"], "strict": false, "latest_tag_prefix": "dev"},
+    "prod": {"host": "legacy", "operations": ["status", "logs", "deploy", "rollback"], "strict": true}
+  },
+  "uat": {"environment": "dev", "release": "rc3-uat"}
+}

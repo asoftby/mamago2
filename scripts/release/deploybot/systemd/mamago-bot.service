@@ -1,0 +1,45 @@
+[Unit]
+Description=mamaGo deployment bot (control plane)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mamago-bot
+Group=mamago-bot
+WorkingDirectory=/opt/mamago-deploy
+ExecStart=/opt/mamago-deploy/venv/bin/python -E -s -B -m mamago_deploy.bot
+StateDirectory=mamago-deploy-bot
+StateDirectoryMode=0700
+LoadCredential=bot_token:/etc/mamago-deploy/secrets/bot_token
+LoadCredential=ghcr_token:/etc/mamago-deploy/secrets/ghcr_token
+Restart=always
+RestartSec=5
+
+# No Docker group, no sudo: the bot reaches hosts only through their gate.
+SupplementaryGroups=
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
