@@ -64,7 +64,7 @@ export async function createPromotionAction(input: {
   }
 
   if (business.operationalStatus !== "ACTIVE" || !(await canPurchasePaidBoost(user.id, business.id))) {
-    return { ok: false, error: "Платное продвижение может приобрести только владелец бизнеса." };
+    return { ok: false, error: "Платное продвижение доступно только активному владельцу или менеджеру бизнеса." };
   }
 
   const parsed = createPromotionSchema.safeParse(input);
