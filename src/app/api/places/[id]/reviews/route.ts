@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import prisma from "@/lib/prisma";
 import { requirePhoneVerifiedUser } from "@/lib/auth/requirePhoneVerifiedUser";
 
@@ -31,8 +32,8 @@ export async function POST(
     const { id: placeId } = await context.params;
 
     // Получить место
-    const place = await prisma.place.findUnique({
-      where: { id: placeId },
+    const place = await prisma.place.findFirst({
+      where: { id: placeId, ...getPublicPublishedPlaceWhere() },
       select: {
         id: true,
         title: true,
@@ -44,14 +45,6 @@ export async function POST(
       return NextResponse.json(
         { error: "PLACE_NOT_FOUND", message: "Place not found" },
         { status: 404 }
-      );
-    }
-
-    // Можно оставлять отзывы только для опубликованных мест
-    if (place.status !== "PUBLISHED") {
-      return NextResponse.json(
-        { error: "PLACE_NOT_PUBLISHED", message: "Cannot review unpublished place" },
-        { status: 400 }
       );
     }
 
