@@ -4,7 +4,7 @@ import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
 import { getBaseUrl, buildCityPublicPath } from "@/lib/routing/cityPaths";
 import {
   getPublicPublishedPlaceWhere,
-  getPublicPublishedOfferWhere,
+  getReleaseScopedPublicOfferWhere,
   getPublicActivityDetailWhere,
   getPublicListingActivityWhere,
   getPublicPublishedArticleWhere,
@@ -292,7 +292,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const offers = await prisma.offer.findMany({
       where: {
         AND: [
-          getPublicPublishedOfferWhere(),
+          getReleaseScopedPublicOfferWhere(),
           { place: { OR: [{ cityId: null }, { city: { isActive: true } }] } },
         ],
       },
