@@ -14,7 +14,7 @@ import {
   suspendBillingAccount,
   reactivateBillingAccount,
 } from "./billingAccount.service";
-import { createRefund, RefundNotAllowedError } from "./billingTransaction.service";
+import { createRefund, getRefundPreview, getBillingTransactionsSummary, RefundNotAllowedError } from "./billingTransaction.service";
 import {
   BoostAlreadyActiveError,
   BoostPurchaseNotAllowedError,
@@ -361,6 +361,46 @@ test("paid Boost is owner-only on the server, including replay and direct servic
     await prisma.businessMember.updateMany({ where: { businessId, userId }, data: { isActive: true } });
   }
   assert.equal(await prisma.boost.count({ where: { offerId } }), 0);
+  assert.equal(await prisma.billingTransaction.count({ where: { billingAccountId: accountId, type: "FEATURE_CHARGE" } }), 1);
+  assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "95.00");
+});
+
+test("refund preview rejects topups and accepts eligible debit", async () => {
+  await resetFinancialState("1.00");
+  const topup = await creditBusinessDeposit({ accountId, amount: 0.10, description: "preview topup" });
+  await assert.rejects(getRefundPreview(topup.id), RefundNotAllowedError);
+  const debit = await debitBusinessDeposit({ accountId, amount: 0.30, type: "FEATURE_CHARGE", description: "preview debit" });
+  const preview = await getRefundPreview(debit.id);
+  assert.equal(preview.availableAmount, 0.30);
+  assert.equal(preview.canRefund, true);
+});
+
+test("transaction summary preserves fractional ledger totals", async () => {
+  await resetFinancialState("0.10");
+  await creditBusinessDeposit({ accountId, amount: 0.20, description: "fractional credit" });
+  const debit = await debitBusinessDeposit({ accountId, amount: 0.30, type: "FEATURE_CHARGE", description: "summary debit" });
+  await createRefund({ parentTransactionId: debit.id, amount: 0.10, currency: "BYN", idempotencyKey: `${prefix}:summary-refund`, reason: "partial" });
+  assert.deepEqual(await getBillingTransactionsSummary({ accountId }), {
+    totalTopups: 0.30, totalCharges: 0.30, totalRefunds: 0.10, netChange: 0.10, transactionsCount: 4,
+  });
+});
+
+test("a paid Boost replay survives a tariff change without a second debit", async () => {
+  await resetFinancialState("100.00");
+  const key = `${prefix}:tariff-change`;
+  const first = await purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: key });
+  const original = process.env.BOOST_PRICE_1D_BYN;
+  try {
+    for (const changed of ["9", undefined]) {
+      if (changed === undefined) delete process.env.BOOST_PRICE_1D_BYN;
+      else process.env.BOOST_PRICE_1D_BYN = changed;
+      const replay = await purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: key });
+      assert.equal(replay.idempotentReplay, true);
+      assert.equal(replay.boost.id, first.boost.id);
+    }
+  } finally {
+    process.env.BOOST_PRICE_1D_BYN = original;
+  }
   assert.equal(await prisma.billingTransaction.count({ where: { billingAccountId: accountId, type: "FEATURE_CHARGE" } }), 1);
   assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "95.00");
 });
