@@ -7,13 +7,13 @@ name: Audit RC image build and smoke (no publish)
 on:
   push:
     branches:
-      - audit/rc2-image-20261127
+      - audit/rc2-image-374e4dfc-20261127
 
 permissions:
   contents: read
 
 concurrency:
-  group: audit-rc2-image-20261127
+  group: audit-rc2-image-374e4dfc-20261127
   cancel-in-progress: false
 
 jobs:
@@ -22,9 +22,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
-      SOURCE_SHA: 8766371f8c6250e49b0aa73091eec76f98461374
-      BUILD_ID: audit-rc2-8766371f8c62
-      IMAGE: mamago2-audit-rc2:8766371f8c62
+      SOURCE_SHA: 374e4dfc0863fcbbf5c8b4a849969ad140d23eff
+      BUILD_ID: audit-rc2-374e4dfc0863
+      IMAGE: mamago2-audit-rc2:374e4dfc0863
     steps:
       - name: Runner platform and memory
         shell: bash
@@ -38,7 +38,7 @@ jobs:
       - name: Check out exact RC SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 8766371f8c6250e49b0aa73091eec76f98461374
+          ref: 374e4dfc0863fcbbf5c8b4a849969ad140d23eff
           persist-credentials: false
 
       - name: Build with production Dockerfile (load only)
@@ -137,7 +137,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: audit-rc-8766371f8c62-evidence
+          name: audit-rc-374e4dfc0863-evidence
           path: |
             ${{ runner.temp }}/build-metadata.json
             ${{ runner.temp }}/build-time.txt
