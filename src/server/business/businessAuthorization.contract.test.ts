@@ -15,6 +15,7 @@ test("billing entry points require active owner membership", () => {
     "src/app/api/business/billing/route.ts",
     "src/app/api/business/billing/transactions/route.ts",
     "src/app/business/(protected)/billing/page.tsx",
+    "src/app/business/(protected)/billing/documents/page.tsx",
   ]) {
     const code = source(path);
     assert.match(code, /ownerUserId: user\.id, members: \{ some: \{ userId: user\.id, isActive: true, role: "OWNER" \} \}/, path);
