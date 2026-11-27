@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { prisma as defaultPrisma } from "@/lib/prisma";
-import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
+import { isReleaseScopedOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { getBaseUrl } from "@/lib/routing/cityPaths";
 import { ensureFamilyForUser } from "@/server/family/ensureFamily";
@@ -461,6 +461,7 @@ async function resolvePublicOffer(c: Ctx, offerId: string): Promise<{ id: string
       id: true,
       slug: true,
       status: true,
+      productType: true,
       archivedAt: true,
       place: {
         select: {
@@ -472,7 +473,7 @@ async function resolvePublicOffer(c: Ctx, offerId: string): Promise<{ id: string
       },
     },
   });
-  if (!offer || !offer.slug || !offer.place?.city?.slug || !isOfferPubliclyVisible(offer)) {
+  if (!offer || !offer.slug || !offer.place?.city?.slug || !isReleaseScopedOfferPubliclyVisible(offer)) {
     throw new WishlistError("invalid_input", "Это предложение недоступно");
   }
   return { id: offer.id, url: `${getBaseUrl()}${getOfferPublicPath(offer, offer.place.city.slug)}` };

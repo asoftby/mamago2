@@ -1,3 +1,4 @@
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { Prisma, PlanItemSource, type PlanVisibility } from "@prisma/client";
 import { planActivityCountsQuery } from "@/server/services/planActivityCountsQuery";
 import { prisma } from "@/lib/prisma";
@@ -368,7 +369,7 @@ export async function addOfferPlanItem(
   options?: { visibility?: PlanVisibility },
 ): Promise<{ id: string }> {
   const offer = await prisma.offer.findFirst({
-    where: { id: offerId, status: "PUBLISHED", archivedAt: null },
+    where: { id: offerId, ...getReleaseScopedPublicOfferWhere() },
     select: { id: true, title: true, coverImage: true },
   });
   if (!offer) throw new Error("Offer not found");

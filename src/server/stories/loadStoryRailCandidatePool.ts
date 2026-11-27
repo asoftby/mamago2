@@ -2,7 +2,7 @@ import { publicOfferSessionWhere } from "@/lib/offers/publicOfferSessions";
 import { ActivityType, MediaEntityType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { getPublicListingActivityWhere, getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { getPublicListingActivityWhere, getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import { buildDateRangeWhere, buildOfferSessionOccurrenceWhere } from "@/lib/stories/dateRangeWhere";
 import type { DateRange } from "@/lib/stories/types";
@@ -36,7 +36,7 @@ export async function loadStoryRailCandidatePool(input: {
       ? [pubActivity.AND]
       : [];
 
-  const pubOffer = getPublicPublishedOfferWhere(now);
+  const pubOffer = getReleaseScopedPublicOfferWhere(now);
   const pubOfferParts = Array.isArray(pubOffer.AND)
     ? pubOffer.AND
     : pubOffer.AND
