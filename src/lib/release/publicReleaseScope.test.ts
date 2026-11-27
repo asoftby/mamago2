@@ -18,6 +18,19 @@ test("excluded features are off unless explicitly enabled", () => {
   }
 });
 
+test("DEV release scope exposes deferred features while PROD stays fail-closed", () => {
+  const devEnv = { APP_ENV: "dev" };
+  const prodEnv = { APP_ENV: "production" };
+  for (const feature of ["classes", "birthday", "placesCatalog"] as const) {
+    assert.equal(isPublicReleaseFeatureEnabled(feature, devEnv), true);
+    assert.equal(isPublicReleaseFeatureEnabled(feature, prodEnv), false);
+  }
+  assert.equal(disabledFeatureForPagePath("/minsk/classes", devEnv), null);
+  assert.equal(disabledFeatureForPagePath("/minsk/birthday", devEnv), null);
+  assert.equal(disabledFeatureForPagePath("/minsk/classes", prodEnv), "classes");
+  assert.equal(disabledFeatureForPagePath("/minsk/birthday", prodEnv), "birthday");
+});
+
 test("gated page paths answer 404 while their feature is off", () => {
   for (const [path, feature] of [
     ["/minsk/classes", "classes"],
