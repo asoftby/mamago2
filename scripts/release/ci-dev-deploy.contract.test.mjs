@@ -50,7 +50,9 @@ test("auto-deploy is opt-in and never cancels in-flight migrations", () => {
 
 test("exact SHA CI gate precedes SSH and digest pull precedes migrations", () => {
   const workflow=readFileSync(".github/workflows/docker.yml","utf8");
-  assert.match(workflow,/Require successful CI for exact DEV SHA[\s\S]*?head_sha="\$EXPECTED_SHA"[\s\S]*?success\) exit 0[\s\S]*?Configure pinned SSH identity/);
+  assert.match(workflow,/Require successful CI for exact DEV SHA[\s\S]*?bash scripts\/release\/require-dev-ci.sh[\s\S]*?Configure pinned SSH identity/);
+  const gate=readFileSync("scripts/release/require-dev-ci.sh","utf8");
+  assert.match(gate,/head_sha="\$EXPECTED_SHA"[\s\S]*?success\) exit 0/);
   const host=readFileSync("scripts/release/ci-dev-host-deploy.sh","utf8");
   assert.ok(host.includes('docker pull "ghcr.io/asoftby/mamago2@$digest"'));
   assert.ok(host.indexOf('docker pull ') < host.indexOf('docker compose -p dev run --pull never'));
