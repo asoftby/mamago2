@@ -4,39 +4,44 @@ import prisma from "@/lib/prisma";
 type Db = Prisma.TransactionClient | typeof prisma;
 
 /**
- * Paid Boost spends the business deposit. Only a principal who may see that
- * deposit may spend it: the same predicate as the billing read guard
- * (business owner of record with an active OWNER membership). MANAGER keeps
- * the free daily Boost, which does not touch money.
+ * Paid Boost purchases are allowed to an active OWNER or MANAGER of the
+ * selected, operationally ACTIVE business. This authorization is intentionally
+ * separate from OWNER-only billing statements and account administration.
  */
-export class PaidBoostOwnerRequiredError extends Error {
-  code = "PAID_BOOST_OWNER_REQUIRED" as const;
+export class PaidBoostMembershipRequiredError extends Error {
+  code = "PAID_BOOST_MEMBERSHIP_REQUIRED" as const;
   constructor() {
-    super("Платный Boost может приобрести только владелец бизнеса.");
-    this.name = "PaidBoostOwnerRequiredError";
+    super("Платное продвижение доступно только активному владельцу или менеджеру бизнеса.");
+    this.name = "PaidBoostMembershipRequiredError";
   }
 }
 
-export function activeBillingOwnerWhere(businessId: string, userId: string): Prisma.BusinessWhereInput {
+export function activePaidBoostMemberWhere(businessId: string, userId: string): Prisma.BusinessWhereInput {
   return {
     id: businessId,
-    ownerUserId: userId,
-    members: { some: { userId, isActive: true, role: "OWNER" } },
+    operationalStatus: "ACTIVE",
+    members: {
+      some: {
+        userId,
+        isActive: true,
+        role: { in: ["OWNER", "MANAGER"] },
+      },
+    },
   };
 }
 
 export async function canPurchasePaidBoost(userId: string, businessId: string, db: Db = prisma): Promise<boolean> {
   if (!userId || !businessId) return false;
   const business = await db.business.findFirst({
-    where: activeBillingOwnerWhere(businessId, userId),
+    where: activePaidBoostMemberWhere(businessId, userId),
     select: { id: true },
   });
   return Boolean(business);
 }
 
-/** Must run inside the purchase transaction, before replay lookup or any debit. */
-export async function assertPaidBoostOwnerInTx(tx: Prisma.TransactionClient, businessId: string, userId: string) {
+/** Must execute within the purchase transaction, before replay lookup or debit. */
+export async function assertPaidBoostPurchaserInTx(tx: Prisma.TransactionClient, businessId: string, userId: string) {
   if (!(await canPurchasePaidBoost(userId, businessId, tx))) {
-    throw new PaidBoostOwnerRequiredError();
+    throw new PaidBoostMembershipRequiredError();
   }
 }
