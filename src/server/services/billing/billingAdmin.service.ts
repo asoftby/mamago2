@@ -37,6 +37,7 @@ export async function getBillingOverview() {
       where: {
         occurredAt: { gte: monthStart },
         status: "SUCCEEDED",
+        amount: { lt: 0 },
       },
     }),
     // Failed payments

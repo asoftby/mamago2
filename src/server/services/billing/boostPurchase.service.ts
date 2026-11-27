@@ -49,11 +49,8 @@ export async function purchaseOfferBoost(params: {
   requestKey: string;
   targetRegionIds?: string[];
 }) {
-  const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
-  if (!option) {
-    throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
-  }
-
+  const definition = BOOST_OPTION_DEFINITIONS.find((item) => item.id === params.optionId);
+  if (!definition) throw new BoostPricingUnavailableError("Unknown Boost option");
   const targetRegionIds = await validateBoostTargetRegions(params.targetRegionIds ?? []);
 
   return prisma.$transaction(async (tx) => {
@@ -64,13 +61,17 @@ export async function purchaseOfferBoost(params: {
     if (replay) {
       if (
         replay.offerId !== params.offerId ||
-        replay.durationDays !== option.durationDays ||
-        !replay.price?.equals(option.price) ||
+        replay.durationDays !== definition.durationDays ||
         JSON.stringify([...replay.targetRegionIds].sort()) !== JSON.stringify([...targetRegionIds].sort())
       ) {
         throw new BoostPurchaseNotAllowedError("Request key was used for another Boost purchase");
       }
       return { boost: replay, transaction: replay.billingTransaction, idempotentReplay: true };
+    }
+
+    const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
+    if (!option) {
+      throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
     }
 
     // Serializes eligibility and active-Boost decisions for this Offer.
