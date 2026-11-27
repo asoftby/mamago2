@@ -432,6 +432,10 @@ async function debitBusinessDepositInTx(
   const creditLimit = account.creditLimit.toNumber();
   const availableBalance = account.depositBalance.plus(account.creditLimit).toNumber();
   const requestedAmount = normalizedAmount.toNumber();
+  if (account.status !== BillingAccountStatus.ACTIVE && type !== BillingTransactionType.MANUAL_ADJUSTMENT) {
+    throw new Error("Billing account is not active");
+  }
+
   const newBalance = account.depositBalance.minus(normalizedAmount);
 
   if (!allowNegative && newBalance.lt(account.creditLimit.negated())) {
