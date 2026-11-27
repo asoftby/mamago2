@@ -21,7 +21,7 @@ export async function purchaseEventBoostAction(input: z.input<typeof schema>) {
   const business = await getMyBusiness(user.id);
   if (!business) return { ok: false as const, error: "Бизнес не найден." };
   if (business.operationalStatus !== "ACTIVE" || !(await canPurchasePaidBoost(user.id, business.id))) {
-    return { ok: false as const, error: "Платное продвижение может приобрести только владелец бизнеса." };
+    return { ok: false as const, error: "Платное продвижение доступно только активному владельцу или менеджеру бизнеса." };
   }
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Некорректный запрос Boost." };
