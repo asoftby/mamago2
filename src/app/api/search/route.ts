@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { swapKeyboardLayout } from "@/lib/search/keyboardLayout";
-import { getPublicActivityDetailWhere, getPublicPublishedPlaceWhere, getPublicPublishedOfferWhere, getPublicPublishedArticleWhere, getPublicRouteIndexWhere } from "@/server/public/publicContentVisibility";
+import { getPublicActivityDetailWhere, getPublicPublishedPlaceWhere, getReleaseScopedPublicOfferWhere, getPublicPublishedArticleWhere, getPublicRouteIndexWhere } from "@/server/public/publicContentVisibility";
 import prisma from "@/lib/prisma";
 import type { SearchResultItem, SearchResultType } from "@/lib/search/types";
 import { logSearchQuery } from "@/lib/search/logSearchQuery";
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
           await Promise.all([
             tx.activity.findMany({ where: { id: { in: ids("activity") }, ...getPublicActivityDetailWhere() }, select: selectId }),
             tx.place.findMany({ where: { id: { in: ids("place") }, ...getPublicPublishedPlaceWhere() }, select: selectId }),
-            tx.offer.findMany({ where: { id: { in: ids("offer") }, ...getPublicPublishedOfferWhere() }, select: selectId }),
+            tx.offer.findMany({ where: { id: { in: ids("offer") }, ...getReleaseScopedPublicOfferWhere() }, select: selectId }),
             tx.article.findMany({ where: { id: { in: ids("article") }, slug: { not: null }, ...getPublicPublishedArticleWhere() }, select: selectId }),
             tx.route.findMany({ where: { id: { in: ids("route") }, ...getPublicRouteIndexWhere() }, select: selectId }),
           ]);

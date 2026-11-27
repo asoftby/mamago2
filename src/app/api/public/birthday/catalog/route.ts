@@ -1,7 +1,14 @@
+import { isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 import { NextRequest, NextResponse } from "next/server";
 import { getPublicBirthdayCatalog } from "@/server/birthday/catalog.service";
 
 export async function GET(request: NextRequest) {
+  if (!isDeferredPublicFeatureEnabled("birthday")) {
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
   const city = new URL(request.url).searchParams.get("city");
   if (!city || !/^[a-z][a-z0-9-]{0,80}$/.test(city)) {
     return NextResponse.json({ error: "Некорректный город" }, { status: 400 });

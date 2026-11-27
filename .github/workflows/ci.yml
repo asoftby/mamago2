@@ -443,7 +443,7 @@ jobs:
           pnpm exec tsx src/lib/seo/globalNoindex.test.ts
           pnpm exec tsx src/app/robots.test.ts
           pnpm exec tsx src/lib/seo/indexingPolicy.test.ts
-          pnpm exec tsx src/server/public/publicContentVisibility.test.ts
+          pnpm test:public-release-scope
           pnpm exec tsx src/lib/search/builders/buildArticleDocument.test.ts
           pnpm exec tsx src/lib/article/nextArticleInSection.test.ts
           pnpm exec tsx src/app/api/search/searchPagination.contract.test.ts
@@ -500,6 +500,14 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           node --conditions=react-server --import ./scripts/testing/next-server-action-imports.mjs --import tsx src/app/api/search/route.test.ts
+
+      - name: Public release scope PostgreSQL integration
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          APP_ENV: test
+        run: |
+          pnpm exec prisma migrate deploy
+          node --conditions=react-server --import ./scripts/testing/next-server-action-imports.mjs --import tsx src/server/public/publicReleaseScope.integration.test.ts
 
       - name: Business identity and payer PostgreSQL regressions
         env:

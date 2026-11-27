@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import type { OfferProductType } from "@prisma/client";
 import {
   getPublicPublishedPlaceWhere,
-  getPublicPublishedOfferWhere,
+  getReleaseScopedPublicOfferWhere,
 } from "@/server/public/publicContentVisibility";
 import { getPlaceRatingSummary } from "@/lib/place/placeRatingSummary";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
@@ -226,7 +226,7 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
     resolvePlaceLogoUrlFromDb(place.images, place.logoImageId),
     loadUpcomingPlaceEvents({ placeId: place.id, cityId: null, take: 12 }),
     prisma.offer.findMany({
-      where: { AND: [{ placeId: place.id }, getPublicPublishedOfferWhere()] },
+      where: { AND: [{ placeId: place.id }, getReleaseScopedPublicOfferWhere()] },
       select: {
         id: true,
         slug: true,

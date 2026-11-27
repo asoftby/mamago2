@@ -1,3 +1,4 @@
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
@@ -165,12 +166,22 @@ export async function saveIdeaWithCollections(
           create: { ...where, activityId: target.id }, update: {},
         });
         break;
-      case "OFFER":
+      case "OFFER": {
+        const offer = await tx.offer.findFirst({
+          where: {
+            id: target.id,
+            ...getReleaseScopedPublicOfferWhere(),
+          },
+          select: { id: true },
+        });
+        if (!offer) throw new IdeaCollectionError("IDEA_NOT_FOUND");
+
         saved = await tx.offerIdea.upsert({
           where: { userId_offerId: { ...where, offerId: target.id } },
           create: { ...where, offerId: target.id }, update: {},
         });
         break;
+      }
       case "ROUTE":
         saved = await tx.routeIdea.upsert({
           where: { userId_routeId: { ...where, routeId: target.id } },

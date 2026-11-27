@@ -1,3 +1,4 @@
+import { hasFullPublicReleaseScope } from "@/lib/config/publicReleaseScope";
 import type { Prisma } from "@prisma/client";
 import { ContentStatus, ScheduleMode } from "@prisma/client";
 import {
@@ -191,3 +192,22 @@ export {
   isPlacePubliclyVisible,
   type PlanActivityPublicAvailability,
 } from "@/lib/plan/publicVisibility";
+
+/**
+ * Public release scope, separate from publication visibility.
+ * Internal business operations retain the original predicate.
+ */
+export function getReleaseScopedPublicOfferWhere(
+  now: Date = new Date(),
+): Prisma.OfferWhereInput {
+  const published = getPublicPublishedOfferWhere(now);
+
+  if (hasFullPublicReleaseScope()) return published;
+
+  return {
+    AND: [
+      published,
+      { productType: "PLACE_VISIT" },
+    ],
+  };
+}

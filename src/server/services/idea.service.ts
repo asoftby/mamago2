@@ -1,3 +1,4 @@
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { Idea } from "@prisma/client";
@@ -243,6 +244,12 @@ export async function addRouteIdea(
 
 /** Сохранить предложение в «Идеи» (idempotent). */
 export async function addOfferIdea(userId: string, offerId: string) {
+  const offer = await prisma.offer.findFirst({
+    where: { id: offerId, ...getReleaseScopedPublicOfferWhere() },
+    select: { id: true },
+  });
+  if (!offer) throw new Error("Offer not found");
+
   const delegate = getOfferIdeaDelegate();
   if (!delegate) {
     throw new Error("offer_ideas_unsupported");

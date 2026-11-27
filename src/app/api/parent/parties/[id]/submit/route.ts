@@ -1,3 +1,4 @@
+import { isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -13,6 +14,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!isDeferredPublicFeatureEnabled("birthdayBuilder")) {
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });

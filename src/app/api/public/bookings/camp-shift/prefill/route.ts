@@ -1,3 +1,4 @@
+import { isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
@@ -16,6 +17,12 @@ function getAgeFromBirthDate(value?: Date | null): number | null {
 }
 
 export async function GET() {
+  if (!isDeferredPublicFeatureEnabled("camps")) {
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
   const user = await getCurrentUser().catch(() => null);
 
   if (!user) {

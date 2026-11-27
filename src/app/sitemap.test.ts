@@ -35,7 +35,6 @@ async function testSitemapContents() {
   process.env.SITE_INDEXING_ENABLED = "true";
 
   const marker = randomUUID();
-  const base = getCanonicalPublicAppUrl();
 
   const user = await prisma.user.create({
     data: { email: `sitemap-test-${marker}@example.invalid` },
@@ -85,38 +84,69 @@ async function testSitemapContents() {
   });
 
   try {
-    const entries = await sitemap();
+    const previousAppEnv = process.env.APP_ENV;
+
+    const { entries, prodBase } = await (async () => {
+      try {
+        process.env.APP_ENV = "dev";
+        const devEntries = await sitemap();
+
+        assert.deepEqual(
+          devEntries,
+          [],
+          "DEV sitemap must remain empty under global noindex",
+        );
+
+        process.env.APP_ENV = "production";
+        const prodBase = getCanonicalPublicAppUrl();
+        const entries = await sitemap();
+
+        assert.ok(entries.length > 0, "PROD sitemap must not be empty");
+
+        return { entries, prodBase };
+      } finally {
+        if (previousAppEnv === undefined) {
+          delete process.env.APP_ENV;
+        } else {
+          process.env.APP_ENV = previousAppEnv;
+        }
+      }
+    })();
+
     const urls = entries.map((entry) => entry.url);
 
-    // --- global listing entries ---
-    assert.ok(urls.includes(`${base}/routes`), "sitemap must include the global /routes listing");
-    assert.ok(urls.includes(`${base}/blog`), "sitemap must include the global /blog listing");
+    for (const path of [
+      "/routes",
+      "/blog",
+      `/${city!.slug}`,
+      `/${city!.slug}/events`,
+      `/${city!.slug}/routes`,
+      `/${city!.slug}/blog`,
+      `/${city!.slug}/places/${visiblePlace.slug}`,
+    ]) {
+      assert.ok(
+        urls.includes(`${prodBase}${path}`),
+        `Required PROD sitemap entry missing: ${path}`,
+      );
+    }
 
-    // --- per-city listing entries (BACKLOG-064 approved gaps only) ---
-    assert.ok(
-      urls.includes(`${base}/${city!.slug}/programs`),
-      "sitemap must include /{city}/programs",
-    );
-    assert.ok(
-      urls.includes(`${base}/${city!.slug}/classes`),
-      "sitemap must include /{city}/classes",
-    );
-    assert.ok(
-      urls.includes(`${base}/${city!.slug}/routes`),
-      "sitemap must include /{city}/routes",
-    );
-    assert.ok(
-      urls.includes(`${base}/${city!.slug}/blog`),
-      "sitemap must include /{city}/blog",
-    );
-    assert.ok(
-      !urls.includes(`${base}/${city!.slug}/birthday`),
-      "sitemap must NOT include /{city}/birthday — not part of the approved BACKLOG-064 gap list",
-    );
+    const deferredSections = new Set([
+      "classes",
+      "programs",
+      "birthday",
+    ]);
+
+    for (const url of urls) {
+      const segments = new URL(url).pathname.split("/");
+      assert.ok(
+        !segments.some((segment) => deferredSections.has(segment)),
+        `Deferred section leaked into PROD sitemap: ${url}`,
+      );
+    }
 
     // --- seoRobots noindex exclusion, proven end-to-end (not just the helper) ---
     assert.ok(
-      urls.includes(`${base}/${city!.slug}/places/${visiblePlace.slug}`),
+      urls.includes(`${prodBase}/${city!.slug}/places/${visiblePlace.slug}`),
       "a normal published place without seoRobots must appear under its city-scoped canonical",
     );
     assert.ok(
@@ -132,7 +162,7 @@ async function testSitemapContents() {
     assert.equal(urls.length, new Set(urls).size, "sitemap must not contain duplicate URLs");
     for (const url of urls) {
       assert.doesNotThrow(() => new URL(url), `malformed URL in sitemap: ${url}`);
-      assert.ok(url.startsWith(base), `sitemap URL must be absolute and same-origin: ${url}`);
+      assert.ok(new URL(url).origin === new URL(prodBase).origin, `sitemap URL must be absolute and same-origin: ${url}`);
     }
 
     console.log(`sitemap (Task 8 / BACKLOG-064) tests: OK (${urls.length} entries)`);
