@@ -229,7 +229,7 @@
     "test:article-content-media-linkage": "tsx src/server/media/articleContentMediaLinkage.test.ts",
     "test:event-wizard-pending-location": "tsx src/lib/business/resolvePendingLocationOnPublish.test.ts",
     "test:publication-display-status": "tsx src/lib/publication/displayStatus.test.ts",
-    "test:business-event-access": "tsx src/lib/auth/activityAccess.test.ts",
+    "test:business-event-access": "tsx src/lib/auth/activityAccess.test.ts && tsx --test src/server/business/businessAuthorization.contract.test.ts",
     "test:address-suggest": "tsx src/lib/address/addressSuggestions.test.ts && tsx src/components/address/addressSuggestInput.wiringContract.test.ts && tsx src/services/googleMaps/addressSuggestionsClient.test.ts && tsx src/components/business/wizard/event/steps/location/quickPlaceAddress.wiringContract.test.ts",
     "test:publication-role-matrix": "tsx src/lib/auth/publicationRoleMatrix.http.test.ts",
     "test:public-edit-permissions": "tsx src/lib/permissions/publicEditPermissions.test.ts",
