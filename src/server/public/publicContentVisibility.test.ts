@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { ScheduleMode } from "@prisma/client";
 import {
   getActivityNotExpiredForPublicWhere,
@@ -125,3 +126,13 @@ assert.ok(
 );
 
 console.log("✅ publicContentVisibility.test.ts — all assertions passed");
+
+// Redirects must not expose canonical paths for non-public places.
+for (const [path, expected] of [
+  ["src/app/(public)/places/[slug]/page.tsx", 1],
+  ["src/app/(public)/[city]/places/[slug]/page.tsx", 3],
+  ["src/app/api/places/[id]/reviews/route.ts", 1],
+] as const) {
+  const source = readFileSync(path, "utf8");
+  assert.ok((source.match(/\.\.\.getPublicPublishedPlaceWhere\(\)/g) ?? []).length >= expected, path);
+}
