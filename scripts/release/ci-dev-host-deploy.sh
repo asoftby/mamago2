@@ -48,7 +48,8 @@ print("DEV_COMPOSE_CONFIG_OK")
 PY
 
 # Verify the remote image's immutable manifest digest and baked-in identity.
-docker pull "$image"
+docker pull "ghcr.io/asoftby/mamago2@$digest"
+docker tag "ghcr.io/asoftby/mamago2@$digest" "$image"
 actual_digest="$(docker image inspect "$image" --format '{{json .RepoDigests}}' | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin)))')"
 printf '%s\n' "$actual_digest" | grep -Fqx "ghcr.io/asoftby/mamago2@$digest" || {
   echo "ABORT: registry digest mismatch" >&2; exit 1;
@@ -90,9 +91,9 @@ PY
 
 # No dependency reconciliation: the healthy database container cannot be
 # recreated by any of these Compose commands. Never call 'down' or 'up db'.
-docker compose -p dev run --rm --no-deps migrate < /dev/null
-docker compose -p dev run --rm --no-deps --entrypoint sh migrate -c 'pnpm prisma migrate status' < /dev/null
-docker compose -p dev up -d --no-deps app worker
+docker compose -p dev run --pull never --rm --no-deps migrate < /dev/null
+docker compose -p dev run --pull never --rm --no-deps --entrypoint sh migrate -c 'pnpm prisma migrate status' < /dev/null
+docker compose -p dev up --pull never -d --no-deps app worker
 
 for service in app worker; do
   actual="$(docker inspect --type container --format '{{.Image}}' "dev-$service-1")"
