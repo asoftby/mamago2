@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   build-and-push:
-    if: github.repository == 'asoftby/mamago2' && github.ref == 'refs/heads/dev'
+    if: github.repository == 'asoftby/mamago2' && github.ref == 'refs/heads/dev' && github.run_attempt == 1
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     runs-on: ubuntu-latest
