@@ -1,0 +1,30 @@
+name: DEV UAT deploy tooling
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "scripts/release/uat/**"
+      - ".github/workflows/uat-deploy-tooling.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  uat-deploy-tooling:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Shellcheck
+        run: shellcheck scripts/release/uat/*.sh scripts/release/uat/tests/*.sh
+      - name: Install aiogram (same version as the host bot)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet aiogram==3.28.2
+      - name: Authorization, confirmation, router and deploy scenario tests
+        run: '"$RUNNER_TEMP/venv/bin/python" -B -m unittest discover -s scripts/release/uat/tests -p "test_*.py" -v'
+      - name: Real Docker rehearsal (local registry, Compose, PostgreSQL 16)
+        run: bash scripts/release/uat/tests/integration.sh
