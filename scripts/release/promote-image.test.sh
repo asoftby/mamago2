@@ -11,7 +11,9 @@ cat > "$tmp/docker" <<'MOCK'
 set -eu
 printf '%s\n' "$*" >> "$LOG"
 if [[ "$3" == create ]]; then
-  [[ "${*: -1}" == "$IMAGE@$EXPECTED_DIGEST" ]]
+  last_arg=""
+  for arg in "$@"; do last_arg="$arg"; done
+  [[ "$last_arg" == "$IMAGE@$EXPECTED_DIGEST" ]]
   touch "$LOG.created"
 elif [[ "$4" == "$IMAGE:$DEV_TAG" || -f "$LOG.created" ]]; then
   printf '"%s"\n' "$EXPECTED_DIGEST"
@@ -20,19 +22,22 @@ else
     same) printf '"%s"\n' "$EXPECTED_DIGEST";;
     different) printf '"sha256:%064d"\n' 2;;
     missing) echo 'ERROR: registry: manifest unknown' >&2; exit 1;;
+    missing-ghcr) echo "ERROR: $IMAGE:$PROD_TAG: not found" >&2; exit 1;;
+    other-not-found) echo 'ERROR: ghcr.io/another/repo:prod-456: not found' >&2; exit 1;;
+    auth-not-found) echo 'ERROR: 401 unauthorized: not found' >&2; exit 1;;
     denied) echo 'ERROR: unauthorized' >&2; exit 1;;
   esac
 fi
 MOCK
 chmod +x "$tmp/docker"
-for mode in same different missing denied; do
+for mode in same different missing missing-ghcr denied other-not-found auth-not-found; do
   export MODE="$mode"
   rm -f "$LOG.created" "$LOG"
   case "$mode" in
-    same|missing) bash scripts/release/promote-image.sh;;
+    same|missing|missing-ghcr) bash scripts/release/promote-image.sh;;
     *) if bash scripts/release/promote-image.sh; then exit 1; fi;;
   esac
-  if [[ "$mode" == missing ]]; then
+  if [[ "$mode" == missing || "$mode" == missing-ghcr ]]; then
     test -f "$LOG.created"
   else
     test ! -f "$LOG.created"
