@@ -10,6 +10,9 @@ import {
   BillingInsufficientFundsError,
   creditBusinessDeposit,
   debitBusinessDeposit,
+  recalculateDepositBalance,
+  suspendBillingAccount,
+  reactivateBillingAccount,
 } from "./billingAccount.service";
 import { createRefund, RefundNotAllowedError } from "./billingTransaction.service";
 import {
@@ -269,4 +272,43 @@ test("paid Promotion is disabled and reconciliation detects divergence without f
   const mismatched = await reconcileBillingAccounts();
   assert.equal(mismatched.rows.find((row) => row.accountId === accountId)?.mismatchAmount, "-1.00");
   assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "99.00");
+});
+
+test("decimal credit limit permits exact boundary debit", async () => {
+  await resetFinancialState("0.10");
+  await prisma.billingAccount.update({ where: { id: accountId }, data: { creditLimit: new Prisma.Decimal("0.20") } });
+  await debitBusinessDeposit({ accountId, amount: 0.30, type: "FEATURE_CHARGE", description: "exact boundary" });
+  const account = await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } });
+  assert.equal(account.depositBalance.toFixed(2), "-0.20");
+});
+
+test("suspended account rejects new service debit without changing balance", async () => {
+  await resetFinancialState("10.00");
+  await suspendBillingAccount(accountId, "test");
+  try {
+    await assert.rejects(debitBusinessDeposit({ accountId, amount: 1, type: "PROMOTION_CHARGE", description: "blocked" }), /not active/);
+    const account = await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    assert.equal(account.depositBalance.toFixed(2), "10.00");
+  } finally {
+    await reactivateBillingAccount(accountId);
+  }
+});
+
+test("reconciliation and concurrent credit preserve ledger balance", async () => {
+  await resetFinancialState("0.10");
+  await Promise.all([
+    recalculateDepositBalance(accountId),
+    creditBusinessDeposit({ accountId, amount: 0.20, description: "concurrent credit" }),
+  ]);
+  const account = await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } });
+  assert.equal(account.depositBalance.toFixed(2), "0.30");
+});
+
+test("fractional partial refunds exhaust the original debit exactly", async () => {
+  await resetFinancialState("1.00");
+  const debit = await debitBusinessDeposit({ accountId, amount: 0.30, type: "FEATURE_CHARGE", description: "fractional debit" });
+  await createRefund({ parentTransactionId: debit.id, amount: 0.10, currency: "BYN", idempotencyKey: `${prefix}:fractional-a`, reason: "partial" });
+  const result = await createRefund({ parentTransactionId: debit.id, amount: 0.20, currency: "BYN", idempotencyKey: `${prefix}:fractional-b`, reason: "remaining" });
+  assert.equal(result.refundSummaryAfter.availableAmount, 0);
+  assert.equal(result.refundSummaryAfter.canRefund, false);
 });
