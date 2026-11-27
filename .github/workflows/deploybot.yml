@@ -1,0 +1,30 @@
+name: Deployment bot and executor
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "scripts/release/deploybot/**"
+      - ".github/workflows/deploybot.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploybot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Shellcheck
+        run: cd scripts/release/deploybot && shellcheck gate *.sh tests/*.sh
+      - name: Install pinned bot dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet -r scripts/release/deploybot/requirements.txt
+      - name: Security, executor, multi-host and Telegram router tests
+        run: cd scripts/release/deploybot/tests && "$RUNNER_TEMP/venv/bin/python" -B -m unittest discover -s . -p "test_*.py"
+      - name: Real Docker, PostgreSQL 16 and sshd rehearsal
+        run: bash scripts/release/deploybot/tests/integration.sh

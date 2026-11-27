@@ -1,0 +1,26 @@
+{
+  "host_id": "legacy",
+  "state_dir": "/var/lib/mamago-deploy",
+  "releases_dir": "/etc/mamago-deploy/releases",
+  "lock_file": "/tmp/mamago-deploy.lock",
+  "environments": {
+    "dev": {
+      "compose_dir": "/opt/mamago/dev", "project": "dev", "db_container": "dev-db-1",
+      "image_repo": "ghcr.io/asoftby/mamago2", "tag_deploy": true,
+      "log_services": ["app", "worker", "migrate", "db"],
+      "public_health_url": "https://dev.mamago.by/api/health", "resolve_public_to": "127.0.0.1",
+      "required_env": {"APP_ENV": "dev", "TRUST_PROXY_HEADERS": "true"},
+      "min_free_gb": 10, "require_attestation": false, "local_dump": true, "backup_max_age_hours": 24,
+      "attestation_dir": "/var/lib/mamago-deploy/dev/attestation", "allowed_signers": "/etc/mamago-deploy/allowed_signers"
+    },
+    "prod": {
+      "compose_dir": "/opt/mamago/prod", "project": "prod", "db_container": "prod-db-1",
+      "image_repo": "ghcr.io/asoftby/mamago2", "tag_deploy": false,
+      "log_services": ["app", "worker", "migrate"],
+      "public_health_url": "https://mamago.by/api/health", "resolve_public_to": "127.0.0.1",
+      "required_env": {},
+      "min_free_gb": 10, "require_attestation": true, "local_dump": true, "backup_max_age_hours": 6,
+      "attestation_dir": "/var/lib/mamago-deploy/prod/attestation", "allowed_signers": "/etc/mamago-deploy/allowed_signers"
+    }
+  }
+}
