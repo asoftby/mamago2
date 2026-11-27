@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { isBoostOptionId } from "@/lib/billing/boostOptions";
 import { purchaseOfferBoost } from "@/server/services/billing/boostPurchase.service";
+import { hasActiveBusinessOwnerMembership } from "@/server/business/paidBoostAuthorization";
 
 const purchaseSchema = z.object({
   offerId: z.string().min(1),
@@ -20,6 +21,12 @@ export async function purchaseOfferBoostAction(input: z.input<typeof purchaseSch
 
   const business = await getMyBusiness(user.id);
   if (!business) return { ok: false as const, error: "Бизнес не найден." };
+
+  // Paid Boost debits the business deposit. MANAGER cannot authorize a charge.
+  // Check before parsing/replaying a request key to avoid disclosing another purchase.
+  if (!(await hasActiveBusinessOwnerMembership(user.id, business.id))) {
+    return { ok: false as const, error: "Платное продвижение доступно только владельцу бизнеса." };
+  }
 
   const parsed = purchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Некорректный запрос Boost." };

@@ -21,3 +21,28 @@ test("billing entry points require active owner membership", () => {
     assert.match(code, /ownerUserId: user\.id, members: \{ some: \{ userId: user\.id, isActive: true, role: "OWNER" \} \}/, path);
   }
 });
+
+
+test("paid Boost must be owner-only on server and in purchase UI", () => {
+  const guard = source("src/server/business/paidBoostAuthorization.ts");
+  assert.match(guard, /import ["']server-only["']/);
+  for (const fragment of ['userId', 'businessId', 'isActive: true', 'role: "OWNER"']) {
+    assert.ok(guard.includes(fragment), fragment);
+  }
+
+  const action = source("src/app/business/(protected)/offers/[id]/boost/actions.ts");
+  assert.match(action, /hasActiveBusinessOwnerMembership\(user\.id, business\.id\)/);
+  assert.ok(
+    action.indexOf("hasActiveBusinessOwnerMembership(user.id, business.id)") <
+    action.indexOf("purchaseOfferBoost({"),
+    "Owner guard must precede any charge, including idempotent replay",
+  );
+
+  const page = source("src/app/business/(protected)/offers/[id]/boost/page.tsx");
+  assert.match(page, /hasActiveBusinessOwnerMembership\(user\.id, business\.id\)/);
+  assert.match(page, /!canPurchasePaidBoost/);
+
+  // Free daily Boost is a separate workflow; this policy must not restrict it.
+  const freeAction = source("src/app/business/(protected)/dashboard/actions.ts");
+  assert.match(freeAction, /createDailyFreeBoost\(/);
+});
