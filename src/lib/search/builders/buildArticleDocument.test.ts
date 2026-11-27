@@ -20,10 +20,14 @@ const baseArticle = {
   city: { slug: "minsk" },
 } as const;
 
-function fakeDb(article: unknown): PrismaClient {
+function fakeDb(article: unknown, visible = true): PrismaClient {
   return {
     article: {
       findUnique: async () => article,
+      findFirst: async ({ where }: { where: unknown }) => {
+        assert.deepEqual(where, { id: baseArticle.id, status: "PUBLISHED", AND: [{ OR: [{ publicationType: "BREAKING_NEWS" }, { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } }] }] });
+        return visible ? { id: baseArticle.id } : null;
+      },
     },
   } as unknown as PrismaClient;
 }
@@ -32,6 +36,9 @@ async function main() {
   const cityDocument = await buildArticleDocument(fakeDb(baseArticle), baseArticle.id);
   assert.equal(cityDocument?.urlPath, "/minsk/blog/family-weekend");
   assert.equal(cityDocument?.isPublished, true);
+
+  const hidden = await buildArticleDocument(fakeDb(baseArticle, false), baseArticle.id);
+  assert.equal(hidden?.isPublished, false, "published article in hidden category must not be indexed as public");
 
   const regionDocument = await buildArticleDocument(
     fakeDb({

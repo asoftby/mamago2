@@ -35,6 +35,7 @@ const now = new Date("2026-06-01T12:00:00.000Z");
   });
 
   assert.equal(where.status, "PUBLISHED");
+  assert.deepEqual(where.AND, [{ OR: [{ publicationType: "BREAKING_NEWS" }, { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } }] }]);
   assert.equal(where.categoryId, "sec-1");
   assert.equal(where.geoScope, "CITY");
   assert.equal(where.cityId, "city-1");

@@ -1,3 +1,4 @@
+import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import type { PrismaClient } from "@prisma/client";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { articleMetaLine } from "@/lib/search/metaLines";
@@ -48,7 +49,10 @@ export async function buildArticleDocument(
   });
   const metaLine = articleMetaLine(article.publishedAt);
   const summaryLine = summarizeForSearchCard(article.subtitle ?? article.excerpt);
-  const isPublished = article.status === "PUBLISHED" && Boolean(slug);
+  const isPublished = Boolean(slug) && Boolean(await db.article.findFirst({
+    where: { id: articleId, ...getPublicPublishedArticleWhere() },
+    select: { id: true },
+  }));
 
   return {
     entityType: "article",
