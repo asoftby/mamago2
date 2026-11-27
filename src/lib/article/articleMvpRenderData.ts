@@ -31,7 +31,7 @@ import {
 import {
   getPublicActivityDetailWhere,
   getPublicPublishedArticleWhere,
-  getPublicPublishedOfferWhere,
+  getReleaseScopedPublicOfferWhere,
   getPublicRouteIndexWhere,
 } from "@/server/public/publicContentVisibility";
 
@@ -277,7 +277,7 @@ async function resolveActivityCard(
   }
   if (b.entityType === "OFFER") {
     const o = await prisma.offer.findFirst({
-      where: { id: b.entityId, ...getPublicPublishedOfferWhere() },
+      where: { id: b.entityId, ...getReleaseScopedPublicOfferWhere() },
       select: {
         id: true,
         title: true,

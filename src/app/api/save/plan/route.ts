@@ -1,3 +1,4 @@
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
@@ -156,6 +157,22 @@ export async function POST(request: NextRequest) {
         : {};
     let planItem;
     let homeAttributionStatus: "recorded" | "unattributed" | "unavailable" | "existing" | undefined;
+
+    if (offerId) {
+      const visibleOffer = await prisma.offer.findFirst({
+        where: {
+          id: offerId!,
+          ...getReleaseScopedPublicOfferWhere(),
+        },
+        select: { id: true },
+      });
+      if (!visibleOffer) {
+        return NextResponse.json(
+          { error: "Not found" },
+          { status: 404 },
+        );
+      }
+    }
 
     if (offerId) {
       planItem = await addOfferPlanItem(user.id, offerId, date, { visibility });

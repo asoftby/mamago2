@@ -1,3 +1,4 @@
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
@@ -55,6 +56,22 @@ export async function POST(request: NextRequest) {
         : activityId
           ? { kind: "ACTIVITY", id: activityId }
           : { kind: "OFFER", id: offerId! };
+    if (saveTarget.kind === "OFFER") {
+      const visibleOffer = await prisma.offer.findFirst({
+        where: {
+          id: offerId!,
+          ...getReleaseScopedPublicOfferWhere(),
+        },
+        select: { id: true },
+      });
+      if (!visibleOffer) {
+        return NextResponse.json(
+          { error: "Not found" },
+          { status: 404 },
+        );
+      }
+    }
+
     // With collections, saving + membership is one transaction, not two.
     const save = async () => {
       if (wantedCollectionIds.length > 0) {
