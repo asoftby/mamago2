@@ -51,7 +51,7 @@ export const INTERNAL_BALANCE_REFUNDABLE_TYPES = new Set<BillingTransactionType>
   BillingTransactionType.LEAD_CHARGE,
 ]);
 
- function buildRefundSummary(params: {
+function buildRefundSummary(params: {
   parentAmount: Prisma.Decimal | number;
   refunds: Array<{ amount: Prisma.Decimal | number }>;
 }) {
@@ -117,27 +117,27 @@ export async function getBillingTransactionsSummary(filters?: BillingTransaction
 
   const summary = rows.reduce(
     (summary, row) => {
-      const amount = row.amount.toNumber();
+      const amount = row.amount;
 
       if (row.status === BillingTransactionStatus.SUCCEEDED) {
-        summary.netChange += amount;
+        summary.netChange = summary.netChange.plus(amount);
 
         if (row.type === BillingTransactionType.DEPOSIT_TOPUP) {
-          summary.totalTopups += Math.abs(amount);
+          summary.totalTopups = summary.totalTopups.plus(amount.abs());
         } else if (row.type === BillingTransactionType.REFUND) {
-          summary.totalRefunds += Math.abs(amount);
-        } else if (amount < 0) {
-          summary.totalCharges += Math.abs(amount);
+          summary.totalRefunds = summary.totalRefunds.plus(amount.abs());
+        } else if (amount.lt(0)) {
+          summary.totalCharges = summary.totalCharges.plus(amount.abs());
         }
       }
 
       return summary;
     },
     {
-      totalTopups: 0,
-      totalCharges: 0,
-      totalRefunds: 0,
-      netChange: 0,
+      totalTopups: new Prisma.Decimal(0),
+      totalCharges: new Prisma.Decimal(0),
+      totalRefunds: new Prisma.Decimal(0),
+      netChange: new Prisma.Decimal(0),
       transactionsCount,
     },
   );
@@ -311,6 +311,16 @@ export async function getRefundPreview(parentTransactionId: string) {
 
   if (transaction.type === BillingTransactionType.REFUND) {
     throw new RefundNotAllowedError("Cannot refund a refund transaction");
+  }
+
+  if (!INTERNAL_BALANCE_REFUNDABLE_TYPES.has(transaction.type)) {
+    throw new RefundNotAllowedError("This transaction type cannot be refunded to internal balance");
+  }
+  if (transaction.amount.gte(0)) {
+    throw new RefundNotAllowedError("Only debit transactions can be refunded to internal balance");
+  }
+  if (transaction.currency !== BILLING_CURRENCY) {
+    throw new RefundNotAllowedError("Internal refunds support BYN only");
   }
 
   return buildRefundSummary({
