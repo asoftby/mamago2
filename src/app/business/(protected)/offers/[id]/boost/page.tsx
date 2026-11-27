@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { hasActiveBusinessOwnerMembership } from "@/server/business/paidBoostAuthorization";
 import prisma from "@/lib/prisma";
 import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurchase.service";
 import { BoostPurchaseClient } from "./BoostPurchaseClient";
@@ -13,6 +14,7 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
   if (!user) redirect("/login");
   const business = await getMyBusiness(user.id);
   if (!business) redirect("/business/onboarding");
+  const canPurchasePaidBoost = await hasActiveBusinessOwnerMembership(user.id, business.id);
 
   const { id } = await params;
   const offer = await prisma.offer.findFirst({
@@ -30,7 +32,11 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
         title={`Boost: ${offer.title}`}
         description="Boost — единственное платное действие first PROD. Лиды и контакты бесплатны."
       />
-      {offer.status !== "PUBLISHED" || offer.archivedAt || !isBoostableOfferProductType(offer.kind, offer.productType) ? (
+      {!canPurchasePaidBoost ? (
+        <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-700">
+          Платное продвижение может приобретать только владелец бизнеса. Бесплатное продвижение остаётся доступным менеджеру.
+        </div>
+      ) : offer.status !== "PUBLISHED" || offer.archivedAt || !isBoostableOfferProductType(offer.kind, offer.productType) ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
           Boost доступен только для опубликованной активной услуги, которая участвует в каталожной выдаче.
         </div>
