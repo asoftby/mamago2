@@ -37,7 +37,7 @@ test("paid promotion requires active OWNER or MANAGER membership and an ACTIVE b
   }
   const authorization = source("src/server/services/billing/paidBoostAuthorization.ts");
   assert.match(authorization, /operationalStatus: "ACTIVE"/);
-  assert.match(authorization, /role: \\{ in: \\["OWNER", "MANAGER"\\] \\}/);
+  assert.match(authorization, /role: \{ in: \["OWNER", "MANAGER"\] \}/);
   assert.match(authorization, /isActive: true/);
   assert.doesNotMatch(authorization, /ownerUserId:/);
   assert.match(authorization, /id: businessId/);
