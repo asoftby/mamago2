@@ -50,7 +50,7 @@ export async function purchaseOfferBoost(params: {
   targetRegionIds?: string[];
 }) {
   const definition = BOOST_OPTION_DEFINITIONS.find((item) => item.id === params.optionId);
-  if (!definition) throw new Error("Unknown Boost option");
+  if (!definition) throw new BoostPricingUnavailableError("Unknown Boost option");
   const targetRegionIds = await validateBoostTargetRegions(params.targetRegionIds ?? []);
 
   return prisma.$transaction(async (tx) => {
