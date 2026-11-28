@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { isOfferSectionPublic } from "@/lib/release/publicReleaseScope";
-import { getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import { swapKeyboardLayout } from "@/lib/search/keyboardLayout";
 import { getPublicActivityDetailWhere, getPublicPublishedPlaceWhere, getReleaseScopedPublicOfferWhere, getPublicPublishedArticleWhere, getPublicRouteIndexWhere } from "@/server/public/publicContentVisibility";
 import prisma from "@/lib/prisma";
@@ -123,7 +121,7 @@ export async function GET(request: Request) {
           ...activities.map(x => `activity:${x.id}`),
           ...places.map(x => `place:${x.id}`),
           // AUDIT-XR-19: class/party offers outside the release scope are not searchable.
-          ...offers.filter(x => isOfferSectionPublic(getOfferPublicSection(x))).map(x => `offer:${x.id}`),
+          ...offers.map(x => `offer:${x.id}`),
           ...articles.map(x => `article:${x.id}`),
           ...routes.map(x => `route:${x.id}`),
         ]);
