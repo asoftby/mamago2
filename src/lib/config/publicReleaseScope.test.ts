@@ -71,3 +71,20 @@ test("PROD and unknown environments fail closed", () => {
     }
   }
 });
+
+test("PROD feature flags keep PLACE_VISIT public while enabling only matching offers", () => {
+  const classes = { APP_ENV: "production", ENABLE_PUBLIC_CLASSES: "true" };
+  const birthday = { APP_ENV: "production", ENABLE_PUBLIC_BIRTHDAY: "true" };
+  assert.equal(isDeferredPublicFeatureEnabled("classes", classes), true);
+  assert.equal(isDeferredPublicFeatureEnabled("camps", classes), true);
+  assert.equal(isOfferTypeInPublicReleaseScope("PLACE_VISIT", classes), true);
+  for (const productType of ["ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "CAMP"]) {
+    assert.equal(isOfferTypeInPublicReleaseScope(productType, classes), true, productType);
+    assert.equal(isOfferTypeInPublicReleaseScope(productType, birthday), false, productType);
+  }
+  assert.equal(isOfferTypeInPublicReleaseScope("PARTY_PACKAGE", classes), false);
+  assert.equal(isDeferredPublicFeatureEnabled("birthday", birthday), true);
+  assert.equal(isOfferTypeInPublicReleaseScope("PARTY_SERVICE", birthday), true);
+  assert.equal(isOfferTypeInPublicReleaseScope("PARTY_PACKAGE", birthday), true);
+  assert.equal(isOfferTypeInPublicReleaseScope(null, classes), false);
+});
