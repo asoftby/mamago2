@@ -1,3 +1,4 @@
+import { releaseScopeApiGuard } from "@/server/release/releaseScopeApi";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/security/rateLimit";
@@ -13,6 +14,8 @@ const schema = z.object({
   guestCount: z.coerce.number().int().min(1).max(1000),
 });
 export async function GET(request: NextRequest) {
+  const outOfScope = releaseScopeApiGuard("birthday");
+  if (outOfScope) return outOfScope;
   const limit = await checkRateLimit("party_slots:" + (request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous"), 30, 60000);
   if (!limit.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   const parsed = schema.safeParse(Object.fromEntries(request.nextUrl.searchParams));

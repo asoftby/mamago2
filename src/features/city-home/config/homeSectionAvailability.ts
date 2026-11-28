@@ -1,3 +1,5 @@
+import { isPublicReleaseFeatureEnabled } from "@/lib/release/publicReleaseScope";
+
 export type HomeSectionFeature = "classes" | "birthday" | "routes";
 
 const HOME_SECTION_ENV_KEYS = {
@@ -26,8 +28,8 @@ export function getHomeSectionAvailability(
   return {
     // Sections render only with published data, so absent flags should not hide them.
     // Explicit false remains available as a kill switch.
-    classes: isNotExplicitlyDisabled(env[HOME_SECTION_ENV_KEYS.classes]),
-    birthday: isNotExplicitlyDisabled(env[HOME_SECTION_ENV_KEYS.birthday]),
+    classes: isPublicReleaseFeatureEnabled("classes", env) && isNotExplicitlyDisabled(env[HOME_SECTION_ENV_KEYS.classes]),
+    birthday: isPublicReleaseFeatureEnabled("birthday", env) && isNotExplicitlyDisabled(env[HOME_SECTION_ENV_KEYS.birthday]),
     routes: isExplicitlyEnabled(env[HOME_SECTION_ENV_KEYS.routes]),
   };
 }

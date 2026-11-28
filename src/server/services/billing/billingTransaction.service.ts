@@ -51,24 +51,23 @@ export const INTERNAL_BALANCE_REFUNDABLE_TYPES = new Set<BillingTransactionType>
   BillingTransactionType.LEAD_CHARGE,
 ]);
 
-function toNumber(value: Prisma.Decimal | number) {
-  return typeof value === "number" ? value : value.toNumber();
-}
-
 function buildRefundSummary(params: {
   parentAmount: Prisma.Decimal | number;
   refunds: Array<{ amount: Prisma.Decimal | number }>;
 }) {
-  const originalAmount = Math.abs(toNumber(params.parentAmount));
-  const refundedAmount = params.refunds.reduce((sum, refund) => sum + Math.abs(toNumber(refund.amount)), 0);
-  const availableAmount = Math.max(0, Number((originalAmount - refundedAmount).toFixed(2)));
+  const originalAmount = new Prisma.Decimal(params.parentAmount).abs();
+  const refundedAmount = params.refunds.reduce(
+    (sum, refund) => sum.plus(new Prisma.Decimal(refund.amount).abs()),
+    new Prisma.Decimal(0),
+  );
+  const availableAmount = Prisma.Decimal.max(0, originalAmount.minus(refundedAmount));
 
   return {
-    originalAmount,
-    refundedAmount,
-    availableAmount,
+    originalAmount: originalAmount.toNumber(),
+    refundedAmount: refundedAmount.toNumber(),
+    availableAmount: availableAmount.toNumber(),
     refundCount: params.refunds.length,
-    canRefund: availableAmount > 0,
+    canRefund: availableAmount.gt(0),
   };
 }
 
@@ -118,27 +117,27 @@ export async function getBillingTransactionsSummary(filters?: BillingTransaction
 
   const summary = rows.reduce(
     (summary, row) => {
-      const amount = row.amount.toNumber();
+      const amount = row.amount;
 
       if (row.status === BillingTransactionStatus.SUCCEEDED) {
-        summary.netChange += amount;
+        summary.netChange = summary.netChange.plus(amount);
 
         if (row.type === BillingTransactionType.DEPOSIT_TOPUP) {
-          summary.totalTopups += Math.abs(amount);
+          summary.totalTopups = summary.totalTopups.plus(amount.abs());
         } else if (row.type === BillingTransactionType.REFUND) {
-          summary.totalRefunds += Math.abs(amount);
-        } else if (amount < 0) {
-          summary.totalCharges += Math.abs(amount);
+          summary.totalRefunds = summary.totalRefunds.plus(amount.abs());
+        } else if (amount.lt(0)) {
+          summary.totalCharges = summary.totalCharges.plus(amount.abs());
         }
       }
 
       return summary;
     },
     {
-      totalTopups: 0,
-      totalCharges: 0,
-      totalRefunds: 0,
-      netChange: 0,
+      totalTopups: new Prisma.Decimal(0),
+      totalCharges: new Prisma.Decimal(0),
+      totalRefunds: new Prisma.Decimal(0),
+      netChange: new Prisma.Decimal(0),
       transactionsCount,
     },
   );
@@ -314,6 +313,16 @@ export async function getRefundPreview(parentTransactionId: string) {
     throw new RefundNotAllowedError("Cannot refund a refund transaction");
   }
 
+  if (!INTERNAL_BALANCE_REFUNDABLE_TYPES.has(transaction.type)) {
+    throw new RefundNotAllowedError("This transaction type cannot be refunded to internal balance");
+  }
+  if (transaction.amount.gte(0)) {
+    throw new RefundNotAllowedError("Only debit transactions can be refunded to internal balance");
+  }
+  if (transaction.currency !== BILLING_CURRENCY) {
+    throw new RefundNotAllowedError("Internal refunds support BYN only");
+  }
+
   return buildRefundSummary({
     parentAmount: transaction.amount,
     refunds: transaction.childTransactions,
@@ -425,7 +434,7 @@ async function createRefundOnce(params: {
       refunds: parentTx.childTransactions,
     });
     const refundAmount = normalizedAmount.toNumber();
-    if (refundAmount > refundSummary.availableAmount) {
+    if (normalizedAmount.gt(new Prisma.Decimal(refundSummary.availableAmount))) {
       throw new RefundAmountExceedsAvailableError({
         originalAmount: refundSummary.originalAmount,
         refundedAmount: refundSummary.refundedAmount,
@@ -464,10 +473,10 @@ async function createRefundOnce(params: {
       refundSummaryBefore: refundSummary,
       refundSummaryAfter: {
         originalAmount: refundSummary.originalAmount,
-        refundedAmount: Number((refundSummary.refundedAmount + refundAmount).toFixed(2)),
-        availableAmount: Number((refundSummary.availableAmount - refundAmount).toFixed(2)),
+        refundedAmount: new Prisma.Decimal(refundSummary.refundedAmount).plus(normalizedAmount).toNumber(),
+        availableAmount: new Prisma.Decimal(refundSummary.availableAmount).minus(normalizedAmount).toNumber(),
         refundCount: refundSummary.refundCount + 1,
-        canRefund: refundSummary.availableAmount - refundAmount > 0,
+        canRefund: new Prisma.Decimal(refundSummary.availableAmount).gt(normalizedAmount),
       },
       business: parentTx.billingAccount.business,
       idempotentReplay: false,

@@ -1,6 +1,7 @@
 // Event Wizard Validation
 
 import type { EventFormData } from "./types";
+import { getEventBookingCapacityIssues } from "./eventBookingCapacityValidation";
 import { isValidE164Phone } from "@/lib/phone/e164";
 import { isRichTextMeaningful, getRichTextLength } from "@/lib/richtext/utils";
 import { DRAFT_REQUIRED, SUBMIT_REQUIRED } from "./types";
@@ -373,10 +374,7 @@ function validateStep6(data: EventFormData): ValidationResult {
     }
 
     if (data.participationMode === "time-slots") {
-      const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
-      if (!hasSlots) {
-        errors.push("Добавьте хотя бы одну дату со слотами");
-      }
+      errors.push(...getEventBookingCapacityIssues(data));
     }
 
     if (data.participationMode === "prebook") {
@@ -400,20 +398,7 @@ function validateStep6(data: EventFormData): ValidationResult {
 
   // Validate CTA type - removed, now auto-determined from participationMode
 
-  const isComplete = Boolean(
-    data.pricingMode &&
-    ((data.pricingMode === "fixed" || data.pricingMode === "from") ? data.price?.trim() : true) &&
-    data.participationMode &&
-    (data.participationMode === "external-link" ? data.ticketLink?.trim() : true) &&
-    (data.participationMode === "time-slots" ? data.timeSlots?.dates?.some(d => d.slots.length > 0) : true) &&
-    (data.participationMode === "prebook"
-      ? data.prebookMethod === "phone"
-        ? Boolean(data.prebookPhone?.trim())
-        : data.prebookMethod === "link"
-          ? Boolean(data.prebookUrl?.trim())
-          : data.prebookMethod === "internal"
-      : true)
-  );
+  const isComplete = errors.length === 0;
 
   return {
     isValid: errors.length === 0,

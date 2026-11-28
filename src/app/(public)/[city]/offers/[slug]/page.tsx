@@ -1,3 +1,4 @@
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -19,7 +20,7 @@ import { OfferPageView } from "@/components/offers";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
 import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
-import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
+import { isReleaseScopedOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
 import { PublicationType } from "@prisma/client";
 
@@ -69,6 +70,9 @@ const offerMetaSelect = {
   seoOgImage: true,
   seoRobots: true,
   coverImage: true,
+  kind: true,
+  campProgramType: true,
+  productType: true,
   status: true,
   archivedAt: true,
   place: {
@@ -93,7 +97,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!resolved) notFound();
 
   const offer = await prisma.offer.findUnique({ where: { id: resolved.offerId }, select: offerMetaSelect });
-  if (!offer || !isOfferPubliclyVisible(offer)) {
+  if (!offer || !isReleaseScopedOfferPubliclyVisible(offer)) {
     notFound();
   }
 
@@ -147,6 +151,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
       kind: true,
       campProgramType: true,
       seoJsonLdOverride: true,
+      productType: true,
       status: true,
       archivedAt: true,
       placeId: true,
@@ -165,7 +170,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
       },
     },
   });
-  if (!offer || !isOfferPubliclyVisible(offer)) notFound();
+  if (!offer || !isReleaseScopedOfferPubliclyVisible(offer)) notFound();
 
   const user = await getCurrentUser();
   let canEditOffer = false;
@@ -195,6 +200,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
     ? await prisma.offer.findMany({
         where: {
           id: { not: offer.id },
+          ...getReleaseScopedPublicOfferWhere(),
           status: "PUBLISHED",
           archivedAt: null,
           place: {
@@ -214,6 +220,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
           priceMode: true,
           currency: true,
           priceText: true,
+          productType: true,
           status: true,
           archivedAt: true,
           place: {
@@ -230,7 +237,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
       })
     : [];
   const otherOffers = otherOffersRaw
-    .filter((candidate) => isOfferPubliclyVisible(candidate) && candidate.slug && candidate.place?.city?.slug)
+    .filter((candidate) => isReleaseScopedOfferPubliclyVisible(candidate) && candidate.slug && candidate.place?.city?.slug)
     .map((candidate) => ({
       id: candidate.id,
       title: candidate.title,

@@ -105,26 +105,29 @@ export function sealIdentityPayload(
   publicKey: IdentityRetentionPublicKey,
 ): { keyId: string; envelope: string } {
   const dataKey = randomBytes(32);
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", dataKey, iv);
-  cipher.setAAD(aadFor(payload.userId));
-  const ct = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  const ek = publicEncrypt(
-    { key: publicKey.key, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: "sha256" },
-    dataKey,
-  );
-  dataKey.fill(0);
-  const envelope: EnvelopeV1 = {
-    v: 1,
-    alg: ALGORITHM,
-    kid: publicKey.keyId,
-    ek: ek.toString("base64"),
-    iv: iv.toString("base64"),
-    tag: tag.toString("base64"),
-    ct: ct.toString("base64"),
-  };
-  return { keyId: publicKey.keyId, envelope: JSON.stringify(envelope) };
+  try {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", dataKey, iv);
+    cipher.setAAD(aadFor(payload.userId));
+    const ct = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    const ek = publicEncrypt(
+      { key: publicKey.key, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: "sha256" },
+      dataKey,
+    );
+    const envelope: EnvelopeV1 = {
+      v: 1,
+      alg: ALGORITHM,
+      kid: publicKey.keyId,
+      ek: ek.toString("base64"),
+      iv: iv.toString("base64"),
+      tag: tag.toString("base64"),
+      ct: ct.toString("base64"),
+    };
+    return { keyId: publicKey.keyId, envelope: JSON.stringify(envelope) };
+  } finally {
+    dataKey.fill(0);
+  }
 }
 
 export function loadPrivateKey(pem: string, passphrase?: string): { key: KeyObject; keyId: string } {
@@ -158,6 +161,28 @@ function parseEnvelope(raw: string): EnvelopeV1 {
   throw new IdentityRetentionKeyError("MALFORMED_ENVELOPE");
 }
 
+function validateIdentityPayload(value: unknown, userId: string): IdentityRetentionPayload {
+  const invalid = () => new IdentityRetentionKeyError("MALFORMED_ENVELOPE");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid();
+  const p = value as Record<string, unknown>;
+  if (p.schemaVersion !== 1 || p.userId !== userId || !userId) throw invalid();
+  const nullableStringFields = [
+    "email", "phoneE164", "businessContactPhoneE164", "displayName",
+    "telegramId", "telegramUsername",
+  ] as const;
+  for (const field of nullableStringFields) {
+    if (p[field] !== null && typeof p[field] !== "string") throw invalid();
+  }
+  const isIsoDate = (v: unknown): boolean =>
+    typeof v === "string" && Number.isFinite(Date.parse(v)) &&
+    new Date(v).toISOString() === v;
+  for (const field of ["emailVerifiedAt", "phoneVerifiedAt", "businessContactPhoneVerifiedAt"]) {
+    if (p[field] !== null && !isIsoDate(p[field])) throw invalid();
+  }
+  if (!isIsoDate(p.accountCreatedAt) || !isIsoDate(p.agreementEndedAt)) throw invalid();
+  return p as IdentityRetentionPayload;
+}
+
 /** Operator-side only. Throws on wrong key, tampering or a userId that does not match the row. */
 export function openIdentityEnvelope(
   rawEnvelope: string,
@@ -179,7 +204,14 @@ export function openIdentityEnvelope(
     decipher.setAAD(aadFor(userId));
     decipher.setAuthTag(tag);
     const plain = Buffer.concat([decipher.update(Buffer.from(envelope.ct, "base64")), decipher.final()]);
-    return JSON.parse(plain.toString("utf8")) as IdentityRetentionPayload;
+    try {
+      const parsed: unknown = JSON.parse(plain.toString("utf8"));
+      return validateIdentityPayload(parsed, userId);
+    } catch {
+      throw new IdentityRetentionKeyError("MALFORMED_ENVELOPE");
+    } finally {
+      plain.fill(0);
+    }
   } finally {
     dataKey.fill(0);
   }

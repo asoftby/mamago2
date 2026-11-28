@@ -1,10 +1,11 @@
+import { hasFullPublicReleaseScope } from "@/lib/config/publicReleaseScope";
 import { ActivityType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
   getPublicListingActivityWhere,
   getPublicPublishedArticleWhere,
-  getPublicPublishedOfferWhere,
+  getReleaseScopedPublicOfferWhere,
   getPublicPublishedPlaceWhere,
   getPublicRouteIndexWhere,
 } from "@/server/public/publicContentVisibility";
@@ -68,13 +69,18 @@ export async function countPublicContentForTerritory(
   // Predicates mirror the section feeds: kuda = EVENT activities (kudaDiscoveryFeed),
   // classes = SERVICE offers (classesDiscoveryFeed); both on top of the public visibility predicates.
   const listing = (getPublicListingActivityWhere().AND ?? []) as Prisma.ActivityWhereInput[];
-  const publicOffers = getPublicPublishedOfferWhere();
+  const publicOffers = getReleaseScopedPublicOfferWhere();
+  const fullScope = hasFullPublicReleaseScope();
   const [events, classes, birthday, places, offers, routes, articles] = await Promise.all([
     db.activity.count({ where: { AND: [{ type: ActivityType.EVENT }, ...listing, activityInTerritory(territoryId)] } }),
-    db.offer.count({ where: { AND: [publicOffers, { kind: "SERVICE" }, { place: { territoryId } }] } }),
-    db.offer.count({ where: getPublicBirthdayOfferWhere("", [territoryId]) }),
+    fullScope
+      ? db.offer.count({ where: { AND: [publicOffers, { kind: "SERVICE" }, { place: { territoryId } }] } })
+      : Promise.resolve(0),
+    fullScope
+      ? db.offer.count({ where: getPublicBirthdayOfferWhere("", [territoryId]) })
+      : Promise.resolve(0),
     db.place.count({ where: { territoryId, AND: getPublicPublishedPlaceWhere().AND } }),
-    db.offer.count({ where: { AND: [publicOffers, { kind: { not: "SERVICE" } }, { place: { territoryId } }] } }),
+    db.offer.count({ where: { AND: [publicOffers, ...(fullScope ? [{ kind: { not: "SERVICE" as const } }] : []), { place: { territoryId } }] } }),
     db.route.count({ where: { AND: [getPublicRouteIndexWhere(), { territoryId }] } }),
     db.article.count({ where: { AND: [getPublicPublishedArticleWhere(), articleInTerritory(territoryId)] } }),
   ]);
@@ -87,7 +93,7 @@ export async function countNationalArticles(db: TerritoryCountsDb = prisma): Pro
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-let cache: { at: number; value: Map<string, TerritorySectionCounts> } | null = null;
+let cache: { fullScope: boolean; at: number; value: Map<string, TerritorySectionCounts> } | null = null;
 
 export function invalidateTerritoryContentCountsCache(): void {
   cache = null;
@@ -98,13 +104,13 @@ export async function countPublicContentByTerritory(
   territoryIds: readonly string[],
   db: TerritoryCountsDb = prisma,
 ): Promise<Map<string, TerritorySectionCounts>> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS && territoryIds.every((id) => cache!.value.has(id))) {
+  if (cache && cache.fullScope === hasFullPublicReleaseScope() && Date.now() - cache.at < CACHE_TTL_MS && territoryIds.every((id) => cache!.value.has(id))) {
     return cache.value;
   }
   const entries = await Promise.all(
     territoryIds.map(async (id) => [id, await countPublicContentForTerritory(id, db)] as const),
   );
   const value = new Map(entries);
-  cache = { at: Date.now(), value };
+  cache = { fullScope: hasFullPublicReleaseScope(), at: Date.now(), value };
   return value;
 }

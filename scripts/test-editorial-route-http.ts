@@ -79,6 +79,116 @@ async function request(path: string, method = "GET") {
   return { response, body, ...row };
 }
 
+async function assertPublicReleaseScope(mode: string) {
+  const production = mode === "production";
+
+  const deferred = [
+    "/minsk/classes",
+    "/minsk/classes/sport",
+    "/minsk/programs",
+    "/minsk/programs/synthetic-missing",
+    "/minsk/birthday",
+    "/minsk/birthday/make",
+  ];
+
+  const hubs = new Set([
+    "/minsk/classes",
+    "/minsk/programs",
+    "/minsk/birthday",
+    "/minsk/birthday/make",
+  ]);
+
+  for (const path of deferred) {
+    for (const method of ["GET", "HEAD"]) {
+      const result = await request(path, method);
+
+      if (production) {
+        assert.equal(result.status, 404, `${mode} ${method} ${path}`);
+        assert.equal(result.location, null);
+        assert.equal(result.robots, "noindex, nofollow");
+        assert.ok(
+          result.response.headers.get("cache-control")?.includes("no-store"),
+          `Missing no-store: ${path}`,
+        );
+        assert.equal(result.body, method === "HEAD" ? "" : "Not Found");
+      } else if (hubs.has(path)) {
+        assert.equal(result.status, 200, `${mode} ${method} ${path}`);
+        assert.ok(
+          !result.body.includes("NEXT_HTTP_ERROR_FALLBACK"),
+          `Deferred hub must remain available in ${mode}: ${path}`,
+        );
+      }
+    }
+  }
+
+  for (const path of [
+    "/minsk",
+    "/minsk/events",
+    "/minsk/blog",
+    "/minsk/routes",
+    "/blog",
+    "/routes",
+  ]) {
+    const result = await request(path);
+    assert.equal(result.status, 200, `${mode} retained ${path}`);
+  }
+
+  const apis = [
+    ["GET", "/api/public/birthday/availability", 422],
+    ["GET", "/api/public/birthday/catalog", 400],
+    ["GET", "/api/public/party-availability", 422],
+    ["GET", "/api/public/discovery/class-chips", 200],
+    ["GET", "/api/public/bookings/camp-shift/prefill", 200],
+    ["POST", "/api/public/bookings/camp-shift", 400],
+    ["POST", "/api/parent/parties", 401],
+    ["GET", "/api/public/offers/synthetic-missing/slots", 400],
+    ["POST", "/api/public/offers/synthetic-missing/reserve", 400],
+  ] as const;
+
+  for (const [method, path, devStatus] of apis) {
+    const response = await fetch(base + path, {
+      method,
+      redirect: "manual",
+      signal: AbortSignal.timeout(30000),
+      ...(method === "POST" ? {
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      } : {}),
+    });
+
+    const body = await response.text();
+
+    evidence.push({
+      environment,
+      path,
+      method,
+      status: response.status,
+    });
+
+    assert.equal(
+      response.status,
+      production ? 404 : devStatus,
+      `${mode} ${method} ${path}: ${body.slice(0, 200)}`,
+    );
+  }
+
+  const sitemap = await request("/sitemap.xml");
+  assert.equal(sitemap.status, 200);
+
+  if (production) {
+    for (const section of ["/classes", "/programs", "/birthday"]) {
+      assert.ok(!sitemap.body.includes(section), `Sitemap leak: ${section}`);
+    }
+
+    assert.ok(sitemap.body.includes("/minsk/events"));
+    assert.ok(sitemap.body.includes("/minsk/blog"));
+  } else {
+    assert.ok(!sitemap.body.includes("<loc>"));
+  }
+
+  console.log(`[PASS] Public release scope HTTP: ${mode}`);
+}
+
 async function assertReady(mode: string) {
   for (const slug of slugs) {
     for (const method of ["GET", "HEAD"]) {
@@ -155,6 +265,7 @@ async function main() {
   }
   await startApp("production");
   await assertReady("production");
+  await assertPublicReleaseScope("production");
   await assertNotRedirected("Excluded Mogilev even with ready data", "marshrut-mogilev");
   await assertNotRedirected("Unapproved ready data", "synthetic-unapproved");
   await assertNotRedirected("Unknown route", "synthetic-missing");
@@ -232,6 +343,7 @@ async function main() {
   for (const mode of ["dev", "staging", "test"]) {
     await startApp(mode);
     await assertReady(mode);
+    await assertPublicReleaseScope(mode);
     const robots = await request("/robots.txt");
     assert.ok(robots.body.includes("Disallow: /"));
   }

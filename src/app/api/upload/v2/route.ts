@@ -20,6 +20,7 @@ import {
 import { MediaSourceType } from "@prisma/client";
 import { validateUploadFileContent } from "@/lib/uploads/imageContentValidation";
 import { jsonUploadError } from "@/lib/uploads/uploadErrors";
+import { enforceUploadRequestLimits } from "@/lib/uploads/uploadRequestLimits";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
 import {
   processImage,
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return jsonUploadError("UNAUTHORIZED", "Authentication is required to upload media", 401);
     }
+
+
+    const limited = await enforceUploadRequestLimits(req, user.id);
+
+    if (limited) return limited;
 
     const formData = await req.formData();
     const file = formData.get("file");

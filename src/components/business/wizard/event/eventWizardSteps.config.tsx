@@ -17,6 +17,7 @@ import { Step2Description } from "./steps/Step2Description";
 import { Step3Media } from "./steps/Step3Media";
 import { Step4DateTime } from "./steps/Step4DateTime";
 import { Step5PricingParticipation } from "./steps/Step5PricingParticipation";
+import { getEventBookingCapacityIssues } from "./eventBookingCapacityValidation";
 import { Step7Contacts } from "./steps/Step7Contacts";
 import { Step8Organizer } from "./steps/Step8Organizer";
 import { FaqStep } from "../shared/FaqStep";
@@ -341,11 +342,8 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         return false;
       }
       
-      // If time slots, at least one date with slots must exist
-      if (data.participationMode === "time-slots") {
-        const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
-        if (!hasSlots) return false;
-      }
+      // All configured dates/slots require a positive capacity.
+      if (getEventBookingCapacityIssues(data).length > 0) return false;
 
       if (data.participationMode === "prebook") {
         if (!data.prebookMethod) return false;
@@ -413,12 +411,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         if (data.participationMode === "external-link" && !data.ticketLink?.trim()) {
           missing.push("Ссылка на покупку билетов");
         }
-        if (data.participationMode === "time-slots") {
-          const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
-          if (!hasSlots) {
-            missing.push("Расписание со слотами");
-          }
-        }
+        missing.push(...getEventBookingCapacityIssues(data));
         if (data.participationMode === "prebook") {
           if (!data.prebookMethod) {
             missing.push("Способ предварительной записи");

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // Get user's business
     const business = await prisma.business.findUnique({
-      where: { ownerUserId: user.id },
+      where: { ownerUserId: user.id, members: { some: { userId: user.id, isActive: true, role: "OWNER" } } },
       select: {
         id: true,
         name: true,
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     if (!business) {
       return NextResponse.json(
-        { error: "Business not found. Only business owners can access billing." },
+        { error: "Business not found. Only active business owners can access billing." },
         { status: 404 }
       );
     }

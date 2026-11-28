@@ -10,15 +10,20 @@ import {
   BillingInsufficientFundsError,
   creditBusinessDeposit,
   debitBusinessDeposit,
+  recalculateDepositBalance,
+  suspendBillingAccount,
+  reactivateBillingAccount,
 } from "./billingAccount.service";
 import { createRefund, RefundNotAllowedError } from "./billingTransaction.service";
 import {
   BoostAlreadyActiveError,
+  BoostPurchaseNotAllowedError,
   BoostPricingUnavailableError,
   getConfiguredBoostOptions,
   purchaseOfferBoost,
 } from "./boostPurchase.service";
 import { reconcileBillingAccounts } from "./billingReconciliation.service";
+import { PaidBoostMembershipRequiredError } from "./paidBoostAuthorization";
 import { registerPromotionActionFromUserEvent } from "../promotion/promotion.service";
 
 const prefix = `task13-${Date.now()}`;
@@ -26,6 +31,9 @@ let userId = "";
 let businessId = "";
 let accountId = "";
 let offerId = "";
+let managerId = "";
+let foreignOwnerId = "";
+let foreignBusinessId = "";
 
 async function resetFinancialState(balance: string) {
   await prisma.boost.deleteMany({ where: { offerId } });
@@ -60,6 +68,17 @@ test.before(async () => {
     data: { name: `${prefix} business`, ownerUserId: user.id, status: "APPROVED" },
   });
   businessId = business.id;
+  await prisma.businessMember.create({ data: { businessId, userId, role: "OWNER", isActive: true } });
+  const manager = await prisma.user.create({ data: { email: `${prefix}-manager@example.invalid` } });
+  managerId = manager.id;
+  await prisma.businessMember.create({ data: { businessId, userId: managerId, role: "MANAGER", isActive: true } });
+  const foreignOwner = await prisma.user.create({ data: { email: `${prefix}-foreign@example.invalid`, role: "BUSINESS_OWNER" } });
+  foreignOwnerId = foreignOwner.id;
+  const foreignBusiness = await prisma.business.create({
+    data: { name: `${prefix} foreign business`, ownerUserId: foreignOwnerId, status: "APPROVED" },
+  });
+  foreignBusinessId = foreignBusiness.id;
+  await prisma.businessMember.create({ data: { businessId: foreignBusinessId, userId: foreignOwnerId, role: "OWNER", isActive: true } });
   const account = await prisma.billingAccount.create({
     data: { businessId, depositBalance: 0, currency: "BYN" },
   });
@@ -86,8 +105,9 @@ test.after(async () => {
   await prisma.boost.deleteMany({ where: { offerId } });
   await prisma.billingTransaction.deleteMany({ where: { billingAccountId: accountId } });
   await prisma.billingAccount.deleteMany({ where: { id: accountId } });
-  await prisma.business.deleteMany({ where: { id: businessId } });
-  await prisma.user.deleteMany({ where: { id: userId } });
+  await prisma.businessMember.deleteMany({ where: { businessId: { in: [businessId, foreignBusinessId] } } });
+  await prisma.business.deleteMany({ where: { id: { in: [businessId, foreignBusinessId] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [userId, managerId, foreignOwnerId] } } });
   await prisma.$disconnect();
 });
 
@@ -184,8 +204,12 @@ test("Boost uses server price and atomically links one debit", async () => {
     { id: "BOOST_7_DAYS", durationDays: 7, price: 25, currency: "BYN" },
   ]);
   const key = `${prefix}:boost-success`;
-  const purchase = await purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
-  const replay = await purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
+  const purchase = await purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
+  const replay = await purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
+  await assert.rejects(
+    purchaseOfferBoost({ businessId: foreignBusinessId, actorUserId: foreignOwnerId, offerId, optionId: "BOOST_3_DAYS", requestKey: key }),
+    BoostPurchaseNotAllowedError,
+  );
   assert.equal(purchase.boost.id, replay.boost.id);
   assert.equal(purchase.boost.price?.toFixed(2), "12.00");
   assert.equal(purchase.boost.durationDays, 3);
@@ -200,6 +224,7 @@ test("Boost pricing rejects unsupported options and fails closed on missing or i
   await assert.rejects(
     purchaseOfferBoost({
       businessId,
+      actorUserId: userId,
       offerId,
       optionId: "BOOST_14_DAYS" as never,
       requestKey: `${prefix}:unsupported-duration`,
@@ -211,7 +236,7 @@ test("Boost pricing rejects unsupported options and fails closed on missing or i
   delete process.env.BOOST_PRICE_1D_BYN;
   assert.equal(getConfiguredBoostOptions().some((option) => option.id === "BOOST_1_DAY"), false);
   await assert.rejects(
-    purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:missing-price` }),
+    purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:missing-price` }),
     BoostPricingUnavailableError,
   );
 
@@ -229,20 +254,21 @@ test("Boost pricing rejects unsupported options and fails closed on missing or i
 test("Boost rejects insufficient funds, foreign ownership and concurrent active duplicates", async () => {
   await resetFinancialState("4.00");
   await assert.rejects(
-    purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:insufficient` }),
+    purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:insufficient` }),
     BillingInsufficientFundsError,
   );
   assert.equal(await prisma.boost.count({ where: { offerId } }), 0);
   assert.equal(await prisma.billingTransaction.count({ where: { billingAccountId: accountId, type: "FEATURE_CHARGE" } }), 0);
 
   await assert.rejects(
-    purchaseOfferBoost({ businessId: "foreign-business", offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:foreign` }),
+    purchaseOfferBoost({ businessId: "foreign-business", actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:foreign` }),
+    PaidBoostMembershipRequiredError,
   );
 
   await resetFinancialState("100.00");
   const concurrent = await Promise.allSettled([
-    purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:boost-a` }),
-    purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:boost-b` }),
+    purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:boost-a` }),
+    purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:boost-b` }),
   ]);
   assert.equal(concurrent.filter((result) => result.status === "fulfilled").length, 1);
   const failure = concurrent.find((result) => result.status === "rejected");
@@ -264,4 +290,138 @@ test("paid Promotion is disabled and reconciliation detects divergence without f
   const mismatched = await reconcileBillingAccounts();
   assert.equal(mismatched.rows.find((row) => row.accountId === accountId)?.mismatchAmount, "-1.00");
   assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "99.00");
+});
+
+test("decimal credit limit permits exact boundary debit", async () => {
+  await resetFinancialState("0.10");
+  await prisma.billingAccount.update({ where: { id: accountId }, data: { creditLimit: new Prisma.Decimal("0.20") } });
+  await debitBusinessDeposit({ accountId, amount: 0.30, type: "FEATURE_CHARGE", description: "exact boundary" });
+  const account = await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } });
+  assert.equal(account.depositBalance.toFixed(2), "-0.20");
+});
+
+test("suspended account rejects new service debit without changing balance", async () => {
+  await resetFinancialState("10.00");
+  await suspendBillingAccount(accountId, "test");
+  try {
+    await assert.rejects(debitBusinessDeposit({ accountId, amount: 1, type: "PROMOTION_CHARGE", description: "blocked" }), /not active/);
+    const account = await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    assert.equal(account.depositBalance.toFixed(2), "10.00");
+  } finally {
+    await reactivateBillingAccount(accountId);
+  }
+});
+
+test("reconciliation and concurrent credit preserve ledger balance", async () => {
+  await resetFinancialState("0.10");
+  await Promise.all([
+    recalculateDepositBalance(accountId),
+    creditBusinessDeposit({ accountId, amount: 0.20, description: "concurrent credit" }),
+  ]);
+  const account = await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } });
+  assert.equal(account.depositBalance.toFixed(2), "0.30");
+});
+
+test("fractional partial refunds exhaust the original debit exactly", async () => {
+  await resetFinancialState("1.00");
+  const debit = await debitBusinessDeposit({ accountId, amount: 0.30, type: "FEATURE_CHARGE", description: "fractional debit" });
+  await createRefund({ parentTransactionId: debit.id, amount: 0.10, currency: "BYN", idempotencyKey: `${prefix}:fractional-a`, reason: "partial" });
+  const result = await createRefund({ parentTransactionId: debit.id, amount: 0.20, currency: "BYN", idempotencyKey: `${prefix}:fractional-b`, reason: "remaining" });
+  assert.equal(result.refundSummaryAfter.availableAmount, 0);
+  assert.equal(result.refundSummaryAfter.canRefund, false);
+});
+
+test("paid Boost replay remains idempotent after server price changes or disablement", async () => {
+  await resetFinancialState("100.00");
+  const key = `${prefix}:historic-price-replay`;
+  const originalPrice = process.env.BOOST_PRICE_1D_BYN;
+  try {
+    const created = await purchaseOfferBoost({
+      businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+    });
+    process.env.BOOST_PRICE_1D_BYN = "9.00";
+    const changed = await purchaseOfferBoost({
+      businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+    });
+    assert.equal(changed.idempotentReplay, true);
+    assert.equal(changed.boost.id, created.boost.id);
+    delete process.env.BOOST_PRICE_1D_BYN;
+    const disabled = await purchaseOfferBoost({
+      businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+    });
+    assert.equal(disabled.idempotentReplay, true);
+    await assert.rejects(
+      purchaseOfferBoost({
+        businessId, actorUserId: foreignOwnerId, offerId, optionId: "BOOST_1_DAY", requestKey: key,
+      }),
+      PaidBoostMembershipRequiredError,
+    );
+    assert.equal(await prisma.boost.count({ where: { offerId } }), 1);
+    assert.equal(await prisma.billingTransaction.count({
+      where: { billingAccountId: accountId, type: "FEATURE_CHARGE" },
+    }), 1);
+    assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "95.00");
+  } finally {
+    if (originalPrice === undefined) delete process.env.BOOST_PRICE_1D_BYN;
+    else process.env.BOOST_PRICE_1D_BYN = originalPrice;
+  }
+});
+
+test("paid Boost allows active OWNER and MANAGER, but rejects inactive or cross-business actors", async () => {
+  await resetFinancialState("100.00");
+  const ownerKey = `${prefix}:owner-paid`;
+  await purchaseOfferBoost({ businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY", requestKey: ownerKey });
+  // Same-business MANAGER may replay a valid key without an additional debit.
+  const replay = await purchaseOfferBoost({
+    businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY", requestKey: ownerKey,
+  });
+  assert.equal(replay.idempotentReplay, true);
+  assert.equal(await prisma.billingTransaction.count({
+    where: { billingAccountId: accountId, type: "FEATURE_CHARGE" },
+  }), 1);
+
+  await prisma.boost.deleteMany({ where: { offerId } });
+  // An active MANAGER can also perform a new paid purchase through the service.
+  const managerPurchase = await purchaseOfferBoost({
+    businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY",
+    requestKey: `${prefix}:manager-offer`,
+  });
+  assert.equal(managerPurchase.idempotentReplay, false);
+  // A member of another business cannot spend this deposit or replay its key.
+  await assert.rejects(
+    purchaseOfferBoost({
+      businessId, actorUserId: foreignOwnerId, offerId, optionId: "BOOST_1_DAY",
+      requestKey: `${prefix}:manager-offer`,
+    }),
+    PaidBoostMembershipRequiredError,
+  );
+  await prisma.businessMember.updateMany({ where: { businessId, userId: managerId }, data: { isActive: false } });
+  try {
+    await assert.rejects(
+      purchaseOfferBoost({
+        businessId, actorUserId: managerId, offerId, optionId: "BOOST_1_DAY",
+        requestKey: `${prefix}:manager-offer`,
+      }),
+      PaidBoostMembershipRequiredError,
+    );
+  } finally {
+    await prisma.businessMember.updateMany({ where: { businessId, userId: managerId }, data: { isActive: true } });
+  }
+  await prisma.businessMember.updateMany({ where: { businessId, userId }, data: { isActive: false } });
+  try {
+    await assert.rejects(
+      purchaseOfferBoost({
+        businessId, actorUserId: userId, offerId, optionId: "BOOST_1_DAY",
+        requestKey: `${prefix}:inactive-owner`,
+      }),
+      PaidBoostMembershipRequiredError,
+    );
+  } finally {
+    await prisma.businessMember.updateMany({ where: { businessId, userId }, data: { isActive: true } });
+  }
+  assert.equal(await prisma.boost.count({ where: { offerId } }), 1);
+  assert.equal(await prisma.billingTransaction.count({
+    where: { billingAccountId: accountId, type: "FEATURE_CHARGE" },
+  }), 2);
+  assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "90.00");
 });

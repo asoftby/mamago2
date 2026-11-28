@@ -76,16 +76,19 @@ export function ScheduleSlotRow({
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1 whitespace-nowrap text-[12px] font-medium text-muted-foreground">
             <Users className="h-3.5 w-3.5 text-primary" aria-hidden />
-            Вместимость (чел.)
+            Вместимость (чел.) *
           </Label>
           <Input
             type="number"
             min={1}
+            step={1}
+            required
+            aria-required="true"
             value={slot.capacity ?? ""}
             onChange={(e) => {
               const raw = e.target.value;
               onChange({
-                capacity: raw === "" ? null : Math.max(1, Number(raw) || 1),
+                capacity: raw === "" ? null : Number(raw),
               });
             }}
             onBlur={() => onBlurField?.("capacity")}

@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { parsePriceData } from "@/lib/priceItems";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
-import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { getReleaseScopedPublicOfferWhere } from "@/server/public/publicContentVisibility";
 import { calculateBookingPrice, BookingPriceError } from "@/server/offers/bookingPrice";
 import { assertBookingDuration, durationChoices } from "@/server/offers/bookingDuration";
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, { params }: {
   }
   const { id } = await params;
   const offer = await prisma.offer.findFirst({
-    where: { id, ...getPublicPublishedOfferWhere(),
+    where: { id, ...getReleaseScopedPublicOfferWhere(),
       bookingEnabled: true, bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] } },
     select: {
       id: true, currency: true, priceItems: true,
@@ -127,7 +127,7 @@ export async function GET(_request: NextRequest, { params }: {
 }) {
   const { id } = await params;
   const offer = await prisma.offer.findFirst({
-    where: { id, ...getPublicPublishedOfferWhere(), bookingEnabled: true,
+    where: { id, ...getReleaseScopedPublicOfferWhere(), bookingEnabled: true,
       bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] } },
     select: { currency: true, place: { select: { ownerBusinessId: true } },
       classGroups: { where: { active: true }, select: { id: true } },

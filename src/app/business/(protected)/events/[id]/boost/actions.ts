@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { canPurchasePaidBoost } from "@/server/services/billing/paidBoostAuthorization";
 import { isBoostOptionId } from "@/lib/billing/boostOptions";
 import { purchaseEventBoost } from "@/server/services/billing/eventBoostPurchase.service";
 
@@ -19,6 +20,9 @@ export async function purchaseEventBoostAction(input: z.input<typeof schema>) {
   if (!user) return { ok: false as const, error: "Сессия истекла." };
   const business = await getMyBusiness(user.id);
   if (!business) return { ok: false as const, error: "Бизнес не найден." };
+  if (business.operationalStatus !== "ACTIVE" || !(await canPurchasePaidBoost(user.id, business.id))) {
+    return { ok: false as const, error: "Платное продвижение доступно только активному владельцу или менеджеру бизнеса." };
+  }
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Некорректный запрос Boost." };
   try {

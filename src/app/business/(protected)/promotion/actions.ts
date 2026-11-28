@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { canPurchasePaidBoost } from "@/server/services/billing/paidBoostAuthorization";
 import {
   PROMOTION_MAX_BUDGET,
   PROMOTION_MIN_BUDGET,
@@ -60,6 +61,10 @@ export async function createPromotionAction(input: {
       ok: false,
       error: "Бизнес не найден.",
     };
+  }
+
+  if (business.operationalStatus !== "ACTIVE" || !(await canPurchasePaidBoost(user.id, business.id))) {
+    return { ok: false, error: "Платное продвижение доступно только активному владельцу или менеджеру бизнеса." };
   }
 
   const parsed = createPromotionSchema.safeParse(input);

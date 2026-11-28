@@ -1,11 +1,12 @@
 import { BillingReferenceType, BillingTransactionType, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { BILLING_CURRENCY } from "@/lib/billing/money";
-import type { BoostOptionId } from "@/lib/billing/boostOptions";
+import { BOOST_OPTION_DEFINITIONS, type BoostOptionId } from "@/lib/billing/boostOptions";
 import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurchase.service";
 import { debitBusinessDepositInTx } from "@/server/services/billing/billingAccount.service";
 import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
+import { assertPaidBoostPurchaserInTx } from "@/server/services/billing/paidBoostAuthorization";
 
 export async function purchaseEventBoost(params: {
   businessId: string;
@@ -15,20 +16,29 @@ export async function purchaseEventBoost(params: {
   requestKey: string;
   targetRegionIds: string[];
 }) {
-  const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
-  if (!option) throw new Error("Тариф Boost недоступен.");
+  const definition = BOOST_OPTION_DEFINITIONS.find((item) => item.id === params.optionId);
+  if (!definition) throw new Error("Unknown Boost option");
   const targetRegionIds = await validateBoostTargetRegions(params.targetRegionIds);
 
   return prisma.$transaction(async (tx) => {
-    const replay = await tx.boost.findUnique({ where: { purchaseRequestKey: params.requestKey } });
+    // Paid Boost spends money: authorize before replay disclosure or any debit.
+    await assertPaidBoostPurchaserInTx(tx, params.businessId, params.ownerUserId);
+    const replay = await tx.boost.findUnique({
+      where: { purchaseRequestKey: params.requestKey },
+      include: { billingTransaction: { select: { billingAccount: { select: { businessId: true } } } } },
+    });
     if (replay) {
-      if (replay.activityId !== params.activityId || replay.durationDays !== option.durationDays ||
-          !replay.price?.equals(option.price) ||
+      if (replay.billingTransaction?.billingAccount.businessId !== params.businessId ||
+          replay.activityId !== params.activityId || replay.durationDays !== definition.durationDays ||
           JSON.stringify([...replay.targetRegionIds].sort()) !== JSON.stringify([...targetRegionIds].sort())) {
         throw new Error("Ключ запроса уже использован для другой покупки.");
       }
       return { boostId: replay.id, idempotentReplay: true };
     }
+
+    // Keep a valid, already-authorized replay independent of subsequent price changes.
+    const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
+    if (!option) throw new Error("Тариф Boost недоступен.");
 
     await tx.$queryRaw`SELECT id FROM "Activity" WHERE id = ${params.activityId} FOR UPDATE`;
     const now = new Date();

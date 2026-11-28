@@ -6456,6 +6456,9 @@ model BookingRequest {
   partyQuotes PartyQuote[]
   providerInvite PartyProviderInvite?
   allocations BookingAllocation[]
+  // Links preserve the original rejected request while creating a new request after client consent.
+  reoffersAsOriginal BookingReoffer[] @relation("ReofferOriginal")
+  reofferAsResult BookingReoffer? @relation("ReofferResult")
   confirmedForPartyItem PartyOrderItem? @relation("ConfirmedPartyBooking")
 
   @@index([kind, businessId, partyStage])
@@ -6476,6 +6479,38 @@ model BookingRequest {
   @@index([createdAt])
   @@index([businessId, createdAt])
   @@index([businessId, firstResponseAt])
+}
+
+/// One active invitation per rejected booking; acceptance creates a separate booking.
+enum BookingReofferStatus {
+  OFFERED
+  ACCEPTED
+  DECLINED
+  CANCELED
+  EXPIRED
+}
+
+model BookingReoffer {
+  id String @id @default(cuid())
+  originalBookingId String @unique
+  businessId String
+  customerUserId String
+  activityId String
+  status BookingReofferStatus @default(OFFERED)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  acceptedAt DateTime?
+  declinedAt DateTime?
+  canceledAt DateTime?
+  invitedById String
+  newBookingId String? @unique
+
+  originalBooking BookingRequest @relation("ReofferOriginal", fields: [originalBookingId], references: [id], onDelete: Cascade)
+  newBooking BookingRequest? @relation("ReofferResult", fields: [newBookingId], references: [id], onDelete: SetNull)
+
+  @@index([customerUserId, status, expiresAt])
+  @@index([businessId, status, createdAt])
 }
 
 /// Тип события в истории заявки

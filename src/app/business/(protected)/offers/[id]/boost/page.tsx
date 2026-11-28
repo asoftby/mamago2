@@ -7,6 +7,7 @@ import { BoostPurchaseClient } from "./BoostPurchaseClient";
 import { listBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 import { isBoostableOfferProductType } from "@/lib/promotion/boostableOfferTypes";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { canPurchasePaidBoost } from "@/server/services/billing/paidBoostAuthorization";
 
 export default async function OfferBoostPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -21,7 +22,10 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
   });
   if (!offer) notFound();
 
-  const regions = await listBoostTargetRegions();
+  const [regions, isPaidBoostPurchaser] = await Promise.all([
+    listBoostTargetRegions(),
+    canPurchasePaidBoost(user.id, business.id),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -35,7 +39,13 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
           Boost доступен только для опубликованной активной услуги, которая участвует в каталожной выдаче.
         </div>
       ) : (
-        <BoostPurchaseClient offerId={offer.id} options={getConfiguredBoostOptions()} regions={regions} />
+        isPaidBoostPurchaser ? (
+          <BoostPurchaseClient offerId={offer.id} options={getConfiguredBoostOptions()} regions={regions} />
+        ) : (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm text-stone-700">
+          Платное продвижение доступно активным владельцам и менеджерам бизнеса. Бесплатный ежедневный Boost доступен в разделе «Boost публикаций».
+        </div>
+        )
       )}
     </div>
   );
