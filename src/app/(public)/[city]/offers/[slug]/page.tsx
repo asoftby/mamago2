@@ -21,8 +21,6 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
 import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
 import { isReleaseScopedOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
-import { isOfferSectionPublic } from "@/lib/release/publicReleaseScope";
-import { getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
 import { PublicationType } from "@prisma/client";
 
@@ -99,7 +97,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!resolved) notFound();
 
   const offer = await prisma.offer.findUnique({ where: { id: resolved.offerId }, select: offerMetaSelect });
-  if (!offer || !isReleaseScopedOfferPubliclyVisible(offer) || !isOfferSectionPublic(getOfferPublicSection(offer))) {
+  if (!offer || !isReleaseScopedOfferPubliclyVisible(offer)) {
     notFound();
   }
 
@@ -173,7 +171,6 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
     },
   });
   if (!offer || !isReleaseScopedOfferPubliclyVisible(offer)) notFound();
-  if (!isOfferSectionPublic(getOfferPublicSection(offer))) notFound();
 
   const user = await getCurrentUser();
   let canEditOffer = false;
