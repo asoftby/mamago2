@@ -80,3 +80,13 @@ test("Unknown or missing environment fails closed", () => {
     );
   }
 });
+
+test("explicit PROD feature overrides open matching routes and retain other 404s", () => {
+  const classes = { APP_ENV: "production", ENABLE_PUBLIC_CLASSES: "true" };
+  const birthday = { APP_ENV: "production", ENABLE_PUBLIC_BIRTHDAY: "true" };
+  assert.equal(isPublicPathBlockedByReleaseScope("/minsk/classes", classes), false);
+  assert.equal(isPublicPathBlockedByReleaseScope("/minsk/programs/example", classes), false);
+  assert.equal(isPublicPathBlockedByReleaseScope("/minsk/birthday", classes), true);
+  assert.equal(isPublicPathBlockedByReleaseScope("/minsk/birthday/make", birthday), false);
+  assert.equal(isPublicPathBlockedByReleaseScope("/minsk/classes", birthday), true);
+});
