@@ -87,3 +87,16 @@ test("gate is wired into proxy, public APIs, sitemap, home and offer page", () =
   assert.match(src("src/app/(public)/[city]/offers/[slug]/page.tsx"), /isReleaseScopedOfferPubliclyVisible\(offer\)/);
   assert.match(src("src/app/api/search/route.ts"), /getReleaseScopedPublicOfferWhere\(\)/);
 });
+
+test("public offer detail/search/sitemap consistently rely on productType visibility", () => {
+  const source = (path: string) => readFileSync(path, "utf8");
+  const page = source("src/app/(public)/[city]/offers/[slug]/page.tsx");
+  const search = source("src/app/api/search/route.ts");
+  const sitemap = source("src/app/sitemap.ts");
+  assert.match(page, /isReleaseScopedOfferPubliclyVisible\(offer\)/);
+  assert.doesNotMatch(page, /isOfferSectionPublic\(getOfferPublicSection\(offer\)\)/);
+  assert.match(search, /getReleaseScopedPublicOfferWhere\(\)/);
+  assert.doesNotMatch(search, /offers\.filter\(x => isOfferSectionPublic/);
+  assert.match(sitemap, /getReleaseScopedPublicOfferWhere\(\)/);
+  assert.doesNotMatch(sitemap, /isOfferSectionPublic\(getOfferPublicSection/);
+});
