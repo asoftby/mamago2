@@ -23,7 +23,6 @@ import { listDiscoveryClassChips } from "@/server/discovery/classChips";
 import { countPublicClassesCategory } from "@/server/discovery/classesCategoryCount";
 import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
 import { isPublicReleaseFeatureEnabled } from "@/lib/release/publicReleaseScope";
-import { getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 
 export const dynamic = "force-dynamic";
 
