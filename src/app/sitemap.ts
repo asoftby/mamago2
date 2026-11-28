@@ -22,7 +22,7 @@ import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
 import { listDiscoveryClassChips } from "@/server/discovery/classChips";
 import { countPublicClassesCategory } from "@/server/discovery/classesCategoryCount";
 import { shouldIndexTagPage } from "@/lib/seo/discoveryTagIndexing";
-import { isOfferSectionPublic, isPublicReleaseFeatureEnabled } from "@/lib/release/publicReleaseScope";
+import { isPublicReleaseFeatureEnabled } from "@/lib/release/publicReleaseScope";
 import { getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 
 export const dynamic = "force-dynamic";
@@ -309,7 +309,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     for (const offer of offers) {
       if (hasNoindexRobots(offer.seoRobots) || !offer.place?.city?.slug) continue;
-      if (!isOfferSectionPublic(getOfferPublicSection(offer))) continue;
       entries.push({
         url: resolveOfferCanonicalUrl({
           seoCanonicalUrl: offer.seoCanonicalUrl,
