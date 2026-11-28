@@ -15,6 +15,8 @@ import {
 async function main() {
   const marker = randomUUID();
   const previousEnv = process.env.APP_ENV;
+  const previousClasses = process.env.ENABLE_PUBLIC_CLASSES;
+  const previousBirthday = process.env.ENABLE_PUBLIC_BIRTHDAY;
 
   const user = await prisma.user.create({
     data: {
@@ -103,6 +105,28 @@ async function main() {
       ["PLACE_VISIT"],
     );
 
+    // P1: PLACE_VISIT uses legacy SERVICE kind but must remain publicly visible.
+    const placeVisit = offers.find((offer) => offer.productType === "PLACE_VISIT");
+    assert.equal(placeVisit?.kind, "SERVICE");
+    assert.ok(prod.some((offer) => offer.id === placeVisit?.id));
+
+    // P2: PROD feature overrides must be reflected in the SQL predicate too.
+    process.env.ENABLE_PUBLIC_CLASSES = "true";
+    const classesEnabled = await prisma.offer.findMany({
+      where: { AND: [{ id: { in: offerIds } }, getReleaseScopedPublicOfferWhere()] },
+    });
+    assert.deepEqual(new Set(classesEnabled.map((offer) => offer.productType)),
+      new Set(["PLACE_VISIT", "ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "CAMP"]));
+    delete process.env.ENABLE_PUBLIC_CLASSES;
+
+    process.env.ENABLE_PUBLIC_BIRTHDAY = "true";
+    const birthdayEnabled = await prisma.offer.findMany({
+      where: { AND: [{ id: { in: offerIds } }, getReleaseScopedPublicOfferWhere()] },
+    });
+    assert.deepEqual(new Set(birthdayEnabled.map((offer) => offer.productType)),
+      new Set(["PLACE_VISIT", "PARTY_SERVICE", "PARTY_PACKAGE"]));
+    delete process.env.ENABLE_PUBLIC_BIRTHDAY;
+
     for (const offer of offers) {
       const target = {
         kind: "OFFER" as const,
@@ -176,6 +200,11 @@ async function main() {
     } else {
       process.env.APP_ENV = previousEnv;
     }
+
+    if (previousClasses === undefined) delete process.env.ENABLE_PUBLIC_CLASSES;
+    else process.env.ENABLE_PUBLIC_CLASSES = previousClasses;
+    if (previousBirthday === undefined) delete process.env.ENABLE_PUBLIC_BIRTHDAY;
+    else process.env.ENABLE_PUBLIC_BIRTHDAY = previousBirthday;
 
     await prisma.offerIdea.deleteMany({
       where: { userId: user.id },
