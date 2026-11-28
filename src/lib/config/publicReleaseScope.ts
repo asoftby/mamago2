@@ -21,7 +21,12 @@ const FULL_SCOPE_ENVIRONMENTS = new Set([
 ]);
 
 export function hasFullPublicReleaseScope(
-  env: PublicReleaseEnvironment = process.env,
+  env: PublicReleaseEnvironment = {
+    APP_ENV: process.env.APP_ENV,
+    ENABLE_PUBLIC_CLASSES: process.env.ENABLE_PUBLIC_CLASSES,
+    ENABLE_PUBLIC_BIRTHDAY: process.env.ENABLE_PUBLIC_BIRTHDAY,
+    ENABLE_PUBLIC_PLACES_CATALOG: process.env.ENABLE_PUBLIC_PLACES_CATALOG,
+  },
 ): boolean {
   const appEnv = env.APP_ENV?.trim().toLowerCase() ?? "";
   return FULL_SCOPE_ENVIRONMENTS.has(appEnv);
