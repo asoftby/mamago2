@@ -1,5 +1,8 @@
 export type PublicReleaseEnvironment = {
   APP_ENV?: string;
+  ENABLE_PUBLIC_CLASSES?: string;
+  ENABLE_PUBLIC_BIRTHDAY?: string;
+  ENABLE_PUBLIC_PLACES_CATALOG?: string;
 };
 
 export type DeferredPublicFeature =
@@ -18,7 +21,7 @@ const FULL_SCOPE_ENVIRONMENTS = new Set([
 ]);
 
 export function hasFullPublicReleaseScope(
-  env: PublicReleaseEnvironment = { APP_ENV: process.env.APP_ENV },
+  env: PublicReleaseEnvironment = process.env,
 ): boolean {
   const appEnv = env.APP_ENV?.trim().toLowerCase() ?? "";
   return FULL_SCOPE_ENVIRONMENTS.has(appEnv);
@@ -28,8 +31,11 @@ export function isDeferredPublicFeatureEnabled(
   feature: DeferredPublicFeature,
   env: PublicReleaseEnvironment = { APP_ENV: process.env.APP_ENV },
 ): boolean {
-  void feature;
-  return hasFullPublicReleaseScope(env);
+  if (hasFullPublicReleaseScope(env)) return true;
+  const flag = feature === "birthday" || feature === "birthdayBuilder"
+    ? env.ENABLE_PUBLIC_BIRTHDAY
+    : env.ENABLE_PUBLIC_CLASSES;
+  return flag?.trim().toLowerCase() === "true";
 }
 
 export function isOfferTypeInPublicReleaseScope(
@@ -37,7 +43,14 @@ export function isOfferTypeInPublicReleaseScope(
   env: PublicReleaseEnvironment = { APP_ENV: process.env.APP_ENV },
 ): boolean {
   if (hasFullPublicReleaseScope(env)) return true;
-  return productType === "PLACE_VISIT";
+  if (productType === "PLACE_VISIT") return true;
+  if (productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") {
+    return isDeferredPublicFeatureEnabled("birthday", env);
+  }
+  if (productType === "ONE_TIME_ACTIVITY" || productType === "REGULAR_ACTIVITY" || productType === "CAMP") {
+    return isDeferredPublicFeatureEnabled("classes", env);
+  }
+  return false;
 }
 
 const DEFERRED_PUBLIC_SECTIONS = new Set([
@@ -66,6 +79,8 @@ export function isPublicPathBlockedByReleaseScope(
   pathname: string,
   env: PublicReleaseEnvironment = { APP_ENV: process.env.APP_ENV },
 ): boolean {
-  return !hasFullPublicReleaseScope(env) &&
-    isDeferredPublicPath(pathname);
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length < 2 || !isDeferredPublicPath(pathname)) return false;
+  const feature = segments[1] === "birthday" ? "birthday" : "classes";
+  return !isDeferredPublicFeatureEnabled(feature, env);
 }
