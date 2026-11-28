@@ -1,4 +1,4 @@
-import { hasFullPublicReleaseScope } from "@/lib/config/publicReleaseScope";
+import { hasFullPublicReleaseScope, isDeferredPublicFeatureEnabled } from "@/lib/config/publicReleaseScope";
 import type { Prisma } from "@prisma/client";
 import { ContentStatus, ScheduleMode } from "@prisma/client";
 import {
@@ -204,10 +204,18 @@ export function getReleaseScopedPublicOfferWhere(
 
   if (hasFullPublicReleaseScope()) return published;
 
+  const permitted = ["PLACE_VISIT"];
+  if (isDeferredPublicFeatureEnabled("classes")) {
+    permitted.push("ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "CAMP");
+  }
+  if (isDeferredPublicFeatureEnabled("birthday")) {
+    permitted.push("PARTY_SERVICE", "PARTY_PACKAGE");
+  }
+
   return {
     AND: [
       published,
-      { productType: "PLACE_VISIT" },
+      { productType: { in: permitted as import("@prisma/client").OfferProductType[] } },
     ],
   };
 }
