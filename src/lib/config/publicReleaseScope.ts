@@ -20,13 +20,17 @@ const FULL_SCOPE_ENVIRONMENTS = new Set([
   "test",
 ]);
 
-export function hasFullPublicReleaseScope(
-  env: PublicReleaseEnvironment = {
+function currentPublicReleaseEnvironment(): PublicReleaseEnvironment {
+  return {
     APP_ENV: process.env.APP_ENV,
     ENABLE_PUBLIC_CLASSES: process.env.ENABLE_PUBLIC_CLASSES,
     ENABLE_PUBLIC_BIRTHDAY: process.env.ENABLE_PUBLIC_BIRTHDAY,
     ENABLE_PUBLIC_PLACES_CATALOG: process.env.ENABLE_PUBLIC_PLACES_CATALOG,
-  },
+  };
+}
+
+export function hasFullPublicReleaseScope(
+  env: PublicReleaseEnvironment = currentPublicReleaseEnvironment(),
 ): boolean {
   const appEnv = env.APP_ENV?.trim().toLowerCase() ?? "";
   return FULL_SCOPE_ENVIRONMENTS.has(appEnv);
@@ -34,7 +38,7 @@ export function hasFullPublicReleaseScope(
 
 export function isDeferredPublicFeatureEnabled(
   feature: DeferredPublicFeature,
-  env: PublicReleaseEnvironment = { APP_ENV: process.env.APP_ENV },
+  env: PublicReleaseEnvironment = currentPublicReleaseEnvironment(),
 ): boolean {
   if (hasFullPublicReleaseScope(env)) return true;
   const flag = feature === "birthday" || feature === "birthdayBuilder"
@@ -45,7 +49,7 @@ export function isDeferredPublicFeatureEnabled(
 
 export function isOfferTypeInPublicReleaseScope(
   productType: string | null | undefined,
-  env: PublicReleaseEnvironment = { APP_ENV: process.env.APP_ENV },
+  env: PublicReleaseEnvironment = currentPublicReleaseEnvironment(),
 ): boolean {
   if (hasFullPublicReleaseScope(env)) return true;
   if (productType === "PLACE_VISIT") return true;
@@ -82,7 +86,7 @@ export function isDeferredPublicPath(pathname: string): boolean {
 
 export function isPublicPathBlockedByReleaseScope(
   pathname: string,
-  env: PublicReleaseEnvironment = { APP_ENV: process.env.APP_ENV },
+  env: PublicReleaseEnvironment = currentPublicReleaseEnvironment(),
 ): boolean {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length < 2 || !isDeferredPublicPath(pathname)) return false;
